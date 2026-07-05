@@ -31,8 +31,10 @@ export function userMeta(id) {
  *  `prefix` selects the surface's CSS classes, e.g. "cx-bdg" → cx-bdg-lvl /
  *  cx-bdg-streak. Surfaces: "cx-bdg", "lb-badge", "thr__badge". */
 export function badgeHtml(meta, prefix) {
-  return (
-    `<span class="${prefix}-lvl" style="background:${meta.fill}" title="Nivel ${meta.level}">${meta.level}${meta.prestige ? "★" : ""}</span>` +
-    `<span class="${prefix}-streak" title="${meta.streak} zile streak">🔥${meta.streak}</span>`
-  );
+  const level = `<span class="${prefix}-lvl" style="background:${meta.fill}" title="Nivel ${meta.level}">${meta.level}${meta.prestige ? "★" : ""}</span>`;
+  // Only show the streak badge once there IS a streak (no "🔥0").
+  const streak = meta.streak > 0
+    ? `<span class="${prefix}-streak" title="${meta.streak} zile streak">🔥${meta.streak}</span>`
+    : "";
+  return level + streak;
 }

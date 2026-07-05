@@ -11,6 +11,11 @@
   gap: var(--space-lg);
   align-items: start;
 }
+/* Until the leaderboard is unlocked it's hidden — let the domain cards take
+   the full width instead of leaving an empty column. */
+.home-domains:has(> #leaderboard[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
 
 .news {
   display: grid;

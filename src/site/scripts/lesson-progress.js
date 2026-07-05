@@ -10,6 +10,7 @@
 // =========================================================
 import { MY_PROFILE, awardPoints } from "../../shared/scripts/community-data.js";
 import { isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
+import { supabase } from "../../shared/scripts/supabase-client.js";
 import { store } from "../../shared/scripts/store.js";
 import { addNote } from "../../shared/scripts/notebook.js";
 import { touchStreak } from "../../shared/scripts/streak.js";
@@ -84,6 +85,15 @@ export function initLessonProgress(basePath = "") {
     if (done[slug]) return; // already counted
     done[slug] = new Date().toISOString().slice(0, 10);
     store.set(DONE_KEY, done);
+
+    // REAL: record progress + award points server-side (cheat-safe, and
+    // idempotent — the RPC ignores a lesson already completed). Feeds the
+    // real leaderboard via profiles.points.
+    supabase
+      .rpc("complete_lesson", { p_slug: slug, p_points: LESSON_COMPLETE_REWARD })
+      .then(({ error }) => {
+        if (error) console.warn("complete_lesson:", error.message);
+      });
 
     awardPoints(`Lecția «${title}» finalizată`, LESSON_COMPLETE_REWARD);
     pointsFx(LESSON_COMPLETE_REWARD);
