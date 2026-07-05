@@ -23,10 +23,24 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      # Stays quietly green until the COMMUNITY_SYNC_TOKEN secret exists —
+      # no red ✗, no failure emails, zero effect on the main site.
+      - name: Check for the sync token
+        id: token
+        env:
+          TOKEN: ${{ secrets.COMMUNITY_SYNC_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "COMMUNITY_SYNC_TOKEN lipsește — sync-ul se sare (normal până configurăm subdomeniul)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout main site
+        if: steps.token.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Build the community copy
+        if: steps.token.outputs.skip != 'true'
         run: |
           mkdir -p /tmp/community
           rsync -a --exclude ".git" --exclude ".github" ./ /tmp/community/
@@ -54,6 +68,7 @@ jobs:
           rm -f sitemap.xml
 
       - name: Push to the comunitate repo
+        if: steps.token.outputs.skip != 'true'
         run: |
           cd /tmp/community
           git init -b main
