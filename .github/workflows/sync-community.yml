@@ -19,6 +19,14 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+# Only ONE sync at a time. A newer push supersedes an in-flight one, so the
+# "comunitate" repo receives a single clean force-push instead of several
+# racing ones — which was making its Pages deployment cancel/fail ("Some
+# jobs were not successful") even though a later re-run always worked.
+concurrency:
+  group: sync-community
+  cancel-in-progress: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest
