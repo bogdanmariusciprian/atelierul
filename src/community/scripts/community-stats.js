@@ -53,7 +53,7 @@ export function renderCommunityStats(mountId = "community-stats", basePath = "")
         <div class="bars">
           ${perDomain
             .map(
-              (d) => `<a class="bar" href="${basePath}src/site/pages/lessons.html#${d.slug}"
+              (d) => `<a class="bar" href="${basePath}lectii/#${d.slug}"
                         style="--c: ${d.color}" data-ready="${d.ready}" data-total="${d.total}">
                 <span class="bar__label"><span aria-hidden="true">${d.icon}</span> ${d.label}</span>
                 <span class="bar__track"><span class="bar__fill"></span></span>

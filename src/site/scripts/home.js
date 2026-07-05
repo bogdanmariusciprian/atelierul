@@ -22,7 +22,7 @@ export function renderDomainCards(basePath = "") {
       : "";
     return `
       <a class="domain-card domain-card--${domain.slug}"
-         href="${basePath}src/site/pages/lessons.html#${domain.slug}">
+         href="${basePath}lectii/#${domain.slug}">
         ${watermark}
         <h3 class="domain-card__title">${domain.label}</h3>
       </a>`;

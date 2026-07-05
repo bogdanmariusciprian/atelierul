@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Comunitate — Atelierul-LRO</title>
+  <meta name="description" content="Comunitatea Atelierul-LRO: forum de discuții, puncte și clasament, provocarea zilei, grupuri de studiu și exerciții propuse de elevi, verificate de profesor." />
+  <meta property="og:title" content="Comunitatea Atelierul-LRO" />
+  <meta property="og:description" content="Forum, puncte, clasament, provocarea zilei și grupuri de studiu pentru elevi." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="../../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../../src/community/styles/landing.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <section class="page-hero cl-hero">
+      <span class="cl-hero__badge">Comunitatea Atelierul</span>
+      <h1>Nu înveți singur.</h1>
+      <p class="page-hero__lead">
+        Intră în comunitate: pagina ta, prieteni, puncte și clasament, discuții
+        la fiecare lecție și un caiet personal. Învățăm româna împreună —
+        cu mai multă motivație și mai mult spor.
+      </p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="../">Intră în comunitate</a>
+        <a class="btn btn--ghost" href="../login/">Am deja cont</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>De ce să te alături</h2>
+      <p class="cl-sub">Apasă pe cartonașe ca să descoperi ce câștigi — unele apar pe parcurs.</p>
+      <div id="benefits"></div>
+    </section>
+
+    <section class="section">
+      <h2>Cum funcționează</h2>
+      <ol class="cl-steps">
+        <li class="cl-step">
+          <span class="cl-step__num">1</span>
+          <div><h3>Creează-ți contul</h3><p>Gratuit, în câteva secunde.</p></div>
+        </li>
+        <li class="cl-step">
+          <span class="cl-step__num">2</span>
+          <div><h3>Personalizează-ți pagina</h3><p>Alege-ți starea și lecțiile preferate.</p></div>
+        </li>
+        <li class="cl-step">
+          <span class="cl-step__num">3</span>
+          <div><h3>Învață și fă prieteni</h3><p>Adună puncte, comentează, urcă în clasament.</p></div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>Atelierul în cifre</h2>
+      <div id="community-stats"></div>
+    </section>
+
+    <section class="section">
+      <h2>Unde ai ajunge?</h2>
+      <p class="cl-sub">Mișcă sliderele și vezi câte puncte ai strânge și pe ce loc ai fi în clasament.</p>
+      <div id="rank-sim"></div>
+    </section>
+
+    <section class="section">
+      <h2>Ce spun membrii</h2>
+      <div id="testimonials"></div>
+    </section>
+
+    <section class="section">
+      <h2>Întrebări frecvente</h2>
+      <div id="faq"></div>
+    </section>
+
+    <section class="cl-cta">
+      <h2>Gata să începi?</h2>
+      <p>Alătură-te comunității și transformă învățatul într-un obicei plăcut.</p>
+      <a class="btn btn--primary" href="../">Intră în comunitate</a>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "../../src/shared/components/site-chrome.js";
+    import { renderCommunityStats } from "../../src/community/scripts/community-stats.js";
+    import { initLandingInteractive } from "../../src/community/scripts/landing-interactive.js";
+    import { initBenefits } from "../../src/community/scripts/benefits.js";
+    import { setLoggedIn } from "../../src/shared/scripts/session.js";
+    renderChrome("../../");
+    renderCommunityStats("community-stats", "../../");
+    initBenefits("benefits");
+    initLandingInteractive();
+
+    // Preview: "Intră în comunitate" logs you in (mock) so you land straight
+    // in the app as if you had an account. Remove once real auth is wired.
+    document.querySelectorAll('a[href="../"]').forEach((a) => {
+      a.addEventListener("click", () => setLoggedIn(true));
+    });
+
+    // Reveal benefits & steps on scroll (CSS handles the animation).
+    document.documentElement.classList.add("has-js");
+    const items = document.querySelectorAll(".cl-benefit, .cl-step");
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.15 });
+      items.forEach((el, i) => { el.style.setProperty("--i", i % 6); io.observe(el); });
+    } else {
+      items.forEach((el) => el.classList.add("is-in"));
+    }
+  </script>
+</body>
+</html>

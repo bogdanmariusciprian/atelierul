@@ -3,7 +3,8 @@
 // on every page (DRY). Each page calls renderChrome(basePath)
 // with its path back to the project root, e.g.:
 //   root page:        ""            (index.html)
-//   src/site/pages/:  "../../../"   (three levels deep)
+//   lectii/:          "../"         (one level deep)
+//   lectii/dom/lec/:  "../../../"   (three levels deep)
 //
 // Usage in a page:
 //   <div id="header"></div> ... <div id="footer"></div>
@@ -35,14 +36,13 @@ import { store } from "../scripts/store.js";
 // Logged-in users will get additional links, added later.
 const NAV_LINKS = [
   { label: "Acasă", href: "index.html" },
-  { label: "Despre", href: "src/site/pages/about.html" },
-  { label: "Lecții", href: "src/site/pages/lessons.html" },
-  { label: "Teste", href: "src/site/pages/teste.html" },
-  // "Atelier" goes straight to the REAL forum (the hub). forum.html is a
-  // legacy page kept only as a redirect for old bookmarks.
-  { label: "Atelier", href: "src/community/pages/spatiul-meu.html#forum", title: "Forumul și comunitatea" },
+  { label: "Despre", href: "despre/" },
+  { label: "Lecții", href: "lectii/" },
+  { label: "Teste", href: "teste/" },
+  // "Atelier" goes straight to the REAL forum (the hub).
+  { label: "Atelier", href: "comunitate/#forum", title: "Forumul și comunitatea" },
   // The community LANDING is a sales pitch — pointless once you're in.
-  { label: "Comunitate", href: "src/community/pages/comunitate.html", title: "Ce primești ca membru", guestOnly: true },
+  { label: "Comunitate", href: "comunitate/descopera/", title: "Ce primești ca membru", guestOnly: true },
   // The account slot at the end is ROLE-AWARE (initNavUser): guests get the
   // "Intră în cont" button, members get their identity chip (name + XP).
 ];
@@ -64,19 +64,19 @@ export function renderChrome(basePath = "") {
 }
 
 // =========================================================
-// THEME SYSTEM — 3 palettes × light/dark (tokens in variables.css).
-// 🎨 cycles the palette, 🌙 cycles auto → light → dark. Persisted via
-// store.js; "auto" follows the OS setting live.
+// THEME SYSTEM — ONE button, SIX looks (Marius's rule): each click steps
+// through palette × light/dark:
+//   Electric ☀️ → Electric 🌙 → Apus ☀️ → Apus 🌙 → Arcade ☀️ → Arcade 🌙 → …
+// Persisted via store.js. On the FIRST visit (nothing chosen yet) the
+// light/dark half follows the OS setting.
 // =========================================================
-const PALETTES = [
-  { id: "electric", label: "Violet electric" },
-  { id: "apus", label: "Apus cald" },
-  { id: "arcade", label: "Arcade mentă" },
-];
-const MODES = [
-  { id: "auto", label: "Auto (sistem)", icon: "🌗" },
-  { id: "light", label: "Luminos", icon: "☀️" },
-  { id: "dark", label: "Întunecat", icon: "🌙" },
+const THEME_STEPS = [
+  { palette: "electric", dark: false, label: "Violet electric · luminos", icon: "🎨" },
+  { palette: "electric", dark: true, label: "Violet electric · întunecat", icon: "🎨" },
+  { palette: "apus", dark: false, label: "Apus cald · luminos", icon: "🌅" },
+  { palette: "apus", dark: true, label: "Apus cald · întunecat", icon: "🌅" },
+  { palette: "arcade", dark: false, label: "Arcade mentă · luminos", icon: "🕹️" },
+  { palette: "arcade", dark: true, label: "Arcade mentă · întunecat", icon: "🕹️" },
 ];
 
 function themeState() {
@@ -84,6 +84,15 @@ function themeState() {
     palette: store.get("atelier_theme_palette", "electric"),
     mode: store.get("atelier_theme_mode", "auto"),
   };
+}
+
+/** The current position in the 6-step cycle (auto resolves via the OS). */
+function themeStepIndex() {
+  const { palette, mode } = themeState();
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = mode === "dark" || (mode === "auto" && systemDark);
+  const i = THEME_STEPS.findIndex((s) => s.palette === palette && s.dark === dark);
+  return i === -1 ? 0 : i;
 }
 
 function applyTheme() {
@@ -101,7 +110,7 @@ function initTheme() {
   if (window.__themeOn) return;
   window.__themeOn = true;
   applyTheme();
-  // "Auto" follows the OS live.
+  // Before the first explicit choice, follow the OS live.
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
 
   // body.is-logged lets CSS react to the role (e.g. hide guest-only links).
@@ -110,34 +119,22 @@ function initTheme() {
   window.addEventListener("atelier:role", applyRoleClass);
 }
 
-/** The 🎨 + 🌙 buttons in the header nav. */
+/** ONE theme button in the header nav — every click = the next look. */
 function initThemeControls(slot) {
   if (!slot) return;
   const build = () => {
-    const { palette, mode } = themeState();
-    const p = PALETTES.find((x) => x.id === palette) || PALETTES[0];
-    const m = MODES.find((x) => x.id === mode) || MODES[0];
+    const s = THEME_STEPS[themeStepIndex()];
     slot.innerHTML = `
-      <button type="button" class="theme-btn" id="theme-palette" title="Paletă: ${p.label} — click pentru următoarea">🎨</button>
-      <button type="button" class="theme-btn" id="theme-mode" title="Temă: ${m.label} — click pentru următoarea">${m.icon}</button>`;
+      <button type="button" class="theme-btn" id="theme-cycle" title="Temă: ${s.label} — click pentru următoarea">${s.dark ? "🌙" : s.icon}</button>`;
   };
   slot.addEventListener("click", (e) => {
-    const { palette, mode } = themeState();
-    if (e.target.closest("#theme-palette")) {
-      const i = PALETTES.findIndex((x) => x.id === palette);
-      const next = PALETTES[(i + 1) % PALETTES.length];
-      store.set("atelier_theme_palette", next.id);
-      applyTheme();
-      build();
-      showToast(`🎨 Paleta „${next.label}”`);
-    } else if (e.target.closest("#theme-mode")) {
-      const i = MODES.findIndex((x) => x.id === mode);
-      const next = MODES[(i + 1) % MODES.length];
-      store.set("atelier_theme_mode", next.id);
-      applyTheme();
-      build();
-      showToast(`${next.icon} Temă: ${next.label}`);
-    }
+    if (!e.target.closest("#theme-cycle")) return;
+    const next = THEME_STEPS[(themeStepIndex() + 1) % THEME_STEPS.length];
+    store.set("atelier_theme_palette", next.palette);
+    store.set("atelier_theme_mode", next.dark ? "dark" : "light");
+    applyTheme();
+    build();
+    showToast(`${next.dark ? "🌙" : next.icon} ${next.label}`);
   });
   build();
 }
@@ -284,15 +281,13 @@ function initAdminQuickPanel(basePath) {
   if (window.__adminQuickOn) return;
   window.__adminQuickOn = true;
   // On the hub itself the sidebar already has everything — no duplicate fab.
-  if (/spatiul-meu\.html$/.test(window.location.pathname)) return;
+  if (document.getElementById("community")) return;
 
-  const HUB = `${basePath}src/community/pages/spatiul-meu.html`;
+  const HUB = `${basePath}comunitate/`;
   let fab = null;
 
-  const lessonSlug = () => {
-    const m = window.location.pathname.match(/\/lessons\/([^/]+)\.html$/);
-    return m ? m[1] : null;
-  };
+  const lessonSlug = () =>
+    document.querySelector("[data-lesson-slug]")?.dataset.lessonSlug || null;
 
   const build = () => {
     const attention = openModerationItems().length + pendingExercises().length;
@@ -367,9 +362,9 @@ function initAdminQuickPanel(basePath) {
  * catalogue — zero per-page wiring, one source of truth (DRY).
  */
 function renderPageBreadcrumbs(basePath) {
-  const m = window.location.pathname.match(/\/lessons\/([^/]+)\.html$/);
-  if (!m) return;
-  const lesson = LESSONS.find((l) => l.href && l.href.endsWith(`/${m[1]}.html`));
+  const slug = document.querySelector("[data-lesson-slug]")?.dataset.lessonSlug;
+  if (!slug) return;
+  const lesson = LESSONS.find((l) => l.slug === slug);
   if (!lesson) return;
   const domain = LESSON_DOMAINS.find((d) => d.slug === lesson.domain);
 
@@ -380,7 +375,7 @@ function renderPageBreadcrumbs(basePath) {
     <div class="container page-crumbs__inner">
       <a href="${basePath}index.html">Acasă</a>
       <span aria-hidden="true">›</span>
-      <a href="${basePath}src/site/pages/lessons.html">Lecții</a>
+      <a href="${basePath}lectii/">Lecții</a>
       ${domain ? `<span aria-hidden="true">›</span><span class="page-crumbs__domain">${domain.label}</span>` : ""}
       <span aria-hidden="true">›</span>
       <b class="page-crumbs__here">${lesson.title}</b>
@@ -509,29 +504,26 @@ function injectSvgFilters() {
   document.body.appendChild(wrap);
 }
 
-/** Last path segment of a URL/href (hash stripped), default "index.html". */
-function fileOf(path) {
-  const name = path.split("/").pop().split("#")[0];
-  return name === "" ? "index.html" : name;
-}
-
-/** The current page's file name (e.g. "lessons.html"). */
-function getCurrentFile() {
-  return fileOf(window.location.pathname);
+/** Canonical form of a path: no hash, no trailing "index.html" — so
+ *  "/lectii/" and "/lectii/index.html" are the same page. */
+function canonicalPath(path) {
+  return path.split("#")[0].replace(/index\.html$/, "");
 }
 
 function renderHeader(basePath) {
   const mount = document.getElementById("header");
   if (!mount) return;
 
-  const currentFile = getCurrentFile();
+  const herePath = canonicalPath(window.location.pathname);
 
   const links = NAV_LINKS.map((link) => {
     // guest-only links are hidden via CSS once body.is-logged is set —
     // so the nav reacts live to the 🎭 role switch, no re-render needed.
     const cls = link.guestOnly ? ' class="nav-guest-only"' : "";
-    // Mark the link matching the current page so CSS can color it.
-    const isActive = fileOf(link.href) === currentFile;
+    // Mark the link matching the current page so CSS can color it —
+    // resolved to an absolute path, so folder URLs compare exactly.
+    const linkPath = new URL(basePath + link.href, window.location.href).pathname;
+    const isActive = canonicalPath(linkPath) === herePath;
     const active = isActive ? ' aria-current="page"' : "";
     const title = link.title ? ` title="${link.title}"` : "";
     // data-label lets CSS reserve the bold width up front (no hover shift).
@@ -600,11 +592,11 @@ function renderHeader(basePath) {
  */
 function initNavUser(slot, basePath) {
   if (!slot) return;
-  const HUB = `${basePath}src/community/pages/spatiul-meu.html`;
+  const HUB = `${basePath}comunitate/`;
 
   const build = () => {
     if (!isLoggedIn()) {
-      slot.innerHTML = `<a class="btn btn--primary nav-cta" href="${basePath}src/community/pages/login.html">Intră în cont</a>`;
+      slot.innerHTML = `<a class="btn btn--primary nav-cta" href="${basePath}comunitate/login/">Intră în cont</a>`;
       return;
     }
     // MEMBERS live on the XP bar row (name + avatar there, one row with the
@@ -667,7 +659,7 @@ function initNotifCenter(basePath) {
   if (window.__notifCenterOn) return;
   window.__notifCenterOn = true;
 
-  const HUB = `${basePath}src/community/pages/spatiul-meu.html`;
+  const HUB = `${basePath}comunitate/`;
   let panel = null;
 
   const row = ({ kind, title, text, time, href, unread }) => {
@@ -784,13 +776,47 @@ function initNotifCenter(basePath) {
     if (panel) scheduleClose();
   });
 
+  // TOUCH: no hover exists — a PRESS-AND-HOLD (~450ms) on the chip opens
+  // the tray (Marius's rule: hover-urile se activează cu stylus sau
+  // apăsare lungă); a short tap still navigates to "Pagina mea".
+  let holdTimer = null;
+  let heldOpen = false;
+  let holdStart = null;
+  document.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse") return;
+    const chip = e.target.closest(".xp__user, .nav-user");
+    if (!chip) return;
+    heldOpen = false;
+    holdStart = { x: e.clientX, y: e.clientY };
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      heldOpen = true;
+      open(chip);
+    }, 450);
+  });
+  const cancelHold = () => clearTimeout(holdTimer);
+  document.addEventListener("pointerup", cancelHold);
+  document.addEventListener("pointercancel", cancelHold);
+  document.addEventListener("pointermove", (e) => {
+    // A finger that wanders is scrolling, not holding.
+    if (e.pointerType === "mouse" || !holdStart) return;
+    if (Math.hypot(e.clientX - holdStart.x, e.clientY - holdStart.y) > 12) cancelHold();
+  }, { passive: true });
+  // The browser's own long-press menu would fight ours on the chip.
+  document.addEventListener("contextmenu", (e) => {
+    if (e.target.closest(".xp__user, .nav-user")) e.preventDefault();
+  });
+
   // Click on the chip → "Pagina mea" (the admin, who has no wall, lands on
-  // his profile). On touch there's no hover, so the panel's doors live in
-  // the hub anyway.
+  // his profile) — unless this very click was the tail of a long-press.
   document.addEventListener("click", (e) => {
     const chip = e.target.closest(".xp__user, .nav-user");
     if (chip) {
       e.preventDefault();
+      if (heldOpen) {
+        heldOpen = false; // the hold already opened the tray — stay
+        return;
+      }
       close();
       window.location.href = `${HUB}#${isAdmin() ? "profil" : "pagina-mea"}`;
       return;
@@ -820,14 +846,14 @@ function renderFooter(basePath) {
         <nav class="site-footer__col" aria-label="Navigare">
           <p class="site-footer__head">Navigare</p>
           <a href="${basePath}index.html">Acasă</a>
-          <a href="${basePath}src/site/pages/about.html">Despre</a>
-          <a href="${basePath}src/site/pages/lessons.html">Lecții</a>
-          <a href="${basePath}src/community/pages/spatiul-meu.html#forum">Atelier</a>
+          <a href="${basePath}despre/">Despre</a>
+          <a href="${basePath}lectii/">Lecții</a>
+          <a href="${basePath}comunitate/#forum">Atelier</a>
         </nav>
         <nav class="site-footer__col" aria-label="Legal">
           <p class="site-footer__head">Legal</p>
-          <a href="${basePath}src/site/pages/termeni.html">Termeni de utilizare</a>
-          <a href="${basePath}src/site/pages/confidentialitate.html">Confidențialitate</a>
+          <a href="${basePath}termeni/">Termeni de utilizare</a>
+          <a href="${basePath}confidentialitate/">Confidențialitate</a>
         </nav>
         <div class="site-footer__col">
           <p class="site-footer__head">Contact</p>
@@ -847,7 +873,7 @@ function renderFooter(basePath) {
       fab.click();
       fab.scrollIntoView({ block: "end", behavior: "smooth" });
     } else {
-      window.location.href = `${basePath}src/community/pages/spatiul-meu.html#mesaje`;
+      window.location.href = `${basePath}comunitate/#mesaje`;
     }
   });
 }

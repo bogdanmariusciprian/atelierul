@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+# Legacy pages are redirect stubs — don't index them.
+Disallow: /src/site/pages/
+Disallow: /src/community/pages/
+
+Sitemap: https://atelierulderomana.ro/sitemap.xml

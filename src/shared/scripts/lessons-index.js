@@ -1,6 +1,10 @@
 // =========================================================
 // Lessons catalogue — single source of truth (DRY).
-// `ready: true` + `href` = lesson has a real page.
+// `ready: true` + `href` + `slug` = lesson has a real page.
+// `href` is the CLEAN root-relative URL (folder with index.html —
+// no .html in the address). `slug` is the STABLE internal id used by
+// exercises, progress, notebook links etc. — never rename it, even if
+// the URL changes.
 // Entries without `ready` are just planned titles (shown as
 // "în curând", not clickable) so we can preview the structure.
 // `domain` matches a slug in domains.js.
@@ -9,22 +13,25 @@ export const LESSONS = [
   // ---------- Morfologie ----------
   {
     domain: "morfologie",
+    slug: "morfologie-substantiv",
     title: "Substantivul: cazuri și funcții sintactice",
-    href: "src/site/pages/lessons/morfologie-substantiv.html",
+    href: "lectii/morfologie/substantivul/",
     summary: "Cele cinci cazuri și rolul substantivului în propoziție.",
     ready: true,
   },
   {
     domain: "morfologie",
+    slug: "morfologie-verbul",
     title: "Verbul: moduri, timpuri și conjugare",
-    href: "src/site/pages/lessons/morfologie-verbul.html",
+    href: "lectii/morfologie/verbul/",
     summary: "Moduri personale și nepersonale, timpuri și persoana/numărul.",
     ready: true,
   },
   {
     domain: "morfologie",
+    slug: "morfologie-adjectivul",
     title: "Adjectivul: acord și grade de comparație",
-    href: "src/site/pages/lessons/morfologie-adjectivul.html",
+    href: "lectii/morfologie/adjectivul/",
     summary: "Acordul cu substantivul și cele patru grade de comparație.",
     ready: true,
   },
@@ -39,8 +46,9 @@ export const LESSONS = [
   // ---------- Vocabular ----------
   {
     domain: "vocabular",
+    slug: "vocabular-imbogatire",
     title: "Mijloacele de îmbogățire a vocabularului",
-    href: "src/site/pages/lessons/vocabular-imbogatire.html",
+    href: "lectii/vocabular/imbogatirea-vocabularului/",
     summary: "Derivarea, compunerea, conversiunea și împrumuturile.",
     ready: true,
   },
@@ -56,8 +64,9 @@ export const LESSONS = [
   // ---------- Fonetică ----------
   {
     domain: "fonetica",
+    slug: "fonetica-grupuri-vocalice",
     title: "Grupurile de sunete vocalice: diftong, triftong, hiat",
-    href: "src/site/pages/lessons/fonetica-grupuri-vocalice.html",
+    href: "lectii/fonetica/grupurile-vocalice/",
     summary: "Cum recunoști și desparți grupurile vocalice.",
     ready: true,
   },
@@ -83,8 +92,9 @@ export const LESSONS = [
   // ---------- Redactare ----------
   {
     domain: "redactare",
+    slug: "redactare-text-argumentativ",
     title: "Textul argumentativ",
-    href: "src/site/pages/lessons/redactare-text-argumentativ.html",
+    href: "lectii/redactare/textul-argumentativ/",
     summary: "Structura unei argumentări clare și convingătoare.",
     ready: true,
   },
@@ -100,8 +110,9 @@ export const LESSONS = [
   // ---------- Lectură ----------
   {
     domain: "lectura",
+    slug: "lectura-text-narativ",
     title: "Textul narativ: lectură și înțelegere",
-    href: "src/site/pages/lessons/lectura-text-narativ.html",
+    href: "lectii/lectura/textul-narativ/",
     summary: "Un text narativ cu întrebări de înțelegere.",
     ready: true,
   },
@@ -114,3 +125,23 @@ export const LESSONS = [
   { domain: "lectura", title: "Ideea principală și ideea secundară" },
   { domain: "lectura", title: "Planul simplu și planul dezvoltat de idei" },
 ];
+
+/** The lesson entry for a STABLE slug (or null). Use this instead of
+ *  building URLs from the slug — the URL lives only in `href`. */
+export function lessonBySlug(slug) {
+  return LESSONS.find((l) => l.slug === slug) || null;
+}
+
+/** Clean root-relative URL for a slug ("" if the lesson has no page). */
+export function lessonHrefBySlug(slug) {
+  return lessonBySlug(slug)?.href || "";
+}
+
+/** The STABLE slug of the lesson page we're ON (reads data-lesson-slug,
+ *  with a legacy fallback to the old filename convention). */
+export function currentLessonSlug() {
+  const el = document.querySelector("[data-lesson-slug]");
+  if (el) return el.dataset.lessonSlug;
+  const file = location.pathname.split("/").pop().replace(".html", "");
+  return file === "index" || file === "" ? null : file;
+}

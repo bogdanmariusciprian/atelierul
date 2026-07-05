@@ -54,10 +54,11 @@ import { exerciseFormFields, readExerciseForm, exerciseEditFormHtml } from "../.
 import { touchStreak, getStreakInfo } from "../../shared/scripts/streak.js";
 import { store } from "../../shared/scripts/store.js";
 import { getNotes, addNote, updateNote, deleteNote } from "../../shared/scripts/notebook.js";
-import { MESSAGE_TEMPLATES, sendMessage, inboxFor, outboxFor, unreadMessages, markInboxRead } from "../../shared/scripts/messages.js";
+import { MESSAGE_TEMPLATES, sendMessage, unreadMessages, conversationsFor, markConversationRead, searchTemplates } from "../../shared/scripts/messages.js";
 import { mascotSvg } from "../../shared/scripts/mascot.js";
 import { MAX_LEVEL, xpSkin, levelInfo, setPreview, xpBarMarkup, applyBar } from "../../shared/scripts/xp-bar.js";
 import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
+import { lessonHrefBySlug } from "../../shared/scripts/lessons-index.js";
 
 // --- Small inline icons for the sidebar (single source, DRY) ----------
 const NAV_ICONS = {
@@ -248,13 +249,15 @@ export function renderCommunity(basePath = "") {
     postMenu: null, // post id with the "⋯" menu open
     composerOpen: false, // collapsed by default — expands on focus/click
     exPreview: false, // live preview of the exercise being proposed (hub)
-    // Messaging (safe templates between members; free text only ↔ teacher).
-    msgTab: "inbox", // "inbox" | "outbox"
-    msgTo: null, // selected recipient id (member composer)
-    msgReplyTo: null, // message id the ADMIN is replying to
+    // Messaging (chat conversations; safe templates between members,
+    // free text only ↔ teacher).
+    msgOpen: null, // open conversation key ("t" | "u<id>" | "g:<name>")
+    msgCat: -1, // template category (-1 = a taste of everything)
+    msgQuery: "", // template search
+    msgParts: [], // templates chained into the message being composed
     msgWarn: null,
-    msgCat: 0, // selected template category (chips + visible grid)
   };
+  const MSG_MAX_PARTS = 5;
   // Deep links into a specific admin tab: #admin/moderare, #admin/utilizatori…
   // (used by the floating admin quick-panel, from any page of the site).
   const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification" };
@@ -527,7 +530,7 @@ export function renderCommunity(basePath = "") {
   // Falls back to plain text if the proposal has no known lesson slug.
   const lessonLink = (e) =>
     e.lessonSlug
-      ? `<a class="cx-lessonlink" href="${basePath}src/site/pages/lessons/${e.lessonSlug}.html" title="Mergi la lecția „${escapeHtml(e.lessonTitle)}”">📘 ${escapeHtml(e.lessonTitle)}</a>`
+      ? `<a class="cx-lessonlink" href="${basePath}${lessonHrefBySlug(e.lessonSlug)}" title="Mergi la lecția „${escapeHtml(e.lessonTitle)}”">📘 ${escapeHtml(e.lessonTitle)}</a>`
       : `<span class="cx-muted">${escapeHtml(e.lessonTitle)}</span>`;
 
   // ---- Friend graph helpers (mock, read/write MY_PROFILE arrays) ----
@@ -622,7 +625,7 @@ export function renderCommunity(basePath = "") {
     return `
       <div class="cx-guestinvite">
         <span>👋 Citești forumul ca vizitator. Cu un cont poți posta, comenta, câștiga puncte și streak.</span>
-        <a class="btn btn--primary btn--sm" href="${basePath}src/community/pages/login.html">Creează cont / Conectează-te</a>
+        <a class="btn btn--primary btn--sm" href="${basePath}comunitate/login/">Creează cont / Conectează-te</a>
       </div>`;
   }
   function guestGateCard(title, sub) {
@@ -634,7 +637,7 @@ export function renderCommunity(basePath = "") {
         <h2>Zona asta e doar a membrilor</h2>
         <p>Fă-ți cont gratuit și primești pagina ta, caietul, punctele, streak-ul — tot tacâmul.</p>
         <div class="cx-gate__actions">
-          <a class="btn btn--primary" href="${basePath}src/community/pages/login.html">Conectează-te cu Google</a>
+          <a class="btn btn--primary" href="${basePath}comunitate/login/">Conectează-te cu Google</a>
         </div>
       </div>`;
   }
@@ -696,7 +699,7 @@ export function renderCommunity(basePath = "") {
            <span class="cx-av" style="--a:#94a3b8">?</span>
            <div class="cx-side__meid">
              <b>Vizitator</b>
-             <a class="cx-side__join" href="${basePath}src/community/pages/login.html">Creează cont →</a>
+             <a class="cx-side__join" href="${basePath}comunitate/login/">Creează cont →</a>
            </div>
          </div>
          <div class="cx-side__sell">
@@ -1017,7 +1020,7 @@ export function renderCommunity(basePath = "") {
            <textarea class="cx-input" placeholder="Scrie un comentariu…" data-role="post-comment-input"></textarea>
            <button type="button" class="btn-mini" data-action="post-comment" data-id="${post.id}">Trimite</button>
          </div>`
-      : `<p class="cx-guestline">🔒 <a href="${basePath}src/community/pages/login.html">Conectează-te</a> ca să comentezi, să apreciezi și să reacționezi.</p>`;
+      : `<p class="cx-guestline">🔒 <a href="${basePath}comunitate/login/">Conectează-te</a> ca să comentezi, să apreciezi și să reacționezi.</p>`;
     const commentsBlock = open
       ? `<div class="post__comments" data-post-id="${post.id}">
            ${composeRow}
@@ -1454,143 +1457,152 @@ export function renderCommunity(basePath = "") {
       <div class="cx-notes">${notes}</div>`;
   }
 
-  // ---------- Section: messages (safe inbox/outbox) ----------
-  // Members talk through PREDEFINED templates only (no insults, no ads,
-  // no "add me on insta"); free text exists ONLY to/from the teacher.
-  function msgRow(m, sent) {
-    const who = sent
-      ? m.toAdmin
-        ? `<span class="cx-teacher">🎓 Profesorului</span>`
-        : userNameLink(m.toId, userById(m.toId)?.name || "Membru")
-      : m.fromTeacher
-        ? `<span class="cx-teacher">🎓 Profesorul</span>`
-        : m.fromId != null
-          ? userNameLink(m.fromId, m.fromName)
-          : `<b>${escapeHtml(m.fromName)}</b>`;
-    const replyBtn =
-      isAdmin() && !sent && !m.fromTeacher
-        ? state.msgReplyTo === m.id
-          ? `<div class="cx-msg__reply">
-               <textarea class="cx-input" data-role="msg-reply-text" rows="2" placeholder="Răspunsul tău (text liber — ești profesorul)…"></textarea>
-               <div class="cx-excompose__actions">
-                 <button type="button" class="btn-mini" data-action="msg-reply-send" data-id="${m.id}">Trimite răspunsul</button>
-                 <button type="button" class="btn-mini btn-mini--ghost" data-action="msg-reply-cancel">Renunță</button>
-               </div>
-             </div>`
-          : `<button type="button" class="btn-mini" data-action="msg-reply" data-id="${m.id}">↩ Răspunde</button>`
-        : "";
-    return `<div class="cx-msg${!sent && !m.read ? " is-unread" : ""}">
-        <span class="cx-msg__avatar">${m.fromId != null && !sent ? avatarLink(m.fromId) : `<span class="cx-av" style="--a:#94a3b8">✉️</span>`}</span>
-        <div class="cx-msg__body">
-          <p class="cx-msg__head">${sent ? "Către " : "De la "}${who}
-            <span class="cx-muted">· ${relTime(Math.max(0, Date.now() - m.createdAt))}</span>
-            ${m.template ? `<span class="cx-tag" title="Mesaj din șabloanele sigure">🧩 șablon</span>` : ""}
-            ${sent ? `<span class="cx-msg__sent" title="Mesajul a plecat">trimis ✓</span>` : ""}
-            ${!sent && !m.read ? '<span class="cx-newdot" title="Nou"></span>' : ""}
-          </p>
-          <p class="cx-msg__text">${escapeHtml(m.text)}</p>
-          ${replyBtn}
-        </div>
+  // ---------- Section: messages (chat-style conversations) ----------
+  // ONE conversation per partner, chronological bubbles — the flow of the
+  // discussion is always visible. Members talk through PREDEFINED
+  // templates only (chainable into one message, searchable); free text
+  // exists ONLY to/from the teacher.
+  function msgBubble(m, mine) {
+    return `<div class="cx-bubble${mine ? " cx-bubble--me" : ""}${!mine && !m.read ? " is-unread" : ""}">
+        <p class="cx-bubble__text">${escapeHtml(m.text).replace(/\n/g, "<br>")}</p>
+        <span class="cx-bubble__meta">${relTime(Math.max(0, Date.now() - m.createdAt))}
+          ${m.template ? `<span title="Mesaj din șabloanele sigure">🧩</span>` : ""}
+          ${mine ? `<span title="Mesajul a plecat">✓</span>` : ""}
+        </span>
       </div>`;
+  }
+
+  // The template picker: search + category chips + grid; every pick lands
+  // in the compose strip, so ONE message can chain several templates.
+  function templatePicker() {
+    const q = state.msgQuery.trim();
+    const catIdx = state.msgCat;
+    const chips = [`<button type="button" class="cx-fchip${catIdx === -1 && !q ? " on" : ""}" data-action="msg-cat" data-i="-1">✨ Toate</button>`]
+      .concat(MESSAGE_TEMPLATES.map(
+        (c, i) => `<button type="button" class="cx-fchip${i === catIdx && !q ? " on" : ""}" data-action="msg-cat" data-i="${i}">${c.cat}</button>`
+      ))
+      .join("");
+    let items;
+    if (q) {
+      items = searchTemplates(q).map((h) => h.item);
+      if (!items.length) items = null;
+    } else if (catIdx === -1) {
+      items = MESSAGE_TEMPLATES.flatMap((c) => c.items.slice(0, 2)); // a taste of everything
+    } else {
+      items = MESSAGE_TEMPLATES[Math.min(catIdx, MESSAGE_TEMPLATES.length - 1)].items;
+    }
+    const grid = items
+      ? `<div class="cx-msggrid">${items
+          .map((t) => `<button type="button" class="cx-msgtpl" data-action="msg-pick" data-text="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
+          .join("")}</div>`
+      : `<p class="cx-muted">Niciun șablon nu se potrivește căutării. Încearcă alt cuvânt.</p>`;
+    const strip = state.msgParts.length
+      ? `<div class="cx-compose">
+           <p class="cx-compose__label">Mesajul tău (${state.msgParts.length}${state.msgParts.length >= MSG_MAX_PARTS ? " · maxim atins" : ""}):</p>
+           ${state.msgParts.map((p, i) => `<span class="cx-compose__part">${escapeHtml(p)}<button type="button" class="cx-compose__x" data-action="msg-part-del" data-i="${i}" title="Scoate">×</button></span>`).join("")}
+           <div class="cx-excompose__actions">
+             <button type="button" class="btn btn--primary btn--sm" data-action="msg-send">Trimite ✉️</button>
+             <button type="button" class="btn-mini btn-mini--ghost" data-action="msg-parts-clear">Golește</button>
+           </div>
+         </div>`
+      : `<p class="cx-muted cx-compose__hint">Apasă pe șabloane ca să-ți compui mesajul — poți înlănțui până la ${MSG_MAX_PARTS}.</p>`;
+    return `
+      <input class="cx-input cx-msgsearch" id="cx-msg-search" type="search" placeholder="🔍 Caută un șablon… (ex: „felicitări”, „test”, „ajutor”)" value="${escapeHtml(q)}" />
+      <div class="cx-msgchips">${chips}</div>
+      ${grid}
+      ${strip}`;
   }
 
   function sectionMessages() {
     const asAdmin = isAdmin();
-    const inbox = inboxFor(asAdmin);
-    const outbox = outboxFor(asAdmin);
-    const unread = inbox.filter((m) => !m.read).length;
+    const convs = conversationsFor(asAdmin);
+    const open = convs.find((c) => c.key === state.msgOpen) || null;
 
-    const tabs = `<div class="cx-tabs cx-tabs--sub">
-        <button class="cx-tabbtn${state.msgTab === "inbox" ? " on" : ""}" data-action="msg-tab" data-id="inbox">Primite${unread ? `<span class="cx-tabbtn__n cx-tabbtn__n--hot">${unread}</span>` : `<span class="cx-tabbtn__n">${inbox.length}</span>`}</button>
-        <button class="cx-tabbtn${state.msgTab === "outbox" ? " on" : ""}" data-action="msg-tab" data-id="outbox">Trimise<span class="cx-tabbtn__n">${outbox.length}</span></button>
+    // --- left rail: conversations + "new message" ---
+    const partnersInConvs = new Set(convs.map((c) => c.partnerId));
+    const newOpts = COMMUNITY_USERS.filter((u) => !partnersInConvs.has(u.id))
+      .map((u) => `<option value="u${u.id}">${escapeHtml(u.name)}</option>`)
+      .join("");
+    const newBox = `
+      <div class="cx-chat__new">
+        <select class="cx-input" id="cx-msg-newto" title="Începe o conversație nouă">
+          <option value="">➕ Conversație nouă…</option>
+          ${!asAdmin && !convs.some((c) => c.teacher) ? `<option value="t">🎓 Profesorul</option>` : ""}
+          ${newOpts}
+        </select>
       </div>`;
+    const rail = convs.length || newOpts
+      ? `<aside class="cx-chat__list">
+          ${newBox}
+          ${convs
+            .map((c) => {
+              const last = c.msgs[c.msgs.length - 1];
+              const av = c.teacher
+                ? `<span class="cx-av" style="--a:#7c3aed">🎓</span>`
+                : c.guest
+                  ? `<span class="cx-av" style="--a:#94a3b8">✉️</span>`
+                  : userAvatar(c.partnerId); // plain (we're inside a <button> — no nested links)
+              return `<button type="button" class="cx-chat__item${c.key === state.msgOpen ? " on" : ""}" data-action="msg-open" data-key="${c.key}">
+                ${av}
+                <span class="cx-chat__meta">
+                  <b class="cx-chat__name">${escapeHtml(c.partnerName)}${c.guest ? ` <span class="cx-tag">vizitator</span>` : ""}</b>
+                  <span class="cx-chat__snippet">${escapeHtml(last.text.split("\n")[0].slice(0, 42))}${last.text.length > 42 ? "…" : ""}</span>
+                </span>
+                <span class="cx-chat__side">
+                  <span class="cx-chat__time">${relTime(Math.max(0, Date.now() - last.createdAt))}</span>
+                  ${c.unread ? `<b class="cx-chat__unread">${c.unread}</b>` : ""}
+                </span>
+              </button>`;
+            })
+            .join("")}
+        </aside>`
+      : "";
 
-    // Member composer: recipient + the safe-template catalogue.
-    let composerBox = "";
-    if (!asAdmin) {
-      const opts = COMMUNITY_USERS.map(
-        (u) => `<option value="${u.id}"${state.msgTo === u.id ? " selected" : ""}>${escapeHtml(u.name)}</option>`
-      ).join("");
-      // Category chips + an always-visible grid — the templates ARE the
-      // product here, so they don't hide behind two clicks anymore.
-      const catIdx = Math.min(state.msgCat, MESSAGE_TEMPLATES.length - 1);
-      const chips = MESSAGE_TEMPLATES.map(
-        (c, i) => `<button type="button" class="cx-fchip${i === catIdx ? " on" : ""}" data-action="msg-cat" data-i="${i}">${c.cat}</button>`
-      ).join("");
-      const cats = `
-        <div class="cx-msgchips">${chips}</div>
-        <div class="cx-msggrid">${MESSAGE_TEMPLATES[catIdx].items
-          .map((t) => `<button type="button" class="cx-msgtpl" data-action="msg-template" data-text="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
-          .join("")}</div>`;
-      composerBox = `
-        <div class="cx-box">
-          <div class="cx-admin__head"><h3>Trimite un mesaj unui coleg</h3></div>
-          <p class="cx-muted">Ca totul să rămână prietenos, mesajele dintre colegi se aleg din șabloane. Cuvinte proprii poți scrie doar profesorului.</p>
-          <label class="cx-label">Către</label>
-          <select class="cx-input" id="cx-msg-to">${opts}</select>
-          <label class="cx-label">Alege mesajul</label>
-          ${cats}
-        </div>
-        <div class="cx-box">
-          <div class="cx-admin__head"><h3>Scrie profesorului</h3></div>
-          <textarea class="cx-input" id="cx-msg-admin" rows="3" placeholder="Aici poți scrie cu cuvintele tale — mesajul ajunge doar la profesor…"></textarea>
-          ${state.msgWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.msgWarn)}</p>` : ""}
-          <div class="cx-excompose__actions">
-            <button type="button" class="btn btn--primary btn--sm" data-action="msg-admin-send">Trimite profesorului</button>
-          </div>
+    // --- right pane: the open conversation ---
+    let pane;
+    if (!open) {
+      pane = `<div class="cx-chat__pane cx-chat__pane--empty">
+          ${emptyState("Alege o conversație", convs.length
+            ? "Deschide o discuție din stânga sau începe una nouă."
+            : asAdmin
+              ? "Mesajele elevilor și ale vizitatorilor vor apărea aici."
+              : "Începe o conversație cu un coleg sau scrie-i profesorului.")}
+        </div>`;
+    } else {
+      const mineIs = (m) => (asAdmin ? m.fromTeacher === true : m.fromId === 0 && !m.fromTeacher);
+      const bubbles = open.msgs.map((m) => msgBubble(m, mineIs(m))).join("");
+      const who = open.teacher
+        ? `<span class="cx-teacher">🎓 Profesorul</span>`
+        : open.guest
+          ? `<b>${escapeHtml(open.partnerName)}</b> <span class="cx-tag">vizitator</span>`
+          : userNameLink(open.partnerId, open.partnerName);
+      // Composer: free text toward/from the teacher, safe templates
+      // between members. (Server-side this will be enforced by RLS too.)
+      const freeText = asAdmin || open.teacher;
+      const composer = freeText
+        ? `<div class="cx-chat__composer">
+             <textarea class="cx-input" id="cx-msg-free" rows="2" placeholder="${asAdmin ? "Răspunsul tău (text liber — ești profesorul)…" : "Scrie-i profesorului cu cuvintele tale…"}"></textarea>
+             ${state.msgWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.msgWarn)}</p>` : ""}
+             <div class="cx-excompose__actions">
+               <button type="button" class="btn btn--primary btn--sm" data-action="msg-free-send">Trimite ✉️</button>
+             </div>
+           </div>`
+        : `<div class="cx-chat__composer">
+             <p class="cx-muted">Ca totul să rămână prietenos, mesajele dintre colegi se compun din șabloane. Cuvintele tale ajung doar la profesor.</p>
+             ${templatePicker()}
+           </div>`;
+      pane = `<div class="cx-chat__pane">
+          <p class="cx-chat__head">${who}</p>
+          <div class="cx-chat__scroll" id="cx-chat-scroll">${bubbles}</div>
+          ${composer}
         </div>`;
     }
 
-    // The ADMIN sees CONVERSATIONS: each sender's messages + the replies
-    // he sent back, threaded chronologically — context never gets lost.
-    let rows;
-    if (asAdmin && state.msgTab === "inbox") {
-      const bySender = new Map();
-      for (const m of inbox) {
-        const key = m.fromId != null ? `u${m.fromId}` : m.fromName;
-        if (!bySender.has(key)) bySender.set(key, { name: m.fromName, fromId: m.fromId, msgs: [] });
-        bySender.get(key).msgs.push(m);
-      }
-      // Weave in my replies (outbox toId) for each member sender.
-      for (const conv of bySender.values()) {
-        if (conv.fromId != null) {
-          conv.msgs.push(...outbox.filter((r) => r.toId === conv.fromId));
-        }
-        conv.msgs.sort((a, b) => a.createdAt - b.createdAt);
-      }
-      const convs = [...bySender.values()].sort(
-        (a, b) => Math.max(...b.msgs.map((m) => m.createdAt)) - Math.max(...a.msgs.map((m) => m.createdAt))
-      );
-      rows = convs.length
-        ? convs
-            .map(
-              (conv) => `<div class="cx-conv">
-                <p class="cx-conv__who">${conv.fromId != null ? userNameLink(conv.fromId, conv.name) : `<b>${escapeHtml(conv.name)}</b> <span class="cx-tag">vizitator</span>`}</p>
-                ${conv.msgs.map((m) => msgRow(m, m.fromTeacher === true)).join("")}
-              </div>`
-            )
-            .join("")
-        : emptyState("Niciun mesaj primit", "Mesajele elevilor și ale vizitatorilor ajung aici.");
-    } else {
-      const list = state.msgTab === "inbox" ? inbox : outbox;
-      rows = list.length
-        ? list.map((m) => msgRow(m, state.msgTab === "outbox")).join("")
-        : emptyState(
-            state.msgTab === "inbox" ? "Niciun mesaj primit" : "Niciun mesaj trimis",
-            asAdmin ? "Mesajele elevilor și ale vizitatorilor ajung aici." : "Alege un coleg și trimite-i un șablon prietenos."
-          );
-    }
-
-    // Everything shown is now seen (badge clears on the next render).
-    if (state.msgTab === "inbox") markInboxRead(asAdmin);
-
     return `
       ${sectionHead("Mesaje", asAdmin
-        ? "Mesajele primite de la elevi și vizitatori. Le poți răspunde cu text liber."
-        : "Mesagerie sigură: șabloane între colegi, cuvintele tale doar către profesor.")}
-      ${composerBox}
-      ${tabs}
-      <div class="cx-msglist">${rows}</div>`;
+        ? "Conversațiile cu elevii și vizitatorii. Le răspunzi cu text liber."
+        : "Mesagerie sigură: conversații pe șabloane cu colegii, cuvintele tale doar către profesor.")}
+      <div class="cx-chat">${rail}${pane}</div>`;
   }
 
   // ---------- Section: saved posts ("Salvate") ----------
@@ -2898,6 +2910,11 @@ export function renderCommunity(basePath = "") {
       if (local) applyBar(local, state.simLevel || 1, 62, state.simPrestige || 0);
     }
 
+    // Chat: always land at the LATEST message (the conversation reads
+    // bottom-up like any messenger).
+    const chatScroll = mount.querySelector("#cx-chat-scroll");
+    if (chatScroll) chatScroll.scrollTop = chatScroll.scrollHeight;
+
     // First time the Clasament opens: confetti over the champion's crown —
     // the top of the top should feel like an event.
     if (state.section === "clasament" && !podiumCelebrated) {
@@ -3099,7 +3116,12 @@ export function renderCommunity(basePath = "") {
       }
       case "copy-profile-link": {
         const slug = btn.dataset.slug;
-        const url = `${location.origin}${location.pathname}#u/${slug}`;
+        // In production, profiles have PRETTY addresses on the community
+        // subdomain (comunitate.atelierulderomana.ro/vasile-ion — routed
+        // by 404.html). Locally we fall back to the hash deep-link.
+        const url = location.hostname.endsWith("atelierulderomana.ro")
+          ? `https://comunitate.atelierulderomana.ro/${slug}`
+          : `${location.origin}${location.pathname}#u/${slug}`;
         const done = () => {
           const old = btn.textContent;
           btn.textContent = "✓ Link copiat";
@@ -3941,33 +3963,55 @@ export function renderCommunity(basePath = "") {
         return render();
       }
 
-      // ---- messages ----
-      case "msg-tab":
-        state.msgTab = btn.dataset.id;
-        state.msgReplyTo = null;
+      // ---- messages (chat) ----
+      case "msg-open": {
+        const key = btn.dataset.key;
+        state.msgOpen = key;
+        state.msgParts = [];
+        state.msgWarn = null;
+        markConversationRead(key, isAdmin());
+        window.dispatchEvent(new CustomEvent("atelier:notifs")); // badges follow
         return render();
+      }
       case "msg-cat":
         state.msgCat = Number(btn.dataset.i);
+        state.msgQuery = "";
         return render();
-      case "msg-template": {
-        const toId = Number(mount.querySelector("#cx-msg-to")?.value ?? NaN);
+      case "msg-pick": {
+        if (state.msgParts.length >= MSG_MAX_PARTS) {
+          showToast(`Maxim ${MSG_MAX_PARTS} șabloane într-un mesaj`, { kind: "warn" });
+          return;
+        }
+        state.msgParts.push(btn.dataset.text);
+        return render();
+      }
+      case "msg-part-del":
+        state.msgParts.splice(Number(btn.dataset.i), 1);
+        return render();
+      case "msg-parts-clear":
+        state.msgParts = [];
+        return render();
+      case "msg-send": {
+        // Member → member: a chain of validated templates, ONE message.
+        const conv = state.msgOpen;
+        const toId = conv?.startsWith("u") ? Number(conv.slice(1)) : NaN;
         const target = userById(toId);
-        if (!target) return;
-        sendMessage({
+        if (!target || !state.msgParts.length) return;
+        const sent = sendMessage({
           fromId: CURRENT_USER.id,
           fromName: CURRENT_USER.name,
           toId,
-          text: btn.dataset.text,
-          template: true,
+          parts: [...state.msgParts],
         });
-        state.msgTo = toId;
-        state.msgTab = "outbox";
+        if (!sent) return; // a part failed validation — nothing leaves
+        state.msgParts = [];
         showToast(`✉️ Trimis lui ${target.name.split(" ")[0]}`, { kind: "success" });
         touchStreak();
         return render();
       }
-      case "msg-admin-send": {
-        const box = mount.querySelector("#cx-msg-admin");
+      case "msg-free-send": {
+        // Free text: member → teacher, or the teacher → anyone.
+        const box = mount.querySelector("#cx-msg-free");
         const text = box?.value.trim();
         if (!text) return;
         // Free text — but still civilised, even toward the teacher.
@@ -3976,33 +4020,25 @@ export function renderCommunity(basePath = "") {
           return render();
         }
         state.msgWarn = null;
-        sendMessage({ fromId: CURRENT_USER.id, fromName: CURRENT_USER.name, toAdmin: true, text });
-        state.msgTab = "outbox";
-        showToast("✉️ Mesaj trimis profesorului", { kind: "success" });
-        return render();
-      }
-      case "msg-reply":
-        if (!isAdmin()) return;
-        state.msgReplyTo = id;
-        return render();
-      case "msg-reply-cancel":
-        state.msgReplyTo = null;
-        return render();
-      case "msg-reply-send": {
-        if (!isAdmin()) return;
-        const src = inboxFor(true).find((m) => m.id === id);
-        const box = btn.closest(".cx-msg")?.querySelector('[data-role="msg-reply-text"]');
-        const text = box?.value.trim();
-        if (!src || !text) return;
-        sendMessage({
-          fromId: 0,
-          fromName: "Profesorul",
-          toId: src.fromId ?? 0,
-          fromTeacher: true,
-          text,
-        });
-        state.msgReplyTo = null;
-        showToast("✉️ Răspuns trimis", { kind: "success" });
+        const conv = state.msgOpen;
+        if (isAdmin()) {
+          const open = conversationsFor(true).find((c) => c.key === conv);
+          if (!open) return;
+          sendMessage({
+            fromId: 0,
+            fromName: "Profesorul",
+            toId: open.guest ? null : open.partnerId,
+            guestName: open.guest ? open.partnerName : null,
+            fromTeacher: true,
+            text,
+          });
+          showToast("✉️ Răspuns trimis", { kind: "success" });
+        } else {
+          if (conv !== "t") return; // members' free text goes ONLY to the teacher
+          sendMessage({ fromId: CURRENT_USER.id, fromName: CURRENT_USER.name, toAdmin: true, text });
+          showToast("✉️ Mesaj trimis profesorului", { kind: "success" });
+          touchStreak();
+        }
         return render();
       }
 
@@ -4091,6 +4127,16 @@ export function renderCommunity(basePath = "") {
   // At most 3 images per post — extra files are ignored with a heads-up.
   const MAX_POST_IMAGES = 3;
   mount.addEventListener("change", (e) => {
+    // "Conversație nouă…" — the select in the chat rail opens (or creates)
+    // that partner's conversation.
+    if (e.target.id === "cx-msg-newto") {
+      const v = e.target.value;
+      if (!v) return;
+      state.msgOpen = v;
+      state.msgParts = [];
+      state.msgWarn = null;
+      return render();
+    }
     if (e.target.id !== "cx-file") return;
     const files = [...e.target.files].filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
@@ -4161,6 +4207,10 @@ export function renderCommunity(basePath = "") {
     if (e.target.id === "cx-note-search") {
       state.noteQuery = e.target.value;
       return rerenderKeepingFocus("cx-note-search");
+    }
+    if (e.target.id === "cx-msg-search") {
+      state.msgQuery = e.target.value;
+      return rerenderKeepingFocus("cx-msg-search");
     }
     if (e.target.id === "cx-admin-usearch") {
       state.adminUserQuery = e.target.value;

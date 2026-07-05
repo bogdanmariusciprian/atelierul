@@ -1131,3 +1131,20 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
   pointer-events: none;
   opacity: 0.45;
 }
+
+/* Mobile: theory tables scroll sideways instead of squeezing the text
+   into unreadable slivers; exercise controls get comfortable tap sizes. */
+@media (max-width: 720px) {
+  .lesson-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: normal;
+  }
+  .lesson-table th,
+  .lesson-table td { min-width: 8rem; }
+  .exercise .option,
+  .exercise__check { min-height: 44px; } /* comfortable touch target */
+  .blank { min-width: 7rem; }
+  .match__select { max-width: 100%; }
+}

@@ -1,0 +1,66 @@
+# =========================================================
+# Auto-sync → the "comunitate" repo (comunitate.atelierulderomana.ro).
+#
+# Marius edits ONLY this repo. On every push, this workflow copies the
+# whole site into the secondary repo that serves the community subdomain:
+#   • CNAME        → comunitate.atelierulderomana.ro
+#   • index.html   → redirect to /comunitate/ (the hub IS the homepage)
+#   • robots.txt   → noindex (the canonical content lives on the main domain)
+# Pretty profile URLs (/vasile-ion) are handled by 404.html's router.
+#
+# Needs ONE secret in THIS repo: COMMUNITY_SYNC_TOKEN — a fine-grained
+# GitHub token with Read/Write "Contents" permission on the "comunitate"
+# repo. (Settings → Secrets and variables → Actions → New repository secret)
+# =========================================================
+name: Sync community subdomain
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main site
+        uses: actions/checkout@v4
+
+      - name: Build the community copy
+        run: |
+          mkdir -p /tmp/community
+          rsync -a --exclude ".git" --exclude ".github" ./ /tmp/community/
+          cd /tmp/community
+
+          # The subdomain answers to its own name.
+          echo "comunitate.atelierulderomana.ro" > CNAME
+
+          # The hub IS the homepage here.
+          cat > index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="ro">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Comunitatea Atelierul-LRO</title>
+            <script>location.replace("/comunitate/" + location.hash);</script>
+            <meta http-equiv="refresh" content="0; url=/comunitate/" />
+          </head>
+          <body><p><a href="/comunitate/">Intră în comunitate →</a></p></body>
+          </html>
+          EOF
+
+          # The canonical content lives on the main domain — don't index twice.
+          printf 'User-agent: *\nDisallow: /\n' > robots.txt
+          rm -f sitemap.xml
+
+      - name: Push to the comunitate repo
+        run: |
+          cd /tmp/community
+          git init -b main
+          git config user.name "sync-bot"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "Sync from atelierul@${GITHUB_SHA::7}"
+          git push --force \
+            "https://x-access-token:${{ secrets.COMMUNITY_SYNC_TOKEN }}@github.com/${{ github.repository_owner }}/comunitate.git" \
+            main

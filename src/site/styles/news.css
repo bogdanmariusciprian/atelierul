@@ -400,6 +400,10 @@
   transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
 }
 .lb-row:hover .lb-detail { max-height: 1.7rem; opacity: 1; margin-top: 2px; }
+/* Touch devices have no hover: the detail is simply always visible. */
+@media (hover: none) {
+  .lb-row .lb-detail { max-height: 1.7rem; opacity: 1; margin-top: 2px; }
+}
 .lb-badge {
   color: #fff;
   font-weight: 800;
@@ -557,6 +561,10 @@
   transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
 }
 .lb-pod:hover .lb-pod__quote { max-height: 2.6rem; opacity: 1; margin-top: 2px; }
+/* Touch devices have no hover: the quote is simply always visible. */
+@media (hover: none) {
+  .lb-pod .lb-pod__quote { max-height: 2.6rem; opacity: 1; margin-top: 2px; }
+}
 .lb-pod__base {
   margin-top: 0.15rem;
   width: 100%;

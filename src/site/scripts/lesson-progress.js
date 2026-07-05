@@ -15,6 +15,7 @@ import { addNote } from "../../shared/scripts/notebook.js";
 import { touchStreak } from "../../shared/scripts/streak.js";
 import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
+import { currentLessonSlug, lessonHrefBySlug } from "../../shared/scripts/lessons-index.js";
 
 const DONE_KEY = "atelier_lessons_done"; // { slug: "YYYY-MM-DD" }
 export const LESSON_COMPLETE_REWARD = 70;
@@ -30,7 +31,8 @@ export function initLessonProgress(basePath = "") {
   const article = document.querySelector(".lesson");
   if (!article) return;
 
-  const slug = location.pathname.split("/").pop().replace(".html", "");
+  const slug = currentLessonSlug();
+  if (!slug) return;
   const title = (article.querySelector("h1")?.textContent || document.title).trim();
 
   // ---------- Completion card ----------
@@ -52,7 +54,7 @@ export function initLessonProgress(basePath = "") {
             <b>Ține-ți progresul!</b>
             <p>Cu un cont, marchezi lecțiile finalizate, primești +${LESSON_COMPLETE_REWARD} puncte pe lecție și îți vezi inelele umplându-se.</p>
           </div>
-          <a class="btn btn--primary btn--sm" href="${basePath}src/community/pages/login.html">Creează cont</a>
+          <a class="btn btn--primary btn--sm" href="${basePath}comunitate/login/">Creează cont</a>
         </div>`;
       return;
     }
@@ -90,7 +92,7 @@ export function initLessonProgress(basePath = "") {
     addNote({
       title: "Lecție finalizată 🏁",
       text: title,
-      lessonHref: `src/site/pages/lessons/${slug}.html`,
+      lessonHref: lessonHrefBySlug(slug),
     });
     showToast(`🏁 «${title}» finalizată — felicitări!`, { kind: "success" });
     render();
@@ -124,7 +126,7 @@ export function initLessonProgress(basePath = "") {
         addNote({
           title: `Din lecția «${title.slice(0, 40)}»`,
           text: text.slice(0, 400),
-          lessonHref: `src/site/pages/lessons/${slug}.html`,
+          lessonHref: lessonHrefBySlug(slug),
         });
         showToast("📓 Adăugat în caietul tău", { kind: "success" });
         removeBubble();

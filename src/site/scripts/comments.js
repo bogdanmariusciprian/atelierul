@@ -24,6 +24,7 @@ import {
 import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { avatarForUser } from "../../shared/scripts/avatars.js";
 import { userMeta } from "../../shared/scripts/badges.js";
+import { currentLessonSlug } from "../../shared/scripts/lessons-index.js";
 
 export function initLessonComments(basePath = "") {
   const article = document.querySelector(".lesson");
@@ -34,7 +35,8 @@ export function initLessonComments(basePath = "") {
   mount.id = "lesson-comments";
   article.appendChild(mount);
 
-  const slug = location.pathname.split("/").pop().replace(".html", "");
+  const slug = currentLessonSlug();
+  if (!slug) return;
   const state = {
     comments: getLessonComments(slug),
     openReplyId: null,
@@ -114,7 +116,7 @@ export function initLessonComments(basePath = "") {
     // Comment authors link to their community profile (the professor — id 0 —
     // stays inert). Cross-page: full path to the hub + shareable hash.
     const hubProfile = (id) =>
-      id === CURRENT_USER.id ? null : `${basePath}src/community/pages/spatiul-meu.html#u/${slugForUser(id)}`;
+      id === CURRENT_USER.id ? null : `${basePath}comunitate/#u/${slugForUser(id)}`;
     const composerAv = myGif
       ? `<span class="thr__avatar thr__avatar--gif" style="background-image:url('${myGif}')"></span>`
       : `<span class="thr__avatar" style="--a:${CURRENT_USER.color}">${CURRENT_USER.initials}</span>`;
@@ -126,7 +128,7 @@ export function initLessonComments(basePath = "") {
          </div>`
       : `<div class="cmt-guestbar">
            <span>🔒 Doar utilizatorii conectați pot comenta, aprecia și reacționa. Comentariile rămân vizibile pentru toți.</span>
-           <a href="${basePath}src/community/pages/login.html">Conectează-te</a>
+           <a href="${basePath}comunitate/login/">Conectează-te</a>
          </div>`;
 
     mount.className = "lesson-section comments" + (logged ? "" : " is-guest");

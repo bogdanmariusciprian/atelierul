@@ -3,40 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <title>Autentificare — Atelierul-LRO</title>
-  <meta name="description" content="Conectează-te la Atelierul-LRO: comunitatea de învățare a limbii și literaturii române." />
-  <link rel="stylesheet" href="../../../src/shared/styles/main.css" />
+  <title>Intră în cont — Atelierul-LRO</title>
+  <!-- Legacy URL: the page moved to a clean address. This stub keeps old
+       bookmarks/links working (hash included). -->
+  <meta name="robots" content="noindex" />
+  <script>window.location.replace("../../../comunitate/login/" + location.hash);</script>
+  <meta http-equiv="refresh" content="0; url=../../../comunitate/login/" />
 </head>
 <body>
-  <div id="header"></div>
-
-  <main class="container">
-    <section class="page-hero">
-      <h1>Autentificare</h1>
-      <p>Conectează-te pentru a participa în comunitate: postezi, comentezi, câștigi puncte și streak.</p>
-      <button id="google-signin" class="btn btn--primary">Continuă cu Google</button>
-      <p id="login-note" class="login-note">Autentificarea reală cu Google (Supabase) vine în curând — până atunci, butonul te conectează în modul de previzualizare.</p>
-    </section>
-  </main>
-
-  <div id="footer"></div>
-
-  <script type="module">
-    import { renderChrome } from "../../../src/shared/components/site-chrome.js";
-    import { setRole, isLoggedIn } from "../../../src/shared/scripts/session.js";
-    renderChrome("../../../");
-
-    // Already logged in? Straight to the community.
-    if (isLoggedIn()) window.location.replace("spatiul-meu.html#forum");
-
-    // MOCK sign-in: becomes the real Supabase Google flow later
-    // (auth.js signInWithGoogle + roleForEmail decide admin vs member).
-    // For the preview, the button simply logs you in as a member.
-    document.getElementById("google-signin").addEventListener("click", () => {
-      setRole("member");
-      window.location.href = "spatiul-meu.html#forum";
-    });
-  </script>
+  <p>Pagina s-a mutat. <a href="../../../comunitate/login/">Continuă →</a></p>
 </body>
 </html>

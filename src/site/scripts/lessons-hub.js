@@ -9,11 +9,11 @@ import { LESSONS } from "../../shared/scripts/lessons-index.js";
 import { isLessonDone } from "./lesson-progress.js";
 import { isLoggedIn } from "../../shared/scripts/session.js";
 
-/** Ring progress for a lesson: 100% once its page was marked finished. */
+/** Ring progress for a lesson: 100% once its page was marked finished.
+ *  Keyed by the STABLE lesson slug (not the URL). */
 function lessonProgress(lesson) {
-  if (!lesson.href) return 0;
-  const slug = lesson.href.split("/").pop().replace(".html", "");
-  return isLessonDone(slug) ? 100 : 0;
+  if (!lesson.slug) return 0;
+  return isLessonDone(lesson.slug) ? 100 : 0;
 }
 
 /**
@@ -214,7 +214,7 @@ export function renderLessonsHub(basePath = "") {
   // Guests learn WHY the progress rings exist — a reason to join.
   const progressHint = !isLoggedIn()
     ? `<p class="lessons-hint">🔓 Inelele arată progresul tău pe lecții.
-         <a href="${basePath}src/community/pages/login.html">Creează-ți cont</a> ca să ți-l salvezi.</p>`
+         <a href="${basePath}comunitate/login/">Creează-ți cont</a> ca să ți-l salvezi.</p>`
     : "";
 
   mount.innerHTML = `

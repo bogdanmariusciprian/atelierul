@@ -6,7 +6,24 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <title>Pagina s-a rătăcit — Atelierul-LRO</title>
   <meta name="description" content="Pagina căutată nu există. Melcul te duce înapoi." />
-  <link rel="stylesheet" href="src/shared/styles/main.css" />
+  <meta name="robots" content="noindex" />
+  <script>
+    // COMMUNITY ROUTER — on comunitate.atelierulderomana.ro, a pretty
+    // profile URL like /vasile-ion has no real file; GitHub Pages serves
+    // this 404, and we route it to the member's profile in the hub.
+    (function () {
+      if (!location.hostname.startsWith("comunitate.")) return;
+      const seg = decodeURIComponent(location.pathname.replace(/^\/+|\/+$/g, "")).toLowerCase();
+      if (seg && !seg.includes("/") && /^[a-z0-9-]+$/.test(seg)) {
+        location.replace("/comunitate/#u/" + seg);
+      } else {
+        location.replace("/comunitate/");
+      }
+    })();
+  </script>
+  <!-- Absolute paths: this page is served for ANY missing URL, at any
+       depth, so relative references would break. -->
+  <link rel="stylesheet" href="/src/shared/styles/main.css" />
 </head>
 <body>
   <div id="header"></div>
@@ -17,9 +34,9 @@
       <h1>404 — pagina asta s-a rătăcit</h1>
       <p>Melcul a căutat-o peste tot, dar în ritmul lui… încă n-a găsit-o. Între timp, hai înapoi pe drumul bun:</p>
       <div class="notfound__actions">
-        <a class="btn btn--primary" href="index.html">Acasă</a>
-        <a class="btn btn--ghost" href="src/site/pages/lessons.html">Vezi lecțiile</a>
-        <a class="btn btn--ghost" href="src/community/pages/spatiul-meu.html#forum">Mergi la forum</a>
+        <a class="btn btn--primary" href="/">Acasă</a>
+        <a class="btn btn--ghost" href="/lectii/">Vezi lecțiile</a>
+        <a class="btn btn--ghost" href="/comunitate/#forum">Mergi la forum</a>
       </div>
     </section>
   </main>
@@ -27,9 +44,9 @@
   <div id="footer"></div>
 
   <script type="module">
-    import { renderChrome } from "./src/shared/components/site-chrome.js";
-    import { mascotSvg } from "./src/shared/scripts/mascot.js";
-    renderChrome("");
+    import { renderChrome } from "/src/shared/components/site-chrome.js";
+    import { mascotSvg } from "/src/shared/scripts/mascot.js";
+    renderChrome("/");
     document.getElementById("notfound-mascot").innerHTML = mascotSvg("lost", 150);
   </script>
 </body>

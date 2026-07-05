@@ -149,9 +149,9 @@ export const MY_PROFILE = {
   friendReqOutgoing: [],
 
   favorites: [
-    { title: "Verbul: moduri, timpuri și conjugare", href: "src/site/pages/lessons/morfologie-verbul.html" },
-    { title: "Substantivul: cazuri și funcții sintactice", href: "src/site/pages/lessons/morfologie-substantiv.html" },
-    { title: "Textul argumentativ", href: "src/site/pages/lessons/redactare-text-argumentativ.html" },
+    { title: "Verbul: moduri, timpuri și conjugare", href: "lectii/morfologie/verbul/" },
+    { title: "Substantivul: cazuri și funcții sintactice", href: "lectii/morfologie/substantivul/" },
+    { title: "Textul argumentativ", href: "lectii/redactare/textul-argumentativ/" },
   ],
 
   pointsLog: [

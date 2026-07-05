@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Teste — Atelierul-LRO</title>
+  <meta name="description" content="Teste de limba română pentru gimnaziu și liceu — în pregătire pe Atelierul-LRO." />
+  <meta property="og:title" content="Teste — Atelierul-LRO" />
+  <meta property="og:description" content="Teste de limba română pentru gimnaziu și liceu — în pregătire." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../src/site/styles/tests.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <section class="page-hero">
+      <h1>Teste</h1>
+      <p class="page-hero__lead">
+        Modele de test pentru examene și admitere — cu bareme și rezolvări.
+        Alege categoria potrivită. (Conținutul se adaugă în curând.)
+      </p>
+    </section>
+
+    <section class="section">
+      <div id="tests-hub" class="tests-grid"></div>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "../src/shared/components/site-chrome.js";
+
+    // Test categories. Add a `tests: [...]` list per category later; for now
+    // each shows an "în curând" pill. Content is Romanian; identifiers English.
+    const TEST_CATEGORIES = [
+      { slug: "clasa-6", icon: "📘", color: "#0ea5e9",
+        title: "Clasa a 6-a", desc: "Evaluarea Națională la clasa a VI-a — limbă și comunicare." },
+      { slug: "clasa-8", icon: "📗", color: "#16a34a",
+        title: "Clasa a 8-a", desc: "Evaluarea Națională — limba și literatura română." },
+      { slug: "clasa-12", icon: "🎓", color: "#7c3aed",
+        title: "Clasa a 12-a", desc: "Bacalaureat — proba de limba și literatura română." },
+      { slug: "admitere-politie", icon: "🛡️", color: "#1d4ed8",
+        title: "Admitere Poliție", desc: "Subiecte de limba română pentru admiterea la Academia de Poliție." },
+      { slug: "admitere-drept", icon: "⚖️", color: "#b45309",
+        title: "Admitere Drept", desc: "Gramatică și redactare pentru admiterea la Facultatea de Drept." },
+    ];
+
+    renderChrome("../");
+
+    const mount = document.getElementById("tests-hub");
+    if (mount) {
+      mount.innerHTML = TEST_CATEGORIES.map((c) => `
+        <a class="test-card" id="${c.slug}" href="#${c.slug}" style="--card-color: ${c.color}">
+          <span class="test-card__icon" aria-hidden="true">${c.icon}</span>
+          <h2 class="test-card__title">${c.title}</h2>
+          <p class="test-card__desc">${c.desc}</p>
+          <span class="test-card__soon">în curând</span>
+        </a>`).join("");
+    }
+  </script>
+</body>
+</html>

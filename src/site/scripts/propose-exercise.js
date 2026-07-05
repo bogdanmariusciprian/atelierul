@@ -15,12 +15,14 @@ import { showToast } from "../../shared/scripts/toast.js";
 import { exerciseFormFields, readExerciseForm, exerciseSolverHtml, exerciseEditFormHtml } from "../../shared/scripts/exercise-form.js";
 import { initExercisesIn } from "./lesson-engine.js";
 import { touchStreak } from "../../shared/scripts/streak.js";
+import { currentLessonSlug } from "../../shared/scripts/lessons-index.js";
 
 export function initProposeExercise(basePath = "") {
   const article = document.querySelector(".lesson");
   if (!article) return;
 
-  const slug = location.pathname.split("/").pop().replace(".html", "");
+  const slug = currentLessonSlug();
+  if (!slug) return;
   const lessonTitle = (article.querySelector("h1")?.textContent || document.title).trim();
 
   const mount = document.createElement("section");
@@ -40,7 +42,7 @@ export function initProposeExercise(basePath = "") {
     if (e.authorId === 0)
       return `<span class="cx-teacher" title="Profesor · cadru didactic">🎓 Profesor</span>`;
     return userById(e.authorId)
-      ? `<a class="cx-userlink" href="${basePath}src/community/pages/spatiul-meu.html#u/${slugForUser(e.authorId)}" title="Vezi profilul">${escapeHtml(e.name)}</a>`
+      ? `<a class="cx-userlink" href="${basePath}comunitate/#u/${slugForUser(e.authorId)}" title="Vezi profilul">${escapeHtml(e.name)}</a>`
       : `<span title="Cont șters">${escapeHtml(e.name)}</span>`;
   };
 
@@ -137,7 +139,7 @@ export function initProposeExercise(basePath = "") {
       action = `<div class="propose__invite">
           <span>🔒 Conectează-te sau creează-ți cont ca să propui exerciții și să votezi.</span>
           <span class="propose__invite__btns">
-            <a class="btn btn--primary btn--sm" href="${basePath}src/community/pages/login.html">Creează cont / Conectează-te</a>
+            <a class="btn btn--primary btn--sm" href="${basePath}comunitate/login/">Creează cont / Conectează-te</a>
           </span>
         </div>`;
     } else if (state.open) {

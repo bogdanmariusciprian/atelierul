@@ -865,3 +865,50 @@ body.is-logged .nav-guest-only { display: none; }
 .page-crumbs a:hover { color: var(--color-primary); text-decoration: none; }
 .page-crumbs__domain { font-weight: 600; }
 .page-crumbs__here { color: var(--color-text); font-weight: 700; }
+
+/* =========================================================
+   Mobile in depth (≤720px) — no overflow, no overlapping text.
+   The header nav becomes a swipeable strip (standard app pattern).
+   ========================================================= */
+@media (max-width: 720px) {
+  .site-header__inner {
+    gap: 0.5rem;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+  /* The logo starts small on phones — 150px would eat the whole row. */
+  .site-header__logo {
+    height: calc(64px - var(--p, 0) * 24px);
+    width: calc(64px - var(--p, 0) * 24px);
+  }
+  .main-nav {
+    gap: 0.75rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+    padding: 0.25rem 0.1rem;
+  }
+  .main-nav::-webkit-scrollbar { display: none; }
+  .main-nav a { white-space: nowrap; font-size: 0.92rem; }
+  .theme-btn { font-size: 1.05rem; padding: 0.35rem 0.45rem; }
+
+  /* Breadcrumbs: one swipeable line instead of wrapping over the title. */
+  .page-crumbs__inner {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    white-space: nowrap;
+  }
+  .page-crumbs__inner::-webkit-scrollbar { display: none; }
+
+  /* Floating controls: keep them clear of each other and of the thumb. */
+  .contact-float { right: 0.6rem; bottom: 0.9rem; }
+  .role-switch { left: 0.6rem; bottom: 0.9rem; }
+}
+
+/* Touch devices (no hover anywhere): hover-revealed details are simply
+   always visible — nothing may hide behind a gesture that doesn't exist. */
+@media (hover: none) {
+  .main-nav a { font-weight: 600; }
+}

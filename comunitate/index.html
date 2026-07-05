@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Atelier — comunitatea Atelierul-LRO</title>
+  <meta name="description" content="Forumul Atelierul-LRO: discuții, întrebări și resurse de la elevi, provocarea zilei, clasament și grupuri de studiu." />
+  <meta property="og:title" content="Atelier — forumul comunității Atelierul-LRO" />
+  <meta property="og:description" content="Discuții, întrebări și resurse de la elevi — plus provocarea zilei și clasamentul." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../src/community/styles/community.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <div id="community"></div>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "../src/shared/components/site-chrome.js";
+    import { renderCommunity } from "../src/community/scripts/community.js";
+    renderChrome("../");
+    renderCommunity("../");
+  </script>
+</body>
+</html>
