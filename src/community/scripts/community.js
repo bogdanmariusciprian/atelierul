@@ -1491,7 +1491,12 @@ export function renderCommunity(basePath = "") {
       items = searchTemplates(q);
       if (!items.length) items = null;
     } else if (catIdx === -1) {
-      items = MESSAGE_TEMPLATES.flatMap((c) => c.items.slice(0, 3)); // a taste of everything
+      // A taste of everything: 2 unlocked + 1 LOCKED per category — the
+      // locks must be visible up front, they're the reason to level up.
+      items = MESSAGE_TEMPLATES.flatMap((c) => [
+        ...c.items.filter((i) => i.lvl <= level).slice(0, 2),
+        ...c.items.filter((i) => i.lvl > level).slice(0, 1),
+      ]);
     } else {
       items = MESSAGE_TEMPLATES[Math.min(catIdx, MESSAGE_TEMPLATES.length - 1)].items;
     }
