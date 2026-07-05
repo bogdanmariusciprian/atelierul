@@ -16,7 +16,7 @@
       <h1>Autentificare</h1>
       <p>Conectează-te pentru a participa în comunitate: postezi, comentezi, câștigi puncte și streak.</p>
       <button id="google-signin" class="btn btn--primary">Continuă cu Google</button>
-      <p id="login-note" class="login-note">Autentificarea reală cu Google (Supabase) vine în curând — până atunci, butonul te conectează în modul de previzualizare.</p>
+      <p id="login-note" class="login-note">Conectează-te cu contul tău Google.</p>
     </section>
   </main>
 
@@ -24,19 +24,44 @@
 
   <script type="module">
     import { renderChrome } from "../../src/shared/components/site-chrome.js";
-    import { setRole, isLoggedIn } from "../../src/shared/scripts/session.js";
+    import { supabase } from "../../src/shared/scripts/supabase-client.js";
+    import { signInWithGoogle, signOut } from "../../src/shared/scripts/auth.js";
     renderChrome("../../");
 
-    // Already logged in? Straight to the community.
-    if (isLoggedIn()) window.location.replace("../#forum");
+    const btn = document.getElementById("google-signin");
+    const note = document.getElementById("login-note");
 
-    // MOCK sign-in: becomes the real Supabase Google flow later
-    // (auth.js signInWithGoogle + roleForEmail decide admin vs member).
-    // For the preview, the button simply logs you in as a member.
-    document.getElementById("google-signin").addEventListener("click", () => {
-      setRole("member");
-      window.location.href = "../#forum";
-    });
+    // Reflect the REAL Supabase session. Shows the signed-in user after
+    // returning from Google, and offers sign-out. (Wiring the rest of the
+    // site to this real session is the next step.)
+    function render(user) {
+      if (user) {
+        const name =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email;
+        note.textContent = "Ești conectat ca " + name + " ✔";
+        btn.textContent = "Deconectează-te";
+        btn.onclick = async () => {
+          await signOut();
+          location.reload();
+        };
+      } else {
+        note.textContent = "Conectează-te cu contul tău Google.";
+        btn.textContent = "Continuă cu Google";
+        btn.onclick = () => signInWithGoogle();
+      }
+    }
+
+    // Fires on login/logout AND right after Google sends the user back.
+    supabase.auth.onAuthStateChange((_event, session) =>
+      render(session?.user ?? null)
+    );
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    render(session?.user ?? null);
   </script>
 </body>
 </html>

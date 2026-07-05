@@ -1,15 +1,19 @@
 // =========================================================
 // Authentication helpers — Google sign-in via Supabase.
 // Shared by Community and Planner zones (DRY).
-// These are thin placeholders; wire up real flows later.
 // =========================================================
 import { supabase } from "./supabase-client.js";
 
-/** Start Google OAuth sign-in. */
-export async function signInWithGoogle() {
+/**
+ * Start Google OAuth sign-in.
+ * @param {string} redirectTo Where Google returns the user. Defaults to the
+ *   current page (minus any #hash) so the session is captured where the flow
+ *   began. Must be on the Redirect URLs allow-list in the Supabase dashboard.
+ */
+export async function signInWithGoogle(redirectTo = window.location.href.split("#")[0]) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo },
   });
   if (error) throw error;
   return data;
