@@ -1,0 +1,867 @@
+/* =========================================================
+   Layout — reusable structural classes (container, header,
+   footer, buttons). Shared across all three zones.
+   ========================================================= */
+.container {
+  width: 100%;
+  max-width: var(--container-max-width);
+  margin-inline: auto;
+  padding-inline: var(--space-md);
+}
+
+/* Site header + primary navigation */
+/* The header is fixed (out of flow) so shrinking it never reflows the
+   page → no scroll jitter. The #header wrapper acts as a constant-height
+   spacer (its height is set in JS to the expanded header height). */
+/* Progressive morph driven by --p (0 = full bar, 1 = floating pill),
+   set from scroll position in JS. No threshold toggle → no jitter. */
+.site-header {
+  --p: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding-top: calc(var(--p) * 10px);
+  pointer-events: none; /* only the pill catches clicks */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Full-width bar background — fades out as the header morphs. */
+.site-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  opacity: calc(1 - var(--p));
+}
+
+.site-header__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+  gap: calc(var(--space-md) + var(--p) * 8px);
+  /* narrows toward a centered pill as p → 1 */
+  max-width: calc(var(--container-max-width) - var(--p) * 400px);
+  padding-block: calc(var(--space-md) - var(--p) * 10px);
+  border-radius: calc(var(--p) * 30px);
+}
+
+/* Floating pill background — fades in as the header morphs. */
+.site-header__inner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  opacity: var(--p);
+}
+
+.site-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+/* Logo shrinks continuously with the morph: 150px → ~48px. */
+.site-header__logo {
+  height: calc(150px - var(--p, 0) * 102px);
+  width: calc(150px - var(--p, 0) * 102px);
+  object-fit: cover;
+  border-radius: 25%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Hover: slight lift (scale + circular shadow) */
+.site-header__brand:hover .site-header__logo {
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.main-nav {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+.main-nav a {
+  color: var(--color-text);
+  font-weight: 500;
+  transition: color 0.15s ease;
+  /* stack the (zero-height) width-reserver above the visible label */
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Invisible bold copy reserves the wider bold width, so turning the
+   label bold on hover causes no layout shift. */
+.main-nav a::before {
+  content: attr(data-label);
+  font-weight: 700;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+/* Hover: bold + accent color, signalling it's about to be pressed. */
+.main-nav a:hover {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* Active (current) page — plain text links get a colored pill. */
+/* CTA button in the nav (e.g. "Acces") — keep its white label,
+   overriding the darker default nav-link color. */
+.main-nav a.btn--primary {
+  color: #fff;
+}
+
+.main-nav a.btn--primary:hover {
+  color: #fff;
+  background-color: var(--color-primary-dark);
+}
+
+.main-nav a[aria-current="page"] {
+  color: var(--color-primary);
+  background-color: var(--color-surface);
+  border-radius: var(--radius);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+/* Active CTA button (e.g. "Acces" when on that page) stays readable. */
+.main-nav a.btn[aria-current="page"] {
+  background-color: var(--color-primary-dark);
+  color: #fff;
+  padding: var(--space-sm) var(--space-md);
+}
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn--primary {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background-color: var(--color-primary-dark);
+  text-decoration: none;
+}
+
+.btn--ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--color-text);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Hover: frosted-glass gradient (glassmorphism), no visible border */
+.btn--ghost:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.14),
+    rgba(255, 255, 255, 0.25)
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Footer */
+.site-footer {
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  margin-top: var(--space-xl);
+}
+
+.site-footer__inner {
+  padding-block: var(--space-lg);
+  text-align: center;
+}
+
+/* Simple page hero */
+.page-hero {
+  padding: var(--space-xl) var(--space-lg);
+  margin-top: var(--space-lg);
+  text-align: center;
+  border-radius: var(--radius);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.10),
+    rgba(124, 58, 237, 0.02)
+  );
+}
+
+/* Larger, softer intro paragraph, constrained width for readability */
+.page-hero__lead {
+  max-width: 60ch;
+  margin-inline: auto;
+  font-size: 1.15rem;
+  color: var(--color-text-muted);
+}
+
+/* Hero action buttons */
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-block: var(--space-lg) var(--space-md);
+}
+
+/* Hero stats strip */
+.hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-lg);
+  color: var(--color-text-muted);
+}
+
+.hero__stat strong {
+  color: var(--color-primary);
+}
+
+/* Generic content section spacing */
+.section {
+  margin-block: var(--space-xl);
+}
+
+/* Responsive card grid (auto-fits columns) */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-lg);
+}
+
+/* --- Lesson domain cards --- */
+.domain-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: var(--space-lg);
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background 0.2s ease, color 0.2s ease;
+}
+
+.domain-card__title {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: 1.4rem;
+  text-transform: uppercase;
+}
+
+/* Watermark: the domain's SVG, tinted with its accent color via a CSS
+   mask, sitting large and faint in the corner. It reacts to the cursor
+   (see home.js). Resting tilt lives here so it can glide back to it. */
+.domain-card__watermark {
+  position: absolute;
+  right: -1.4rem;
+  bottom: -1.8rem;
+  z-index: 0;
+  width: 150px;
+  height: 150px;
+  opacity: 0.14;
+  pointer-events: none;
+  background: var(--card-color, var(--color-primary));
+  /* -webkit-mask / mask are set inline in home.js so the SVG URL resolves
+     relative to the page (not this stylesheet's folder). */
+  transform: rotate(-8deg);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+}
+
+.domain-card:hover .domain-card__watermark {
+  opacity: 0.24;
+}
+
+/* Pencil (Redactare): smaller and pulled up so its tip stays on the card. */
+.domain-card--redactare .domain-card__watermark {
+  width: 118px;
+  height: 118px;
+  right: -0.6rem;
+  bottom: 0.4rem;
+}
+
+/* Calendar + "S¹/F²/" (Sintaxa frazei): larger and pulled onto the card so
+   the sequence written on the calendar stays readable. */
+.domain-card--sintaxa-frazei .domain-card__watermark {
+  width: 172px;
+  height: 172px;
+  right: -0.8rem;
+  bottom: -0.6rem;
+}
+
+/* Phone (Fonetică): smaller. */
+.domain-card--fonetica .domain-card__watermark {
+  width: 116px;
+  height: 116px;
+  right: -0.6rem;
+  bottom: -0.6rem;
+}
+
+/* Notebook / agenda (Vocabular): smaller. */
+.domain-card--vocabular .domain-card__watermark {
+  width: 116px;
+  height: 116px;
+  right: -0.4rem;
+  bottom: -0.4rem;
+}
+
+/* Group-arrows-rotate (Morfologie): a touch smaller. */
+.domain-card--morfologie .domain-card__watermark {
+  width: 122px;
+  height: 122px;
+  right: -0.5rem;
+  bottom: -0.5rem;
+}
+
+/* Hover: real inner shadow via the SVG filter (see site-chrome.js).
+   The shadow is painted INSIDE the glyphs — text looks cut into the card. */
+.domain-card:hover .domain-card__title {
+  filter: url(#inner-shadow);
+}
+
+/* Per-domain gradients + accent color (--card-color) used on hover.
+   Hues spread across the wheel so every card is clearly distinct. */
+.domain-card--morfologie    { --card-color: #6d28d9; background: linear-gradient(135deg, #ede9fe, #ddd6fe); } /* violet */
+.domain-card--sintaxa-frazei{ --card-color: #2563eb; background: linear-gradient(135deg, #dbeafe, #bfdbfe); } /* blue   */
+.domain-card--vocabular     { --card-color: #16a34a; background: linear-gradient(135deg, #dcfce7, #bbf7d0); } /* green  */
+.domain-card--lectura       { --card-color: #ea580c; background: linear-gradient(135deg, #ffedd5, #fed7aa); } /* orange */
+.domain-card--fonetica      { --card-color: #dc2626; background: linear-gradient(135deg, #fee2e2, #fecaca); } /* red    */
+.domain-card--redactare     { --card-color: #0891b2; background: linear-gradient(135deg, #cffafe, #a5f3fc); } /* cyan   */
+
+/* Hover: lift + switch to the same fine violet gradient as the menu */
+.domain-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+  color: var(--card-color, var(--color-text));
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.06),
+    rgba(124, 58, 237, 0.015)
+  );
+}
+
+.card {
+  display: block;
+  padding: var(--space-lg);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.card__title {
+  margin: 0;
+  color: var(--color-primary);
+}
+
+/* News list */
+.news-list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.news-item {
+  display: flex;
+  gap: var(--space-md);
+  align-items: baseline;
+  padding: var(--space-md);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.news-item__date {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   Footer v2 — navigation + legal + contact
+   ========================================================= */
+.site-footer__cols {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: var(--space-lg);
+  padding-block: var(--space-lg) var(--space-md);
+}
+.site-footer__col { display: flex; flex-direction: column; gap: 0.3rem; }
+.site-footer__brand { margin: 0; font-weight: 800; font-size: 1.05rem; }
+.site-footer__tag { margin: 0; font-size: 0.85rem; color: var(--color-text-muted); }
+.site-footer__head {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.site-footer__col a {
+  color: var(--color-text);
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+.site-footer__col a:hover { color: var(--color-primary); text-decoration: none; }
+.site-footer__contact {
+  align-self: flex-start;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.site-footer__contact:hover { border-color: var(--color-primary); color: var(--color-primary); }
+@media (max-width: 720px) {
+  .site-footer__cols { grid-template-columns: 1fr 1fr; }
+}
+
+/* The hero's ONE dominant CTA — bigger, unmissable (design critique G2). */
+.btn--hero {
+  font-size: 1.08rem;
+  padding: 0.85rem 1.7rem;
+  background: var(--grad-brand);
+  border: none;
+  box-shadow: 0 14px 30px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn--hero:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px -12px color-mix(in srgb, var(--color-primary) 80%, transparent);
+}
+
+/* 404 — the lost snail */
+.notfound { text-align: center; padding-block: var(--space-xl); }
+.notfound #notfound-mascot .mascot { animation: mascot-sway 4s ease-in-out infinite; }
+@keyframes mascot-sway {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+.notfound__actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: var(--space-md); }
+@media (prefers-reduced-motion: reduce) {
+  .notfound #notfound-mascot .mascot { animation: none; }
+}
+
+/* Legal pages (termeni / confidențialitate) */
+.legal { max-width: 70ch; padding-bottom: var(--space-xl); }
+.legal h2 { margin-top: var(--space-lg); font-size: 1.15rem; }
+.legal__note {
+  margin-top: var(--space-lg);
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+/* Skip link — first tab stop, visible only on focus. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 2147482700;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  transform: translateY(-200%);
+  transition: transform 0.15s ease;
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* =========================================================
+   Floating ✉️ "Scrie profesorului" (site-chrome.js) — non-admin, all pages
+   ========================================================= */
+.contact-float {
+  position: fixed;
+  right: 22px;
+  bottom: 26px;
+  z-index: 2147482100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.contact-float__fab {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 50%;
+  border: none;
+  font-size: 1.25rem;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  box-shadow: 0 12px 28px -10px rgba(124, 58, 237, 0.7);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.contact-float__fab:hover { transform: scale(1.07); box-shadow: 0 16px 34px -10px rgba(124, 58, 237, 0.85); }
+.contact-float__panel {
+  order: -1;
+  width: 18rem;
+  padding: 0.8rem;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 22px 50px -20px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.contact-float__panel[hidden] { display: none; }
+.contact-float__title { margin: 0; font-weight: 800; }
+.contact-float__sub { margin: 0; font-size: 0.8rem; color: var(--color-text-muted); }
+.contact-float__warn { margin: 0; font-size: 0.8rem; color: var(--color-danger, #dc2626); }
+
+/* Small honest note under the mock login button. */
+.login-note {
+  margin-top: 0.8rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  max-width: 42ch;
+}
+
+/* =========================================================
+   Demo role switcher 🎭 (site-chrome.js) — discreet, bottom-left.
+   Preview-only affordance; remove before production.
+   ========================================================= */
+.role-switch {
+  position: fixed;
+  left: 18px;
+  bottom: 22px;
+  z-index: 2147482100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.role-switch__row { display: flex; align-items: center; gap: 0.45rem; }
+.role-switch__fab {
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+  background: var(--color-bg);
+  font-size: 1.2rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 10px 24px -10px rgba(124, 58, 237, 0.55);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.role-switch__fab:hover { transform: scale(1.08); box-shadow: 0 14px 30px -10px rgba(124, 58, 237, 0.7); }
+/* The current role, always readable next to the mask. */
+.role-switch__now {
+  padding: 0.18rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+.role-switch__panel {
+  order: -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.45rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 16px 36px -16px rgba(0, 0, 0, 0.35);
+}
+.role-switch__panel[hidden] { display: none; }
+.role-switch__title {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 0 0.4rem 0.15rem;
+}
+.role-switch__opt {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.role-switch__opt:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); }
+.role-switch__opt.on { background: var(--color-primary); color: #fff; }
+
+/* =========================================================
+   Account slot in the header — CTA (guest) or identity chip (member/admin)
+   ========================================================= */
+/* Nav items never wrap mid-label — the morphing pill narrows, text doesn't fold. */
+.main-nav a,
+.main-nav .btn {
+  white-space: nowrap;
+}
+/* Guest-only links (the community sales pitch) vanish once you're in. */
+body.is-logged .nav-guest-only { display: none; }
+.nav-cta { flex: none; }
+.nav-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.7rem 0.2rem 0.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  text-decoration: none;
+  color: var(--color-text);
+  white-space: nowrap;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.nav-user:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--color-primary) 60%, transparent);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.nav-user__av {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  flex: none;
+}
+.nav-user__av--init {
+  display: grid;
+  place-items: center;
+  background: var(--a, var(--color-primary));
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.nav-user__id { display: flex; flex-direction: column; line-height: 1.15; }
+.nav-user__name { font-size: 0.85rem; }
+.nav-user__meta { font-size: 0.68rem; font-weight: 700; color: var(--color-primary); }
+
+/* =========================================================
+   Theme controls (🎨 palette + 🌙 mode) — in the header nav
+   ========================================================= */
+.theme-slot { display: inline-flex; gap: 0.2rem; align-items: center; }
+.theme-btn {
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.theme-btn:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); transform: scale(1.1); }
+
+/* =========================================================
+   Notification center — anchored to the user chip (site-chrome.js).
+   Aligned columns: icon | content | time. Typed, hoverable, breathable.
+   ========================================================= */
+.notif-wrap { position: static; }
+.notif {
+  position: fixed;
+  z-index: 2147482650;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 24px 56px -20px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: notif-in 0.16s ease;
+}
+@keyframes notif-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.notif__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 0.95rem 0.55rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.notif__head b { font-size: 0.95rem; }
+.notif__total {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+  background: #dc2626;
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+}
+.notif__list { display: flex; flex-direction: column; padding: 0.35rem; max-height: 21rem; overflow-y: auto; }
+.notif__row {
+  display: grid;
+  grid-template-columns: 2.1rem minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--color-text);
+  transition: background 0.12s ease;
+}
+.notif__row:hover { background: color-mix(in srgb, var(--color-primary) 8%, transparent); text-decoration: none; }
+.notif__row.is-unread { background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg)); }
+.notif__row.is-unread:hover { background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg)); }
+.notif__ic {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--k, var(--color-primary));
+  background: color-mix(in srgb, var(--k, var(--color-primary)) 14%, var(--color-bg));
+}
+.notif__ic svg { width: 1.05rem; height: 1.05rem; }
+.notif__body { display: flex; flex-direction: column; gap: 0.08rem; min-width: 0; }
+.notif__kind {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--k, var(--color-text-muted));
+}
+.notif__text { font-size: 0.86rem; line-height: 1.35; }
+.notif__snip {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notif__time { font-size: 0.7rem; color: var(--color-text-muted); padding-top: 0.15rem; white-space: nowrap; }
+.notif__empty { margin: 0; padding: 0.9rem; font-size: 0.86rem; color: var(--color-text-muted); text-align: center; }
+.notif__foot {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.45rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.notif__foot a {
+  flex: 1;
+  text-align: center;
+  padding: 0.35rem 0.4rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+.notif__foot a:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); text-decoration: none; }
+
+/* The admin nav chip is a button now, with the same badge. */
+.nav-user { position: relative; cursor: pointer; }
+.nav-user__badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.25rem;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  border: 2px solid var(--color-bg);
+}
+
+/* =========================================================
+   Page breadcrumbs — auto-injected on deep pages (site-chrome.js)
+   ========================================================= */
+.page-crumbs {
+  margin-top: 0.5rem;
+  font-size: 0.86rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.page-crumbs__inner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  color: var(--color-text-muted);
+}
+.page-crumbs a {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.page-crumbs a:hover { color: var(--color-primary); text-decoration: none; }
+.page-crumbs__domain { font-weight: 600; }
+.page-crumbs__here { color: var(--color-text); font-weight: 700; }

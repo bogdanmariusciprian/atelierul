@@ -1,0 +1,120 @@
+/* =========================================================
+   Design tokens (single source of truth) — DRY.
+   THEME SYSTEM: 3 palettes × light/dark, switched from the header
+   (🎨 cycles the palette, 🌙 cycles auto/light/dark) and persisted.
+   JS (site-chrome initThemeControls) sets on <html>:
+     data-palette = "electric" | "apus" | "arcade"   (default electric)
+     data-mode    = "light" | "dark"                 (resolved from auto)
+   Components consume ONLY the purpose tokens below — never raw hex.
+   ========================================================= */
+
+/* ---------- Structure (palette-independent) ---------- */
+:root {
+  /* Typography */
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-body);
+  --font-size-base: 16px;
+  --line-height-base: 1.6;
+
+  /* Spacing scale */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  /* Layout */
+  --container-max-width: 1120px;
+  --radius: 10px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+
+  /* Feedback (semantic, stable across palettes) */
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+
+  /* Reply-depth tints derive from the palette automatically. */
+  --reply-depth-1: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg));
+  --reply-depth-2: color-mix(in srgb, var(--color-primary) 18%, var(--color-bg));
+  --reply-depth-3: color-mix(in srgb, var(--color-primary) 30%, var(--color-bg));
+  --reply-depth-4: color-mix(in srgb, var(--color-primary) 45%, var(--color-bg));
+}
+
+/* ---------- Palette A · „Violet electric” (default) ---------- */
+:root {
+  --color-primary: #7c5cff;
+  --color-primary-dark: #5a3fe0;
+  --color-accent: #ffb020; /* warm highlight (badges, streak) */
+  --color-accent-2: #ff4d8d; /* second brand hue (gradients, likes) */
+  --grad-brand: linear-gradient(135deg, #7c5cff 0%, #ff4d8d 55%, #22d3ee 100%);
+
+  --color-bg: #fbfaff;
+  --color-surface: #f3f1fc;
+  --color-text: #191627;
+  --color-text-muted: #575271; /* darker than before — readable on cheap screens */
+  --color-border: #e4e1f2;
+}
+:root[data-mode="dark"] {
+  --color-primary: #9d86ff;
+  --color-primary-dark: #7c5cff;
+  --color-bg: #14121f;
+  --color-surface: #1d1a2e;
+  --color-text: #eceaf6;
+  --color-text-muted: #a8a3c4;
+  --color-border: #34304e;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Palette B · „Apus cald” ---------- */
+:root[data-palette="apus"] {
+  --color-primary: #f4573f;
+  --color-primary-dark: #c93b30;
+  --color-accent: #ffb020;
+  --color-accent-2: #5b2e68;
+  --grad-brand: linear-gradient(135deg, #ff6b5e 0%, #ffb020 55%, #5b2e68 100%);
+
+  --color-bg: #fff9f2;
+  --color-surface: #fbf0e4;
+  --color-text: #2b1b2e;
+  --color-text-muted: #6d5a6a;
+  --color-border: #eedfd2;
+}
+:root[data-mode="dark"][data-palette="apus"] {
+  --color-primary: #ff8578;
+  --color-primary-dark: #ff6b5e;
+  --color-bg: #221621;
+  --color-surface: #2d1f2c;
+  --color-text: #f5edf2;
+  --color-text-muted: #bda4b6;
+  --color-border: #473549;
+}
+
+/* ---------- Palette C · „Arcade mentă” ---------- */
+:root[data-palette="arcade"] {
+  --color-primary: #0ea97b;
+  --color-primary-dark: #0b8261;
+  --color-accent: #b4e34a;
+  --color-accent-2: #3b82f6;
+  --grad-brand: linear-gradient(135deg, #0ea97b 0%, #3b82f6 60%, #22d3ee 100%);
+
+  --color-bg: #f4fbf8;
+  --color-surface: #e9f4ee;
+  --color-text: #16241f;
+  --color-text-muted: #4f645a;
+  --color-border: #d9e7e0;
+}
+:root[data-mode="dark"][data-palette="arcade"] {
+  --color-primary: #2dd4a8;
+  --color-primary-dark: #0ea97b;
+  --color-bg: #10201c;
+  --color-surface: #182b25;
+  --color-text: #e8f4ee;
+  --color-text-muted: #9db8ac;
+  --color-border: #2c4038;
+}
+
+/* In dark mode the whole page & form fields follow the tokens. */
+:root[data-mode="dark"] {
+  color-scheme: dark;
+}

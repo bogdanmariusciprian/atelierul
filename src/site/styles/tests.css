@@ -1,0 +1,62 @@
+/* =========================================================
+   Teste hub: a grid of test-model categories. Load AFTER
+   shared/styles/main.css. Each card tints via --card-color.
+   ========================================================= */
+
+.tests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--space-lg);
+  margin-block: var(--space-lg);
+}
+
+.test-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--card-color, var(--color-primary));
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.test-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.test-card__icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.test-card__title {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--card-color, var(--color-primary));
+}
+
+.test-card__desc {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.test-card__soon {
+  align-self: flex-start;
+  margin-top: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}

@@ -1,0 +1,2521 @@
+/* =========================================================
+   Community hub — app-shell with a fixed left sidebar and a content pane.
+   A deliberate style break from the rest of the site: bento-ish cards,
+   soft glass, a lively (but restrained) violet→pink→cyan accent, big
+   radii and fine micro-interactions. Load AFTER shared/styles/main.css.
+   ========================================================= */
+
+:root {
+  --cx-grad: var(--grad-brand); /* follows the active palette (variables.css) */
+  --cx-radius: 18px;
+  --cx-radius-sm: 12px;
+}
+
+/* =========================================================
+   Animated group icons — gentle, looping (subtle, no glow)
+   ========================================================= */
+.gi { display: inline-block; line-height: 1; will-change: transform; }
+.gi--float { animation: gi-float 3s ease-in-out infinite; }
+.gi--bounce { animation: gi-bounce 1.8s ease-in-out infinite; }
+.gi--spin { animation: gi-spin 6s linear infinite; }
+.gi--pulse { animation: gi-pulse 2.4s ease-in-out infinite; }
+.gi--wobble { animation: gi-wobble 3s ease-in-out infinite; }
+.gi--swing { animation: gi-swing 3.2s ease-in-out infinite; transform-origin: 50% 0; }
+@keyframes gi-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes gi-bounce { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-5px); } 55% { transform: translateY(0); } }
+@keyframes gi-spin { to { transform: rotate(360deg); } }
+@keyframes gi-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.16); } }
+@keyframes gi-wobble { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes gi-swing { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .gi { animation: none !important; }
+}
+
+/* Avatars (community-scoped) */
+.cx-av {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--a, var(--color-primary));
+  user-select: none;
+}
+.cx-av--lg { width: 4rem; height: 4rem; font-size: 1.25rem; }
+
+/* Note: shared primitives (.cx-input, .cx-label, .cx-muted, .cx-kind,
+   .cx-propose, .cx-tag*) live once in shared/styles/comments.css (DRY). */
+
+/* =========================================================
+   Shell
+   ========================================================= */
+.cx-shell {
+  --side-w: 250px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--side-w) 1fr;
+  gap: var(--space-lg);
+  margin: var(--space-lg) 0 var(--space-xl);
+}
+/* Subtle mesh glow behind the whole hub (no jitter — it's fixed decor) */
+.cx-shell::before {
+  content: "";
+  position: absolute;
+  inset: -40px -20px auto -20px;
+  height: 320px;
+  z-index: -1;
+  background:
+    radial-gradient(600px 220px at 12% 0%, rgba(124, 58, 237, 0.10), transparent 70%),
+    radial-gradient(520px 200px at 88% 10%, rgba(8, 145, 178, 0.09), transparent 70%),
+    radial-gradient(420px 180px at 60% 0%, rgba(219, 39, 119, 0.07), transparent 70%);
+  pointer-events: none;
+}
+
+/* =========================================================
+   Sidebar
+   ========================================================= */
+.cx-side {
+  position: sticky;
+  top: var(--sticky-top, 104px);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem;
+  border-radius: var(--cx-radius);
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+.cx-side__me {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.cx-side__meid { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.cx-side__meid b { font-size: 0.98rem; }
+.cx-side__mini { font-size: 0.76rem; color: var(--color-text-muted); }
+.cx-flame { font-weight: 700; color: var(--color-accent); }
+
+.cx-side__nav { display: flex; flex-direction: column; gap: 0.4rem; }
+.cx-side__group { display: flex; flex-direction: column; gap: 0.15rem; }
+.cx-side__title {
+  margin: 0.3rem 0 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+.cx-side__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.7rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--cx-radius-sm);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.94rem;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.cx-side__item:hover { background: var(--color-surface); transform: translateX(2px); }
+.cx-side__icon { display: grid; place-items: center; width: 1.35rem; height: 1.35rem; color: var(--color-text-muted); }
+.cx-side__icon svg { width: 100%; height: 100%; }
+.cx-side__label { flex: 1; }
+.cx-side__item.on {
+  color: #fff;
+  background: var(--cx-grad);
+  box-shadow: 0 6px 16px -6px rgba(124, 58, 237, 0.55);
+}
+.cx-side__item.on .cx-side__icon { color: #fff; }
+.cx-side__badge {
+  flex: none;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #3a2a00;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.cx-side__item.on .cx-side__badge { background: rgba(255, 255, 255, 0.9); color: var(--color-primary-dark); }
+
+.cx-side__demo {
+  margin-top: 0.3rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+.cx-seg {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+.cx-seg.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+/* =========================================================
+   Main pane
+   ========================================================= */
+.cx-main { min-width: 0; }
+
+/* Breadcrumb — the ONE wayfinding strip above the content: a "←" that
+   undoes the last jump + Atelier › secțiune › subpagină. Pill-shaped,
+   glassy, playful but quiet. (Replaces the old top tabs.) */
+.cx-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0.7rem;
+  margin-bottom: var(--space-lg);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.9rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cx-crumbs__back {
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  margin-right: 0.15rem;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-primary);
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.cx-crumbs__back:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  transform: translateX(-2px);
+}
+.cx-crumbs__seg {
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  font-size: inherit;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.cx-crumbs__seg:hover { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.cx-crumbs__root { color: var(--color-primary); }
+.cx-crumbs__sep { color: var(--color-text-muted); opacity: 0.6; }
+.cx-crumbs__here {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--cx-grad);
+  box-shadow: 0 6px 16px -7px rgba(124, 58, 237, 0.6);
+  font-weight: 700;
+}
+
+.cx-head { margin-bottom: var(--space-md); }
+.cx-head__title {
+  margin: 0;
+  font-size: 1.8rem;
+  background: var(--cx-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cx-head__sub { margin: 0.2rem 0 0; color: var(--color-text-muted); }
+
+/* Generic card box */
+.cx-box {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.1rem;
+}
+
+/* Spotlight — post of the week. A light card with a gradient edge, gently
+   tilted like a pinned note; it straightens and lifts on hover. Text is
+   dark on light, so the author link stays readable in every state. */
+.cx-spotlight {
+  position: relative;
+  border-radius: var(--cx-radius);
+  padding: 1.15rem 1.25rem 0.95rem;
+  margin: 0.5rem 0 var(--space-md);
+  color: var(--color-text);
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    var(--cx-grad) border-box;
+  transform: rotate(-0.8deg);
+  box-shadow: 0 16px 32px -20px rgba(124, 58, 237, 0.5);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.cx-spotlight:hover {
+  transform: rotate(0deg) translateY(-2px);
+  box-shadow: 0 20px 38px -20px rgba(124, 58, 237, 0.6);
+}
+.cx-spotlight__badge {
+  position: absolute;
+  top: -0.8rem;
+  left: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--cx-grad);
+  box-shadow: 0 6px 14px -8px rgba(124, 58, 237, 0.7);
+  transform: rotate(-1.5deg);
+}
+.cx-spotlight__text { margin: 0.5rem 0 0.35rem; font-size: 1.05rem; line-height: 1.45; }
+.cx-spotlight__by { font-size: 0.84rem; color: var(--color-text-muted); }
+.cx-spotlight__by .cx-userlink { font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .cx-spotlight,
+  .cx-spotlight:hover { transform: none; transition: none; }
+}
+
+/* =========================================================
+   Composer
+   ========================================================= */
+.cx-composer {
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1rem;
+  margin-bottom: var(--space-lg);
+  transition: background 0.25s ease;
+}
+.cx-composer__top { display: flex; gap: 0.6rem; align-items: flex-start; }
+.cx-composer__text { min-height: 2.8rem; }
+
+.cx-composer__types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0.2rem;
+}
+.cx-type {
+  --t: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.cx-type__ic { display: grid; place-items: center; width: 1.05rem; height: 1.05rem; color: var(--t); }
+.cx-type__ic svg { width: 100%; height: 100%; }
+.cx-type:hover { border-color: var(--t); color: var(--t); }
+.cx-type.on {
+  color: #fff;
+  background: var(--t);
+  border-color: var(--t);
+}
+.cx-type.on .cx-type__ic { color: #fff; }
+
+.cx-composer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--color-border);
+}
+.cx-composer__tools { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.cx-tool {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.cx-tool:hover, .cx-tool.on { border-color: var(--color-primary); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+
+.cx-swatches { display: inline-flex; gap: 0.25rem; align-items: center; margin-left: 0.2rem; }
+.cx-swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--sw);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.cx-swatch:hover { transform: scale(1.15); }
+.cx-swatch.on { border-color: var(--color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent); }
+.cx-swatch[style*="transparent"] { background: repeating-conic-gradient(#e9e9f2 0% 25%, #fff 0% 50%) 50% / 8px 8px; }
+
+.cx-ytrow { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.cx-ytrow .cx-input { flex: 1; }
+
+.cx-mediaprev {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+}
+.cx-mediaprev__yt { font-size: 0.85rem; color: var(--color-text-muted); }
+.cx-mediaprev__imgs { display: inline-flex; gap: 0.3rem; }
+.cx-thumb {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--color-border);
+}
+.cx-x {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+}
+.cx-x:hover { background: var(--color-border); color: var(--color-text); }
+
+/* =========================================================
+   Feed + post card
+   ========================================================= */
+.cx-feed { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.post {
+  --postfrom: var(--color-bg);
+  --postto: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.1rem;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.post:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.post--tinted { background: linear-gradient(135deg, var(--postfrom), var(--postto)); }
+
+.post__head { display: flex; align-items: center; gap: 0.6rem; }
+.post__id { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.post__id .post__name { font-size: 0.96rem; font-weight: 700; }
+.cx-adminrow__u .cx-userlink { font-weight: 700; }
+.post__sub { font-size: 0.78rem; color: var(--color-text-muted); }
+.post__type {
+  --t: var(--color-primary);
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--t);
+  background: color-mix(in srgb, var(--t) 12%, transparent);
+}
+.post__type__ic { display: grid; place-items: center; width: 0.95rem; height: 0.95rem; }
+.post__type__ic svg { width: 100%; height: 100%; }
+.post__follow {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+}
+.post__follow svg { width: 1.05rem; height: 1.05rem; }
+.post__follow:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.post__follow.on { background: var(--color-accent); border-color: var(--color-accent); color: #3a2a00; }
+
+.post__body { margin: 0.6rem 0 0.2rem; }
+.post__text { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+
+/* Images */
+.post__imgs {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.post__imgs--n1 { grid-template-columns: 1fr; }
+.post__imgs--n2 { grid-template-columns: 1fr 1fr; }
+.post__imgs--n3 { grid-template-columns: repeat(3, 1fr); }
+.post__img {
+  aspect-ratio: 16 / 10;
+  border-radius: var(--cx-radius-sm);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--color-border);
+}
+.post__img--ph {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  padding: 0.5rem;
+  text-align: center;
+}
+/* Images are buttons now (they open the lightbox). */
+.post__img--zoom {
+  padding: 0;
+  cursor: zoom-in;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.post__img--zoom:hover { transform: scale(1.02); box-shadow: 0 10px 22px -14px rgba(0, 0, 0, 0.45); }
+.post__img--ph.post__img--zoom { padding: 0.5rem; }
+
+/* =========================================================
+   Image lightbox — the enlarged image + floating actions
+   ========================================================= */
+.cx-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482400; /* under the toasts, above everything else */
+  display: grid;
+  place-items: center;
+  padding: 4vh 4vw;
+  background: rgba(15, 12, 26, 0.78);
+  backdrop-filter: blur(6px);
+  animation: lb-in 0.18s ease;
+}
+@keyframes lb-in { from { opacity: 0; } to { opacity: 1; } }
+.cx-lightbox__fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; max-width: 100%; }
+.cx-lightbox__img {
+  width: min(88vw, 70rem);
+  height: min(74vh, 44rem);
+  border-radius: var(--cx-radius);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  cursor: zoom-out;
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+}
+.cx-lightbox__img--ph {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 800;
+  font-size: 1.3rem;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  background-size: cover; /* gradients fill the frame */
+}
+.cx-lightbox__bar { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.cx-lbbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s ease, transform 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cx-lbbtn:hover { background: rgba(255, 255, 255, 0.24); transform: translateY(-1px); }
+@media (prefers-reduced-motion: reduce) {
+  .cx-lightbox { animation: none; }
+  .post__img--zoom:hover { transform: none; }
+}
+
+/* YouTube facade + player */
+.post__yt {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-top: 0.7rem;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--cx-radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: #0f0f14;
+}
+.post__yt--facade { cursor: pointer; padding: 0; }
+.post__yt__thumb { width: 100%; height: 100%; object-fit: cover; opacity: 0.85; transition: opacity 0.2s ease, transform 0.4s ease; }
+.post__yt--facade:hover .post__yt__thumb { opacity: 1; transform: scale(1.03); }
+.post__yt__play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.3rem;
+  padding-left: 4px;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.post__yt--facade:hover .post__yt__play { transform: scale(1.1); background: #db2777; }
+.post__yt__title {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 1.4rem 0.8rem 0.6rem;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.6), transparent);
+}
+.post__yt--live iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+/* Footer actions */
+.post__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+.post__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.post__act__ic { display: inline-grid; place-items: center; width: 1.1rem; height: 1.1rem; }
+.post__act__ic svg { width: 100%; height: 100%; }
+.post__act:hover { background: var(--color-surface); color: var(--color-text); }
+.post__act.is-liked { color: var(--color-danger); }
+.post__act.on { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.post__act.is-shared { color: var(--color-success); }
+
+.post__comments {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--color-border);
+}
+.cx-postcompose { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.9rem; }
+.cx-postcompose .btn-mini { flex: none; }
+
+/* =========================================================
+   Activity
+   ========================================================= */
+.cx-tabs { display: flex; gap: 0.4rem; margin-bottom: var(--space-md); flex-wrap: wrap; }
+/* Sub-tabs (e.g. Exerciții: În așteptare / Istoric) — breathing room from the
+   composer above and the list below. */
+.cx-tabs--sub { margin-top: var(--space-md); padding-top: var(--space-sm); border-top: 1px solid var(--color-border); }
+.cx-tabbtn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+}
+.cx-tabbtn { display: inline-flex; align-items: center; gap: 0.4rem; }
+.cx-tabbtn__ic { display: grid; place-items: center; width: 1.1rem; height: 1.1rem; }
+.cx-tabbtn__ic svg { width: 100%; height: 100%; }
+.cx-tabbtn__n {
+  min-width: 1.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+.cx-tabbtn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.cx-tabbtn.on { background: var(--cx-grad); color: #fff; border-color: transparent; }
+.cx-tabbtn.on .cx-tabbtn__n { background: rgba(255, 255, 255, 0.9); color: var(--color-primary-dark); }
+
+.cx-actlist { display: flex; flex-direction: column; gap: 0.6rem; }
+.cx-actrow {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--k, var(--color-primary));
+  border-radius: var(--cx-radius);
+  padding: 0.8rem 0.9rem;
+  box-shadow: var(--shadow-sm);
+}
+.cx-actrow--comment { --k: #2563eb; }
+.cx-actrow--like { --k: #db2777; }
+.cx-actrow--reply { --k: #16a34a; }
+/* Avatar with a small activity-kind icon badge on its corner */
+.cx-actrow__avatar { position: relative; flex: none; }
+.cx-actkind {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 1.15rem;
+  height: 1.15rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--k, var(--color-primary));
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+.cx-actkind svg { width: 0.78rem; height: 0.78rem; }
+.cx-actrow__body { min-width: 0; }
+.cx-actrow__body p { margin: 0; }
+.cx-actrow__snip { color: var(--color-text); margin-top: 0.2rem !important; }
+.cx-actrow__ctx { font-size: 0.76rem; color: var(--color-text-muted); }
+
+/* =========================================================
+   Exercises
+   ========================================================= */
+/* .cx-propose lives in comments.css; add the hub-only spacing here. */
+.cx-exlist ~ .cx-propose, .cx-main .cx-propose { margin-bottom: var(--space-md); }
+
+.cx-excompose {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.1rem;
+  margin-bottom: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cx-excompose__actions { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+
+.cx-exlist { display: flex; flex-direction: column; gap: 0.6rem; }
+.cx-ex {
+  display: flex;
+  gap: 0.8rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1rem;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.cx-ex:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.cx-ex__vote { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; flex: none; }
+.cx-ex__up {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+.cx-ex__up:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.cx-ex__up.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.cx-ex__body { min-width: 0; }
+.cx-ex__prompt { margin: 0 0 0.4rem; line-height: 1.5; }
+.cx-ex__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+/* .cx-tag* live in comments.css (shared). */
+
+/* =========================================================
+   Lessons / notebook / points / profile
+   ========================================================= */
+.cx-favs { display: flex; flex-direction: column; gap: 0.5rem; }
+.cx-fav {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  padding: 0.8rem 1rem;
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.cx-fav:hover { transform: translateX(3px); box-shadow: var(--shadow-md); border-color: var(--color-primary); }
+.cx-fav__title { flex: 1; font-weight: 600; }
+.cx-fav__go { color: var(--color-primary); font-weight: 700; }
+
+.cx-writer { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: var(--space-md); }
+.cx-writer #cx-note-title { max-width: 12rem; }
+.cx-writer .cx-input { flex: 1; }
+.cx-notes { display: flex; flex-direction: column; gap: 0.6rem; }
+.cx-note {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--cx-radius-sm);
+  padding: 0.7rem 0.9rem;
+  box-shadow: var(--shadow-sm);
+}
+.cx-note__head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.2rem; }
+.cx-note__text { margin: 0; }
+
+.cx-total { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.7rem; }
+.cx-total b { font-size: 2rem; color: var(--color-primary); }
+.cx-plist { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.cx-plog {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.5rem 0.2rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.cx-plog:last-child { border-bottom: none; }
+.cx-plog__when { color: var(--color-text-muted); font-size: 0.8rem; }
+.cx-plog__pts { font-weight: 800; color: var(--color-success); }
+
+.cx-profile__row { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.8rem; }
+.cx-profile__row h3 { margin: 0; }
+.cx-badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.9rem; }
+.cx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.cx-statusedit { display: flex; gap: 0.5rem; align-items: center; }
+.cx-statusedit .cx-input { flex: 1; }
+
+/* Avatar as an animated gif — white behind transparent gifs, circular ring */
+.cx-av--gif {
+  background-color: #fff;
+  background-size: cover;
+  background-position: center;
+  color: transparent;
+  border: 2px solid var(--color-border);
+}
+.cx-av--xl { width: 150px; height: 150px; font-size: 3rem; } /* native gif size */
+
+/* Ringed + badged avatar (level ring + level & streak badges) — used
+   wherever a user's name & avatar appear, for global consistency. */
+.cx-avwrap { position: relative; display: inline-grid; place-items: center; flex: none; }
+.cx-ring {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  padding: 3px;
+  background: var(--ring, var(--color-primary));
+}
+.cx-ring .cx-av { border: 2px solid #fff; }
+.cx-bdg-lvl,
+.cx-bdg-streak {
+  position: absolute;
+  z-index: 2;
+  line-height: 1.3;
+  font-weight: 800;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-bg);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.cx-bdg-lvl {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 1rem;
+  padding: 0 0.22rem;
+  text-align: center;
+  color: #fff;
+  font-size: 0.56rem;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
+.cx-bdg-streak {
+  top: -5px;
+  right: -6px;
+  padding: 0 0.2rem;
+  background: #fff5e6;
+  color: #b45309;
+  font-size: 0.54rem;
+}
+/* On the big profile avatar, scale the badges up a bit. */
+.cx-avwrap:has(.cx-av--xl) .cx-bdg-lvl { font-size: 0.85rem; bottom: 4px; min-width: 1.5rem; }
+.cx-avwrap:has(.cx-av--xl) .cx-bdg-streak { font-size: 0.8rem; top: 6px; right: 4px; }
+
+/* On very small avatars (admin table rows, the member picker) the badges
+   would be cramped — and the admin row already prints "Nv X" as text — so
+   keep just the level ring there, no badges. */
+.cx-adminrow__u .cx-bdg-lvl,
+.cx-adminrow__u .cx-bdg-streak,
+.cx-addmember__opt .cx-bdg-lvl,
+.cx-addmember__opt .cx-bdg-streak { display: none; }
+
+/* Profile view */
+.cx-profile__row { align-items: flex-start; }
+.cx-profile__id { flex: 1; min-width: 0; }
+.cx-profile__id h3 { margin: 0; }
+.cx-profile__row .btn-mini { flex: none; }
+.cx-vis {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+.cx-info { display: flex; flex-direction: column; margin: 0.9rem 0; }
+.cx-inforow { display: grid; grid-template-columns: 130px 1fr; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--color-border); }
+.cx-inforow:last-child { border-bottom: none; }
+.cx-inforow__k { font-weight: 700; color: var(--color-text-muted); font-size: 0.85rem; }
+.cx-inforow__v { overflow-wrap: anywhere; }
+
+/* ---- Clickable users, friends, audience (added feature set) ---- */
+/* .cx-userlink / .cx-avlink / .cx-teacher live in comments.css (shared, so
+   they also style lesson-page comments). Community-only bits are below. */
+.cx-av--sm { width: 2rem; height: 2rem; font-size: 0.7rem; }
+
+/* The professor (teacher/admin): inert name/avatar. The "🎓 Profesor" tag
+   (.cx-teacher) is defined in comments.css (shared). */
+.cx-avteacher { display: inline-flex; cursor: default; }
+.cx-username { font-weight: 700; }
+
+/* Another member's wall (their posts) on their profile page. */
+.cx-profile__ph { font-size: 1rem; font-weight: 800; margin: var(--space-lg) 0 0.6rem; }
+.cx-profile__empty {
+  padding: 1rem;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--cx-radius);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* Composer audience toggle + per-post audience badge */
+.cx-composer__send { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+.cx-audience { display: inline-flex; border: 1px solid var(--color-border); border-radius: 999px; overflow: hidden; background: var(--color-bg); }
+.cx-audopt { background: none; border: 0; padding: 0.25rem 0.65rem; font-size: 0.78rem; font-weight: 600; color: var(--color-text-muted); cursor: pointer; user-select: none; }
+.cx-audopt:hover { color: var(--color-primary); }
+.cx-audopt.on { background: var(--color-primary); color: #fff; }
+.post__aud { color: var(--color-text-muted); }
+
+/* Another user's profile: back button + friend action + private state */
+.cx-profiletools { display: inline-flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.cx-profiletools.cx-profiletools { margin-bottom: 0.6rem; }
+.cx-profile__row .cx-profiletools { margin-bottom: 0; }
+.cx-sharebtn { white-space: nowrap; }
+.cx-friendbtns { display: inline-flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.cx-friendtag { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.8rem; font-weight: 700; color: #15803d; background: #dcfce7; border-radius: 999px; padding: 0.15rem 0.6rem; }
+.cx-profile--locked .cx-locked {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  margin-top: 0.6rem;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--cx-radius);
+  color: var(--color-text-muted);
+}
+.cx-locked__ic { font-size: 1.6rem; flex: none; }
+
+/* Own profile: incoming requests + friends grid */
+.cx-friendreqs { display: flex; flex-direction: column; }
+.cx-friendrow { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0; border-top: 1px solid var(--color-border); }
+.cx-friendrow:first-child { border-top: none; }
+.cx-friendrow__name { flex: 1; font-weight: 700; }
+.cx-friendrow__act { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; }
+.cx-friendgrid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+.cx-friendchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.7rem 0.22rem 0.22rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cx-friendchip:hover { border-color: var(--color-primary); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+/* Tiny avatars in friend UI keep the level ring but drop the cramped badges. */
+.cx-friendchip .cx-bdg-lvl, .cx-friendchip .cx-bdg-streak,
+.cx-friendrow .cx-bdg-lvl, .cx-friendrow .cx-bdg-streak { display: none; }
+
+/* Profile edit form */
+.cx-profileform { display: flex; flex-direction: column; gap: 0.35rem; }
+.cx-fieldgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.cx-fieldgrid > div { display: flex; flex-direction: column; }
+
+/* Gif picker grid */
+.cx-gifgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.4rem;
+  margin-bottom: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  background: var(--color-surface);
+}
+.cx-gifopt {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+.cx-gifopt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cx-gifopt:hover { transform: scale(1.06); border-color: var(--color-primary); }
+.cx-gifopt.on { border-color: var(--color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent); }
+.cx-gifopt--initials .cx-av { width: 100%; height: 100%; border-radius: 0; font-size: 1.1rem; }
+.cx-gifopt--champ { border-color: var(--color-accent); }
+.cx-gifopt__crown { position: absolute; top: 2px; right: 3px; font-size: 0.85rem; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
+.cx-gifopt--locked {
+  cursor: not-allowed;
+  flex-direction: column;
+  gap: 2px;
+  border-style: dashed;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+.cx-gifopt__lock { font-size: 1.2rem; }
+.cx-gifopt__lvl { font-size: 0.52rem; font-weight: 800; text-align: center; line-height: 1.1; padding: 0 2px; }
+
+@media (max-width: 560px) {
+  .cx-fieldgrid { grid-template-columns: 1fr; }
+}
+
+/* Empty states */
+.cx-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+.cx-empty__mark { font-size: 1.6rem; color: var(--color-primary); opacity: 0.7; }
+.cx-empty b { display: block; margin: 0.3rem 0 0.2rem; color: var(--color-text); }
+.cx-empty p { margin: 0; }
+
+/* =========================================================
+   Discover: challenge + word of the day
+   ========================================================= */
+.cx-bento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+.cx-word, .cx-ch {
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.2rem;
+}
+.cx-word { background: linear-gradient(135deg, #f5f3ff, #ede9fe); }
+.cx-word__badge, .cx-ch__badge {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-primary);
+}
+.cx-word__w { margin: 0.3rem 0 0.4rem; font-size: 1.6rem; }
+.cx-word__type { font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); font-style: italic; }
+.cx-word__def { margin: 0 0 0.4rem; }
+.cx-word__ex { margin: 0 0 0.7rem; color: var(--color-text-muted); font-style: italic; }
+.cx-word__syn { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.cx-chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+.cx-chip--syn { color: #15803d; border-color: #bbf7d0; }
+.cx-chip--ant { color: #b91c1c; border-color: #fecaca; }
+
+.cx-ch__q { margin: 0.4rem 0 0.7rem; font-weight: 600; font-size: 1.05rem; }
+.cx-ch__opts { display: flex; flex-direction: column; gap: 0.5rem; }
+.cx-ch__opt {
+  text-align: left;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+.cx-ch__opt:not(:disabled):hover { border-color: var(--color-primary); transform: translateX(2px); }
+.cx-ch__opt.is-correct { border-color: var(--color-success); background: #dcfce7; color: #15803d; }
+.cx-ch__opt.is-wrong { border-color: var(--color-danger); background: #fee2e2; color: #b91c1c; }
+.cx-ch__opt.is-dim { opacity: 0.5; }
+.cx-ch__opt:disabled { cursor: default; }
+.cx-ch__feedback {
+  margin-top: 0.8rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+.cx-ch__feedback.ok { background: #dcfce7; }
+.cx-ch__feedback.no { background: #fef3c7; }
+.cx-ch__feedback b { display: block; margin-bottom: 0.2rem; }
+.cx-ch__feedback p { margin: 0; color: var(--color-text); }
+
+/* =========================================================
+   Discover: leaderboard
+   ========================================================= */
+.cx-lb__me {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.8rem 1rem;
+  margin-bottom: var(--space-md);
+  border-radius: var(--cx-radius);
+  color: #fff;
+  background: var(--cx-grad);
+  box-shadow: 0 8px 22px -12px rgba(124, 58, 237, 0.6);
+}
+.cx-lb__melabel { font-weight: 700; opacity: 0.95; }
+.cx-lb__merank { font-size: 1.5rem; }
+.cx-lb__me .cx-muted { color: rgba(255, 255, 255, 0.85); }
+.cx-lb { display: flex; flex-direction: column; gap: 0.4rem; }
+.cx-lb__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+}
+.cx-lb__row--top { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border)); }
+.cx-lb__rank { flex: none; width: 1.8rem; text-align: center; font-weight: 800; font-size: 1.1rem; }
+.cx-lb__id { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; flex: 1; }
+.cx-lb__id b { font-size: 0.95rem; }
+.cx-lb__pts { font-weight: 800; color: var(--color-primary); }
+
+/* =========================================================
+   Discover: study groups
+   ========================================================= */
+.cx-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-md);
+}
+.cx-group {
+  --g: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--g);
+  border-radius: var(--cx-radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.cx-group:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.cx-group__badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 14px;
+  font-size: 1.5rem;
+  color: #fff;
+  background: var(--g);
+}
+.cx-group__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.cx-group__name { display: block; font-size: 1rem; }
+.cx-group__topic { display: block; font-size: 0.88rem; color: var(--color-text-muted); }
+.cx-group__go { flex: none; color: var(--g); font-weight: 800; font-size: 1.1rem; }
+.cx-group__join {
+  flex: none;
+  align-self: flex-start;
+  border: 1px solid var(--g);
+  background: transparent;
+  color: var(--g);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cx-group__join:hover { background: color-mix(in srgb, var(--g) 12%, transparent); }
+.cx-group__join.on { background: var(--g); color: #fff; }
+
+/* =========================================================
+   Discover: events
+   ========================================================= */
+.cx-events { display: flex; flex-direction: column; gap: 0.6rem; }
+.cx-event {
+  --e: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--e);
+  border-radius: var(--cx-radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.8rem 1rem;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.cx-event:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.cx-event__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 14px;
+  font-size: 1.2rem;
+  background: color-mix(in srgb, var(--e) 12%, transparent);
+}
+.cx-event__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.cx-event__kind {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--e);
+}
+.cx-event__title { font-size: 0.98rem; }
+.cx-event__go {
+  flex: none;
+  border: 1px solid var(--e);
+  background: transparent;
+  color: var(--e);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cx-event__go:hover { background: color-mix(in srgb, var(--e) 12%, transparent); }
+.cx-event__go.on { background: var(--e); color: #fff; }
+
+/* =========================================================
+   Discover: badges gallery
+   ========================================================= */
+.cx-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-md);
+}
+.cx-badgecard {
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.2rem 0.9rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cx-badgecard.is-earned:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.cx-badgecard.is-earned { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border)); }
+.cx-badgecard.is-locked { opacity: 0.6; filter: grayscale(0.4); }
+.cx-badgecard__ic {
+  display: inline-grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  font-size: 1.6rem;
+  margin-bottom: 0.5rem;
+  background: var(--color-surface);
+}
+.cx-badgecard.is-earned .cx-badgecard__ic { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+.cx-badgecard b { display: block; font-size: 0.95rem; }
+.cx-badgecard p { margin: 0.2rem 0 0; font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; }
+
+/* Discover sections stack on narrow screens */
+@media (max-width: 720px) {
+  .cx-bento { grid-template-columns: 1fr; }
+}
+
+/* =========================================================
+   Composer: group-creation extras + icon picker
+   ========================================================= */
+.cx-type--group { --t: #0891b2; }
+.cx-grouprow { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; }
+.cx-iconpick {
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  transition: border-color 0.15s ease;
+}
+.cx-iconpick:hover { border-color: var(--color-primary); }
+.cx-grouprow .cx-input { flex: 1; }
+.cx-icongrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  background: var(--color-surface);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.cx-iconopt {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--color-bg);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.cx-iconopt:hover { transform: scale(1.12); border-color: var(--color-primary); }
+.cx-iconopt.on { border-color: var(--color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent); }
+
+/* =========================================================
+   Group topic (detail view)
+   ========================================================= */
+.cx-back {
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-weight: 700;
+  padding: 0.2rem 0;
+  margin-bottom: 0.6rem;
+}
+.cx-back:hover { text-decoration: underline; }
+.cx-grouphead {
+  --g: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--color-border);
+  border-left: 5px solid var(--g);
+  border-radius: var(--cx-radius);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--g) 10%, var(--color-bg)), var(--color-bg));
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.2rem;
+  margin-bottom: var(--space-md);
+}
+.cx-grouphead__ic {
+  flex: none;
+  width: 3.4rem;
+  height: 3.4rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.9rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--g) 16%, var(--color-bg));
+}
+.cx-grouphead__id { flex: 1; min-width: 0; }
+.cx-grouphead__id h1 { margin: 0; font-size: 1.4rem; }
+.cx-grouphead__id p { margin: 0.1rem 0 0.2rem; color: var(--color-text-muted); }
+.cx-grouphead .cx-group__join { align-self: center; }
+
+.cx-groupbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+}
+.cx-members { display: flex; }
+.cx-member { margin-left: -0.5rem; }
+.cx-member:first-child { margin-left: 0; }
+.cx-member .cx-av { border: 2px solid var(--color-bg); }
+.cx-groupbar__actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.btn-mini.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+.cx-addmember {
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-surface);
+  padding: 0.8rem 1rem;
+  margin-bottom: var(--space-md);
+}
+.cx-addmember__list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.cx-addmember__opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem 0.2rem 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease;
+}
+.cx-addmember__opt:hover { border-color: var(--color-primary); }
+.cx-addmember__opt .cx-av { width: 1.7rem; height: 1.7rem; font-size: 0.65rem; }
+
+.cx-groupcompose { display: flex; align-items: flex-start; gap: 0.6rem; margin-bottom: var(--space-md); }
+.cx-groupcompose .cx-input { flex: 1; }
+.cx-groupcompose .btn { flex: none; }
+.cx-groupjoinbar {
+  text-align: center;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-surface);
+  padding: 0.9rem;
+  margin-bottom: var(--space-md);
+}
+
+/* =========================================================
+   Events: locked (no access) state
+   ========================================================= */
+.cx-lock {
+  text-align: center;
+  padding: 2.4rem 1.5rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--cx-radius);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+.cx-lock__ic { font-size: 2.2rem; }
+.cx-lock b { display: block; margin: 0.3rem 0 0.2rem; color: var(--color-text); }
+.cx-lock p { margin: 0 auto; max-width: 46ch; }
+
+/* =========================================================
+   Admin: chip, role switch, dashboard
+   ========================================================= */
+.cx-adminchip {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: var(--color-danger);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  vertical-align: middle;
+}
+.cx-segs { display: inline-flex; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.3rem; }
+.cx-side__group--admin .cx-side__title { color: var(--color-danger); }
+
+.cx-adminstats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: var(--space-md);
+}
+.cx-adminstat {
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.8rem 0.5rem;
+}
+.cx-adminstat b { display: block; font-size: 1.4rem; color: var(--color-primary); }
+.cx-adminstat span { font-size: 0.8rem; color: var(--color-text-muted); }
+
+.cx-box + .cx-box { margin-top: var(--space-md); }
+.cx-admin__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
+.cx-admin__head h3 { margin: 0; }
+
+.cx-admintable { display: flex; flex-direction: column; }
+.cx-adminrow {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1fr 1.4fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.2rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+.cx-adminrow--head { border-top: none; font-weight: 800; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.cx-adminrow__u { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.cx-adminrow__u .cx-av { width: 1.8rem; height: 1.8rem; font-size: 0.65rem; }
+.cx-toggle {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.cx-toggle.on { background: var(--color-success); border-color: var(--color-success); color: #fff; }
+.cx-crudbtns { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+
+.cx-levelchip {
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-radius: 999px;
+  padding: 0.02rem 0.4rem;
+  margin-left: 0.2rem;
+}
+.cx-simlevel { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+.cx-simlbl { min-width: 6rem; font-weight: 700; font-size: 0.85rem; color: var(--color-text-muted); }
+.cx-simlevel input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--color-primary); }
+.cx-simlevel b { min-width: 2rem; text-align: right; color: var(--color-primary); }
+
+.cx-crud { display: flex; flex-direction: column; gap: 0.4rem; }
+.cx-crudrow { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.4rem 0; border-top: 1px solid var(--color-border); }
+.cx-crudrow:first-child { border-top: none; }
+
+.cx-adminprofile__row { display: flex; align-items: center; gap: 0.8rem; margin: 0.4rem 0 0.6rem; }
+.cx-adminprofile__row b { font-size: 1.05rem; }
+.cx-adminprofile__row p { margin: 0.1rem 0 0; }
+.cx-adminprofile__stats { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.cx-adminprofile__stats b { color: var(--color-primary); }
+
+@media (max-width: 720px) {
+  .cx-adminrow { grid-template-columns: 1.6fr 0.7fr 1fr; }
+  .cx-adminrow > :nth-child(4) { display: none; }
+}
+
+/* =========================================================
+   Admin CRUD controls on content (posts, groups, events, exercises)
+   ========================================================= */
+.post__admin,
+.cx-event__admin,
+.cx-grouphead__admin {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-left: 0.35rem;
+  flex: none;
+}
+.post__adminbtn {
+  width: 1.9rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-bg);
+  font-size: 0.85rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.post__adminbtn:hover { border-color: var(--color-primary); }
+.post__adminbtn--del:hover { border-color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 10%, transparent); }
+
+.post__edit { display: flex; flex-direction: column; gap: 0.5rem; }
+.post__editactions { display: flex; gap: 0.5rem; }
+
+.cx-groupedit { margin-bottom: var(--space-md); display: flex; flex-direction: column; gap: 0.3rem; }
+
+.cx-ex__admin { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.5rem; }
+.cx-ex__empty { padding: 0.8rem 0; }
+
+/* Admin proposal history — sortable, filterable table */
+.cx-histfilter {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin: 0.6rem 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+.cx-fchip {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.cx-fchip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.cx-fchip.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+.cx-histtable-wrap { overflow-x: auto; }
+.cx-histtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.cx-histtable th,
+.cx-histtable td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.cx-histtable thead th {
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+.cx-histtable tbody tr:hover { background: color-mix(in srgb, var(--color-primary) 5%, transparent); }
+/* Sortable header buttons */
+.cx-th {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cx-th:hover { color: var(--color-primary); }
+.cx-th.on { color: var(--color-primary); }
+.cx-histt__n { width: 2.2rem; color: var(--color-text-muted); }
+.cx-histt__prompt { min-width: 16rem; }
+.cx-histtable td.cx-histt__act { width: 2.4rem; text-align: center; }
+.cx-histtable td.cx-histt__status { text-align: center; }
+.cx-histt__empty { text-align: center; padding: 1.2rem; }
+.cx-histtable .cx-tag { display: inline-block; }
+
+/* Status as a colored bullet + label (green = approved, red = rejected) */
+.cx-status { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.cx-dot { display: inline-block; vertical-align: middle; width: 0.7rem; height: 0.7rem; border-radius: 50%; flex: none; }
+.cx-dot--ok { background: #16a34a; box-shadow: 0 0 0 3px color-mix(in srgb, #16a34a 20%, transparent); }
+.cx-dot--no { background: #dc2626; box-shadow: 0 0 0 3px color-mix(in srgb, #dc2626 20%, transparent); }
+.cx-histt__lesson { margin-top: 0.25rem; font-size: 0.82rem; }
+
+/* Link back to the lesson a proposal came from (pending list + history) */
+.cx-lessonlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+  user-select: none;
+}
+.cx-lessonlink:hover { color: var(--color-primary-dark); border-bottom-style: solid; }
+
+.cx-eventform { margin-bottom: var(--space-md); display: flex; flex-direction: column; gap: 0.3rem; }
+.cx-eventform__row { display: flex; gap: 0.6rem; }
+.cx-eventform__row > div { flex: 1; }
+
+.cx-crudrow__hint { flex: 1; font-size: 0.8rem; margin: 0 0.6rem; }
+@media (max-width: 720px) {
+  .cx-eventform__row { flex-direction: column; }
+  .cx-crudrow__hint { display: none; }
+}
+
+/* =========================================================
+   Guest gate
+   ========================================================= */
+.cx-gate {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  max-width: 560px;
+  margin: var(--space-xl) auto;
+  padding: 2.5rem 1.5rem;
+  border-radius: var(--cx-radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-md);
+}
+.cx-gate__glow {
+  position: absolute;
+  inset: -60% 20% auto 20%;
+  height: 300px;
+  background: radial-gradient(closest-side, rgba(124, 58, 237, 0.18), transparent);
+  pointer-events: none;
+}
+.cx-gate__lock { font-size: 2.4rem; }
+.cx-gate__mascot .mascot,
+.cx-empty__mascot .mascot { animation: mascot-bob 3.2s ease-in-out infinite; }
+@keyframes mascot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cx-gate__mascot .mascot, .cx-empty__mascot .mascot { animation: none; }
+}
+.cx-gate h2 { margin: 0.4rem 0 0.3rem; }
+.cx-gate p { color: var(--color-text-muted); max-width: 42ch; margin-inline: auto; }
+.cx-gate__actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
+
+/* =========================================================
+   Clasament v2 — podium cu aure + aplauze, „Zona ta" cu poke + melc
+   ========================================================= */
+.cx-podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  align-items: end;
+  gap: 0.7rem;
+  margin-bottom: var(--space-md);
+}
+.cx-pod {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1.4rem 0.6rem 0.55rem;
+  border-radius: var(--cx-radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+.cx-pod--1 {
+  padding-top: 1.9rem;
+  border-color: #fcd34d;
+  background: linear-gradient(180deg, #fffbeb, var(--color-bg) 60%);
+}
+.cx-pod--2 { background: linear-gradient(180deg, #f8fafc, var(--color-bg) 60%); }
+.cx-pod--3 { background: linear-gradient(180deg, #fff7ed, var(--color-bg) 60%); }
+.cx-pod__aura {
+  position: absolute;
+  top: 1.1rem;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(245, 158, 11, 0.3), transparent 70%);
+  filter: blur(2px);
+  pointer-events: none;
+  animation: cx-aura 3.4s ease-in-out infinite;
+}
+.cx-pod--2 .cx-pod__aura { background: radial-gradient(closest-side, rgba(148, 163, 184, 0.32), transparent 70%); }
+.cx-pod--3 .cx-pod__aura { background: radial-gradient(closest-side, rgba(180, 83, 9, 0.26), transparent 70%); }
+@keyframes cx-aura {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.12); }
+}
+.cx-pod__crown {
+  position: absolute;
+  top: -0.85rem;
+  font-size: 1.4rem;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+  animation: cx-crown 3s ease-in-out infinite;
+}
+.cx-pod--1 .cx-pod__crown { font-size: 1.7rem; }
+@keyframes cx-crown {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-4px) rotate(3deg); }
+}
+.cx-pod__name { font-size: 0.95rem; }
+.cx-pod__pts { font-weight: 800; color: var(--color-primary); font-size: 0.9rem; }
+.cx-pod__base {
+  position: absolute;
+  bottom: 0.3rem;
+  right: 0.55rem;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: color-mix(in srgb, var(--color-text-muted) 25%, transparent);
+}
+
+/* 👏 aplauze (podium + rânduri) */
+.cx-clap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.12rem 0.6rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
+}
+.cx-clap:hover { border-color: var(--color-primary); color: var(--color-primary); transform: scale(1.07); }
+.cx-clap.is-done { border-color: #f59e0b; color: #b45309; background: #fffbeb; cursor: default; transform: none; }
+.cx-lb__row .cx-clap { flex: none; margin-right: 0.5rem; }
+
+/* 🚀 în formă (cel mai mare urcuș) */
+.cx-riser {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #9a3412;
+  background: linear-gradient(135deg, #ffedd5, #fed7aa);
+  border: 1px solid #fdba74;
+  white-space: nowrap;
+  animation: cx-riser 2.8s ease-in-out infinite;
+}
+@keyframes cx-riser {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.cx-lb__trend { font-size: 0.62rem; font-weight: 800; color: var(--color-text-muted); display: block; }
+.cx-lb__trend--up { color: #16a34a; }
+.cx-lb__trend--down { color: #dc2626; }
+
+/* „Zona ta" — vecinii tăi de clasament + progres + poke + melc */
+.cx-zone {
+  margin-top: var(--space-md);
+  padding: 0.9rem 1rem;
+  border-radius: var(--cx-radius);
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    var(--cx-grad) border-box;
+  box-shadow: var(--shadow-sm);
+}
+.cx-zone__head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+.cx-zone__head h3 { margin: 0 0 0.4rem; }
+.cx-zone__row { display: flex; align-items: center; gap: 0.55rem; padding: 0.3rem 0; }
+.cx-zone__row--me { background: color-mix(in srgb, var(--color-primary) 6%, transparent); border-radius: 10px; padding-inline: 0.45rem; }
+.cx-zone__who { min-width: 0; }
+.cx-zone__trackwrap { padding: 0.15rem 0 0.35rem; }
+.cx-zone__track {
+  position: relative;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  overflow: visible;
+}
+.cx-zone__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cx-grad);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cx-zone__gap { display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--color-text-muted); }
+
+/* 👉 poke — o dată pe zi, către cel de deasupra ta */
+.cx-poke {
+  margin-left: auto;
+  flex: none;
+  border: 1px solid #fdba74;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  color: #9a3412;
+  border-radius: 999px;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cx-poke:hover { transform: scale(1.06) rotate(-2deg); box-shadow: 0 8px 18px -10px rgba(234, 88, 12, 0.7); }
+.cx-poke.is-done { margin-left: auto; flex: none; font-size: 0.8rem; font-weight: 700; color: #b45309; cursor: default; padding: 0.25rem 0.4rem; }
+
+/* 🐌 melcul care urcă spre următorul din top (apare după poke) */
+.cx-zone__snail {
+  position: absolute;
+  top: 50%;
+  left: var(--from, 20%);
+  font-size: 1.05rem;
+  transform: translate(-50%, -58%) scaleX(-1); /* privește spre dreapta */
+  animation: cx-snail 14s ease-in-out infinite;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+}
+@keyframes cx-snail {
+  0% { left: var(--from, 20%); }
+  46% { left: calc(var(--from, 20%) + 7%); }
+  55% { left: calc(var(--from, 20%) + 6.4%); } /* alunecă puțin înapoi… e melc */
+  96%, 100% { left: calc(var(--from, 20%) + 12%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-pod__aura, .cx-pod__crown, .cx-riser, .cx-zone__snail { animation: none; }
+}
+@media (max-width: 720px) {
+  .cx-podium { grid-template-columns: 1fr; align-items: stretch; }
+  .cx-pod--1 { order: -1; }
+}
+
+/* =========================================================
+   Forum discovery toolbar (search + type chips + Noi/Populare)
+   ========================================================= */
+.cx-feedbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.7rem 0;
+}
+.cx-feedbar__search { flex: 1 1 12rem; min-width: 10rem; }
+.cx-feedbar__chips,
+.cx-feedbar__sort { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+.cx-feedbar__sort { margin-left: auto; }
+.cx-feedbar .cx-fchip.on { background: var(--t, var(--color-primary)); border-color: var(--t, var(--color-primary)); }
+.cx-fchip--sort.on { background: var(--color-primary); border-color: var(--color-primary); }
+
+/* =========================================================
+   Inline notices & warnings (profanity filter, held posts)
+   ========================================================= */
+.cx-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0.6rem 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--cx-radius-sm);
+  border: 1px solid #f59e0b;
+  background: color-mix(in srgb, #f59e0b 12%, var(--color-bg));
+  font-size: 0.88rem;
+}
+.cx-warn {
+  margin: 0.45rem 0 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid #dc2626;
+  background: color-mix(in srgb, #dc2626 8%, var(--color-bg));
+  color: #b91c1c;
+  font-size: 0.84rem;
+}
+
+/* =========================================================
+   Notifications v2 — friendly, self-explaining cards: a kind label in
+   its own colour, the actor in bold, the quote, then WHERE it happened.
+   ========================================================= */
+.cx-actrow {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid color-mix(in srgb, var(--color-text-muted) 30%, transparent);
+  border-radius: var(--cx-radius-sm);
+  padding: 0.65rem 0.85rem;
+  box-shadow: var(--shadow-sm);
+}
+.cx-actrow--award { border-left-color: #16a34a; }
+.cx-actrow--friend { border-left-color: #7c3aed; }
+.cx-actrow--mention { border-left-color: #0891b2; }
+.cx-actrow--like { border-left-color: #db2777; }
+.cx-actrow--comment, .cx-actrow--reply { border-left-color: #2563eb; }
+.cx-actrow--poke { border-left-color: #f59e0b; }
+.cx-actrow__kind {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--k, var(--color-text-muted));
+  margin-bottom: 0.1rem;
+}
+.cx-actrow__kind b { color: #dc2626; }
+.cx-actrow__what { margin: 0; }
+.cx-actrow.is-unread { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg)); }
+
+/* Rows that resolve to a source post are clickable and say so. */
+.cx-actrow--link { cursor: pointer; border-radius: var(--cx-radius-sm); transition: background 0.15s ease; }
+.cx-actrow--link:hover { background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.cx-actrow__go {
+  align-self: center;
+  margin-left: auto;
+  flex: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.cx-actrow__go:hover { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+
+/* Bookmark ("Salvate") */
+.post__act.is-saved { color: var(--color-primary); }
+
+/* =========================================================
+   Messages — safe inbox/outbox (templates between members)
+   ========================================================= */
+.cx-msglist { display: flex; flex-direction: column; gap: 0.6rem; }
+.cx-msg {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.65rem 0.85rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+.cx-msg.is-unread { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg)); }
+.cx-msg__body { flex: 1; min-width: 0; }
+.cx-msg__head { margin: 0 0 0.15rem; font-size: 0.86rem; }
+.cx-msg__text { margin: 0; overflow-wrap: anywhere; }
+.cx-msg__reply { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; }
+
+/* The template catalogue (collapsible categories of safe messages). */
+.cx-msgcat { border: 1px solid var(--color-border); border-radius: 10px; margin: 0.3rem 0; }
+.cx-msgcat > summary {
+  cursor: pointer;
+  padding: 0.45rem 0.7rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  list-style: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cx-msgcat > summary::before { content: "▸ "; color: var(--color-primary); }
+.cx-msgcat[open] > summary::before { content: "▾ "; }
+.cx-msgcat__items { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0 0.7rem 0.6rem; }
+.cx-msgtpl {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+.cx-msgtpl:hover { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); transform: translateY(-1px); }
+
+/* "nou" pulse on a group card with unseen activity */
+.cx-group__new {
+  display: inline-block;
+  padding: 0.02rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #dc2626;
+  animation: cx-groupnew 2s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes cx-groupnew {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cx-group__new { animation: none; }
+}
+
+/* Guest experience: join invitations + slim sidebar identity */
+.cx-guestinvite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--cx-radius);
+  border: 1px dashed var(--color-border);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg));
+  font-size: 0.92rem;
+}
+.cx-guestline { margin: 0 0 0.5rem; font-size: 0.88rem; color: var(--color-text-muted); }
+.cx-guestline a { font-weight: 700; }
+.cx-side__me--guest .cx-av { width: 2.6rem; height: 2.6rem; }
+.cx-side__join { font-size: 0.82rem; font-weight: 700; color: var(--color-primary); text-decoration: none; }
+.cx-side__join:hover { color: var(--color-primary-dark); text-decoration: none; }
+
+/* Forum pagination */
+.cx-loadmore {
+  display: block;
+  width: 100%;
+  margin-top: 0.7rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  background: var(--color-bg);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.cx-loadmore:hover { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 6%, transparent); }
+
+/* Notebook v2: tools, edit mode, search, lesson select */
+.cx-note__tools { display: inline-flex; align-items: center; gap: 0.35rem; }
+.cx-note--edit { display: flex; flex-direction: column; gap: 0.4rem; }
+.cx-note__actions { display: flex; gap: 0.4rem; }
+.cx-writer__lesson { max-width: 14rem; }
+.cx-notes__search { margin: 0.6rem 0; }
+
+/* Brief flash on the post you just jumped to. */
+.post--flash { animation: post-flash 1.5s ease; }
+@keyframes post-flash {
+  0%, 60% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 55%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.cx-newdot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-primary);
+  vertical-align: middle;
+  margin-left: 0.2rem;
+}
+
+/* Sidebar admin badge — things awaiting the teacher. */
+.cx-side__badge {
+  margin-left: auto;
+  min-width: 1.2rem;
+  text-align: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #fff;
+  background: #dc2626;
+}
+
+/* =========================================================
+   Reshares — wrapper card with the original embedded read-only
+   ========================================================= */
+.post__embed {
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  padding: 0.7rem 0.85rem;
+  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+}
+.post__embed--gone { padding: 0.9rem; }
+.post__head--embed { margin-bottom: 0.35rem; }
+.post__shared { color: var(--color-primary); font-weight: 700; }
+
+/* Report control on posts */
+.post__act--report:hover { color: #b91c1c; }
+.post__act--reported { opacity: 0.65; cursor: default; }
+
+/* Own proposal — vote arrow replaced by an inert dash */
+.cx-ex__up--own { opacity: 0.5; cursor: default; }
+
+/* Negative entries in the points log (e.g. a withdrawn "correct") */
+.cx-plog__pts--neg { color: #b91c1c; }
+
+/* =========================================================
+   Admin dashboard v2 — tabs, attention box, users bar, moderation
+   ========================================================= */
+.cx-tabs--admin { margin-bottom: var(--space-md); }
+.cx-tabbtn__n--hot { background: #dc2626; color: #fff; }
+.cx-tabbtn.on .cx-tabbtn__n--hot { background: #dc2626; color: #fff; }
+
+.cx-attention {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--cx-radius-sm);
+  border: 1px solid #f59e0b;
+  background: color-mix(in srgb, #f59e0b 10%, var(--color-bg));
+}
+.cx-attention--clear { border-color: #16a34a; background: color-mix(in srgb, #16a34a 8%, var(--color-bg)); }
+.cx-attention__item {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.cx-attention__item:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* Stats are buttons now — each opens where you act on it. */
+button.cx-adminstat { cursor: pointer; font: inherit; transition: transform 0.15s ease, border-color 0.15s ease; }
+button.cx-adminstat:hover { border-color: var(--color-primary); transform: translateY(-1px); }
+
+.cx-userbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.cx-userbar__search { flex: 1 1 10rem; }
+
+/* Moderation queue items */
+.cx-modlist { display: flex; flex-direction: column; gap: 0.6rem; }
+.cx-moditem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  background: var(--color-bg);
+}
+.cx-moditem--held-post { border-left-color: #f59e0b; }
+.cx-moditem--blocked-comment { border-left-color: #94a3b8; }
+.cx-moditem--report { border-left-color: #dc2626; }
+.cx-moditem--exercise { border-left-color: var(--color-primary); }
+.cx-moditem__ic { font-size: 1.1rem; line-height: 1.5; }
+.cx-moditem__body { flex: 1; min-width: 0; }
+.cx-moditem__head { margin: 0; font-size: 0.86rem; }
+.cx-moditem__text { margin: 0.25rem 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+.cx-moditem__meta { margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.8rem; }
+.cx-modmatches code {
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  color: #b91c1c;
+  border-radius: 6px;
+  padding: 0.05rem 0.35rem;
+  margin-right: 0.2rem;
+  font-size: 0.78rem;
+}
+.cx-moditem__act { display: flex; flex-direction: column; gap: 0.3rem; align-items: stretch; }
+
+/* Collapsible admin panels (bar previews) */
+.cx-details > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  user-select: none;
+}
+.cx-details > summary::before { content: "▸"; color: var(--color-primary); transition: transform 0.15s ease; }
+.cx-details[open] > summary::before { transform: rotate(90deg); }
+.cx-details > summary h3 { display: inline; margin: 0; }
+
+@media (max-width: 720px) {
+  .cx-feedbar__sort { margin-left: 0; }
+  .cx-moditem { flex-direction: column; }
+  .cx-moditem__act { flex-direction: row; }
+}
+
+/* =========================================================
+   Design refresh v2 — post menu, collapsed composer, highlights,
+   profile cover, streak calendar, level card, messages grid, admin v3
+   ========================================================= */
+
+/* Post "⋯" menu (secondary actions: follow, report) */
+.post__more { position: relative; margin-left: auto; }
+.post__menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  z-index: 40;
+  min-width: 14rem;
+  padding: 0.3rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 16px 36px -16px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+}
+.post__menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.post__menu__item:hover { background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.post__menu__item.is-done { opacity: 0.6; cursor: default; }
+.post__followdot { color: var(--color-primary); display: inline-flex; width: 1rem; height: 1rem; }
+.post__followdot svg { width: 100%; height: 100%; }
+
+/* Guests see ghosted actions — the styling explains, no toast spam. */
+.post__foot--ghost .post__act { opacity: 0.5; }
+.post__foot--ghost .post__act:hover { opacity: 0.8; }
+
+/* Collapsed composer — one friendly line until you actually write. */
+.cx-composer--collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  cursor: text;
+  text-align: left;
+}
+.cx-composer__hint { color: var(--color-text-muted); font-size: 0.95rem; }
+
+/* Search highlight */
+.cx-mark { background: color-mix(in srgb, var(--color-accent) 45%, transparent); border-radius: 3px; padding: 0 2px; }
+
+/* Profile cover — a social profile, not an admin sheet. */
+.cx-profile--cover { position: relative; overflow: hidden; padding-top: 4.4rem; }
+.cx-profile__cover {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4.6rem;
+  background: var(--grad-brand);
+  opacity: 0.9;
+}
+.cx-profile--cover .cx-profile__row { position: relative; }
+.cx-inforow__hint {
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: 999px;
+  padding: 0.02rem 0.4rem;
+}
+
+/* Streak calendar — the last 14 days, active ones lit. */
+.cx-cal {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--cx-radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+.cx-cal__flame { font-weight: 800; }
+.cx-cal__strip { display: flex; gap: 0.25rem; }
+.cx-cal__day {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.cx-cal__day.on { background: var(--color-accent); color: #3a2a00; border-color: transparent; }
+.cx-cal__day.today { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+/* Level card on the Puncte page */
+.cx-levelcard__head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.cx-levelcard__head b { font-size: 1.15rem; }
+.cx-levelcard__track {
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+.cx-levelcard__track span { display: block; height: 100%; border-radius: 999px; background: var(--grad-brand); transition: width 0.5s ease; }
+
+/* Messages: category chips + always-visible template grid + sent tick */
+.cx-msgchips { display: flex; gap: 0.35rem; flex-wrap: wrap; margin: 0.5rem 0; }
+.cx-msggrid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.cx-msg__sent { font-size: 0.72rem; font-weight: 700; color: var(--color-success); }
+
+/* Exercise proposal preview (hub, simple rendition) */
+.cx-expreview {
+  margin-top: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--cx-radius-sm);
+  border: 1px dashed var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg));
+}
+.cx-expreview__label { margin: 0 0 0.3rem; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+.cx-expreview__prompt { margin: 0 0 0.4rem; font-weight: 600; }
+.cx-expreview__opts { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.cx-expreview__opt {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.84rem;
+  background: var(--color-bg);
+}
+.cx-expreview__opt.ok { border-color: var(--color-success); color: var(--color-success); font-weight: 700; }
+
+/* Moderation v2: expand, media thumbs, resolved look */
+.cx-moditem__more summary { cursor: pointer; list-style: none; }
+.cx-moditem__more summary b { color: var(--color-primary); font-size: 0.8rem; }
+.cx-moditem__more[open] summary { display: none; }
+.cx-moditem__media { display: flex; gap: 0.35rem; margin: 0.35rem 0; }
+.cx-moditem__thumb {
+  width: 64px;
+  height: 42px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--color-border);
+}
+.cx-moditem--resolved { opacity: 0.75; }
+
+/* Users pager */
+.cx-pager { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin-top: 0.6rem; }
+
+/* Challenges week strip */
+.cx-week { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+.cx-week__day {
+  flex: 1 1 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.45rem 0.3rem;
+  border-radius: var(--cx-radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-size: 0.78rem;
+}
+.cx-week__day.on { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--color-bg)); }
+.cx-week__day em { font-style: normal; font-size: 0.68rem; color: var(--color-text-muted); }
+
+/* Admin pulse (today's numbers + your last actions) */
+.cx-pulse { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.cx-pulse__stat {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.84rem;
+  background: var(--color-bg);
+}
+.cx-pulse__stat b { color: var(--color-primary); }
+.cx-pulse__logtitle { margin: 0.4rem 0 0.2rem; font-size: 0.8rem; }
+.cx-pulse__log { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.84rem; }
+
+/* ONE admin tool language: the round ✎/🗑 buttons now match btn-mini. */
+.post__adminbtn {
+  border: 1px dashed var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.post__adminbtn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.post__adminbtn--del:hover { border-color: var(--color-danger); color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
+
+/* Guest sidebar seller */
+.cx-side__sell {
+  margin: 0.4rem 0.2rem 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--cx-radius-sm);
+  border: 1px dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cx-side__selltitle { margin: 0; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+.cx-side__sellrow { font-size: 0.82rem; }
+
+/* Admin inbox = conversations (thread per sender). */
+.cx-conv {
+  border: 1px solid var(--color-border);
+  border-radius: var(--cx-radius-sm);
+  padding: 0.6rem 0.7rem;
+  background: var(--color-surface);
+}
+.cx-conv__who { margin: 0 0 0.4rem; font-size: 0.9rem; }
+.cx-conv .cx-msg { margin-bottom: 0.4rem; }
+
+/* Admin on mobile: rows wrap instead of breaking. */
+@media (max-width: 720px) {
+  .cx-adminrow { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .cx-adminrow--head { display: none; }
+  .cx-week__day { flex-basis: 30%; }
+  .cx-pulse__stat { flex: 1 1 45%; text-align: center; }
+}
+
+/* =========================================================
+   Responsive — sidebar collapses to a top strip
+   ========================================================= */
+@media (max-width: 820px) {
+  .cx-shell { grid-template-columns: 1fr; }
+  .cx-side {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .cx-side__me { border-bottom: none; border-right: 1px solid var(--color-border); padding: 0.2rem 0.7rem 0.2rem 0.3rem; }
+  .cx-side__nav { flex-direction: row; flex-wrap: wrap; flex: 1; }
+  .cx-side__item { transform: none; }
+  .cx-side__item .cx-side__label { display: none; }
+  .cx-side__item.on .cx-side__label { display: inline; }
+  .cx-side__demo { border-top: none; margin: 0; padding: 0; width: 100%; }
+}

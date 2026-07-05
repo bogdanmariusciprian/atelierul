@@ -1,0 +1,4218 @@
+// =========================================================
+// Community hub (logged-in only). A single app-shell with a fixed left
+// sidebar and a content pane on the right. Sections:
+//   forum       – public community feed (default)
+//   pagina-mea  – my personal wall
+//   activitate  – comments received / given / followed
+//   exercitii   – community-proposed exercises (per lesson)
+//   lectii      – my favorite lessons
+//   caiet       – my notebook
+//   puncte      – points log
+//   profil      – editable profile
+//
+// Posts (shared by forum + wall, DRY) support: a type with an icon, a
+// chosen background tint, image uploads (object URLs), a YouTube video
+// that only plays on click, likes (no self-like), reshare (self allowed),
+// follow, and threaded comments (shared thread.js engine) revealed on
+// clicking the comment icon.
+//
+// Everything is mock (local state + mock session) for preview.
+// =========================================================
+import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
+import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
+import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
+import {
+  findProfanity, FILTER_MESSAGE, MODERATION_QUEUE, queueHeldPost,
+  queueBlockedComment, queueReport, openModerationItems, resolveModerationItem,
+} from "../../shared/scripts/moderation.js";
+import {
+  wordOfToday, challengeOfToday, allChallenges, upsertCustomChallenge,
+  deleteCustomChallenge, isCustomChallenge, GROUP_TOPICS, GROUP_ICONS, groupIcon,
+  groupColor, newGroupTopic, newGroupPost, EVENTS, EVENT_KINDS, BADGES,
+} from "../../shared/scripts/discover-data.js";
+import {
+  FORUM_POSTS, myWallPosts, POST_TYPES, postType,
+  POST_BACKGROUNDS, postBackground, topPost, nextId, relTime,
+} from "../../shared/scripts/forum-data.js";
+import {
+  PROPOSED_EXERCISES, EXERCISE_KINDS, exerciseKind, newExercise,
+  pendingExercises, resolvedExercises, decideExercise,
+} from "../../shared/scripts/exercises-data.js";
+import {
+  ACTIVITY_RECEIVED, ACTIVITY_GIVEN, ACTIVITY_KINDS,
+  unreadActivityCount, markActivityRead, recordGiven, notifyReceived, notifyUser,
+} from "../../shared/scripts/activity-data.js";
+import { AVATAR_GIFS, CHAMPION_GIF, CHAMPION_UNLOCK_LEVEL, avatarForUser } from "../../shared/scripts/avatars.js";
+import {
+  renderThread, handleThreadClick, countComments, makeUserComment, escapeHtml,
+  removeComment, CORRECT_REWARD, EDIT_WINDOW_MS,
+} from "../../shared/scripts/thread.js";
+import { pointsFx, burstAt } from "../../shared/scripts/points-fx.js";
+import { showToast } from "../../shared/scripts/toast.js";
+import { initMentions, invalidMentions, linkifyMentions, mentionsIn } from "../../shared/scripts/mentions.js";
+import { exerciseFormFields, readExerciseForm, exerciseEditFormHtml } from "../../shared/scripts/exercise-form.js";
+import { touchStreak, getStreakInfo } from "../../shared/scripts/streak.js";
+import { store } from "../../shared/scripts/store.js";
+import { getNotes, addNote, updateNote, deleteNote } from "../../shared/scripts/notebook.js";
+import { MESSAGE_TEMPLATES, sendMessage, inboxFor, outboxFor, unreadMessages, markInboxRead } from "../../shared/scripts/messages.js";
+import { mascotSvg } from "../../shared/scripts/mascot.js";
+import { MAX_LEVEL, xpSkin, levelInfo, setPreview, xpBarMarkup, applyBar } from "../../shared/scripts/xp-bar.js";
+import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
+
+// --- Small inline icons for the sidebar (single source, DRY) ----------
+const NAV_ICONS = {
+  forum: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 20l1.4-4.2A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg>`,
+  "pagina-mea": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>`,
+  activitate: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`,
+  exercitii: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h6v4a2 2 0 1 0 4 0V7h2a2 2 0 1 1 0 4h-1v6H5a1 1 0 0 1-1-1v-3a2 2 0 1 0 0-4z"/></svg>`,
+  lectii: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/></svg>`,
+  caiet: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v18M13 8h3M13 12h3"/></svg>`,
+  salvate: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg>`,
+  mesaje: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>`,
+  puncte: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M9 14l-1.5 7L12 18l4.5 3L15 14"/></svg>`,
+  profil: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.3-1.3L13.7 2h-3.4l-.3 2.5a7 7 0 0 0-2.3 1.3l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.3l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.3 1.3l.3 2.5h3.4l.3-2.5a7 7 0 0 0 2.3-1.3l2.3 1 2-3.4-2-1.5A7 7 0 0 0 19 12z"/></svg>`,
+  provocare: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>`,
+  clasament: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>`,
+  grupuri: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5.5M21 20a6 6 0 0 0-4-5.7"/></svg>`,
+  evenimente: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>`,
+  insigne: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M9 14l-1.5 7L12 18l4.5 3L15 14"/></svg>`,
+  admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>`,
+};
+
+// ONE navigation, grouped — the old top tabs + sidebar were two competing
+// systems and made wayfinding confusing. Everything now lives in the
+// sidebar; a breadcrumb above the content always says where you are.
+const NAV_GROUPS = [
+  {
+    title: "Comunitate",
+    items: [
+      { id: "forum", label: "Forum" },
+      { id: "pagina-mea", label: "Pagina mea" },
+      { id: "activitate", label: "Activitatea mea" },
+      { id: "mesaje", label: "Mesaje" },
+      { id: "exercitii", label: "Exerciții" },
+    ],
+  },
+  {
+    title: "Descoperă",
+    items: [
+      { id: "provocare", label: "Provocarea zilei" },
+      { id: "clasament", label: "Clasament" },
+      { id: "grupuri", label: "Grupuri de studiu" },
+      { id: "evenimente", label: "Evenimente" },
+      { id: "insigne", label: "Insigne" },
+    ],
+  },
+  {
+    title: "Spațiul meu",
+    items: [
+      { id: "lectii", label: "Lecțiile mele" },
+      { id: "salvate", label: "Salvate" },
+      { id: "caiet", label: "Caietul meu" },
+      { id: "puncte", label: "Puncte" },
+      { id: "profil", label: "Profil" },
+    ],
+  },
+];
+
+// Flat list of every section id (for hash validation) + label lookup.
+const ALL_SECTIONS = [...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id)), "admin"];
+// Member-only sections: the ADMIN (teacher) has no wall, points or badges —
+// gamification belongs to students. (The "Logat" demo role previews those.)
+const ADMIN_HIDDEN_SECTIONS = new Set(["pagina-mea", "puncte", "insigne"]);
+
+// What a GUEST may open: the public forum (read-only), the leaderboard,
+// the daily challenge (a real taste, no points) and public profiles.
+// Everything else invites them to join.
+const GUEST_SECTIONS = new Set(["forum", "clasament", "provocare", "profil"]);
+
+// Actions a guest may perform (read/view-only + the demo challenge).
+// Anything else shows a friendly "join us" toast instead of failing silently.
+const GUEST_ALLOWED_ACTIONS = new Set([
+  "go", "nav-back", "feed-type", "feed-sort", "feed-more", "toggle-comments",
+  "play-yt", "open-image", "lb-close", "lb-copy", "lb-save", "dismiss-notice",
+  "challenge", "copy-profile-link",
+]);
+
+// A stand-in identity for guests, so "is this mine?" checks in the thread
+// engine never match a real member's content.
+const GUEST_USER = { id: -999, name: "Vizitator", initials: "?", color: "#94a3b8" };
+const SECTION_LABELS = {
+  ...Object.fromEntries(NAV_GROUPS.flatMap((g) => g.items.map((i) => [i.id, i.label]))),
+  admin: "Panou admin",
+};
+
+const ACTION_ICONS = {
+  like: `♥`,
+  save: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg>`,
+  flag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4c4-2 8 2 12 0v9c-4 2-8-2-12 0"/></svg>`,
+  comment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 20l1.4-4.2A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg>`,
+  share: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3M8 7l4-4 4 4"/></svg>`,
+  bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`,
+};
+
+function parseYouTubeId(url) {
+  if (!url) return null;
+  const m = String(url).match(/(?:youtu\.be\/|v=|embed\/)([\w-]{6,})/);
+  return m ? m[1] : /^[\w-]{6,}$/.test(url) ? url : null;
+}
+
+function freshComposer() {
+  return {
+    type: "discutie", bg: "none", media: null, text: "",
+    audience: "public", // "public" | "friends"
+    ytOpen: false, typeOpen: false, bgOpen: false,
+    // Group-creation fields (used when type === "grup")
+    groupName: "", iconId: 0, iconOpen: false,
+  };
+}
+
+export function renderCommunity(basePath = "") {
+  const mount = document.getElementById("community");
+  if (!mount) return;
+
+  // The daily challenge persists per calendar day (no more answering it
+  // again on every reload — that was free points).
+  const CHALLENGE_KEY = "atelier_daily_challenge";
+  const todayStr = () => new Date().toISOString().slice(0, 10);
+  const savedChallenge = (() => {
+    try {
+      const s = JSON.parse(localStorage.getItem(CHALLENGE_KEY) || "null");
+      return s && s.date === todayStr() ? s : null;
+    } catch {
+      return null;
+    }
+  })();
+  // Lifetime count of solved daily challenges (drives the badge).
+  const SOLVED_KEY = "atelier_challenges_solved";
+  const challengesSolved = () => Number(localStorage.getItem(SOLVED_KEY) || 0);
+
+  const state = {
+    section: location.hash.slice(1) || "forum",
+    // ONE unified post list (Facebook model): the forum shows every public
+    // post; "Pagina mea" is just the filter of your own. Sorted newest-first.
+    posts: [...FORUM_POSTS, ...myWallPosts()].sort((a, b) => b.createdAt - a.createdAt),
+    notes: getNotes(), // persistent notebook (store.js adapter)
+    noteQuery: "",
+    editingNote: null, // note id being edited
+    saved: new Set(store.get("atelier_saved_posts", [])), // persistent 🔖
+    feedLimit: 6, // forum pagination ("Încarcă mai mult")
+    groupCreateOpen: false, // the "create group" composer in Grupuri
+    proposed: PROPOSED_EXERCISES,
+    openComments: new Set(),
+    playing: new Set(),
+    composer: freshComposer(),
+    exComposer: { open: false, lesson: MY_PROFILE.favorites[0]?.title || "", kind: "choice" },
+    thread: { openReplyId: null, openReactId: null, openEditId: null, warnId: null, warnMsg: null },
+    activityTab: "primite",
+    exTab: "pending", // exercises section: "pending" | "history" (admin)
+    exEditId: null, // proposal being edited by the admin (checked & polished)
+    exEditWarn: null,
+    histSort: { key: "date", dir: "desc" }, // history table sort
+    histFilter: "all", // history table: "all" | "approved" | "rejected"
+    challengeAnswer: savedChallenge ? savedChallenge.answer : null,
+    groups: GROUP_TOPICS.map((g) => ({ ...g })),
+    events: EVENTS.map((e) => ({ ...e })),
+    openGroup: null, // id of the group topic being viewed
+    addMemberOpen: false,
+    eventsGranted: new Set(), // admin-granted event access for other users (mock)
+    editingPost: null, // post id being edited (author or admin)
+    editingGroup: false, // editing the open group's details (admin/creator)
+    editingEvent: null, // event id being edited (admin)
+    newEventOpen: false, // admin "create event" form
+    simLevel: null, // admin: simulate a level to preview the bar/frame
+    simPrestige: 0, // admin: simulate prestige stars
+    editingProfile: false, // profile edit mode
+    pickAvatar: undefined, // avatar chosen while editing (path or null)
+    viewUser: null, // when set, the profile section shows this user's profile
+    // Forum discovery toolbar.
+    feedQuery: "", // free-text search
+    feedType: "all", // "all" | a POST_TYPES key
+    feedSort: "new", // "new" | "top"
+    // Inline notices/warnings (profanity filter & co).
+    notice: null, // message shown under the post composer
+    commentWarn: null, // { postId, msg } under a post's comment box
+    exWarn: null, // under the exercise proposal composer
+    groupWarn: null, // under the group post composer
+    profileWarn: null, // in the profile edit form
+    // Admin dashboard.
+    adminTab: "overview", // "overview" | "users" | "moderation" | "challenges" | "gamification"
+    adminUserQuery: "",
+    adminUserSort: "points", // "points" | "name"
+    adminUserPage: 1, // 10 per page
+    modFilter: "all", // "all" | "held-post" | "blocked-comment" | "report" | "history"
+    chEditId: null, // the custom challenge being edited ("new" = fresh form)
+    chWarn: null,
+    lightbox: null, // { postId, i } — the enlarged post image
+    prevNav: null, // one-step "←" snapshot (section/group/profile)
+    postMenu: null, // post id with the "⋯" menu open
+    composerOpen: false, // collapsed by default — expands on focus/click
+    exPreview: false, // live preview of the exercise being proposed (hub)
+    // Messaging (safe templates between members; free text only ↔ teacher).
+    msgTab: "inbox", // "inbox" | "outbox"
+    msgTo: null, // selected recipient id (member composer)
+    msgReplyTo: null, // message id the ADMIN is replying to
+    msgWarn: null,
+    msgCat: 0, // selected template category (chips + visible grid)
+  };
+  // Deep links into a specific admin tab: #admin/moderare, #admin/utilizatori…
+  // (used by the floating admin quick-panel, from any page of the site).
+  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification" };
+  const ADMIN_SLUG_BY_TAB = Object.fromEntries(Object.entries(ADMIN_TAB_BY_SLUG).map(([s, t]) => [t, s]));
+  function applyAdminHash() {
+    const h = location.hash.slice(1);
+    if (h !== "admin" && !h.startsWith("admin/")) return false;
+    if (!isAdmin()) {
+      state.section = "forum";
+      return true;
+    }
+    state.section = "admin";
+    // Plain #admin = the dashboard's start (Prezentare); #admin/<slug>
+    // opens that exact tab. Without the reset, the last visited tab stuck
+    // and "Panou admin" vs "Moderare" looked like the same destination.
+    const slug = h.split("/")[1];
+    state.adminTab = slug && ADMIN_TAB_BY_SLUG[slug] ? ADMIN_TAB_BY_SLUG[slug] : "overview";
+    return true;
+  }
+
+  if (!applyAdminHash()) {
+    if (!ALL_SECTIONS.includes(state.section)) state.section = "forum";
+    if (state.section === "admin" && !isAdmin()) state.section = "forum";
+  }
+
+  // Shareable deep link: ...#u/<slug> opens that member's profile directly.
+  applyUserHash();
+  function applyUserHash() {
+    const h = location.hash.slice(1);
+    if (!h.startsWith("u/")) return false;
+    const u = userBySlug(decodeURIComponent(h.slice(2)));
+    state.section = "profil";
+    state.viewUser = u && u.id !== CURRENT_USER.id ? u.id : null;
+    return true;
+  }
+
+  // findPost searches the unified feed and every group topic's posts, so
+  // the shared like/comment/share/thread handlers work everywhere.
+  const allPosts = () => [...state.posts, ...state.groups.flatMap((g) => g.posts)];
+  const findPost = (id) => allPosts().find((p) => p.id === id);
+  const findGroup = (id) => state.groups.find((g) => g.id === id);
+  const canAddMembers = (g) =>
+    isAdmin() || g.creatorId === CURRENT_USER.id || g.adderIds.includes(CURRENT_USER.id) ||
+    (g.allowMembersAdd && g.memberIds.includes(CURRENT_USER.id));
+
+  // Whether I'm allowed to see this post (audience gate, used everywhere a
+  // post could surface: feed, spotlight, urmărite, profiles — no leaks).
+  // Guests see ONLY public posts — so "🌐 Public" finally means public.
+  const canSeePost = (p) => {
+    if (!isLoggedIn()) return p.audience === "public";
+    return p.audience !== "friends" || p.authorId === CURRENT_USER.id || isFriend(p.authorId) || isAdmin();
+  };
+
+  // A user's wall = their posts from the unified feed that I may see.
+  // Group posts stay INSIDE their group (they never leak onto walls).
+  const wallPostsOf = (id) => state.posts.filter((p) => p.authorId === id && canSeePost(p));
+
+  // Remove a post from wherever it lives; reshares of it disappear too
+  // (a share without its original is meaningless).
+  function removePost(id) {
+    for (const coll of [state.posts, ...state.groups.map((g) => g.posts)]) {
+      const i = coll.findIndex((p) => p.id === id);
+      if (i >= 0) {
+        coll.splice(i, 1);
+        state.posts = state.posts.filter((p) => p.shareOf !== id);
+        return true;
+      }
+    }
+    return false;
+  }
+  function removeGroup(id) {
+    const i = state.groups.findIndex((g) => g.id === id);
+    if (i >= 0) state.groups.splice(i, 1);
+  }
+
+  // The author (or admin) manages a post; members may report others'.
+  // Guests manage nothing (they only borrow the id-0 mock identity).
+  const canManagePost = (p) => isLoggedIn() && (isAdmin() || p.authorId === CURRENT_USER.id);
+  // The author may EDIT only in the 5-minute typo window (then delete-only);
+  // admin edits anytime. Same rule as comments (Marius's rule).
+  const canEditPost = (p) =>
+    isAdmin() || (canManagePost(p) && Date.now() - (p.createdAt || 0) < EDIT_WINDOW_MS);
+
+  // Profanity gate for one text field: returns the offending words.
+  const moderate = (text) => findProfanity(text || "");
+
+  // Award/withdraw points when admin marks a reply correct. Mine go through
+  // awardPoints so the "Puncte" history stays in sync with the total.
+  function awardCorrect(c, nowCorrect) {
+    if (c.authorId === CURRENT_USER.id) {
+      // The teacher never earns points — marking his own reply "correct"
+      // (an admin-only action) is purely informational.
+      if (isAdmin()) return;
+      awardPoints(
+        nowCorrect ? "Răspuns marcat corect de profesor" : "Retragere: răspuns corect",
+        nowCorrect ? CORRECT_REWARD : -CORRECT_REWARD
+      );
+      if (nowCorrect) {
+        pointsFx(CORRECT_REWARD); // celebrate at the cursor
+        notifyReceived({
+          actorId: 0, kind: "award",
+          action: `ți-a marcat răspunsul drept CORECT (+${CORRECT_REWARD} puncte)`,
+          snippet: String(c.text).slice(0, 90),
+          context: "Răspuns corect ✓",
+        });
+      }
+    } else {
+      const u = userById(c.authorId);
+      if (u) u.points += nowCorrect ? CORRECT_REWARD : -CORRECT_REWARD;
+      // Supabase later: this lands in the student's own notifications.
+      if (nowCorrect) notifyUser(c.authorId, { actorId: 0, kind: "award", action: "ți-a marcat răspunsul drept corect", snippet: String(c.text).slice(0, 90), context: "Răspuns corect ✓" });
+    }
+  }
+
+  // Tiny audit trail: the admin's last actions, so "Prezentare" can show
+  // the community's pulse at a glance. (Mock: store.js, capped at 20.)
+  function logAdmin(text) {
+    const log = store.get("atelier_admin_log", []);
+    log.unshift({ t: Date.now(), text });
+    store.set("atelier_admin_log", log.slice(0, 20));
+  }
+
+  // Resolve an activity entry to its source post: live entries carry a
+  // postId; seeds carry a distinctive text fragment (postMatch).
+  function resolveActivityPostId(a) {
+    if (a.postId && findPost(a.postId)) return a.postId;
+    if (a.postMatch) {
+      const p = allPosts().find((x) => String(x.text).includes(a.postMatch));
+      if (p) return p.id;
+    }
+    return null;
+  }
+
+  // Jump to a post from anywhere (activity rows): opens the right section
+  // (forum or its group), expands the comments, scrolls and flashes it.
+  function goToPost(id) {
+    const inFeed = state.posts.some((p) => p.id === id);
+    const group = inFeed ? null : state.groups.find((g) => g.posts.some((p) => p.id === id));
+    if (!inFeed && !group) return;
+    remember();
+    if (group) {
+      state.section = "grupuri";
+      state.openGroup = group.id;
+    } else {
+      state.section = "forum";
+      // The post must actually be visible: reset any filters hiding it.
+      state.feedQuery = "";
+      state.feedType = "all";
+    }
+    state.openComments.add(id);
+    history.replaceState(null, "", `#${state.section}`);
+    render();
+    const card = mount.querySelector(`article[data-post-id="${id}"]`);
+    if (card) {
+      card.scrollIntoView({ block: "center", behavior: "smooth" });
+      card.classList.add("post--flash");
+      setTimeout(() => card.classList.remove("post--flash"), 1600);
+    }
+  }
+
+  // Reshare toggle — used by the post footer AND the image lightbox (DRY).
+  // Creates/removes the wrapper post on my wall and confirms with a toast.
+  function toggleShare(p) {
+    if (!p || p.shareOf || p.inGroup || (p.audience === "friends" && p.authorId !== CURRENT_USER.id)) return;
+    p.sharedByMe = !p.sharedByMe;
+    p.shares += p.sharedByMe ? 1 : -1;
+    if (p.sharedByMe) {
+      // A REAL reshare: a wrapper post lands on my wall (and the feed).
+      state.posts.unshift({
+        id: nextId(),
+        authorId: CURRENT_USER.id,
+        name: CURRENT_USER.name,
+        initials: CURRENT_USER.initials,
+        color: CURRENT_USER.color,
+        createdAt: Date.now(),
+        time: "acum",
+        type: p.type,
+        bg: "none",
+        audience: "public",
+        text: "",
+        media: null,
+        likes: 0,
+        likedByMe: false,
+        shares: 0,
+        sharedByMe: false,
+        followed: false,
+        comments: [],
+        shareOf: p.id,
+      });
+      showToast("↪ Redistribuit — postarea apare acum pe Pagina ta", { kind: "success" });
+    } else {
+      // Un-share removes my wrapper.
+      state.posts = state.posts.filter((x) => !(x.shareOf === p.id && x.authorId === CURRENT_USER.id));
+      showToast("Redistribuirea a fost anulată");
+    }
+  }
+
+  // "Raportează" on a post/comment → the admin's moderation queue. The
+  // flag is remembered on the item so the button turns inert.
+  function reportPost(p) {
+    if (p.authorId === CURRENT_USER.id || p.reportedByMe) return;
+    p.reportedByMe = true;
+    queueReport({
+      targetType: "post",
+      targetId: p.id,
+      authorId: p.authorId,
+      name: p.name,
+      snippet: String(p.text).replace(/<[^>]*>/g, "").slice(0, 120),
+      reporterId: CURRENT_USER.id,
+      reporterName: CURRENT_USER.name,
+    });
+  }
+  function reportComment(c) {
+    if (c.reportedByMe) return;
+    c.reportedByMe = true;
+    queueReport({
+      targetType: "comment",
+      targetId: c.id,
+      authorId: c.authorId,
+      name: c.name,
+      snippet: String(c.text).slice(0, 120),
+      reporterId: CURRENT_USER.id,
+      reporterName: CURRENT_USER.name,
+    });
+  }
+
+  const avatar = (init, color, cls = "") =>
+    `<span class="cx-av ${cls}" style="--a:${color}">${init}</span>`;
+
+  // Wrap an avatar in a level-styled ring with level + streak badges — used
+  // everywhere a user's name & avatar appear (global consistency). Both the
+  // data (userMeta) and the badge markup (badgeHtml) come from the shared
+  // badges.js, so the leaderboard, hub and threads never drift apart.
+  const badged = (id, inner) => {
+    // The teacher wears no level ring / badges — he's not in the game.
+    if (isAdmin() && id === CURRENT_USER.id) return `<span class="cx-avwrap">${inner}</span>`;
+    const m = userMeta(id);
+    return `<span class="cx-avwrap">
+        <span class="cx-ring" style="--ring:${m.fill}">${inner}</span>
+        ${badgeHtml(m, "cx-bdg")}
+      </span>`;
+  };
+
+  // The current user's avatar — the chosen gif if set, else the initials.
+  const meAvatar = (cls = "") => {
+    const inner = MY_PROFILE.avatar
+      ? `<span class="cx-av cx-av--gif ${cls}" style="background-image:url('${basePath}${MY_PROFILE.avatar}')" role="img" aria-label="Avatarul meu"></span>`
+      : `<span class="cx-av ${cls}" style="--a:${CURRENT_USER.color}">${CURRENT_USER.initials}</span>`;
+    return badged(CURRENT_USER.id, inner);
+  };
+
+  // Any user's avatar: the current user's chosen one, or a stable mock gif
+  // for the other (seed) members — always ringed + badged.
+  const userAvatar = (id, cls = "") => {
+    if (id === CURRENT_USER.id) return meAvatar(cls);
+    const u = userById(id) || {};
+    const inner = `<span class="cx-av cx-av--gif ${cls}" style="background-image:url('${basePath}${avatarForUser(id)}')" role="img" aria-label="${escapeHtml(u.name || "")}"></span>`;
+    return badged(id, inner);
+  };
+
+  // Avatar URL for a thread comment's author (used by renderThread).
+  const avatarUrlFor = (id) =>
+    id === CURRENT_USER.id
+      ? MY_PROFILE.avatar
+        ? `${basePath}${MY_PROFILE.avatar}`
+        : null
+      : `${basePath}${avatarForUser(id)}`;
+
+  // A clickable label linking a proposal back to its source lesson page.
+  // Falls back to plain text if the proposal has no known lesson slug.
+  const lessonLink = (e) =>
+    e.lessonSlug
+      ? `<a class="cx-lessonlink" href="${basePath}src/site/pages/lessons/${e.lessonSlug}.html" title="Mergi la lecția „${escapeHtml(e.lessonTitle)}”">📘 ${escapeHtml(e.lessonTitle)}</a>`
+      : `<span class="cx-muted">${escapeHtml(e.lessonTitle)}</span>`;
+
+  // ---- Friend graph helpers (mock, read/write MY_PROFILE arrays) ----
+  const isFriend = (id) => MY_PROFILE.friendIds.includes(id);
+  const reqIncoming = (id) => MY_PROFILE.friendReqIncoming.includes(id);
+  const reqOutgoing = (id) => MY_PROFILE.friendReqOutgoing.includes(id);
+
+  // The teacher/admin account. Their name & avatar are shown with a
+  // "Profesor" tag and are NOT clickable — students must never be routed to
+  // an admin surface. (Real role check still happens in the handlers.)
+  const PROFESSOR_ID = CURRENT_USER.id; // the admin is the teacher (id 0)
+  const isProfessor = (id) => id === PROFESSOR_ID;
+  const teacherTag = `<span class="cx-teacher" title="Profesor · cadru didactic">🎓 Profesor</span>`;
+
+  // A user still exists (0 = me/professor; otherwise must be in the user
+  // table). Deleted accounts keep their content, but every link to their
+  // profile degrades to plain text.
+  const userExists = (id) => id === CURRENT_USER.id || !!userById(id);
+
+  // Every user link points to the shareable profile deep link (same page on
+  // the hub → just the hash). The professor is never linkable; neither is a
+  // deleted account.
+  const profileHref = (id) => `#u/${slugForUser(id)}`;
+  const userProfileHref = (id) => (isProfessor(id) || !userExists(id) ? null : profileHref(id));
+
+  // Wrap an avatar in a real link to that user's profile — except the
+  // professor's (inert) and deleted accounts' (inert too).
+  const avatarLink = (id, cls = "") =>
+    isProfessor(id)
+      ? `<span class="cx-avteacher" title="Profesor">${userAvatar(id, cls)}</span>`
+      : !userExists(id)
+        ? `<span title="Cont șters">${userAvatar(id, cls)}</span>`
+        : `<a class="cx-avlink" href="${profileHref(id)}" title="Vezi profilul">${userAvatar(id, cls)}</a>`;
+
+  // A user name as a real link to their profile — except the professor's
+  // (inert text + "Profesor" tag) and deleted accounts' (plain text).
+  const userNameLink = (id, name, extraCls = "") =>
+    isProfessor(id)
+      ? `<span class="cx-username ${extraCls}">${escapeHtml(name)} ${teacherTag}</span>`
+      : !userExists(id)
+        ? `<span class="cx-username ${extraCls}" title="Cont șters">${escapeHtml(name)}</span>`
+        : `<a class="cx-userlink ${extraCls}" href="${profileHref(id)}">${escapeHtml(name)}</a>`;
+
+  // ---- @mentions plumbing ----
+  // Render-time: "@Nume Prenume" in post/comment text becomes a real
+  // profile link (professor & deleted accounts stay plain highlights).
+  const decorateText = (text) => linkifyMentions(text, (u) => userProfileHref(u.id));
+
+  // Can this friend SEE the post the mention lives on? (audience gate)
+  const mentionEligibleForPost = (post) => (u) => {
+    if (post.inGroup) {
+      const g = state.groups.find((x) => x.posts.some((p) => p.id === post.id));
+      return g && g.memberIds.includes(u.id) ? true : "nu e membru al acestui grup";
+    }
+    if (post.audience === "friends" && post.authorId !== CURRENT_USER.id)
+      return "postarea e doar pentru prietenii autorului, iar el/ea s-ar putea să n-o vadă";
+    return true;
+  };
+  const mentionMsg = (bad) =>
+    `Nu-l poți menționa pe @${bad[0].user.name}: ${bad[0].reason}.`;
+
+  // A published text with @mentions notifies the mentioned friends (mock:
+  // only the current user's inbox exists — Supabase makes this real).
+  function notifyMentions(text, context) {
+    for (const u of mentionsIn(text)) {
+      notifyUser(u.id, {
+        actorId: 0, kind: "mention",
+        action: "te-a menționat",
+        snippet: String(text).slice(0, 90),
+        context,
+      });
+    }
+  }
+
+  // Small audience tag shown on each post ("public" is the default).
+  const audienceBadge = (a) =>
+    a === "friends"
+      ? `<span class="post__aud" title="Vizibilă doar prietenilor tăi">👥 Prieteni</span>`
+      : `<span class="post__aud" title="Vizibilă tuturor">🌐 Public</span>`;
+
+  // Public/Friends toggle in the composer bar.
+  const audiencePicker = (a) => {
+    const opt = (key, label) =>
+      `<button type="button" class="cx-audopt${a === key ? " on" : ""}" data-action="set-audience" data-key="${key}">${label}</button>`;
+    return `<div class="cx-audience" title="Cine vede postarea">${opt("public", "🌐 Public")}${opt("friends", "👥 Prieteni")}</div>`;
+  };
+
+  // ---------- Guest bits ----------
+  // Instead of a wall, guests get the real (read-only) forum plus friendly
+  // invitations exactly where an account would unlock something.
+  function guestComposerInvite() {
+    return `
+      <div class="cx-guestinvite">
+        <span>👋 Citești forumul ca vizitator. Cu un cont poți posta, comenta, câștiga puncte și streak.</span>
+        <a class="btn btn--primary btn--sm" href="${basePath}src/community/pages/login.html">Creează cont / Conectează-te</a>
+      </div>`;
+  }
+  function guestGateCard(title, sub) {
+    return `
+      ${sectionHead(title, sub)}
+      <div class="cx-gate">
+        <div class="cx-gate__glow" aria-hidden="true"></div>
+        <div class="cx-gate__mascot" aria-hidden="true">${mascotSvg("hello", 110)}</div>
+        <h2>Zona asta e doar a membrilor</h2>
+        <p>Fă-ți cont gratuit și primești pagina ta, caietul, punctele, streak-ul — tot tacâmul.</p>
+        <div class="cx-gate__actions">
+          <a class="btn btn--primary" href="${basePath}src/community/pages/login.html">Conectează-te cu Google</a>
+        </div>
+      </div>`;
+  }
+
+  // ---------- Sidebar ----------
+  function sidebar() {
+    // Admin gets an extra group, visible only in the admin role. Badges:
+    // "Activitatea mea" shows unread notifications; "Panou admin" shows
+    // how many things await the teacher (proposals + moderation).
+    // GUESTS get a slim, read-only navigation + a join card.
+    const guest = !isLoggedIn();
+    const attention = isAdmin() ? pendingExercises().length + openModerationItems().length : 0;
+    const unread = guest ? 0 : unreadActivityCount();
+    const friendReqs = guest || isAdmin() ? 0 : MY_PROFILE.friendReqIncoming.length;
+    const groupNews = guest ? 0 : state.groups.filter(groupHasNews).length;
+    const badgeFor = (id) =>
+      id === "activitate" && unread
+        ? `<span class="cx-side__badge" title="Notificări necitite">${unread}</span>`
+        : id === "profil" && friendReqs
+          ? `<span class="cx-side__badge" title="Cereri de prietenie în așteptare">${friendReqs}</span>`
+          : id === "grupuri" && groupNews
+            ? `<span class="cx-side__badge" title="Grupuri cu activitate nouă">${groupNews}</span>`
+            : id === "mesaje" && !guest && unreadMessages(isAdmin())
+              ? `<span class="cx-side__badge" title="Mesaje necitite">${unreadMessages(isAdmin())}</span>`
+              : id === "admin" && attention
+                ? `<span class="cx-side__badge" title="Necesită atenție">${attention}</span>`
+                : "";
+    const navGroups = [
+      ...NAV_GROUPS.map((g) => ({
+        ...g,
+        // The teacher's sidebar hides the member-only, gamified sections;
+        // a guest's shows only what guests may open.
+        items: g.items.filter((i) =>
+          guest ? GUEST_SECTIONS.has(i.id) && i.id !== "profil" : !isAdmin() || !ADMIN_HIDDEN_SECTIONS.has(i.id)
+        ),
+      })).filter((g) => g.items.length),
+      ...(isAdmin() ? [{ title: "Administrare", items: [{ id: "admin", label: "Panou admin" }] }] : []),
+    ];
+    const groups = navGroups
+      .map(
+        (g) => `<div class="cx-side__group${g.title === "Administrare" ? " cx-side__group--admin" : ""}">
+          <p class="cx-side__title">${g.title}</p>
+          ${g.items
+            .map(
+              (s) => `<button class="cx-side__item${s.id === state.section ? " on" : ""}" data-action="go" data-id="${s.id}">
+                <span class="cx-side__icon">${NAV_ICONS[s.id]}</span>
+                <span class="cx-side__label">${s.label}</span>
+                ${badgeFor(s.id)}
+              </button>`
+            )
+            .join("")}
+        </div>`
+      )
+      .join("");
+
+    // (The role preview switch moved to the discreet global 🎭 button.)
+    const meBox = guest
+      ? `<div class="cx-side__me cx-side__me--guest">
+           <span class="cx-av" style="--a:#94a3b8">?</span>
+           <div class="cx-side__meid">
+             <b>Vizitator</b>
+             <a class="cx-side__join" href="${basePath}src/community/pages/login.html">Creează cont →</a>
+           </div>
+         </div>
+         <div class="cx-side__sell">
+           <p class="cx-side__selltitle">Cu un cont primești:</p>
+           <span class="cx-side__sellrow">🏅 puncte, niveluri și insigne</span>
+           <span class="cx-side__sellrow">🔥 streak zilnic + provocări</span>
+           <span class="cx-side__sellrow">🐌 loc în clasament (și poke!)</span>
+           <span class="cx-side__sellrow">📓 caiet personal + progres salvat</span>
+         </div>`
+      : `<div class="cx-side__me">
+           ${meAvatar("cx-av--lg")}
+           <div class="cx-side__meid">
+             <b>${CURRENT_USER.name}${isAdmin() ? ' <span class="cx-adminchip">admin</span>' : ""}</b>
+             <span class="cx-side__mini">
+               ${isAdmin()
+                 ? `<span>🎓 profesor · fără puncte</span>`
+                 : `<span class="cx-flame">🔥 ${MY_PROFILE.streak}</span> · <span>${MY_PROFILE.points} pct</span>`}
+             </span>
+           </div>
+         </div>`;
+
+    return `
+      <aside class="cx-side">
+        ${meBox}
+        <nav class="cx-side__nav">${groups}</nav>
+      </aside>`;
+  }
+
+  // ---------- Post composer (forum + wall). Choosing the "Grup" type turns
+  // it into a group-topic creator (name + one of 30 animated icons). -------
+  function composer() {
+    const c = state.composer;
+    const isGroup = c.type === "grup";
+
+    // Collapsed by default — one friendly line; the full toolkit (type,
+    // background, media, audience) unfolds only when you actually write.
+    if (!state.composerOpen && !isGroup && !c.text && !c.media) {
+      return `
+        <button type="button" class="cx-composer cx-composer--collapsed" data-action="composer-open">
+          ${meAvatar()}
+          <span class="cx-composer__hint">La ce te gândești? Scrie, întreabă, laudă-te…</span>
+        </button>`;
+    }
+
+    const types =
+      POST_TYPES.map(
+        (t) => `<button type="button" class="cx-type${c.type === t.key ? " on" : ""}" data-action="set-type" data-key="${t.key}"
+            style="--t:${t.color}" title="${t.hint}"><span class="cx-type__ic">${t.icon}</span><span>${t.label}</span></button>`
+      ).join("") +
+      `<button type="button" class="cx-type cx-type--group${isGroup ? " on" : ""}" data-action="set-type" data-key="grup"
+          style="--t:#0891b2" title="Creează un topic de grup"><span class="cx-type__ic">${NAV_ICONS.grupuri}</span><span>Grup</span></button>`;
+
+    // Group-creation extras
+    const gi = groupIcon(c.iconId);
+    const groupUI = isGroup
+      ? `<div class="cx-grouprow">
+           <button type="button" class="cx-iconpick" data-action="toggle-icon" title="Alege un icon pentru grup">
+             <span class="gi gi--${gi.anim}">${gi.char}</span>
+           </button>
+           <input class="cx-input" id="cx-group-name" placeholder="Numele grupului…" value="${escapeHtml(c.groupName)}" />
+         </div>
+         ${c.iconOpen
+           ? `<div class="cx-icongrid">${GROUP_ICONS.map(
+               (ic) => `<button type="button" class="cx-iconopt${ic.id === c.iconId ? " on" : ""}" data-action="set-icon" data-id="${ic.id}"><span class="gi gi--${ic.anim}">${ic.char}</span></button>`
+             ).join("")}</div>`
+           : ""}`
+      : "";
+
+    const swatches = POST_BACKGROUNDS.map(
+      (b) => `<button type="button" class="cx-swatch${c.bg === b.key ? " on" : ""}" data-action="set-bg" data-key="${b.key}"
+          style="--sw:${b.swatch}" title="${b.label}" aria-label="${b.label}"></button>`
+    ).join("");
+
+    const media = isGroup ? "" : mediaPreview(c.media, true);
+    const ytRow =
+      !isGroup && c.ytOpen
+        ? `<div class="cx-ytrow">
+             <input class="cx-input" id="cx-yt-url" placeholder="Lipește linkul YouTube (se redă doar la click)…" />
+             <button type="button" class="btn-mini" data-action="add-yt">Adaugă</button>
+           </div>`
+        : "";
+
+    const tint = postBackground(c.bg);
+    const tintStyle =
+      isGroup || c.bg === "none" ? "" : `style="background:linear-gradient(135deg,${tint.from},${tint.to})"`;
+
+    const tools = isGroup
+      ? ""
+      : `<div class="cx-composer__tools">
+            <button type="button" class="cx-tool" data-action="pick-image" title="Adaugă imagini">🖼️ Imagine</button>
+            <button type="button" class="cx-tool${c.ytOpen ? " on" : ""}" data-action="toggle-yt" title="Adaugă un clip YouTube">▶️ YouTube</button>
+            <span class="cx-swatches" title="Culoare de fundal">${swatches}</span>
+          </div>`;
+
+    return `
+      <div class="cx-composer" ${tintStyle}>
+        <div class="cx-composer__top">
+          ${meAvatar()}
+          <textarea class="cx-input cx-composer__text" id="cx-post-text" rows="2"
+            placeholder="${isGroup ? "Descrie pe scurt grupul (opțional)…" : "Împarte o idee, o întrebare sau o reușită cu comunitatea…"}">${escapeHtml(c.text)}</textarea>
+        </div>
+        ${groupUI}
+        ${media}
+        ${ytRow}
+        <div class="cx-composer__types">${types}</div>
+        <div class="cx-composer__bar">
+          ${tools || "<span></span>"}
+          <div class="cx-composer__send">
+            ${isGroup ? "" : audiencePicker(c.audience)}
+            <button type="button" class="btn btn--primary btn--sm" data-action="publish">${isGroup ? "Creează grupul" : "Publică"}</button>
+          </div>
+        </div>
+        <input type="file" id="cx-file" accept="image/*" multiple hidden />
+      </div>`;
+  }
+
+  function mediaPreview(media, editable) {
+    if (!media) return "";
+    if (media.kind === "youtube") {
+      return `<div class="cx-mediaprev">
+          <span class="cx-mediaprev__yt">▶ YouTube: ${escapeHtml(media.title || media.videoId)}</span>
+          ${editable ? `<button type="button" class="cx-x" data-action="clear-media" aria-label="Elimină">×</button>` : ""}
+        </div>`;
+    }
+    if (media.kind === "images") {
+      const thumbs = media.images
+        .map(
+          (im) =>
+            `<span class="cx-thumb" style="${im.src ? `background-image:url('${im.src}')` : `background:${im.gradient}`}"></span>`
+        )
+        .join("");
+      return `<div class="cx-mediaprev">
+          <span class="cx-mediaprev__imgs">${thumbs}</span>
+          ${editable ? `<button type="button" class="cx-x" data-action="clear-media" aria-label="Elimină">×</button>` : ""}
+        </div>`;
+    }
+    return "";
+  }
+
+  // ---------- One post card (shared) ----------
+  function postMedia(post) {
+    if (!post.media) return "";
+    if (post.media.kind === "youtube") {
+      const id = post.media.videoId;
+      if (state.playing.has(post.id)) {
+        return `<div class="post__yt post__yt--live">
+            <iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0"
+              title="${escapeHtml(post.media.title || "YouTube")}" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>
+          </div>`;
+      }
+      return `<button type="button" class="post__yt post__yt--facade" data-action="play-yt" data-id="${post.id}" aria-label="Redă clipul">
+          <img class="post__yt__thumb" src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" loading="lazy" onerror="this.style.display='none'" />
+          <span class="post__yt__play" aria-hidden="true">▶</span>
+          <span class="post__yt__title">${escapeHtml(post.media.title || "Clip YouTube")}</span>
+        </button>`;
+    }
+    if (post.media.kind === "images") {
+      const n = post.media.images.length;
+      // Every image opens the lightbox (real uploads get copy/save too).
+      const imgs = post.media.images
+        .map((im, i) =>
+          im.src
+            ? `<button type="button" class="post__img post__img--zoom" style="background-image:url('${im.src}')"
+                 data-action="open-image" data-id="${post.id}" data-i="${i}" title="Mărește imaginea" aria-label="Mărește imaginea ${i + 1}"></button>`
+            : `<button type="button" class="post__img post__img--ph post__img--zoom" style="background:${im.gradient}"
+                 data-action="open-image" data-id="${post.id}" data-i="${i}" title="Mărește imaginea"><span>${escapeHtml(im.label || "")}</span></button>`
+        )
+        .join("");
+      return `<div class="post__imgs post__imgs--n${Math.min(n, 3)}">${imgs}</div>`;
+    }
+    return "";
+  }
+
+  // ---------- Image lightbox ----------
+  // Click a post image → it grows to (near) full screen with floating
+  // actions: copy, save, share (the post), reply (about that image).
+  // A click on the image or outside it closes; Esc works too.
+  function lightboxHtml() {
+    if (!state.lightbox) return "";
+    const p = findPost(state.lightbox.postId);
+    const im = p?.media?.images?.[state.lightbox.i];
+    if (!p || !im) return "";
+    const real = !!im.src;
+    const canShare = !p.shareOf && !p.inGroup && p.audience !== "friends";
+    const visual = real
+      ? `style="background-image:url('${im.src}')"`
+      : `style="background:${im.gradient}"`;
+    // Arrows between the post's images (keyboard ←/→ works too).
+    const total = p.media.images.length;
+    const arrows = total > 1
+      ? `<button type="button" class="cx-lightbox__arrow cx-lightbox__arrow--prev" data-action="lb-prev" aria-label="Imaginea anterioară">‹</button>
+         <button type="button" class="cx-lightbox__arrow cx-lightbox__arrow--next" data-action="lb-next" aria-label="Imaginea următoare">›</button>
+         <span class="cx-lightbox__count">${state.lightbox.i + 1} / ${total}</span>`
+      : "";
+    return `
+      <div class="cx-lightbox" data-action="lb-close" role="dialog" aria-modal="true" aria-label="Imagine mărită">
+        ${arrows}
+        <figure class="cx-lightbox__fig">
+          <div class="cx-lightbox__img${real ? "" : " cx-lightbox__img--ph"}" ${visual} data-action="lb-close">
+            ${real ? "" : `<span>${escapeHtml(im.label || "")}</span>`}
+          </div>
+          <figcaption class="cx-lightbox__bar" aria-label="Acțiuni imagine">
+            ${real ? `<button type="button" class="cx-lbbtn" data-action="lb-copy">📋 Copiază</button>
+            <a class="cx-lbbtn" data-action="lb-save" href="${im.src}" download="atelierul-imagine-${p.id}-${state.lightbox.i + 1}.png">💾 Salvează</a>` : ""}
+            ${canShare ? `<button type="button" class="cx-lbbtn" data-action="lb-share">↪ Distribuie postarea</button>` : ""}
+            <button type="button" class="cx-lbbtn" data-action="lb-reply">💬 Răspunde la imagine</button>
+          </figcaption>
+        </figure>
+      </div>`;
+  }
+
+  // A reshare renders as a slim wrapper: "X a redistribuit" + the original
+  // embedded read-only. If the original vanished, the share explains itself.
+  function shareCard(post) {
+    const orig = findPost(post.shareOf);
+    const inner = orig
+      ? `<div class="post__embed">
+           <header class="post__head post__head--embed">
+             ${avatarLink(orig.authorId)}
+             <div class="post__id">
+               ${userNameLink(orig.authorId, orig.name, "post__name")}
+               <span class="post__sub">${orig.time} · ${audienceBadge(orig.audience)}</span>
+             </div>
+           </header>
+           <p class="post__text">${decorateText(orig.text)}</p>${postMedia(orig)}
+         </div>`
+      : `<p class="cx-muted post__embed post__embed--gone">Postarea originală nu mai există.</p>`;
+    return { inner };
+  }
+
+  function postCard(post) {
+    const t = postType(post.type);
+    const bg = postBackground(post.bg);
+    const tintStyle =
+      post.bg === "none" ? "" : `style="--postfrom:${bg.from};--postto:${bg.to}"`;
+    const isMine = isLoggedIn() && post.authorId === CURRENT_USER.id;
+    const isShare = !!post.shareOf;
+    // Own posts show no like button at all (you can't like yourself).
+    // Guests SEE the button — clicking invites them to join (toast).
+    const likeBtn = isMine
+      ? ""
+      : `<button type="button" class="post__act${post.likedByMe ? " is-liked" : ""}" data-action="like" data-id="${post.id}">
+            <span class="post__act__ic">${ACTION_ICONS.like}</span><span>${post.likes}</span>
+          </button>`;
+    const commentsCount = countComments(post.comments);
+    const open = state.openComments.has(post.id);
+
+    // Sharing: not on shares-of-shares, never on friends-only posts and
+    // never on group posts (both would leak past the intended audience).
+    const shareBtn =
+      isShare || post.audience === "friends" || post.inGroup
+        ? ""
+        : `<button type="button" class="post__act${post.sharedByMe ? " is-shared" : ""}" data-action="share" data-id="${post.id}"
+             title="${post.sharedByMe ? "Anulează redistribuirea" : "Redistribuie pe pagina ta"}">
+             <span class="post__act__ic">${ACTION_ICONS.share}</span><span>${post.shares}</span>
+           </button>`;
+
+    // Bookmark ("Salvate") — a primary action, stays in the footer.
+    const savedNow = state.saved.has(post.id);
+    const saveBtn = isLoggedIn()
+      ? `<button type="button" class="post__act${savedNow ? " is-saved" : ""}" data-action="save-post" data-id="${post.id}"
+          title="${savedNow ? "Scoate de la Salvate" : "Salvează postarea"}"><span class="post__act__ic">${ACTION_ICONS.save}</span></button>`
+      : "";
+
+    // Secondary actions (follow, report) fold into a "⋯" menu — the footer
+    // stays breathable, everything stays one tap away. (Design critique M1.)
+    const menuOpen = state.postMenu === post.id;
+    const menuBtn = !isMine && isLoggedIn()
+      ? `<span class="post__more">
+           <button type="button" class="post__act${menuOpen ? " on" : ""}" data-action="post-menu" data-id="${post.id}" title="Mai multe" aria-expanded="${menuOpen}">⋯</button>
+           ${menuOpen
+             ? `<span class="post__menu">
+                  <button type="button" class="post__menu__item" data-action="follow" data-id="${post.id}">
+                    <span class="post__act__ic">${ACTION_ICONS.bell}</span>${post.followed ? "Nu mai urmări" : "Urmărește postarea"}
+                  </button>
+                  ${post.reportedByMe
+                    ? `<span class="post__menu__item is-done"><span class="post__act__ic">${ACTION_ICONS.flag}</span>Raportat profesorului ✓</span>`
+                    : `<button type="button" class="post__menu__item" data-action="post-report" data-id="${post.id}">
+                        <span class="post__act__ic">${ACTION_ICONS.flag}</span>Raportează profesorului
+                      </button>`}
+                </span>`
+             : ""}
+         </span>`
+      : "";
+    const followedDot = post.followed && !isMine && isLoggedIn()
+      ? `<span class="post__followdot" title="Urmărești postarea">${ACTION_ICONS.bell}</span>`
+      : "";
+
+    // Manage toolbar: the author EDITS only in the 5-minute window (admin
+    // anytime); DELETING your own stays available forever.
+    const manageBar = canManagePost(post)
+      ? `<span class="post__admin">
+           ${isShare || !canEditPost(post) ? "" : `<button type="button" class="post__adminbtn" data-action="post-edit" data-id="${post.id}" title="Editează (5 min)">✎</button>`}
+           <button type="button" class="post__adminbtn post__adminbtn--del" data-action="post-del" data-id="${post.id}" title="Șterge">🗑</button>
+         </span>`
+      : "";
+
+    const editing = state.editingPost === post.id;
+    const bodyInner = isShare
+      ? shareCard(post).inner
+      : editing
+        ? `<div class="post__edit">
+             <textarea class="cx-input" data-role="edit-post" rows="3">${post.text}</textarea>
+             <div class="post__editactions">
+               <button type="button" class="btn-mini" data-action="post-save" data-id="${post.id}">Salvează</button>
+               <button type="button" class="btn-mini btn-mini--ghost" data-action="post-cancel-edit">Renunță</button>
+             </div>
+           </div>`
+        : `<p class="post__text">${highlightQuery(decorateText(post.text))}</p>${postMedia(post)}`;
+
+    const warn =
+      state.commentWarn && state.commentWarn.postId === post.id
+        ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.commentWarn.msg)}</p>`
+        : "";
+    const composeRow = isLoggedIn()
+      ? `<div class="cx-postcompose">
+           ${meAvatar()}
+           <textarea class="cx-input" placeholder="Scrie un comentariu…" data-role="post-comment-input"></textarea>
+           <button type="button" class="btn-mini" data-action="post-comment" data-id="${post.id}">Trimite</button>
+         </div>`
+      : `<p class="cx-guestline">🔒 <a href="${basePath}src/community/pages/login.html">Conectează-te</a> ca să comentezi, să apreciezi și să reacționezi.</p>`;
+    const commentsBlock = open
+      ? `<div class="post__comments" data-post-id="${post.id}">
+           ${composeRow}
+           ${warn}
+           ${renderThread(post.comments, state.thread, isLoggedIn() ? CURRENT_USER : GUEST_USER, {
+             isAdmin: isAdmin(),
+             avatarUrl: (c) => avatarUrlFor(c.authorId),
+             userMeta: (c) => (isAdmin() && c.authorId === CURRENT_USER.id ? null : userMeta(c.authorId)),
+             userHref: (c) => userProfileHref(c.authorId),
+             professorId: PROFESSOR_ID,
+             onReport: isLoggedIn() ? reportComment : undefined,
+             decorateText: (t) => highlightQuery(decorateText(t)),
+           })}
+         </div>`
+      : "";
+
+    const edited = post.edited ? " · editat" : "";
+    const sub = isShare
+      ? `${post.time}${edited} · <span class="post__shared">↪ redistribuire</span> · ${audienceBadge(post.audience)}`
+      : `${post.time}${edited} · ${audienceBadge(post.audience)}`;
+
+    return `
+      <article class="post ${post.bg !== "none" ? "post--tinted" : ""}${isShare ? " post--share" : ""}" data-post-id="${post.id}" ${tintStyle}>
+        <header class="post__head">
+          ${avatarLink(post.authorId)}
+          <div class="post__id">
+            ${userNameLink(post.authorId, post.name, "post__name")}
+            <span class="post__sub">${sub}</span>
+          </div>
+          <span class="post__type" style="--t:${t.color}"><span class="post__type__ic">${t.icon}</span>${t.label}</span>
+          ${followedDot}
+          ${manageBar}
+        </header>
+        <div class="post__body">
+          ${bodyInner}
+        </div>
+        <footer class="post__foot${isLoggedIn() ? "" : " post__foot--ghost"}">
+          ${likeBtn}
+          <button type="button" class="post__act${open ? " on" : ""}" data-action="toggle-comments" data-id="${post.id}">
+            <span class="post__act__ic">${ACTION_ICONS.comment}</span><span>${commentsCount}</span>
+          </button>
+          ${shareBtn}
+          ${saveBtn}
+          ${menuBtn}
+        </footer>
+        ${commentsBlock}
+      </article>`;
+  }
+
+  // ---------- Sections ----------
+  // The forum's discovery toolbar: search + type chips + Noi/Populare.
+  function feedToolbar() {
+    const typeChips = [{ key: "all", label: "Toate", color: "#64748b" }, ...POST_TYPES]
+      .map(
+        (t) => `<button type="button" class="cx-fchip${state.feedType === t.key ? " on" : ""}" style="--t:${t.color}"
+            data-action="feed-type" data-key="${t.key}">${t.label}</button>`
+      )
+      .join("");
+    const sortBtn = (key, label) =>
+      `<button type="button" class="cx-fchip cx-fchip--sort${state.feedSort === key ? " on" : ""}" data-action="feed-sort" data-key="${key}">${label}</button>`;
+    return `
+      <div class="cx-feedbar">
+        <input class="cx-input cx-feedbar__search" id="cx-feed-search" type="search"
+          placeholder="Caută în forum…" value="${escapeHtml(state.feedQuery)}" />
+        <span class="cx-feedbar__chips">${typeChips}</span>
+        <span class="cx-feedbar__sort">${sortBtn("new", "Noi")}${sortBtn("top", "Populare")}</span>
+      </div>`;
+  }
+
+  // Does any comment (at any depth) contain the query?
+  function commentsMatch(list, q) {
+    return (list || []).some(
+      (c) => String(c.text).toLowerCase().includes(q) || commentsMatch(c.replies, q)
+    );
+  }
+
+  // The forum feed everyone may see, with the toolbar's filters applied.
+  // Search covers the post text, the author AND the comments underneath.
+  function visibleForumPosts() {
+    const q = state.feedQuery.trim().toLowerCase();
+    let list = state.posts.filter(canSeePost);
+    if (state.feedType !== "all") list = list.filter((p) => p.type === state.feedType);
+    if (q)
+      list = list.filter(
+        (p) =>
+          String(p.text).toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          commentsMatch(p.comments, q)
+      );
+    return state.feedSort === "top"
+      ? [...list].sort((a, b) => b.likes - a.likes)
+      : [...list].sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  // Highlight the search term in rendered text (safe: input is already
+  // escaped; we only wrap plain-text matches in <mark>).
+  function highlightQuery(html) {
+    const q = state.feedQuery.trim();
+    if (q.length < 2 || state.section !== "forum") return html;
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(${safe})`, "gi");
+    // Touch only the TEXT between tags — never hrefs/attributes.
+    return String(html)
+      .split(/(<[^>]*>)/)
+      .map((part) => (part.startsWith("<") ? part : part.replace(re, `<mark class="cx-mark">$1</mark>`)))
+      .join("");
+  }
+
+  function sectionForum() {
+    // Spotlight only over posts everyone can actually see (a friends-only
+    // post must never be quoted publicly) and never over reshares.
+    const spot = topPost(state.posts.filter((p) => canSeePost(p) && !p.shareOf && p.audience === "public"));
+    const st = spot
+      ? `<div class="cx-spotlight">
+           <span class="cx-spotlight__badge">⭐ Postarea săptămânii</span>
+           <p class="cx-spotlight__text">„${spot.text.replace(/<[^>]*>/g, "").slice(0, 120)}${spot.text.length > 120 ? "…" : ""}”</p>
+           <span class="cx-spotlight__by">— ${userNameLink(spot.authorId, spot.name)} · ${spot.likes} aprecieri</span>
+         </div>`
+      : "";
+    const visible = visibleForumPosts();
+    // Pagination: show a slice + "Încarcă mai mult" (no endless wall).
+    const shown = visible.slice(0, state.feedLimit);
+    const remaining = visible.length - shown.length;
+    const feed = shown.length
+      ? shown.map(postCard).join("")
+      : emptyState("Nimic aici", "Niciun rezultat pentru filtrele alese. Încearcă altă căutare.");
+    const more = remaining > 0
+      ? `<button type="button" class="cx-loadmore" data-action="feed-more">Încarcă mai mult <span class="cx-muted">(încă ${remaining})</span></button>`
+      : "";
+    return `
+      ${sectionHead("Forum", "Întreabă, răspunde, laudă-te cu ce-ai învățat. Aici e agitația.")}
+      ${st}
+      ${isLoggedIn() ? composer() + composerNotice() : guestComposerInvite()}
+      ${feedToolbar()}
+      <div class="cx-feed">${feed}</div>
+      ${more}`;
+  }
+
+  // The friendly note shown when the filter held a post for review.
+  function composerNotice() {
+    return state.notice
+      ? `<div class="cx-notice" role="status">
+           <span>🛡️ ${escapeHtml(state.notice)}</span>
+           <button type="button" class="cx-x" data-action="dismiss-notice" aria-label="Închide">×</button>
+         </div>`
+      : "";
+  }
+
+  function sectionWall() {
+    const mine = wallPostsOf(CURRENT_USER.id);
+    const feed = mine.length
+      ? mine.map(postCard).join("")
+      : emptyState("Nicio postare încă", "Ce ai învățat azi? Spune-le prietenilor tăi.");
+    return `
+      ${sectionHead("Pagina mea", "Peretele tău personal — postările tale, într-un singur loc. Ce publici aici apare și în forum.")}
+      ${composer()}
+      ${composerNotice()}
+      <div class="cx-feed">${feed}</div>`;
+  }
+
+  function sectionActivity() {
+    const TAB_ICONS = {
+      primite: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><path d="M8 11l4 4 4-4M12 3v12"/></svg>`,
+      oferite: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>`,
+      urmarite: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`,
+    };
+    // Followed posts: from the feed + from groups I'm actually a member of.
+    const followedPosts = [
+      ...state.posts.filter((p) => p.followed && canSeePost(p)),
+      ...state.groups
+        .filter((g) => g.memberIds.includes(CURRENT_USER.id) || isAdmin())
+        .flatMap((g) => g.posts.filter((p) => p.followed)),
+    ];
+    const tabs = [
+      { id: "primite", label: "Primite", count: ACTIVITY_RECEIVED.length },
+      { id: "oferite", label: "Oferite", count: ACTIVITY_GIVEN.length },
+      { id: "urmarite", label: "Urmărite", count: followedPosts.length },
+    ];
+    const tabBar = `<div class="cx-tabs">${tabs
+      .map(
+        (t) => `<button class="cx-tabbtn${state.activityTab === t.id ? " on" : ""}" data-action="act-tab" data-id="${t.id}">
+          <span class="cx-tabbtn__ic">${TAB_ICONS[t.id]}</span>${t.label}
+          <span class="cx-tabbtn__n">${t.count}</span>
+        </button>`
+      )
+      .join("")}</div>`;
+
+    const actIcon = (kind) => {
+      const k = ACTIVITY_KINDS[kind] || ACTIVITY_KINDS.comment;
+      return `<span class="cx-actkind" style="--k:${k.color}" title="${k.label}">${k.icon}</span>`;
+    };
+
+    let body = "";
+    if (state.activityTab === "primite" || state.activityTab === "oferite") {
+      const list = state.activityTab === "primite" ? ACTIVITY_RECEIVED : ACTIVITY_GIVEN;
+      body = list
+        .map((a) => {
+          // Resolvable rows link to the post (or hub section) behind them.
+          const srcId = resolveActivityPostId(a);
+          const link = srcId
+            ? { action: "act-open", id: srcId, label: "Vezi →" }
+            : a.goSection
+              ? { action: "go", id: a.goSection, label: "Deschide →" }
+              : null;
+          const openBtn = link
+            ? `<button type="button" class="cx-actrow__go" data-action="${link.action}" data-id="${link.id}">${link.label}</button>`
+            : "";
+          const k = ACTIVITY_KINDS[a.kind] || ACTIVITY_KINDS.comment;
+          return `<div class="cx-actrow cx-actrow--${a.kind}${a.read ? "" : " is-unread"}${link ? " cx-actrow--link" : ""}"${link ? ` data-action="${link.action}" data-id="${link.id}" role="link" tabindex="0"` : ""}>
+            <span class="cx-actrow__avatar">
+              ${avatarLink(a.authorId)}
+              ${actIcon(a.kind)}
+            </span>
+            <div class="cx-actrow__body">
+              <span class="cx-actrow__kind" style="--k:${k.color}">${k.label}${a.read ? "" : ' · <b>nou</b>'}</span>
+              <p class="cx-actrow__what"><b>${a.authorId === CURRENT_USER.id ? "Tu" : userNameLink(a.authorId, a.name)}</b> ${escapeHtml(a.action)} <span class="cx-muted">· ${a.time}</span></p>
+              <p class="cx-actrow__snip">„${escapeHtml(a.snippet)}”</p>
+              <span class="cx-actrow__ctx">${escapeHtml(a.context)}</span>
+            </div>
+            ${openBtn}
+          </div>`;
+        })
+        .join("");
+    } else {
+      body = followedPosts.length
+        ? `<div class="cx-feed">${followedPosts.map(postCard).join("")}</div>`
+        : emptyState("Nicio postare urmărită", "Apasă pe clopoțel la o postare din forum ca s-o urmărești aici.");
+    }
+
+    // Everything shown is now seen — the badge clears on the NEXT render,
+    // so the "Nou" dots stay visible for this visit.
+    markActivityRead();
+
+    return `${sectionHead("Activitatea mea", "Cine te-a apreciat, cui i-ai răspuns, ce urmărești — pe scurt, viața ta de aici.")}${tabBar}<div class="cx-actlist">${body}</div>`;
+  }
+
+  // "Așa va arăta exercițiul tău" — read the form live and show a simple
+  // rendition, so nobody submits a broken grilă by accident.
+  function exPreviewHtml() {
+    const prompt = mount.querySelector("#cx-ex-prompt")?.value.trim() || "(enunțul tău)";
+    const form = readExerciseForm(mount, state.exComposer.kind);
+    let body = `<p class="cx-warn">⚠️ ${escapeHtml(form.error || "Completează câmpurile ca să vezi previzualizarea.")}</p>`;
+    if (form.ok && form.data) {
+      const d = form.data;
+      if (state.exComposer.kind === "choice")
+        body = `<div class="cx-expreview__opts">${d.options.map((o, i) => `<span class="cx-expreview__opt${i === d.correct ? " ok" : ""}">${i === d.correct ? "✔ " : ""}${escapeHtml(o)}</span>`).join("")}</div>`;
+      else if (state.exComposer.kind === "fill")
+        body = `<p class="cx-muted">Răspunsuri acceptate: <b>${escapeHtml(d.answer.split("|").join(" / "))}</b></p>`;
+      else
+        body = `<div class="cx-expreview__opts">${d.pairs.map(([l, r]) => `<span class="cx-expreview__opt">${escapeHtml(l)} → ${escapeHtml(r)}</span>`).join("")}</div>`;
+    }
+    return `<div class="cx-expreview">
+        <p class="cx-expreview__label">Așa va arăta:</p>
+        <p class="cx-expreview__prompt">${escapeHtml(prompt)}</p>
+        ${body}
+      </div>`;
+  }
+
+  function sectionExercises() {
+    const kinds = EXERCISE_KINDS.map(
+      (k) => `<button type="button" class="cx-kind${state.exComposer.kind === k.key ? " on" : ""}" data-action="ex-kind" data-key="${k.key}" title="${k.hint}">${k.label}</button>`
+    ).join("");
+    const lessonOpts = MY_PROFILE.favorites
+      .map((f) => `<option value="${escapeHtml(f.title)}"${state.exComposer.lesson === f.title ? " selected" : ""}>${escapeHtml(f.title)}</option>`)
+      .join("");
+
+    const composerBox = state.exComposer.open
+      ? `<div class="cx-excompose">
+           <label class="cx-label">Lecția</label>
+           <select class="cx-input" id="cx-ex-lesson">${lessonOpts}</select>
+           <label class="cx-label">Tipul exercițiului</label>
+           <div class="cx-kinds">${kinds}</div>
+           <label class="cx-label">Enunțul propus</label>
+           <textarea class="cx-input" id="cx-ex-prompt" rows="3" placeholder="Scrie enunțul exercițiului tău…"></textarea>
+           ${exerciseFormFields(state.exComposer.kind)}
+           <div class="cx-excompose__actions">
+             <button type="button" class="btn btn--primary btn--sm" data-action="ex-submit">Trimite propunerea</button>
+             <button type="button" class="btn-mini" data-action="ex-preview">${state.exPreview ? "Ascunde previzualizarea" : "👁 Previzualizează"}</button>
+             <button type="button" class="btn-mini btn-mini--ghost" data-action="ex-toggle">Renunță</button>
+           </div>
+           ${state.exPreview ? exPreviewHtml() : ""}
+           ${state.exWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.exWarn)}</p>` : ""}
+         </div>`
+      : `<button type="button" class="cx-propose" data-action="ex-toggle">+ Propune un exercițiu</button>`;
+
+    // Only proposals still awaiting a decision live in the "pending" tab; once
+    // the admin approves/rejects, they move to the "history" tab.
+    const pending = pendingExercises();
+    const pendingList = pending.length
+      ? pending
+          .map((e) => {
+            const k = exerciseKind(e.kind);
+            // Admin edit mode: the proposal becomes a prefilled form —
+            // check it, polish it, THEN approve it.
+            if (isAdmin() && state.exEditId === e.id) {
+              return `<div class="cx-excompose cx-excompose--edit">
+                  ${exerciseEditFormHtml(e)}
+                  <div class="cx-excompose__actions">
+                    <button type="button" class="btn btn--primary btn--sm" data-action="ex-admin-save" data-id="${e.id}">Salvează modificările</button>
+                    <button type="button" class="btn-mini btn-mini--ghost" data-action="ex-admin-cancel">Renunță</button>
+                  </div>
+                  ${state.exEditWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.exEditWarn)}</p>` : ""}
+                </div>`;
+            }
+            const adminBar = isAdmin()
+              ? `<div class="cx-ex__admin">
+                   <button type="button" class="btn-mini" data-action="ex-admin-edit" data-id="${e.id}">✎ Editează</button>
+                   <button type="button" class="btn-mini btn-mini--ok" data-action="admin-approve-ex" data-id="${e.id}">✓ Aprobă</button>
+                   <button type="button" class="btn-mini btn-mini--no" data-action="admin-reject-ex" data-id="${e.id}">✕ Respinge</button>
+                 </div>`
+              : "";
+            // You can't vote for your own proposal (same rule as self-like).
+            const voteUi =
+              e.authorId === CURRENT_USER.id
+                ? `<span class="cx-ex__up cx-ex__up--own" title="Propunerea ta — colegii o votează">—</span>`
+                : `<button type="button" class="cx-ex__up${e.votedByMe ? " on" : ""}" data-action="ex-vote" data-id="${e.id}" aria-label="Votează">▲</button>`;
+            return `<div class="cx-ex">
+                <div class="cx-ex__vote">
+                  ${voteUi}
+                  <b>${e.votes}</b>
+                </div>
+                <div class="cx-ex__body">
+                  <p class="cx-ex__prompt">${escapeHtml(e.prompt)}</p>
+                  <div class="cx-ex__meta">
+                    <span class="cx-tag cx-tag--${e.kind}">${k.label}</span>
+                    <span class="cx-tag cx-tag--wait">în așteptare</span>
+                    ${e.editedByAdmin ? `<span class="cx-tag" title="Verificată și ajustată de profesor">✎ verificată</span>` : ""}
+                    ${lessonLink(e)}
+                    <span class="cx-muted">· ${userNameLink(e.authorId, e.name)} · ${e.time}</span>
+                  </div>
+                  ${adminBar}
+                </div>
+              </div>`;
+          })
+          .join("")
+      : `<p class="cx-muted cx-ex__empty">Nicio propunere în așteptare. Cele aprobate ajung la lecția lor.</p>`;
+
+    // Tabs (admin only — regular users have no history to see).
+    const showHistory = isAdmin();
+    const activeTab = showHistory ? state.exTab || "pending" : "pending";
+    let tabBar = "";
+    let body = `<div class="cx-exlist">${pendingList}</div>`;
+    if (showHistory) {
+      const tabs = [
+        { id: "pending", label: "În așteptare", count: pending.length },
+        { id: "history", label: "Istoric", count: resolvedExercises().length },
+      ];
+      tabBar = `<div class="cx-tabs cx-tabs--sub">${tabs
+        .map(
+          (t) => `<button class="cx-tabbtn${activeTab === t.id ? " on" : ""}" data-action="ex-tab" data-id="${t.id}">
+            ${t.label}<span class="cx-tabbtn__n">${t.count}</span>
+          </button>`
+        )
+        .join("")}</div>`;
+      body =
+        activeTab === "history"
+          ? proposalHistoryTable()
+          : `<div class="cx-exlist">${pendingList}</div>`;
+    }
+
+    return `
+      ${sectionHead("Exerciții propuse", "Propune exerciții pentru lecții și votează-le pe cele mai bune. Adminul le aprobă sau le respinge; cele aprobate apar la lecția respectivă.")}
+      ${composerBox}
+      ${tabBar}
+      ${body}`;
+  }
+
+  function sectionLessons() {
+    const items = MY_PROFILE.favorites
+      .map(
+        (f) => `<a class="cx-fav" href="${basePath}${f.href}">
+          <span class="cx-fav__star" aria-hidden="true">⭐</span>
+          <span class="cx-fav__title">${escapeHtml(f.title)}</span>
+          <span class="cx-fav__go" aria-hidden="true">→</span>
+        </a>`
+      )
+      .join("");
+    return `${sectionHead("Lecțiile mele", "Lecțiile pe care le-ai marcat ca preferate.")}<div class="cx-favs">${items}</div>`;
+  }
+
+  function sectionNotebook() {
+    const q = state.noteQuery.trim().toLowerCase();
+    const list = q
+      ? state.notes.filter((n) => (n.title + " " + n.text).toLowerCase().includes(q))
+      : state.notes;
+
+    const noteCard = (n) => {
+      if (state.editingNote === n.id) {
+        return `<div class="cx-note cx-note--edit" data-note-id="${n.id}">
+            <input class="cx-input" data-role="note-title" value="${escapeHtml(n.title)}" />
+            <textarea class="cx-input" data-role="note-text" rows="3">${escapeHtml(n.text)}</textarea>
+            <div class="cx-note__actions">
+              <button type="button" class="btn-mini" data-action="note-save" data-id="${n.id}">Salvează</button>
+              <button type="button" class="btn-mini btn-mini--ghost" data-action="note-cancel">Renunță</button>
+            </div>
+          </div>`;
+      }
+      const lesson = n.lessonHref
+        ? `<a class="cx-lessonlink" href="${basePath}${n.lessonHref}">📘 ${escapeHtml(MY_PROFILE.favorites.find((f) => f.href === n.lessonHref)?.title || "lecția")}</a>`
+        : "";
+      return `<div class="cx-note" data-note-id="${n.id}">
+          <div class="cx-note__head">
+            <b>${escapeHtml(n.title)}</b>
+            <span class="cx-note__tools">
+              <span class="cx-muted">${n.when}</span>
+              <button type="button" class="post__adminbtn" data-action="note-edit" data-id="${n.id}" title="Editează">✎</button>
+              <button type="button" class="post__adminbtn post__adminbtn--del" data-action="note-del" data-id="${n.id}" title="Șterge">🗑</button>
+            </span>
+          </div>
+          <p class="cx-note__text">${escapeHtml(n.text)}</p>
+          ${lesson}
+        </div>`;
+    };
+
+    const notes = list.length
+      ? list.map(noteCard).join("")
+      : q
+        ? emptyState("Niciun rezultat", "Nicio notiță nu conține ce ai căutat.")
+        : emptyState("Caiet gol", "Notează o regulă sau un truc ca să nu-l uiți.");
+
+    const lessonOpts = [`<option value="">— fără lecție —</option>`]
+      .concat(MY_PROFILE.favorites.map((f) => `<option value="${escapeHtml(f.href)}">${escapeHtml(f.title)}</option>`))
+      .join("");
+
+    return `
+      ${sectionHead("Caietul meu", "Notițe personale, doar pentru tine — cu editare, ștergere și legătură la lecție.")}
+      <div class="cx-box cx-writer">
+        <input class="cx-input" id="cx-note-title" placeholder="Titlu…" />
+        <input class="cx-input" id="cx-note-text" placeholder="O notiță pentru tine…" />
+        <select class="cx-input cx-writer__lesson" id="cx-note-lesson" title="Leagă notița de o lecție (opțional)">${lessonOpts}</select>
+        <button type="button" class="btn-mini" data-action="add-note">Adaugă</button>
+      </div>
+      <input class="cx-input cx-notes__search" id="cx-note-search" type="search" placeholder="Caută în caiet…" value="${escapeHtml(state.noteQuery)}" />
+      <div class="cx-notes">${notes}</div>`;
+  }
+
+  // ---------- Section: messages (safe inbox/outbox) ----------
+  // Members talk through PREDEFINED templates only (no insults, no ads,
+  // no "add me on insta"); free text exists ONLY to/from the teacher.
+  function msgRow(m, sent) {
+    const who = sent
+      ? m.toAdmin
+        ? `<span class="cx-teacher">🎓 Profesorului</span>`
+        : userNameLink(m.toId, userById(m.toId)?.name || "Membru")
+      : m.fromTeacher
+        ? `<span class="cx-teacher">🎓 Profesorul</span>`
+        : m.fromId != null
+          ? userNameLink(m.fromId, m.fromName)
+          : `<b>${escapeHtml(m.fromName)}</b>`;
+    const replyBtn =
+      isAdmin() && !sent && !m.fromTeacher
+        ? state.msgReplyTo === m.id
+          ? `<div class="cx-msg__reply">
+               <textarea class="cx-input" data-role="msg-reply-text" rows="2" placeholder="Răspunsul tău (text liber — ești profesorul)…"></textarea>
+               <div class="cx-excompose__actions">
+                 <button type="button" class="btn-mini" data-action="msg-reply-send" data-id="${m.id}">Trimite răspunsul</button>
+                 <button type="button" class="btn-mini btn-mini--ghost" data-action="msg-reply-cancel">Renunță</button>
+               </div>
+             </div>`
+          : `<button type="button" class="btn-mini" data-action="msg-reply" data-id="${m.id}">↩ Răspunde</button>`
+        : "";
+    return `<div class="cx-msg${!sent && !m.read ? " is-unread" : ""}">
+        <span class="cx-msg__avatar">${m.fromId != null && !sent ? avatarLink(m.fromId) : `<span class="cx-av" style="--a:#94a3b8">✉️</span>`}</span>
+        <div class="cx-msg__body">
+          <p class="cx-msg__head">${sent ? "Către " : "De la "}${who}
+            <span class="cx-muted">· ${relTime(Math.max(0, Date.now() - m.createdAt))}</span>
+            ${m.template ? `<span class="cx-tag" title="Mesaj din șabloanele sigure">🧩 șablon</span>` : ""}
+            ${sent ? `<span class="cx-msg__sent" title="Mesajul a plecat">trimis ✓</span>` : ""}
+            ${!sent && !m.read ? '<span class="cx-newdot" title="Nou"></span>' : ""}
+          </p>
+          <p class="cx-msg__text">${escapeHtml(m.text)}</p>
+          ${replyBtn}
+        </div>
+      </div>`;
+  }
+
+  function sectionMessages() {
+    const asAdmin = isAdmin();
+    const inbox = inboxFor(asAdmin);
+    const outbox = outboxFor(asAdmin);
+    const unread = inbox.filter((m) => !m.read).length;
+
+    const tabs = `<div class="cx-tabs cx-tabs--sub">
+        <button class="cx-tabbtn${state.msgTab === "inbox" ? " on" : ""}" data-action="msg-tab" data-id="inbox">Primite${unread ? `<span class="cx-tabbtn__n cx-tabbtn__n--hot">${unread}</span>` : `<span class="cx-tabbtn__n">${inbox.length}</span>`}</button>
+        <button class="cx-tabbtn${state.msgTab === "outbox" ? " on" : ""}" data-action="msg-tab" data-id="outbox">Trimise<span class="cx-tabbtn__n">${outbox.length}</span></button>
+      </div>`;
+
+    // Member composer: recipient + the safe-template catalogue.
+    let composerBox = "";
+    if (!asAdmin) {
+      const opts = COMMUNITY_USERS.map(
+        (u) => `<option value="${u.id}"${state.msgTo === u.id ? " selected" : ""}>${escapeHtml(u.name)}</option>`
+      ).join("");
+      // Category chips + an always-visible grid — the templates ARE the
+      // product here, so they don't hide behind two clicks anymore.
+      const catIdx = Math.min(state.msgCat, MESSAGE_TEMPLATES.length - 1);
+      const chips = MESSAGE_TEMPLATES.map(
+        (c, i) => `<button type="button" class="cx-fchip${i === catIdx ? " on" : ""}" data-action="msg-cat" data-i="${i}">${c.cat}</button>`
+      ).join("");
+      const cats = `
+        <div class="cx-msgchips">${chips}</div>
+        <div class="cx-msggrid">${MESSAGE_TEMPLATES[catIdx].items
+          .map((t) => `<button type="button" class="cx-msgtpl" data-action="msg-template" data-text="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
+          .join("")}</div>`;
+      composerBox = `
+        <div class="cx-box">
+          <div class="cx-admin__head"><h3>Trimite un mesaj unui coleg</h3></div>
+          <p class="cx-muted">Ca totul să rămână prietenos, mesajele dintre colegi se aleg din șabloane. Cuvinte proprii poți scrie doar profesorului.</p>
+          <label class="cx-label">Către</label>
+          <select class="cx-input" id="cx-msg-to">${opts}</select>
+          <label class="cx-label">Alege mesajul</label>
+          ${cats}
+        </div>
+        <div class="cx-box">
+          <div class="cx-admin__head"><h3>Scrie profesorului</h3></div>
+          <textarea class="cx-input" id="cx-msg-admin" rows="3" placeholder="Aici poți scrie cu cuvintele tale — mesajul ajunge doar la profesor…"></textarea>
+          ${state.msgWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.msgWarn)}</p>` : ""}
+          <div class="cx-excompose__actions">
+            <button type="button" class="btn btn--primary btn--sm" data-action="msg-admin-send">Trimite profesorului</button>
+          </div>
+        </div>`;
+    }
+
+    // The ADMIN sees CONVERSATIONS: each sender's messages + the replies
+    // he sent back, threaded chronologically — context never gets lost.
+    let rows;
+    if (asAdmin && state.msgTab === "inbox") {
+      const bySender = new Map();
+      for (const m of inbox) {
+        const key = m.fromId != null ? `u${m.fromId}` : m.fromName;
+        if (!bySender.has(key)) bySender.set(key, { name: m.fromName, fromId: m.fromId, msgs: [] });
+        bySender.get(key).msgs.push(m);
+      }
+      // Weave in my replies (outbox toId) for each member sender.
+      for (const conv of bySender.values()) {
+        if (conv.fromId != null) {
+          conv.msgs.push(...outbox.filter((r) => r.toId === conv.fromId));
+        }
+        conv.msgs.sort((a, b) => a.createdAt - b.createdAt);
+      }
+      const convs = [...bySender.values()].sort(
+        (a, b) => Math.max(...b.msgs.map((m) => m.createdAt)) - Math.max(...a.msgs.map((m) => m.createdAt))
+      );
+      rows = convs.length
+        ? convs
+            .map(
+              (conv) => `<div class="cx-conv">
+                <p class="cx-conv__who">${conv.fromId != null ? userNameLink(conv.fromId, conv.name) : `<b>${escapeHtml(conv.name)}</b> <span class="cx-tag">vizitator</span>`}</p>
+                ${conv.msgs.map((m) => msgRow(m, m.fromTeacher === true)).join("")}
+              </div>`
+            )
+            .join("")
+        : emptyState("Niciun mesaj primit", "Mesajele elevilor și ale vizitatorilor ajung aici.");
+    } else {
+      const list = state.msgTab === "inbox" ? inbox : outbox;
+      rows = list.length
+        ? list.map((m) => msgRow(m, state.msgTab === "outbox")).join("")
+        : emptyState(
+            state.msgTab === "inbox" ? "Niciun mesaj primit" : "Niciun mesaj trimis",
+            asAdmin ? "Mesajele elevilor și ale vizitatorilor ajung aici." : "Alege un coleg și trimite-i un șablon prietenos."
+          );
+    }
+
+    // Everything shown is now seen (badge clears on the next render).
+    if (state.msgTab === "inbox") markInboxRead(asAdmin);
+
+    return `
+      ${sectionHead("Mesaje", asAdmin
+        ? "Mesajele primite de la elevi și vizitatori. Le poți răspunde cu text liber."
+        : "Mesagerie sigură: șabloane între colegi, cuvintele tale doar către profesor.")}
+      ${composerBox}
+      ${tabs}
+      <div class="cx-msglist">${rows}</div>`;
+  }
+
+  // ---------- Section: saved posts ("Salvate") ----------
+  function sectionSaved() {
+    const posts = [...state.saved].map((id) => findPost(id)).filter((p) => p && canSeePost(p));
+    const feed = posts.length
+      ? posts.map(postCard).join("")
+      : emptyState("Nimic salvat încă", "Apasă 🔖 pe o postare din forum ca s-o regăsești aici.");
+    return `
+      ${sectionHead("Salvate", "Postările pe care ți le-ai pus deoparte.")}
+      <div class="cx-feed">${feed}</div>`;
+  }
+
+  function sectionPoints() {
+    const rows = MY_PROFILE.pointsLog
+      .map(
+        (e) => `<li class="cx-plog">
+          <span class="cx-plog__label">${escapeHtml(e.label)}</span>
+          <span class="cx-plog__when">${e.when}</span>
+          <span class="cx-plog__pts${e.points < 0 ? " cx-plog__pts--neg" : ""}">${e.points > 0 ? "+" : ""}${e.points}</span>
+        </li>`
+      )
+      .join("");
+    // Level context — the page finally talks to the XP bar above it.
+    const info = levelInfo(MY_PROFILE.points);
+    const toNext = Math.max(0, Math.round(info.next - info.pointsInRun));
+    const levelCard = `
+      <div class="cx-box cx-levelcard">
+        <div class="cx-levelcard__head">
+          <b>Nivel ${info.level}</b>
+          <span class="cx-muted">încă ${toNext.toLocaleString("ro-RO")} puncte până la nivelul ${Math.min(info.level + 1, MAX_LEVEL)}</span>
+        </div>
+        <div class="cx-levelcard__track"><span style="width:${Math.round(info.pct)}%"></span></div>
+      </div>`;
+
+    return `
+      ${sectionHead("Puncte", "Fiecare lecție, exercițiu și zi de streak îți aduce puncte.")}
+      ${levelCard}
+      <div class="cx-box">
+        <div class="cx-total"><b>${MY_PROFILE.points}</b><span>puncte în total</span></div>
+        <ul class="cx-plist">${rows}</ul>
+      </div>`;
+  }
+
+  const VIS_LABELS = {
+    members: "Membri conectați",
+    friends: "Doar prietenii",
+    everyone: "Toată lumea (inclusiv nelogați)",
+  };
+
+  function profileBadges() {
+    // The teacher's profile shows his role, not gamification stats.
+    const items = isAdmin()
+      ? [
+          { icon: "🎓", label: "Profesor" },
+          { icon: "🛡️", label: "Administrator" },
+        ]
+      : [
+          { icon: "🔥", label: `Streak ${MY_PROFILE.streak} zile` },
+          { icon: "🏅", label: `${MY_PROFILE.points} puncte` },
+          { icon: "📚", label: `${MY_PROFILE.lessons} lecții` },
+          { icon: "✍️", label: "Primul comentariu" },
+        ];
+    return items
+      .map((b) => `<span class="cx-badge"><span aria-hidden="true">${b.icon}</span> ${b.label}</span>`)
+      .join("");
+  }
+
+  // Dispatcher: your own profile, or another member's (respecting privacy).
+  function sectionProfile() {
+    if (state.viewUser && state.viewUser !== CURRENT_USER.id) return otherProfile(state.viewUser);
+    // A guest has no own profile — invite them to make one.
+    if (!isLoggedIn()) return guestGateCard("Profil", "Pagina ta din comunitate.");
+    return ownProfile();
+  }
+
+  // The friend button for another user's profile — its label/action depends
+  // on the current relationship (friend, requested, incoming, or none).
+  function friendButton(id) {
+    if (isFriend(id))
+      return `<div class="cx-friendbtns">
+          <span class="cx-friendtag">✓ Prieteni</span>
+          <button type="button" class="btn-mini btn-mini--no" data-action="friend-remove" data-uid="${id}">Elimină</button>
+        </div>`;
+    if (reqIncoming(id))
+      return `<div class="cx-friendbtns">
+          <button type="button" class="btn-mini btn-mini--ok" data-action="friend-accept" data-uid="${id}">✓ Acceptă cererea</button>
+          <button type="button" class="btn-mini btn-mini--ghost" data-action="friend-decline" data-uid="${id}">Refuză</button>
+        </div>`;
+    if (reqOutgoing(id))
+      return `<button type="button" class="btn-mini" data-action="friend-cancel" data-uid="${id}">⏳ Cerere trimisă · anulează</button>`;
+    return `<button type="button" class="btn btn--primary btn--sm" data-action="friend-add" data-uid="${id}">+ Adaugă prieten</button>`;
+  }
+
+  // Another member's profile, gated by their visibility setting.
+  function otherProfile(id) {
+    const pp = publicProfileOf(id);
+    if (!pp) {
+      state.viewUser = null;
+      return ownProfile();
+    }
+    // Wayfinding lives in the breadcrumb now (Atelier › Profil › nume + ←).
+    const back = `<div class="cx-profiletools">
+        <button type="button" class="btn-mini cx-sharebtn" data-action="copy-profile-link" data-slug="${slugForUser(id)}">🔗 Copiază link</button>
+      </div>`;
+    const canView =
+      pp.visibility === "everyone" ||
+      (pp.visibility === "members" && isLoggedIn()) ||
+      (pp.visibility === "friends" && isFriend(id)) ||
+      isAdmin();
+
+    const head = `<div class="cx-profile__row">
+        ${avatarLink(id, "cx-av--xl")}
+        <div class="cx-profile__id">
+          <h3>${escapeHtml(pp.fullName)}</h3>
+          <p class="cx-muted">„${escapeHtml(pp.status)}”</p>
+          <span class="cx-vis"><span aria-hidden="true">👁️</span> ${VIS_LABELS[pp.visibility]}</span>
+        </div>
+        ${isLoggedIn() && !isAdmin() ? friendButton(id) : ""}
+      </div>`;
+
+    if (!canView) {
+      return `
+        ${sectionHead("Profil", "Cum îi vezi pe ceilalți în comunitate.")}
+        ${back}
+        <div class="cx-box cx-profile cx-profile--locked">
+          ${head}
+          <div class="cx-locked">
+            <span class="cx-locked__ic" aria-hidden="true">🔒</span>
+            <p>Acest profil este vizibil doar prietenilor. Trimite o cerere de prietenie ca să-l poți vedea.</p>
+          </div>
+        </div>`;
+    }
+
+    const badges = [
+      { icon: "🏅", label: `${pp.points.toLocaleString("ro-RO")} puncte` },
+      { icon: "📈", label: `Nivel ${levelInfo(pp.points).level}` },
+      { icon: "🔥", label: `Streak ${pp.streak} zile` },
+      { icon: "📚", label: `${pp.lessons} lecții` },
+      { icon: "🤝", label: `${pp.friendsCount} prieteni` },
+    ]
+      .map((b) => `<span class="cx-badge"><span aria-hidden="true">${b.icon}</span> ${b.label}</span>`)
+      .join("");
+    const rows = [
+      ["Nume complet", pp.fullName],
+      ["Clasa", pp.grade],
+      ["Localitate", pp.locality],
+      ["Pasiuni", pp.passions],
+    ]
+      .map(([k, v]) => `<div class="cx-inforow"><span class="cx-inforow__k">${k}</span><span class="cx-inforow__v">${v ? escapeHtml(v) : "—"}</span></div>`)
+      .join("");
+
+    // Their wall: only their FEED posts I'm allowed to see. Posts made
+    // inside groups stay in those groups — they never leak onto the wall.
+    const firstName = pp.fullName.split(" ")[0];
+    const theirPosts = wallPostsOf(id);
+    const wall = theirPosts.length
+      ? `<div class="cx-feed">${theirPosts.map(postCard).join("")}</div>`
+      : `<p class="cx-muted cx-profile__empty">${escapeHtml(firstName)} n-a postat încă nimic vizibil pentru tine.</p>`;
+
+    return `
+      ${sectionHead("Profil", "Cum îi vezi pe ceilalți în comunitate.")}
+      ${back}
+      <div class="cx-box cx-profile">
+        ${head}
+        <div class="cx-badges">${badges}</div>
+        <div class="cx-info">${rows}</div>
+      </div>
+      <h3 class="cx-profile__ph">Postările lui ${escapeHtml(firstName)}</h3>
+      ${wall}`;
+  }
+
+  function ownProfile() {
+    const P = MY_PROFILE;
+    const level = levelInfo(P.points).level;
+    const champUnlocked = level >= CHAMPION_UNLOCK_LEVEL || isAdmin();
+
+    // ---- Edit mode ----
+    if (state.editingProfile) {
+      const initialsOpt = `<button type="button" class="cx-gifopt cx-gifopt--initials${!state.pickAvatar ? " on" : ""}" data-action="profile-pick" data-gif="" title="Inițiale">
+          <span class="cx-av" style="--a:${CURRENT_USER.color}">${CURRENT_USER.initials}</span></button>`;
+      const gifs = AVATAR_GIFS.map(
+        (g) => `<button type="button" class="cx-gifopt${state.pickAvatar === g ? " on" : ""}" data-action="profile-pick" data-gif="${g}"><img src="${basePath}${g}" alt="" loading="lazy" /></button>`
+      ).join("");
+      const champ = champUnlocked
+        ? `<button type="button" class="cx-gifopt cx-gifopt--champ${state.pickAvatar === CHAMPION_GIF ? " on" : ""}" data-action="profile-pick" data-gif="${CHAMPION_GIF}" title="Champion — deblocat!"><img src="${basePath}${CHAMPION_GIF}" alt="" loading="lazy" /><span class="cx-gifopt__crown" aria-hidden="true">🏆</span></button>`
+        : `<div class="cx-gifopt cx-gifopt--locked" title="Se deblochează la nivelul ${CHAMPION_UNLOCK_LEVEL}"><span class="cx-gifopt__lock" aria-hidden="true">🔒</span><span class="cx-gifopt__lvl">Champion · Nv ${CHAMPION_UNLOCK_LEVEL}</span></div>`;
+
+      return `
+        ${sectionHead("Editează profilul", "Completează-ți datele și alege-ți imaginea de profil.")}
+        <div class="cx-box cx-profileform">
+          <label class="cx-label">Imagine de profil</label>
+          <div class="cx-gifgrid">${initialsOpt}${gifs}${champ}</div>
+
+          <div class="cx-fieldgrid">
+            <div><label class="cx-label">Prenume</label><input class="cx-input" id="pf-first" value="${escapeHtml(P.firstName)}" /></div>
+            <div><label class="cx-label">Nume</label><input class="cx-input" id="pf-last" value="${escapeHtml(P.lastName)}" /></div>
+            <div><label class="cx-label">Clasa</label><input class="cx-input" id="pf-grade" value="${escapeHtml(P.grade)}" placeholder="ex: clasa a X-a" /></div>
+            <div><label class="cx-label">Localitate</label><input class="cx-input" id="pf-locality" value="${escapeHtml(P.locality)}" /></div>
+          </div>
+          <label class="cx-label">Școală <span class="cx-muted">(opțional)</span></label>
+          <input class="cx-input" id="pf-school" value="${escapeHtml(P.school)}" />
+          <label class="cx-label">Pasiuni</label>
+          <textarea class="cx-input" id="pf-passions" rows="2">${escapeHtml(P.passions)}</textarea>
+          <label class="cx-label">Provocări / dificultăți</label>
+          <textarea class="cx-input" id="pf-challenges" rows="2">${escapeHtml(P.challenges)}</textarea>
+
+          <label class="cx-label">Cine îmi poate vedea profilul</label>
+          <select class="cx-input" id="pf-vis">
+            ${Object.entries(VIS_LABELS).map(([k, v]) => `<option value="${k}"${P.visibility === k ? " selected" : ""}>${v}</option>`).join("")}
+          </select>
+
+          ${state.profileWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.profileWarn)}</p>` : ""}
+          <div class="cx-excompose__actions">
+            <button type="button" class="btn btn--primary btn--sm" data-action="save-profile">Salvează profilul</button>
+            <button type="button" class="btn-mini btn-mini--ghost" data-action="cancel-profile">Renunță</button>
+          </div>
+        </div>`;
+    }
+
+    // ---- View mode ----
+    const fullName = [P.firstName, P.lastName].filter(Boolean).join(" ") || CURRENT_USER.name;
+    const rows = [
+      ["Nume complet", fullName],
+      ["Clasa", P.grade],
+      ["Școală", P.school],
+      ["Localitate", P.locality],
+      ["Pasiuni", P.passions],
+      // Personal struggles are between you and the teacher — never public.
+      ["Provocări 🔒", P.challenges, "doar tu și profesorul vedeți asta"],
+    ]
+      .map(([k, v, hint]) => `<div class="cx-inforow"><span class="cx-inforow__k">${k}${hint ? ` <span class="cx-inforow__hint" title="${hint}">privat</span>` : ""}</span><span class="cx-inforow__v">${v ? escapeHtml(v) : "—"}</span></div>`)
+      .join("");
+
+    return `
+      ${sectionHead("Profil", "Cum te văd ceilalți în comunitate.")}
+      <div class="cx-box cx-profile cx-profile--cover">
+        <div class="cx-profile__cover" aria-hidden="true"></div>
+        <div class="cx-profile__row">
+          ${meAvatar("cx-av--xl")}
+          <div class="cx-profile__id">
+            <h3>${escapeHtml(fullName)}</h3>
+            <p class="cx-muted">„${escapeHtml(P.status)}” · ${isAdmin() ? "profesor · cont de administrare" : `membru din ${P.joined}`}</p>
+            <span class="cx-vis"><span aria-hidden="true">👁️</span> ${VIS_LABELS[P.visibility]}</span>
+          </div>
+          <span class="cx-profiletools">
+            <button type="button" class="btn-mini" data-action="edit-profile">✎ Editează profilul</button>
+            <button type="button" class="btn-mini cx-sharebtn" data-action="copy-profile-link" data-slug="${slugForUser(CURRENT_USER.id)}">🔗 Copiază link</button>
+          </span>
+        </div>
+        <div class="cx-badges">${profileBadges()}</div>
+        <div class="cx-info">${rows}</div>
+        <label class="cx-label" for="cx-status">Starea ta <span class="cx-muted">(max 10 cuvinte)</span></label>
+        <div class="cx-statusedit">
+          <input class="cx-input" id="cx-status" maxlength="90" value="${escapeHtml(P.status)}" />
+          <button type="button" class="btn-mini" data-action="save-status">Salvează</button>
+        </div>
+        ${state.profileWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.profileWarn)}</p>` : ""}
+        <p class="cx-muted" id="cx-wordcount">${P.status.trim().split(/\s+/).filter(Boolean).length}/10 cuvinte</p>
+      </div>
+      ${isAdmin() ? "" : friendsBox()}`;
+  }
+
+  // Incoming friend requests (accept/decline) + my friends list (own profile).
+  function friendsBox() {
+    const incoming = MY_PROFILE.friendReqIncoming;
+    const friends = MY_PROFILE.friendIds;
+    const reqRows = incoming.length
+      ? incoming
+          .map((id) => {
+            const u = userById(id);
+            if (!u) return "";
+            return `<div class="cx-friendrow">
+                ${avatarLink(id, "cx-av--sm")}
+                ${userNameLink(id, u.name, "cx-friendrow__name")}
+                <span class="cx-friendrow__act">
+                  <button type="button" class="btn-mini btn-mini--ok" data-action="friend-accept" data-uid="${id}">Acceptă</button>
+                  <button type="button" class="btn-mini btn-mini--ghost" data-action="friend-decline" data-uid="${id}">Refuză</button>
+                </span>
+              </div>`;
+          })
+          .join("")
+      : `<p class="cx-muted">Nicio cerere nouă.</p>`;
+    const friendCards = friends.length
+      ? friends
+          .map((id) => {
+            const u = userById(id);
+            if (!u) return "";
+            return `<a class="cx-friendchip" href="${profileHref(id)}" title="Vezi profilul">
+                ${userAvatar(id, "cx-av--sm")}<span>${escapeHtml(u.name.split(" ")[0])}</span>
+              </a>`;
+          })
+          .join("")
+      : `<p class="cx-muted">Încă n-ai prieteni adăugați.</p>`;
+    return `
+      <div class="cx-box">
+        <div class="cx-admin__head"><h3>Cereri de prietenie${incoming.length ? ` · ${incoming.length}` : ""}</h3></div>
+        <div class="cx-friendreqs">${reqRows}</div>
+      </div>
+      <div class="cx-box">
+        <div class="cx-admin__head"><h3>Prietenii mei · ${friends.length}</h3></div>
+        <div class="cx-friendgrid">${friendCards}</div>
+      </div>`;
+  }
+
+  // ---------- Section: daily challenge + word of the day ----------
+  function sectionChallenge() {
+    const w = wordOfToday();
+    const c = challengeOfToday();
+    const answered = state.challengeAnswer !== null;
+    const correct = answered && state.challengeAnswer === c.correct;
+    const opts = c.options
+      .map((o, i) => {
+        let cls = "cx-ch__opt";
+        if (answered) cls += i === c.correct ? " is-correct" : i === state.challengeAnswer ? " is-wrong" : " is-dim";
+        return `<button type="button" class="${cls}" data-action="challenge" data-i="${i}" ${answered ? "disabled" : ""}>${escapeHtml(o)}</button>`;
+      })
+      .join("");
+    const okLabel = !isLoggedIn()
+      ? `✓ Corect! Cu un cont primeai +${c.reward} puncte și streak 😉`
+      : isAdmin()
+        ? "✓ Corect!"
+        : `✓ Corect! +${c.reward} puncte`;
+    const feedback = answered
+      ? `<div class="cx-ch__feedback ${correct ? "ok" : "no"}">
+           <b>${correct ? okLabel : "✗ Aproape! Uite de ce:"}</b>
+           <p>${escapeHtml(c.explanation)}</p>
+         </div>`
+      : "";
+    // The streak calendar: the last 14 days, active ones lit — the visual
+    // memory that makes daily streaks addictive (in the healthy way).
+    const cal = (() => {
+      if (!isLoggedIn() || isAdmin()) return "";
+      const { count, lastDay } = getStreakInfo();
+      const last = lastDay ? new Date(lastDay + "T12:00") : null;
+      const days = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 864e5);
+        const diff = last ? Math.round((last - d) / 864e5) : -1;
+        // Active = within the current run of `count` days ending lastDay.
+        const active = last && diff >= 0 && diff < count;
+        const label = d.toLocaleDateString("ro-RO", { weekday: "narrow" });
+        days.push(`<span class="cx-cal__day${active ? " on" : ""}${i === 0 ? " today" : ""}" title="${d.toLocaleDateString("ro-RO")}">${label}</span>`);
+      }
+      return `<div class="cx-cal">
+          <span class="cx-cal__flame">🔥 ${MY_PROFILE.streak} ${MY_PROFILE.streak === 1 ? "zi" : "zile"}</span>
+          <div class="cx-cal__strip">${days.join("")}</div>
+        </div>`;
+    })();
+
+    return `
+      ${sectionHead("Provocarea zilei", "Un cuvânt nou și o întrebare rapidă — revino zilnic pentru puncte și streak.")}
+      ${cal}
+      <div class="cx-bento">
+        <div class="cx-word">
+          <span class="cx-word__badge">Cuvântul zilei</span>
+          <h3 class="cx-word__w">${escapeHtml(w.word)} <span class="cx-word__type">${w.type}</span></h3>
+          <p class="cx-word__def">${escapeHtml(w.definition)}</p>
+          <p class="cx-word__ex">„${escapeHtml(w.example)}”</p>
+          <div class="cx-word__syn">
+            ${w.synonyms.map((s) => `<span class="cx-chip cx-chip--syn">= ${escapeHtml(s)}</span>`).join("")}
+            ${w.antonyms.map((s) => `<span class="cx-chip cx-chip--ant">≠ ${escapeHtml(s)}</span>`).join("")}
+          </div>
+        </div>
+        <div class="cx-ch">
+          <span class="cx-ch__badge">Provocare</span>
+          <p class="cx-ch__q">${escapeHtml(c.prompt)}</p>
+          <div class="cx-ch__opts">${opts}</div>
+          ${feedback}
+        </div>
+      </div>`;
+  }
+
+  // ---------- Section: leaderboard ----------
+  // Alive, not a list: podium with auras + applause (the top feels SEEN),
+  // a "🚀 în formă" chip for the week's biggest climber, and "Zona ta" —
+  // your neighbours, progress toward the one above, a daily 👉 Poke and a
+  // snail 🐌 that starts climbing after you poke. (By design, names here
+  // stay non-clickable; right-click still offers "copiază numele".)
+  function clapBtnCx(u) {
+    const done = hasClapped(u.id);
+    return `<button type="button" class="cx-clap${done ? " is-done" : ""}" data-action="clap" data-uid="${u.id}"
+        title="${done ? "Ai aplaudat azi" : `Aplaudă-l pe ${escapeHtml(u.name.split(" ")[0])}`}">
+        👏 <span>${clapsFor(u.id)}</span>
+      </button>`;
+  }
+
+  function sectionLeaderboard() {
+    const top = topUsers(10);
+    const sorted = [...COMMUNITY_USERS].sort((a, b) => b.points - a.points);
+    const myRank = sorted.filter((u) => u.points > MY_PROFILE.points).length + 1;
+
+    // The week's biggest climber (shared trend mock — same as the homepage).
+    const riser = [...top].sort((a, b) => {
+      const ta = trendOf(a), tb = trendOf(b);
+      return (tb.dir === "up" ? tb.n : -1) - (ta.dir === "up" ? ta.n : -1);
+    })[0];
+    const riserChip = (u) =>
+      riser && u.id === riser.id && trendOf(u).dir === "up"
+        ? `<span class="cx-riser" title="Cel mai mare urcuș săptămâna aceasta">🚀 în formă</span>`
+        : "";
+
+    // Podium (top 3) — crowned, with animated auras + applause.
+    const CROWNS = ["👑", "🥈", "🥉"];
+    const pod = (u, i) =>
+      u
+        ? `<div class="cx-pod cx-pod--${i + 1}">
+            <span class="cx-pod__aura" aria-hidden="true"></span>
+            <span class="cx-pod__crown" aria-hidden="true">${CROWNS[i]}</span>
+            ${userAvatar(u.id, "cx-av--lg")}
+            <b class="cx-pod__name" data-user-name>${escapeHtml(u.name.split(" ")[0])}</b>
+            <span class="cx-pod__pts">${u.points.toLocaleString("ro-RO")}</span>
+            ${riserChip(u)}
+            ${clapBtnCx(u)}
+            <span class="cx-pod__base">${i + 1}</span>
+          </div>`
+        : "";
+    const podium = `<div class="cx-podium">${pod(top[1], 1)}${pod(top[0], 0)}${pod(top[2], 2)}</div>`;
+
+    // Ranks 4–10.
+    const rows = top
+      .slice(3)
+      .map((u, i) => {
+        const tr = trendOf(u);
+        const arrow = tr.dir === "up" ? `<span class="cx-lb__trend cx-lb__trend--up">▲${tr.n}</span>` : tr.dir === "down" ? `<span class="cx-lb__trend cx-lb__trend--down">▼${tr.n}</span>` : `<span class="cx-lb__trend">•</span>`;
+        return `<div class="cx-lb__row">
+          <span class="cx-lb__rank">${i + 4}${arrow}</span>
+          ${userAvatar(u.id)}
+          <div class="cx-lb__id"><b data-user-name>${escapeHtml(u.name)}</b> ${riserChip(u)}<span class="cx-muted">${u.lessons} lecții · 🔥 ${u.streak}</span></div>
+          ${clapBtnCx(u)}
+          <span class="cx-lb__pts">${u.points.toLocaleString("ro-RO")}</span>
+        </div>`;
+      })
+      .join("");
+
+    // ---- "Zona ta": neighbours + progress + Poke + snail ----
+    const above = sorted[myRank - 2] || null; // the one right above me
+    const below = sorted.filter((u) => u.points <= MY_PROFILE.points).sort((a, b) => b.points - a.points)[0] || null;
+    let zone = "";
+    // Only members race — the teacher and guests have no rank here.
+    if (above && isLoggedIn() && !isAdmin()) {
+      const gap = above.points - MY_PROFILE.points;
+      const pct = Math.max(4, Math.min(96, (MY_PROFILE.points / above.points) * 100));
+      const poked = hasPoked(above.id);
+      const pokeUi = poked
+        ? `<span class="cx-poke is-done" title="Poke trimis azi">👉 Poke trimis ✓</span>`
+        : `<button type="button" class="cx-poke" data-action="poke" data-uid="${above.id}"
+             title="Dă-i de știre că te apropii">👉 Poke</button>`;
+      const snail = poked
+        ? `<span class="cx-zone__snail" style="--from:${pct}%" title="Melcul tău urcă spre ${escapeHtml(above.name.split(" ")[0])}…">🐌</span>`
+        : "";
+      zone = `
+        <div class="cx-zone">
+          <div class="cx-zone__head"><h3>Zona ta</h3><span class="cx-muted">locul <b>#${myRank}</b> din ${sorted.length + 1}</span></div>
+          <div class="cx-zone__row cx-zone__row--target">
+            ${userAvatar(above.id, "cx-av--sm")}
+            <span class="cx-zone__who"><b data-user-name>${escapeHtml(above.name)}</b> <span class="cx-muted">· #${myRank - 1} · ${above.points.toLocaleString("ro-RO")} pct</span></span>
+            ${pokeUi}
+          </div>
+          <div class="cx-zone__trackwrap">
+            <div class="cx-zone__track"><span class="cx-zone__fill" style="width:${pct}%"></span>${snail}</div>
+            <span class="cx-zone__gap">îți mai trebuie <b>${gap.toLocaleString("ro-RO")}</b> puncte ca să-l întreci</span>
+          </div>
+          <div class="cx-zone__row cx-zone__row--me">
+            ${meAvatar("cx-av--sm")}
+            <span class="cx-zone__who"><b>Tu</b> <span class="cx-muted">· #${myRank} · ${MY_PROFILE.points.toLocaleString("ro-RO")} pct</span></span>
+          </div>
+          ${below
+            ? `<div class="cx-zone__row cx-zone__row--chaser">
+                ${userAvatar(below.id, "cx-av--sm")}
+                <span class="cx-zone__who"><b data-user-name>${escapeHtml(below.name)}</b> <span class="cx-muted">· e la ${(MY_PROFILE.points - below.points).toLocaleString("ro-RO")} puncte în spatele tău — nu te lăsa!</span></span>
+              </div>`
+            : ""}
+        </div>`;
+    }
+
+    return `
+      ${sectionHead("Clasament", "Cei mai activi membri ai comunității. Aplaudă-i pe cei din top — și ia-le locul.")}
+      ${podium}
+      <div class="cx-lb">${rows}</div>
+      ${zone}`;
+  }
+
+  // ---------- Section: study groups (list) + group topic (detail) ----------
+  // When did I last open each group? Anything newer earns a "nou" pulse.
+  const groupSeen = () => store.get("atelier_group_seen", {});
+  const groupLatest = (g) => Math.max(0, ...g.posts.map((p) => p.createdAt || 0));
+  const groupHasNews = (g) =>
+    isLoggedIn() && g.memberIds.includes(CURRENT_USER.id) && groupLatest(g) > (groupSeen()[g.id] || 0);
+
+  function sectionGroups() {
+    if (state.openGroup) return sectionGroupTopic(findGroup(state.openGroup));
+    // Create a group right where you'd look for it (not only from Forum).
+    const createUi = !isLoggedIn()
+      ? ""
+      : state.groupCreateOpen
+        ? `${composer()}${composerNotice()}`
+        : `<button type="button" class="cx-propose" data-action="group-create-toggle">+ Creează un grup de studiu</button>`;
+    const cards = state.groups
+      .map((g) => {
+        const gi = groupIcon(g.iconId);
+        const joined = isLoggedIn() && g.memberIds.includes(CURRENT_USER.id);
+        const latest = groupLatest(g);
+        const pulse = latest
+          ? `· ultima activitate ${relTime(Math.max(0, Date.now() - latest))}`
+          : "· încă liniște";
+        const news = groupHasNews(g)
+          ? `<span class="cx-group__new" title="Postări noi de la ultima vizită">nou</span>`
+          : "";
+        return `<button type="button" class="cx-group" style="--g:${g.color}" data-action="open-group" data-id="${g.id}">
+          <span class="cx-group__badge" style="background:${g.color}"><span class="gi gi--${gi.anim}">${gi.char}</span></span>
+          <span class="cx-group__body">
+            <b class="cx-group__name">${escapeHtml(g.name)} ${news}</b>
+            <span class="cx-group__topic">${escapeHtml(g.description)}</span>
+            <span class="cx-muted">👥 ${g.memberIds.length} membri · 💬 ${g.posts.length} postări ${pulse}${joined ? " · membru ✓" : ""}</span>
+          </span>
+          <span class="cx-group__go" aria-hidden="true">→</span>
+        </button>`;
+      })
+      .join("");
+    return `
+      ${sectionHead("Grupuri de studiu", "Fiecare grup are propriul topic, membri și discuții.")}
+      ${createUi}
+      <div class="cx-groups">${cards}</div>`;
+  }
+
+  // Group topic detail: members, membership, add-member permissions, and
+  // its own posts with the shared threading engine.
+  function sectionGroupTopic(g) {
+    if (!g) {
+      state.openGroup = null;
+      return sectionGroups();
+    }
+    const gi = groupIcon(g.iconId);
+    const joined = g.memberIds.includes(CURRENT_USER.id);
+    const isCreator = g.creatorId === CURRENT_USER.id || isAdmin();
+    const canAdd = canAddMembers(g);
+    const creatorName = (userById(g.creatorId) || CURRENT_USER).name;
+
+    const members = g.memberIds
+      .map((mid) => {
+        const name = mid === CURRENT_USER.id ? CURRENT_USER.name : (userById(mid) || {}).name || "Membru";
+        const col = mid === CURRENT_USER.id ? CURRENT_USER.color : avatarColor(mid);
+        return `<span class="cx-member" title="${escapeHtml(name)}">${avatarLink(mid)}</span>`;
+      })
+      .join("");
+
+    const candidates = COMMUNITY_USERS.filter((u) => !g.memberIds.includes(u.id)).slice(0, 12);
+    const addPanel =
+      canAdd && state.addMemberOpen
+        ? `<div class="cx-addmember">
+             <p class="cx-label">Adaugă un membru</p>
+             <div class="cx-addmember__list">${candidates
+               .map((u) => `<button type="button" class="cx-addmember__opt" data-action="add-member" data-uid="${u.id}">${userAvatar(u.id)} ${escapeHtml(u.name.split(" ")[0])}</button>`)
+               .join("")}</div>
+           </div>`
+        : "";
+
+    const posts = g.posts.length
+      ? g.posts.map(postCard).join("")
+      : emptyState("Niciun mesaj în grup încă", "Pornește prima discuție a grupului.");
+
+    const composerBox =
+      joined || isAdmin()
+        ? `<div class="cx-box cx-groupcompose">
+             ${meAvatar()}
+             <textarea class="cx-input" id="cx-group-post" rows="2" placeholder="Scrie o postare în grup…"></textarea>
+             <button type="button" class="btn btn--primary btn--sm" data-action="group-post" data-id="${g.id}">Postează</button>
+           </div>${state.groupWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.groupWarn)}</p>` : ""}`
+        : `<div class="cx-groupjoinbar">Alătură-te grupului ca să poți posta.</div>`;
+
+    // Admin/creator can edit (name/description/icon) or delete the group.
+    const editForm =
+      isCreator && state.editingGroup
+        ? `<div class="cx-box cx-groupedit">
+             <label class="cx-label">Icon</label>
+             <div class="cx-icongrid">${GROUP_ICONS.map(
+               (ic) => `<button type="button" class="cx-iconopt${ic.id === g.iconId ? " on" : ""}" data-action="group-set-icon" data-id="${ic.id}"><span class="gi gi--${ic.anim}">${ic.char}</span></button>`
+             ).join("")}</div>
+             <label class="cx-label">Nume</label>
+             <input class="cx-input" id="cx-editgroup-name" value="${escapeHtml(g.name)}" />
+             <label class="cx-label">Descriere</label>
+             <textarea class="cx-input" id="cx-editgroup-desc" rows="2">${escapeHtml(g.description)}</textarea>
+             <div class="cx-excompose__actions">
+               <button type="button" class="btn btn--primary btn--sm" data-action="group-save" data-id="${g.id}">Salvează</button>
+               <button type="button" class="btn-mini btn-mini--ghost" data-action="group-edit-cancel">Renunță</button>
+             </div>
+           </div>`
+        : "";
+
+    const adminBar = isCreator
+      ? `<span class="cx-grouphead__admin">
+           <button type="button" class="post__adminbtn" data-action="group-edit" data-id="${g.id}" title="Editează grupul">✎</button>
+           <button type="button" class="post__adminbtn post__adminbtn--del" data-action="group-del" data-id="${g.id}" title="Șterge grupul">🗑</button>
+         </span>`
+      : "";
+
+    return `
+      <div class="cx-grouphead" style="--g:${g.color}">
+        <span class="cx-grouphead__ic"><span class="gi gi--${gi.anim}">${gi.char}</span></span>
+        <div class="cx-grouphead__id">
+          <h1>${escapeHtml(g.name)}</h1>
+          <p>${escapeHtml(g.description)}</p>
+          <span class="cx-muted">Creat de ${escapeHtml(creatorName)} · 👥 ${g.memberIds.length} membri</span>
+        </div>
+        <button type="button" class="cx-group__join${joined ? " on" : ""}" data-action="group-toggle" data-id="${g.id}">${joined ? "Membru ✓" : "Alătură-te"}</button>
+        ${adminBar}
+      </div>
+      ${editForm}
+      <div class="cx-groupbar">
+        <div class="cx-members">${members}</div>
+        <div class="cx-groupbar__actions">
+          ${canAdd ? `<button type="button" class="btn-mini${state.addMemberOpen ? " on" : ""}" data-action="toggle-addmember">+ Adaugă membru</button>` : ""}
+          ${isCreator ? `<button type="button" class="btn-mini${g.allowMembersAdd ? " on" : ""}" data-action="toggle-members-add" data-id="${g.id}">${g.allowMembersAdd ? "Membrii pot invita ✓" : "Permite membrilor să invite"}</button>` : ""}
+        </div>
+      </div>
+      ${addPanel}
+      ${composerBox}
+      <div class="cx-feed">${posts}</div>`;
+  }
+
+  // ---------- Section: events (admin-gated) ----------
+  function sectionEvents() {
+    const allowed = isAdmin() || MY_PROFILE.eventsAccess;
+    if (!allowed) {
+      return `
+        ${sectionHead("Evenimente", "Sesiuni live, quiz-uri și cluburi de lectură.")}
+        <div class="cx-lock">
+          <div class="cx-lock__ic" aria-hidden="true">🔒</div>
+          <b>Acces restricționat</b>
+          <p>Evenimentele sunt vizibile doar membrilor cărora un administrator le-a acordat acces. Cere-i profesorului să te adauge.</p>
+        </div>`;
+    }
+    const kindOptions = (sel) =>
+      Object.entries(EVENT_KINDS)
+        .map(([key, k]) => `<option value="${key}"${sel === key ? " selected" : ""}>${k.label}</option>`)
+        .join("");
+    const eventForm = (ev, isNew) => `<div class="cx-box cx-eventform">
+        <label class="cx-label">Titlu</label>
+        <input class="cx-input" id="cx-ev-title" value="${escapeHtml(ev.title || "")}" />
+        <div class="cx-eventform__row">
+          <div><label class="cx-label">Tip</label><select class="cx-input" id="cx-ev-kind">${kindOptions(ev.kind || "live")}</select></div>
+          <div><label class="cx-label">Când</label><input class="cx-input" id="cx-ev-when" value="${escapeHtml(ev.when || "")}" placeholder="ex: vineri, 19:00" /></div>
+        </div>
+        <label class="cx-label">Gazdă</label>
+        <input class="cx-input" id="cx-ev-host" value="${escapeHtml(ev.host || "")}" />
+        <div class="cx-excompose__actions">
+          <button type="button" class="btn btn--primary btn--sm" data-action="${isNew ? "admin-create-event" : "admin-save-event"}" data-id="${ev.id || 0}">${isNew ? "Creează evenimentul" : "Salvează"}</button>
+          <button type="button" class="btn-mini btn-mini--ghost" data-action="admin-event-cancel">Renunță</button>
+        </div>
+      </div>`;
+
+    const createUI = isAdmin()
+      ? state.newEventOpen
+        ? eventForm({ kind: "live" }, true)
+        : `<button type="button" class="cx-propose" data-action="admin-new-event">+ Creează un eveniment</button>`
+      : "";
+
+    const cards = state.events
+      .map((e) => {
+        if (isAdmin() && state.editingEvent === e.id) return eventForm(e, false);
+        const k = EVENT_KINDS[e.kind];
+        const adminBar = isAdmin()
+          ? `<span class="cx-event__admin">
+               <button type="button" class="post__adminbtn" data-action="admin-edit-event" data-id="${e.id}" title="Editează">✎</button>
+               <button type="button" class="post__adminbtn post__adminbtn--del" data-action="admin-del-event" data-id="${e.id}" title="Șterge">🗑</button>
+             </span>`
+          : "";
+        return `<div class="cx-event" style="--e:${k.color}">
+          <span class="cx-event__icon">${k.icon}</span>
+          <div class="cx-event__body">
+            <span class="cx-event__kind">${k.label}</span>
+            <b class="cx-event__title">${escapeHtml(e.title)}</b>
+            <span class="cx-muted">📅 ${escapeHtml(e.when)} · ${escapeHtml(e.host)}</span>
+          </div>
+          <button type="button" class="cx-event__go${e.going ? " on" : ""}" data-action="event-go" data-id="${e.id}">${e.going ? "Particip ✓" : "Particip"}</button>
+          ${adminBar}
+        </div>`;
+      })
+      .join("");
+    return `
+      ${sectionHead("Evenimente", "Sesiuni live, quiz-uri și cluburi de lectură. Nu rata nimic.")}
+      ${createUI}
+      <div class="cx-events">${cards}</div>`;
+  }
+
+  // ---------- Section: admin dashboard (admin role only) ----------
+  function adminUserRow(u, hasAccess, isMe) {
+    const li = levelInfo(u.points || 0);
+    return `<div class="cx-adminrow">
+      <span class="cx-adminrow__u">${avatarLink(u.id)} ${userNameLink(u.id, u.name)}${isMe ? ' <span class="cx-adminchip">tu</span>' : ""}</span>
+      <span>${(u.points || 0).toLocaleString("ro-RO")} <span class="cx-levelchip">Nv ${li.level}${li.prestige ? ` ⭐${li.prestige}` : ""}</span></span>
+      <span><button type="button" class="cx-toggle${hasAccess ? " on" : ""}" data-action="grant-events" data-uid="${u.id}">${hasAccess ? "Acordat ✓" : "Acordă"}</button></span>
+      <span class="cx-crudbtns"><button type="button" class="btn-mini" data-action="admin-view" data-uid="${u.id}">Vezi profil</button></span>
+    </div>`;
+  }
+
+  function adminProfilePreview() {
+    const uid = state.adminViewUser;
+    if (uid === undefined || uid === null) return "";
+    const isMe = uid === CURRENT_USER.id;
+    const u = isMe
+      ? { name: CURRENT_USER.name, points: MY_PROFILE.points, lessons: MY_PROFILE.lessons, streak: MY_PROFILE.streak, status: MY_PROFILE.status }
+      : userById(uid);
+    if (!u) return "";
+    const col = isMe ? CURRENT_USER.color : avatarColor(uid);
+    return `<div class="cx-box cx-adminprofile">
+      <div class="cx-admin__head"><h3>Profil utilizator</h3><button type="button" class="cx-x" data-action="admin-closeview" aria-label="Închide">×</button></div>
+      <div class="cx-adminprofile__row">${userAvatar(uid, "cx-av--lg")}
+        <div><b>${escapeHtml(u.name)}</b><p class="cx-muted">„${escapeHtml(u.status || "—")}”</p></div>
+      </div>
+      <div class="cx-adminprofile__stats">
+        <span><b>${(u.points || 0).toLocaleString("ro-RO")}</b> puncte</span>
+        <span><b>${u.lessons ?? "—"}</b> lecții</span>
+        <span><b>🔥 ${u.streak ?? "—"}</b> streak</span>
+      </div>
+      <p class="cx-muted">Din contul de admin poți vedea complet profilul oricărui utilizator (mockup).</p>
+    </div>`;
+  }
+
+  // Admin proposal history as a sortable, filterable table. Reused in the
+  // "Exerciții" tab AND wrapped in a box for the admin panel (DRY).
+  function proposalHistoryTable() {
+    const filter = state.histFilter || "all";
+    const sort = state.histSort || { key: "date", dir: "desc" };
+
+    let rows = resolvedExercises();
+    if (filter !== "all") rows = rows.filter((e) => e.status === filter);
+
+    const cmp = {
+      user: (a, b) => a.name.localeCompare(b.name, "ro"),
+      date: (a, b) => (a.decidedAt || 0) - (b.decidedAt || 0),
+      status: (a, b) => a.status.localeCompare(b.status),
+    }[sort.key] || ((a, b) => (a.decidedAt || 0) - (b.decidedAt || 0));
+    rows = [...rows].sort(cmp);
+    if (sort.dir === "desc") rows.reverse();
+
+    const arrow = (key) => (sort.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
+    const th = (key, label) =>
+      `<th><button type="button" class="cx-th${sort.key === key ? " on" : ""}" data-action="hist-sort" data-id="${key}">${label}${arrow(key)}</button></th>`;
+
+    const chips = [
+      { id: "all", label: "Toate" },
+      { id: "approved", label: "Aprobate" },
+      { id: "rejected", label: "Respinse" },
+    ]
+      .map((c) => `<button type="button" class="cx-fchip${filter === c.id ? " on" : ""}" data-action="hist-filter" data-id="${c.id}">${c.label}</button>`)
+      .join("");
+
+    const body = rows.length
+      ? rows
+          .map((e, i) => {
+            const ok = e.status === "approved";
+            const k = exerciseKind(e.kind);
+            const date = e.decidedAt ? new Date(e.decidedAt).toLocaleDateString("ro-RO") : "—";
+            return `<tr>
+                <td class="cx-histt__n">${i + 1}</td>
+                <td>${userNameLink(e.authorId, e.name)}</td>
+                <td class="cx-histt__prompt"><span class="cx-tag cx-tag--${e.kind}">${k.label}</span> ${escapeHtml(e.prompt)}<div class="cx-histt__lesson">${lessonLink(e)}</div></td>
+                <td title="decis ${e.decidedTime || ""}">${date}</td>
+                <td class="cx-histt__status"><span class="cx-dot cx-dot--${ok ? "ok" : "no"}" title="${ok ? "aprobat" : "respins"}"></span></td>
+                <td class="cx-histt__act"><button type="button" class="post__adminbtn post__adminbtn--del" data-action="admin-del-ex" data-id="${e.id}" title="Șterge din istoric">🗑</button></td>
+              </tr>`;
+          })
+          .join("")
+      : `<tr><td colspan="6" class="cx-histt__empty cx-muted">Nicio propunere ${filter === "approved" ? "aprobată" : filter === "rejected" ? "respinsă" : "decisă"} încă.</td></tr>`;
+
+    return `<div class="cx-histfilter">Filtru: ${chips}</div>
+      <div class="cx-histtable-wrap">
+        <table class="cx-histtable">
+          <thead><tr>
+            <th class="cx-histt__n">#</th>
+            ${th("user", "Propunător")}
+            <th>Propunere</th>
+            ${th("date", "Data")}
+            ${th("status", "Status")}
+            <th></th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>`;
+  }
+  function proposalHistory() {
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Istoric propuneri · ${resolvedExercises().length}</h3></div>
+        <p class="cx-muted">Propunerile de exerciții pe care le-ai aprobat sau respins. Cele aprobate apar în lista de exerciții de la lecția lor.</p>
+        ${proposalHistoryTable()}
+      </div>`;
+  }
+
+  // The moderation queue — held posts, blocked attempts and reports.
+  // Now with FILTERS, full-text expand, media preview on held posts and a
+  // HISTORY view (resolved items, reopenable) — built to scale.
+  const MOD_KIND_META = {
+    "held-post": { icon: "🛡️", label: "Postare reținută de filtru" },
+    "blocked-comment": { icon: "✋", label: "Comentariu blocat de filtru" },
+    report: { icon: "⚑", label: "Raportare de la un membru" },
+  };
+
+  function modItemHtml(m, resolved = false) {
+    const k = MOD_KIND_META[m.kind];
+    const matches = m.matches?.length
+      ? `<span class="cx-modmatches">${m.matches.map((w) => `<code>${escapeHtml(w)}</code>`).join(" ")}</span>`
+      : "";
+    const reporter = m.kind === "report"
+      ? `<span class="cx-muted">· semnalat de ${escapeHtml(m.reporterName || "un membru")}${m.reportCount > 1 ? ` (×${m.reportCount})` : ""}</span>`
+      : "";
+    // Full text on demand (no more deciding on 180 characters).
+    const full = String(m.text);
+    const text = full.length > 180
+      ? `<details class="cx-moditem__more"><summary>„${escapeHtml(full.slice(0, 180))}…” <b>vezi tot</b></summary><p>„${escapeHtml(full)}”</p></details>`
+      : `<p class="cx-moditem__text">„${escapeHtml(full)}”</p>`;
+    // Held posts show their media too — decide on the WHOLE post.
+    const media = m.kind === "held-post" && m.post?.media?.images?.length
+      ? `<div class="cx-moditem__media">${m.post.media.images
+          .map((im) => `<span class="cx-moditem__thumb" style="${im.src ? `background-image:url('${im.src}')` : `background:${im.gradient}`}"></span>`)
+          .join("")}</div>`
+      : "";
+    const RESOLUTION_LABELS = { approved: "publicată", rejected: "respinsă", deleted: "conținut șters", dismissed: "ignorată" };
+    const actions = resolved
+      ? `<span class="cx-tag">${RESOLUTION_LABELS[m.resolution] || m.resolution}</span>
+         <button type="button" class="btn-mini btn-mini--ghost" data-action="mod-reopen" data-id="${m.id}">↩ Redeschide</button>`
+      : m.kind === "held-post"
+        ? `<button type="button" class="btn-mini btn-mini--ok" data-action="mod-approve" data-id="${m.id}">✓ Publică</button>
+           <button type="button" class="btn-mini btn-mini--no" data-action="mod-reject" data-id="${m.id}">✕ Respinge</button>`
+        : m.kind === "report"
+          ? `<button type="button" class="btn-mini btn-mini--no" data-action="mod-delete-target" data-id="${m.id}">🗑 Șterge conținutul</button>
+             <button type="button" class="btn-mini btn-mini--ghost" data-action="mod-dismiss" data-id="${m.id}">Ignoră</button>`
+          : `<button type="button" class="btn-mini btn-mini--ghost" data-action="mod-dismiss" data-id="${m.id}">Am văzut</button>`;
+    return `<div class="cx-moditem cx-moditem--${m.kind}${resolved ? " cx-moditem--resolved" : ""}">
+        <span class="cx-moditem__ic" title="${k.label}">${k.icon}</span>
+        <div class="cx-moditem__body">
+          <p class="cx-moditem__head"><b>${k.label}</b> <span class="cx-muted">· ${userNameLink(m.authorId, m.name)} · ${m.time}</span> ${reporter}</p>
+          ${text}
+          ${media}
+          <p class="cx-moditem__meta">${matches}<span class="cx-muted">${escapeHtml(m.context || "")}</span></p>
+        </div>
+        <span class="cx-moditem__act">${actions}</span>
+      </div>`;
+  }
+
+  function moderationBox() {
+    const open = openModerationItems();
+    const resolved = MODERATION_QUEUE.filter((i) => i.status === "resolved");
+    const counts = {
+      all: open.length,
+      "held-post": open.filter((i) => i.kind === "held-post").length,
+      "blocked-comment": open.filter((i) => i.kind === "blocked-comment").length,
+      report: open.filter((i) => i.kind === "report").length,
+      history: resolved.length,
+    };
+    const chip = (id, label) =>
+      `<button type="button" class="cx-fchip${state.modFilter === id ? " on" : ""}" data-action="mod-filter" data-id="${id}">${label} <span class="cx-muted">${counts[id]}</span></button>`;
+    const chips = `<div class="cx-histfilter">${chip("all", "Toate")}${chip("held-post", "🛡️ Reținute")}${chip("blocked-comment", "✋ Blocate")}${chip("report", "⚑ Raportări")}${chip("history", "🗂 Istoric")}</div>`;
+
+    const showing = state.modFilter === "history"
+      ? resolved
+      : state.modFilter === "all"
+        ? open
+        : open.filter((i) => i.kind === state.modFilter);
+    const items = showing.length
+      ? showing.map((m) => modItemHtml(m, state.modFilter === "history")).join("")
+      : `<p class="cx-muted">${state.modFilter === "history" ? "Încă n-ai moderat nimic." : "Nimic aici. 🎉"}</p>`;
+
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Moderare${open.length ? ` · ${open.length} deschise` : ""}</h3></div>
+        ${chips}
+        <div class="cx-modlist">${items}</div>
+      </div>`;
+  }
+
+  // Pending exercise proposals, decidable right here (same handlers as the
+  // Exerciții section — one flow, two entry points).
+  function adminPendingBox() {
+    const pending = pendingExercises();
+    if (!pending.length) return "";
+    const rows = pending
+      .map(
+        (e) => `<div class="cx-moditem cx-moditem--exercise">
+          <span class="cx-moditem__ic">🧩</span>
+          <div class="cx-moditem__body">
+            <p class="cx-moditem__head"><b>Propunere de exercițiu</b> <span class="cx-muted">· ${userNameLink(e.authorId, e.name)} · ▲ ${e.votes} voturi</span></p>
+            <p class="cx-moditem__text">„${escapeHtml(e.prompt)}”</p>
+            <p class="cx-moditem__meta">${lessonLink(e)}</p>
+          </div>
+          <span class="cx-moditem__act">
+            <button type="button" class="btn-mini" data-action="ex-admin-edit" data-id="${e.id}" title="Verifică și ajustează înainte de aprobare">✎ Editează</button>
+            <button type="button" class="btn-mini btn-mini--ok" data-action="admin-approve-ex" data-id="${e.id}">✓ Aprobă</button>
+            <button type="button" class="btn-mini btn-mini--no" data-action="admin-reject-ex" data-id="${e.id}">✕ Respinge</button>
+          </span>
+        </div>`
+      )
+      .join("");
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Exerciții în așteptare · ${pending.length}</h3></div>
+        <div class="cx-modlist">${rows}</div>
+      </div>`;
+  }
+
+  function adminTabOverview() {
+    const totalPosts = state.posts.length + state.groups.reduce((n, g) => n + g.posts.length, 0);
+
+    // The community's pulse: what happened TODAY + your last actions.
+    const dayStart = new Date().setHours(0, 0, 0, 0);
+    const postsToday = allPosts().filter((p) => (p.createdAt || 0) >= dayStart).length;
+    const proposalsToday = state.proposed.filter((e) => (e.createdAt || 0) >= dayStart).length;
+    const log = store.get("atelier_admin_log", []).slice(0, 8);
+    const pulse = `
+      <div class="cx-box">
+        <div class="cx-admin__head"><h3>Pulsul de azi</h3></div>
+        <div class="cx-pulse">
+          <span class="cx-pulse__stat"><b>${postsToday}</b> postări noi</span>
+          <span class="cx-pulse__stat"><b>${proposalsToday}</b> exerciții propuse</span>
+          <span class="cx-pulse__stat"><b>${openModerationItems().length}</b> de moderat</span>
+          <span class="cx-pulse__stat"><b>${unreadMessages(true)}</b> mesaje necitite</span>
+        </div>
+        ${log.length
+          ? `<p class="cx-muted cx-pulse__logtitle">Ultimele tale acțiuni:</p>
+             <ul class="cx-pulse__log">${log
+               .map((l) => `<li><span class="cx-muted">${relTime(Math.max(0, Date.now() - l.t))}</span> ${escapeHtml(l.text)}</li>`)
+               .join("")}</ul>`
+          : ""}
+      </div>`;
+    const attention = [
+      { n: openModerationItems().length, label: "de moderat", tab: "moderation" },
+      { n: pendingExercises().length, label: "exerciții în așteptare", tab: "moderation" },
+    ].filter((a) => a.n > 0);
+    const attentionBox = attention.length
+      ? `<div class="cx-attention">
+           <b>⚠️ Necesită atenție</b>
+           ${attention
+             .map((a) => `<button type="button" class="cx-attention__item" data-action="admin-tab" data-id="${a.tab}"><b>${a.n}</b> ${a.label} →</button>`)
+             .join("")}
+         </div>`
+      : `<div class="cx-attention cx-attention--clear"><b>✅ Totul e în regulă</b> <span class="cx-muted">— nimic în așteptare.</span></div>`;
+
+    // Every number is a real door: it opens the place where you act on it.
+    const stats = [
+      { n: COMMUNITY_USERS.length + 1, l: "utilizatori", tab: "users" },
+      { n: totalPosts, l: "postări", go: "forum" },
+      { n: state.groups.length, l: "grupuri", go: "grupuri" },
+      { n: state.proposed.length, l: "exerciții", go: "exercitii" },
+      { n: state.events.length, l: "evenimente", go: "evenimente" },
+    ]
+      .map(
+        (s) => `<button type="button" class="cx-adminstat" data-action="${s.tab ? "admin-tab" : "go"}" data-id="${s.tab || s.go}">
+          <b>${s.n}</b><span>${s.l}</span>
+        </button>`
+      )
+      .join("");
+
+    const crud = [
+      { label: "Postări", section: "forum", hint: "editezi/ștergi pe fiecare postare, din feed" },
+      { label: "Grupuri", section: "grupuri", hint: "editezi/ștergi în pagina fiecărui grup" },
+      { label: "Exerciții", section: "exercitii", hint: "aprobi/respingi și din fila Moderare" },
+      { label: "Evenimente", section: "evenimente", hint: "creezi/editezi/ștergi evenimente" },
+    ]
+      .map(
+        (c) => `<div class="cx-crudrow">
+          <b>${c.label}</b>
+          <span class="cx-crudrow__hint cx-muted">${c.hint}</span>
+          <button type="button" class="btn-mini" data-action="go" data-id="${c.section}">Gestionează →</button>
+        </div>`
+      )
+      .join("");
+
+    return `
+      ${attentionBox}
+      <div class="cx-adminstats">${stats}</div>
+      ${pulse}
+      <div class="cx-box">
+        <div class="cx-admin__head"><h3>Unde gestionezi conținutul</h3></div>
+        <p class="cx-muted">Controalele de editare/ștergere sunt inline, exact unde trăiește conținutul.</p>
+        <div class="cx-crud">${crud}</div>
+      </div>`;
+  }
+
+  function adminTabUsers() {
+    const q = state.adminUserQuery.trim().toLowerCase();
+    let users = [...COMMUNITY_USERS];
+    if (q) users = users.filter((u) => u.name.toLowerCase().includes(q));
+    users.sort(state.adminUserSort === "name" ? (a, b) => a.name.localeCompare(b.name, "ro") : (a, b) => b.points - a.points);
+
+    // Only MEMBERS are listed — the teacher/admin isn't a member account.
+    // Paginated (10/page) so it stays scannable at any class size.
+    const PER_PAGE = 10;
+    const pages = Math.max(1, Math.ceil(users.length / PER_PAGE));
+    const page = Math.min(state.adminUserPage, pages);
+    const slice = users.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+    const rows = slice.map((u) => adminUserRow(u, state.eventsGranted.has(u.id), false)).join("");
+    const pager = pages > 1
+      ? `<div class="cx-pager">
+           <button type="button" class="btn-mini" data-action="admin-user-page" data-dir="-1" ${page === 1 ? "disabled" : ""}>‹</button>
+           <span class="cx-muted">pagina ${page} din ${pages}</span>
+           <button type="button" class="btn-mini" data-action="admin-user-page" data-dir="1" ${page === pages ? "disabled" : ""}>›</button>
+         </div>`
+      : "";
+    const sortBtn = (key, label) =>
+      `<button type="button" class="cx-fchip${state.adminUserSort === key ? " on" : ""}" data-action="admin-user-sort" data-key="${key}">${label}</button>`;
+
+    return `
+      ${adminProfilePreview()}
+      <div class="cx-box">
+        <div class="cx-admin__head"><h3>Utilizatori · ${users.length}</h3></div>
+        <div class="cx-userbar">
+          <input class="cx-input cx-userbar__search" id="cx-admin-usearch" type="search" placeholder="Caută un membru…" value="${escapeHtml(state.adminUserQuery)}" />
+          <span>${sortBtn("points", "După puncte")}${sortBtn("name", "După nume")}</span>
+        </div>
+        <div class="cx-admintable">
+          <div class="cx-adminrow cx-adminrow--head"><span>Utilizator</span><span>Puncte</span><span>Evenimente</span><span>Acțiuni</span></div>
+          ${rows}
+        </div>
+        ${pager}
+      </div>`;
+  }
+
+  function adminTabModeration() {
+    return `${moderationBox()}${adminPendingBox()}${proposalHistory()}`;
+  }
+
+  // ---- Admin: schedule the daily challenges ----
+  function challengeForm(ch = {}) {
+    const opts = ch.options || [];
+    const opt = (i) => `
+      <label class="exf__opt">
+        <input type="radio" name="chf-correct" value="${i}" ${i === (ch.correct ?? 0) ? "checked" : ""} title="Răspunsul corect" />
+        <input class="cx-input" id="chf-opt-${i}" value="${escapeHtml(opts[i] || "")}" placeholder="Varianta ${i + 1}${i < 2 ? "" : " (opțional)"}" />
+      </label>`;
+    return `<div class="cx-excompose">
+        <label class="cx-label">Întrebarea</label>
+        <textarea class="cx-input" id="chf-prompt" rows="2">${escapeHtml(ch.prompt || "")}</textarea>
+        <label class="cx-label">Variantele <span class="cx-muted">(bifează răspunsul corect)</span></label>
+        ${opt(0)}${opt(1)}${opt(2)}${opt(3)}
+        <label class="cx-label">Explicația <span class="cx-muted">(apare după răspuns)</span></label>
+        <textarea class="cx-input" id="chf-explanation" rows="2">${escapeHtml(ch.explanation || "")}</textarea>
+        <div class="cx-eventform__row">
+          <div>
+            <label class="cx-label">Programată pe ziua <span class="cx-muted">(gol = intră în rotația zilnică)</span></label>
+            <input class="cx-input" id="chf-date" type="date" value="${ch.date || ""}" />
+          </div>
+          <div>
+            <label class="cx-label">Recompensă (puncte)</label>
+            <input class="cx-input" id="chf-reward" type="number" min="5" max="50" value="${ch.reward ?? 15}" />
+          </div>
+        </div>
+        <div class="cx-excompose__actions">
+          <button type="button" class="btn btn--primary btn--sm" data-action="ch-save" data-chid="${ch.id || ""}">${ch.id ? "Salvează" : "Adaugă provocarea"}</button>
+          <button type="button" class="btn-mini btn-mini--ghost" data-action="ch-cancel">Renunță</button>
+        </div>
+        ${state.chWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.chWarn)}</p>` : ""}
+      </div>`;
+  }
+
+  function adminTabChallenges() {
+    const today = challengeOfToday();
+    // The next 7 days at a glance — plan with your eyes open.
+    const week = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(Date.now() + i * 864e5);
+      const iso = d.toISOString().slice(0, 10);
+      const pinned = allChallenges().find((c) => c.date === iso);
+      return `<span class="cx-week__day${pinned ? " on" : ""}" title="${pinned ? escapeHtml(pinned.prompt) : "rotație automată"}">
+          <b>${d.toLocaleDateString("ro-RO", { weekday: "short" })}</b>
+          <span>${d.getDate()}</span>
+          <em>${pinned ? "⚡ fixată" : "♻️ rotație"}</em>
+        </span>`;
+    }).join("");
+    const rows = allChallenges()
+      .map((c) => {
+        const custom = isCustomChallenge(c.id);
+        const isToday = c.id === today.id;
+        const expired = c.date && c.date < new Date().toISOString().slice(0, 10);
+        const when = c.date
+          ? `📅 ${new Date(c.date + "T12:00").toLocaleDateString("ro-RO")}${expired ? ` <span class="cx-tag cx-tag--no">expirată</span>` : ""}`
+          : "♻️ în rotație";
+        const act = custom
+          ? `<span class="cx-moditem__act">
+               <button type="button" class="btn-mini" data-action="ch-edit" data-chid="${c.id}">✎ Editează</button>
+               <button type="button" class="btn-mini btn-mini--no" data-action="ch-del" data-chid="${c.id}">🗑</button>
+             </span>`
+          : `<span class="cx-muted">implicit</span>`;
+        return `<div class="cx-moditem${isToday ? " cx-moditem--exercise" : ""}">
+            <span class="cx-moditem__ic">${isToday ? "⭐" : "⚡"}</span>
+            <div class="cx-moditem__body">
+              <p class="cx-moditem__head"><b>${when}</b>${isToday ? ` <span class="cx-tag cx-tag--ok">azi</span>` : ""} <span class="cx-muted">· +${c.reward} pct</span></p>
+              <p class="cx-moditem__text">„${escapeHtml(c.prompt)}”</p>
+              <p class="cx-moditem__meta"><span class="cx-muted">${(c.options || []).map((o, i) => (i === c.correct ? `✔ ${escapeHtml(o)}` : escapeHtml(o))).join(" · ")}</span></p>
+            </div>
+            ${act}
+          </div>`;
+      })
+      .join("");
+
+    const editing = state.chEditId !== null;
+    const form = editing
+      ? challengeForm(state.chEditId === "new" ? {} : allChallenges().find((c) => c.id === state.chEditId) || {})
+      : `<button type="button" class="cx-propose" data-action="ch-new">+ Programează o provocare nouă</button>`;
+
+    return `
+      <div class="cx-box">
+        <div class="cx-admin__head"><h3>Provocarea zilei · planificare</h3></div>
+        <p class="cx-muted">O provocare fixată pe o zi câștigă acea zi; zilele fără provocare fixată rotesc automat lista „în rotație”. Cele adăugate de tine rămân salvate local (Supabase mai târziu).</p>
+        <div class="cx-week">${week}</div>
+        ${form}
+        <div class="cx-modlist">${rows}</div>
+      </div>`;
+  }
+
+  function adminTabGamification() {
+    return `
+      <div class="cx-box">
+        <div class="cx-admin__head"><h3>Simulează nivelul (test)</h3></div>
+        <p class="cx-muted">Mișcă sliderele ca să vezi bara reală de sus: nivelul (skinul + valurile la 20 + rama de pagină) și prestige-ul (stelele care apar după ce completezi bara 20). Nu-ți modifică punctele.</p>
+        <div class="cx-simlevel">
+          <label class="cx-simlbl">Nivel</label>
+          <input type="range" id="cx-simlevel" min="1" max="${MAX_LEVEL}" value="${state.simLevel || 1}" />
+          <b id="cx-simlevel-out">${state.simLevel || 1}</b>
+        </div>
+        <div class="cx-simlevel">
+          <label class="cx-simlbl">Prestige ⭐</label>
+          <input type="range" id="cx-simprestige" min="0" max="6" value="${state.simPrestige || 0}" />
+          <b id="cx-simprestige-out">${state.simPrestige || 0}</b>
+        </div>
+        <div class="xp xp--preview" id="cx-simpreview">${xpBarMarkup(false)}</div>
+        <p class="cx-muted">↑ previzualizarea de aici se mișcă odată cu sliderele; bara reală de sus se schimbă și ea.</p>
+        <button type="button" class="btn-mini" data-action="sim-reset">Revino la starea reală</button>
+      </div>
+      <div class="cx-box">
+        <details class="cx-details">
+          <summary><h3>Bare pe niveluri · previzualizare (1–${MAX_LEVEL})</h3></summary>
+          <p class="cx-muted">Cum arată bara la fiecare nivel — de la simplu la fancy. Se acumulează: emblemă, segmente, stele, steaguri, reflexie, gradient, ramă. Efectele rulează live.</p>
+          <div class="xp-prev-list">${barPreviews()}</div>
+        </details>
+      </div>`;
+  }
+
+  function sectionAdmin() {
+    if (!isAdmin()) return sectionForum();
+    const modCount = openModerationItems().length + pendingExercises().length;
+    const TABS = [
+      { id: "overview", label: "Prezentare" },
+      { id: "users", label: "Utilizatori" },
+      { id: "moderation", label: "Moderare", badge: modCount },
+      { id: "challenges", label: "Provocări" },
+      { id: "gamification", label: "Gamificare" },
+    ];
+    const tabBar = `<div class="cx-tabs cx-tabs--admin">${TABS.map(
+      (t) => `<button class="cx-tabbtn${state.adminTab === t.id ? " on" : ""}" data-action="admin-tab" data-id="${t.id}">
+        ${t.label}${t.badge ? `<span class="cx-tabbtn__n cx-tabbtn__n--hot">${t.badge}</span>` : ""}
+      </button>`
+    ).join("")}</div>`;
+
+    const BODY = {
+      overview: adminTabOverview,
+      users: adminTabUsers,
+      moderation: adminTabModeration,
+      challenges: adminTabChallenges,
+      gamification: adminTabGamification,
+    };
+    return `
+      ${sectionHead("Panou de administrare", "Vizibil doar pentru tine. Tot ce ține de administrarea comunității, organizat pe file.")}
+      ${tabBar}
+      ${(BODY[state.adminTab] || adminTabOverview)()}`;
+  }
+
+  // 20 mini XP-bar skins so the admin can see every level at a glance.
+  function barPreviews() {
+    return Array.from({ length: MAX_LEVEL }, (_, i) => {
+      const L = i + 1;
+      const s = xpSkin(L);
+      const width = 100; // each bar is shown fully filled (its completed look)
+      const flags = [33, 66].map((p) => `<span class="xp__flag is-passed" style="left:${p}%"></span>`).join("");
+      return `<div class="xp-prev-row">
+          <span class="xp-prev-lbl">Nivel ${L}</span>
+          <div class="xp xp--preview ${s.classes}" data-level="${L}" style="--xp-fill:${s.fill};--lvl:${L};--seg:${s.segCount}">
+            <div class="xp__inner">
+              <span class="xp__emblem"><span class="xp__ring"></span><span class="xp__emblem-ic">${s.emblem}</span></span>
+              <span class="xp__badge"><b class="xp__lvl">${L}</b></span>
+              <div class="xp__wrap">
+                <div class="xp__stars"></div>
+                <div class="xp__track">${flags}<div class="xp__fill" style="width:${width}%"><span class="xp__seg"></span><span class="xp__wave"></span><span class="xp__shine"></span><span class="xp__spark"></span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  // ---------- Section: badges ----------
+  // Earned states are DERIVED from real data (they used to be static flags,
+  // so "Streak 7 zile" showed as earned while the actual streak was 2).
+  function badgeEarned(b) {
+    switch (b.id) {
+      case 1: return ACTIVITY_GIVEN.length > 0; // first comment
+      case 2: return MY_PROFILE.streak >= 7;
+      case 3: return MY_PROFILE.lessons >= 10;
+      case 4: return ACTIVITY_GIVEN.length >= 50;
+      case 5: return COMMUNITY_USERS.filter((u) => u.points > MY_PROFILE.points).length + 1 <= 10;
+      case 6: return false; // all morphology lessons — needs lesson progress (backend)
+      case 7: return PROPOSED_EXERCISES.some((e) => e.authorId === CURRENT_USER.id && e.status === "approved");
+      case 8: return challengesSolved() >= 30;
+      default: return false;
+    }
+  }
+  function sectionBadges() {
+    const cards = BADGES.map((b) => {
+      const earned = badgeEarned(b);
+      return `<div class="cx-badgecard${earned ? " is-earned" : " is-locked"}">
+        <span class="cx-badgecard__ic">${earned ? b.icon : "🔒"}</span>
+        <b>${escapeHtml(b.name)}</b>
+        <p>${escapeHtml(b.desc)}</p>
+      </div>`;
+    }).join("");
+    const earnedCount = BADGES.filter(badgeEarned).length;
+    return `${sectionHead("Insigne", `Ai câștigat ${earnedCount} din ${BADGES.length}. Continuă și le deblochezi pe toate!`)}<div class="cx-badges-grid">${cards}</div>`;
+  }
+
+  function sectionHead(title, sub) {
+    return `<div class="cx-head"><h1 class="cx-head__title">${title}</h1><p class="cx-head__sub">${sub}</p></div>`;
+  }
+
+  function emptyState(title, sub) {
+    return `<div class="cx-empty"><div class="cx-empty__mascot" aria-hidden="true">${mascotSvg("lost", 96)}</div><b>${title}</b><p>${sub}</p></div>`;
+  }
+
+  const SECTION_RENDER = {
+    forum: sectionForum,
+    "pagina-mea": sectionWall,
+    activitate: sectionActivity,
+    exercitii: sectionExercises,
+    provocare: sectionChallenge,
+    clasament: sectionLeaderboard,
+    grupuri: sectionGroups,
+    evenimente: sectionEvents,
+    insigne: sectionBadges,
+    lectii: sectionLessons,
+    mesaje: sectionMessages,
+    salvate: sectionSaved,
+    caiet: sectionNotebook,
+    puncte: sectionPoints,
+    profil: sectionProfile,
+    admin: sectionAdmin,
+  };
+
+  // ---------- Wayfinding ----------
+  // Snapshot the current place before navigating, so "←" always returns
+  // exactly one step — no more getting lost between sections.
+  function remember() {
+    state.prevNav = {
+      section: state.section,
+      openGroup: state.openGroup,
+      viewUser: state.viewUser,
+      adminTab: state.adminTab,
+    };
+  }
+
+  // The breadcrumb above the content: Atelier › secțiune [› subpagină],
+  // plus a "←" that undoes the last jump. Every segment is clickable.
+  function crumbs() {
+    const sep = `<span class="cx-crumbs__sep" aria-hidden="true">›</span>`;
+    const parts = [
+      `<button type="button" class="cx-crumbs__seg cx-crumbs__root" data-action="go" data-id="forum">Atelier</button>`,
+    ];
+    // Current section.
+    const label = SECTION_LABELS[state.section] || "Forum";
+    // Sub-page (a group topic / someone's profile) → the section segment
+    // stays clickable and the sub-page is the current, bold crumb.
+    let sub = null;
+    if (state.section === "grupuri" && state.openGroup) {
+      const g = findGroup(state.openGroup);
+      if (g) sub = g.name;
+    } else if (state.section === "profil" && state.viewUser) {
+      const u = userById(state.viewUser);
+      if (u) sub = u.name;
+    }
+    parts.push(sep, sub
+      ? `<button type="button" class="cx-crumbs__seg" data-action="go" data-id="${state.section}">${label}</button>`
+      : `<b class="cx-crumbs__here">${label}</b>`);
+    if (sub) parts.push(sep, `<b class="cx-crumbs__here">${escapeHtml(sub)}</b>`);
+
+    const back = state.prevNav
+      ? `<button type="button" class="cx-crumbs__back" data-action="nav-back" title="Înapoi unde erai">←</button>`
+      : "";
+    return `<nav class="cx-crumbs" aria-label="Unde te afli">${back}${parts.join("")}</nav>`;
+  }
+
+  let podiumCelebrated = false;
+  function render() {
+    // Member-only sections don't exist for the teacher; guests get the
+    // read-only subset (everything else lands on the public forum).
+    if (isAdmin() && ADMIN_HIDDEN_SECTIONS.has(state.section)) state.section = "forum";
+    if (!isLoggedIn() && !GUEST_SECTIONS.has(state.section)) state.section = "forum";
+    mount.innerHTML = `
+      <div class="cx-shell">
+        ${sidebar()}
+        <div class="cx-main">
+          ${crumbs()}
+          ${(SECTION_RENDER[state.section] || sectionForum)()}
+        </div>
+      </div>
+      ${lightboxHtml()}`;
+
+    // The gamification simulator's local preview mirrors the current sim.
+    if (state.section === "admin" && state.adminTab === "gamification") {
+      const local = mount.querySelector("#cx-simpreview");
+      if (local) applyBar(local, state.simLevel || 1, 62, state.simPrestige || 0);
+    }
+
+    // First time the Clasament opens: confetti over the champion's crown —
+    // the top of the top should feel like an event.
+    if (state.section === "clasament" && !podiumCelebrated) {
+      podiumCelebrated = true;
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const crown = mount.querySelector(".cx-pod--1 .cx-pod__crown");
+        if (crown) {
+          const r = crown.getBoundingClientRect();
+          burstAt(r.left + r.width / 2, r.top + r.height / 2, 20);
+        }
+      }
+    }
+  }
+
+  // Keep the composer textarea across re-renders triggered by its own controls.
+  function syncComposer() {
+    const box = mount.querySelector("#cx-post-text");
+    if (box) state.composer.text = box.value;
+    const gn = mount.querySelector("#cx-group-name");
+    if (gn) state.composer.groupName = gn.value;
+  }
+
+  // Build a fresh post from the composer (not yet published — the publish
+  // handler decides: into the feed, or held for moderation).
+  function buildPost() {
+    const c = state.composer;
+    const text = (c.text || "").trim();
+    if (!text && !c.media) return null;
+    return {
+      id: nextId(),
+      authorId: CURRENT_USER.id,
+      name: CURRENT_USER.name,
+      initials: CURRENT_USER.initials,
+      color: CURRENT_USER.color,
+      createdAt: Date.now(),
+      time: "acum",
+      type: c.type,
+      bg: c.bg,
+      audience: c.audience || "public",
+      text: escapeHtml(text),
+      media: c.media,
+      likes: 0,
+      likedByMe: false,
+      shares: 0,
+      sharedByMe: false,
+      followed: false,
+      comments: [],
+    };
+  }
+
+  function createGroup() {
+    const c = state.composer;
+    const name = (c.groupName || "").trim();
+    if (!name) return; // a group needs a name
+    // The group's name & description pass through the same language filter.
+    const bad = moderate(`${name} ${c.text || ""}`);
+    if (bad.length) {
+      state.notice = FILTER_MESSAGE;
+      queueBlockedComment({
+        authorId: CURRENT_USER.id, name: CURRENT_USER.name,
+        text: `${name} — ${(c.text || "").trim()}`, matches: bad, context: "Creare grup",
+      });
+      return;
+    }
+    const badM = invalidMentions(`${name} ${c.text || ""}`);
+    if (badM.length) {
+      state.notice = mentionMsg(badM);
+      return;
+    }
+    const g = newGroupTopic({
+      name: escapeHtml(name),
+      iconId: c.iconId,
+      creatorId: CURRENT_USER.id,
+      description: escapeHtml((c.text || "").trim()),
+    });
+    state.groups.unshift(g);
+    state.composer = freshComposer();
+    state.groupCreateOpen = false;
+    // Jump straight into the new group topic.
+    state.section = "grupuri";
+    state.openGroup = g.id;
+    history.replaceState(null, "", "#grupuri");
+  }
+
+  // ---------- Events ----------
+  mount.addEventListener("click", (e) => {
+    // 1) Thread controls, scoped to the post whose comments were clicked.
+    const postScope = e.target.closest("[data-post-id]");
+    if (postScope) {
+      const post = findPost(Number(postScope.dataset.postId));
+      if (post) {
+        const consumed = handleThreadClick(e, {
+          comments: post.comments,
+          state: state.thread,
+          user: isLoggedIn() ? CURRENT_USER : GUEST_USER,
+          nextId,
+          canInteract: isLoggedIn,
+          onGuard: () => showToast("Conectează-te ca să interacționezi cu comunitatea 🔑"),
+          isAdmin: isAdmin(),
+          onCorrect: awardCorrect,
+          moderate,
+          warnMsg: "Răspunsul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.",
+          onBlocked: (text, matches) =>
+            queueBlockedComment({
+              authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches,
+              context: `Răspuns la postarea „${String(post.text).replace(/<[^>]*>/g, "").slice(0, 60)}…”`,
+            }),
+          onReport: reportComment,
+          decorateText,
+          validate: (text) => {
+            const bad = invalidMentions(text, mentionEligibleForPost(post));
+            return bad.length ? mentionMsg(bad) : null;
+          },
+          onReply: (parent, text) => {
+            touchStreak(); // replying counts as today's activity
+            notifyMentions(text, "Într-un răspuns");
+            if (post.authorId !== CURRENT_USER.id || parent.authorId !== CURRENT_USER.id) {
+              recordGiven({
+                kind: "reply",
+                action: `ai răspuns lui ${parent.name}`,
+                snippet: text.slice(0, 90),
+                context: `${postType(post.type).label} · „${String(post.text).replace(/<[^>]*>/g, "").slice(0, 50)}…”`,
+                postId: post.id,
+              });
+            }
+          },
+          rerender: render,
+        });
+        if (consumed) return;
+      }
+    }
+
+    // Real links (profiles, lessons) navigate on their own — don't let a
+    // clickable ancestor row (e.g. an activity row) hijack the click.
+    const anchor = e.target.closest("a[href]");
+    if (anchor && !anchor.dataset.action) return;
+
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+
+    // Guests may browse (go, filters, lightbox, the demo challenge…);
+    // anything that WRITES invites them to join — but only ONCE per visit
+    // (after that the ghost styling speaks for itself, no toast spam).
+    if (!isLoggedIn() && !GUEST_ALLOWED_ACTIONS.has(action)) {
+      if (!state.guestNudged) {
+        state.guestNudged = true;
+        showToast("Conectează-te ca să interacționezi cu comunitatea 🔑");
+      }
+      return;
+    }
+
+    const id = Number(btn.dataset.id);
+
+    switch (action) {
+      case "go":
+        remember();
+        state.section = btn.dataset.id;
+        // "Panou admin" from the sidebar always starts at Prezentare —
+        // same rule as the #admin deep link (least surprise).
+        if (state.section === "admin") state.adminTab = "overview";
+        state.openComments.clear();
+        state.openGroup = null;
+        state.addMemberOpen = false;
+        state.viewUser = null;
+        state.editingProfile = false;
+        state.feedLimit = 6;
+        state.groupCreateOpen = false;
+        state.postMenu = null;
+        state.exPreview = false;
+        // Section-local notices don't follow you around.
+        state.commentWarn = state.exWarn = state.groupWarn = state.profileWarn = null;
+        history.replaceState(null, "", `#${state.section}`);
+        return render();
+
+      case "nav-back": {
+        const p = state.prevNav;
+        if (!p) return;
+        state.prevNav = null;
+        state.section = p.section;
+        state.openGroup = p.openGroup;
+        state.viewUser = p.viewUser;
+        state.adminTab = p.adminTab;
+        state.editingProfile = false;
+        history.replaceState(null, "", `#${p.section}`);
+        return render();
+      }
+
+      // ---- profiles & friends ----
+      case "view-user": {
+        remember();
+        const uid = Number(btn.dataset.uid);
+        state.viewUser = uid === CURRENT_USER.id ? null : uid;
+        state.editingProfile = false;
+        state.section = "profil";
+        // Shareable URL for this profile (deep link).
+        history.replaceState(null, "", `#u/${slugForUser(uid)}`);
+        return render();
+      }
+      case "copy-profile-link": {
+        const slug = btn.dataset.slug;
+        const url = `${location.origin}${location.pathname}#u/${slug}`;
+        const done = () => {
+          const old = btn.textContent;
+          btn.textContent = "✓ Link copiat";
+          setTimeout(() => { btn.textContent = old; }, 1500);
+        };
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(url).then(done).catch(done);
+        else done();
+        return;
+      }
+      case "friend-add": {
+        const uid = Number(btn.dataset.uid);
+        if (!isFriend(uid) && !reqOutgoing(uid) && !reqIncoming(uid)) MY_PROFILE.friendReqOutgoing.push(uid);
+        return render();
+      }
+      case "friend-cancel": {
+        const uid = Number(btn.dataset.uid);
+        MY_PROFILE.friendReqOutgoing = MY_PROFILE.friendReqOutgoing.filter((x) => x !== uid);
+        return render();
+      }
+      case "friend-accept": {
+        const uid = Number(btn.dataset.uid);
+        MY_PROFILE.friendReqIncoming = MY_PROFILE.friendReqIncoming.filter((x) => x !== uid);
+        if (!isFriend(uid)) MY_PROFILE.friendIds.push(uid);
+        return render();
+      }
+      case "friend-decline": {
+        const uid = Number(btn.dataset.uid);
+        MY_PROFILE.friendReqIncoming = MY_PROFILE.friendReqIncoming.filter((x) => x !== uid);
+        return render();
+      }
+      case "friend-remove": {
+        const uid = Number(btn.dataset.uid);
+        MY_PROFILE.friendIds = MY_PROFILE.friendIds.filter((x) => x !== uid);
+        return render();
+      }
+      case "set-audience":
+        syncComposer();
+        state.composer.audience = btn.dataset.key;
+        return render();
+
+      // ---- composer ----
+      case "set-type":
+        syncComposer();
+        state.composer.type = btn.dataset.key;
+        return render();
+      case "set-bg":
+        syncComposer();
+        state.composer.bg = btn.dataset.key;
+        return render();
+      case "toggle-icon":
+        syncComposer();
+        state.composer.iconOpen = !state.composer.iconOpen;
+        return render();
+      case "set-icon":
+        syncComposer();
+        state.composer.iconId = Number(btn.dataset.id);
+        state.composer.iconOpen = false;
+        return render();
+      case "pick-image":
+        mount.querySelector("#cx-file")?.click();
+        return;
+      case "toggle-yt":
+        syncComposer();
+        state.composer.ytOpen = !state.composer.ytOpen;
+        return render();
+      case "add-yt": {
+        const url = mount.querySelector("#cx-yt-url")?.value.trim();
+        const vid = parseYouTubeId(url);
+        syncComposer();
+        if (vid) state.composer.media = { kind: "youtube", videoId: vid, title: "Clip YouTube" };
+        state.composer.ytOpen = false;
+        return render();
+      }
+      case "clear-media":
+        syncComposer();
+        state.composer.media = null;
+        return render();
+      case "publish": {
+        syncComposer();
+        if (state.composer.type === "grup") {
+          createGroup();
+          return render();
+        }
+        const post = buildPost();
+        if (!post) return;
+        // Profanity gate: a flagged post is HELD for the teacher, not
+        // published. The author gets a friendly heads-up.
+        const bad = moderate(state.composer.text);
+        if (bad.length) {
+          queueHeldPost(post, bad);
+          state.notice = FILTER_MESSAGE;
+          state.composer = freshComposer();
+          return render();
+        }
+        // @mentions: only friends can be mentioned (any audience I choose
+        // is visible to my friends, so no further gate needed here).
+        const badM = invalidMentions(state.composer.text);
+        if (badM.length) {
+          state.notice = mentionMsg(badM);
+          return render();
+        }
+        state.posts.unshift(post);
+        state.notice = null;
+        notifyMentions(state.composer.text, "Într-o postare din forum");
+        state.composer = freshComposer();
+        state.composerOpen = false; // fold back after publishing
+        touchStreak(); // posting counts as today's activity
+        return render();
+      }
+      case "dismiss-notice":
+        state.notice = null;
+        return render();
+      case "composer-open": {
+        state.composerOpen = true;
+        render();
+        const box = mount.querySelector("#cx-post-text");
+        box?.focus();
+        return;
+      }
+
+      // ---- forum discovery toolbar ----
+      case "feed-type":
+        state.feedType = btn.dataset.key;
+        state.feedLimit = 6; // filters changed → start the page fresh
+        return render();
+      case "feed-sort":
+        state.feedSort = btn.dataset.key;
+        state.feedLimit = 6;
+        return render();
+      case "feed-more":
+        state.feedLimit += 6;
+        return render();
+
+      // ---- bookmarks ("Salvate") ----
+      case "save-post": {
+        const p = findPost(id);
+        if (!p) return;
+        if (state.saved.has(id)) {
+          state.saved.delete(id);
+          showToast("Scos de la Salvate");
+        } else {
+          state.saved.add(id);
+          showToast("🔖 Salvat — îl găsești în „Salvate”", { kind: "success" });
+        }
+        store.set("atelier_saved_posts", [...state.saved]); // persists reloads
+        return render();
+      }
+
+      // ---- post actions ----
+      case "like": {
+        const p = findPost(id);
+        if (p && p.authorId !== CURRENT_USER.id) {
+          p.likedByMe = !p.likedByMe;
+          p.likes += p.likedByMe ? 1 : -1;
+        }
+        return render();
+      }
+      case "share": {
+        const p = findPost(id);
+        toggleShare(p);
+        return render();
+      }
+      case "follow": {
+        const p = findPost(id);
+        if (p) {
+          p.followed = !p.followed;
+          showToast(p.followed ? "🔔 Urmărești postarea — o găsești la Activitate › Urmărite" : "Nu mai urmărești postarea");
+        }
+        state.postMenu = null;
+        return render();
+      }
+      case "post-menu":
+        state.postMenu = state.postMenu === id ? null : id;
+        return render();
+      case "toggle-comments":
+        state.openComments.has(id) ? state.openComments.delete(id) : state.openComments.add(id);
+        state.commentWarn = null;
+        return render();
+      case "play-yt":
+        state.playing.add(id);
+        return render();
+      case "post-comment": {
+        const area = btn.closest(".post__comments");
+        const box = area?.querySelector('[data-role="post-comment-input"]');
+        const text = box?.value.trim();
+        if (!text) return;
+        const p = findPost(id);
+        if (!p) return;
+        const bad = moderate(text);
+        if (bad.length) {
+          state.commentWarn = { postId: id, msg: "Comentariul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat." };
+          queueBlockedComment({
+            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches: bad,
+            context: `Comentariu la postarea „${String(p.text).replace(/<[^>]*>/g, "").slice(0, 60)}…”`,
+          });
+          return render();
+        }
+        const badM = invalidMentions(text, mentionEligibleForPost(p));
+        if (badM.length) {
+          state.commentWarn = { postId: id, msg: mentionMsg(badM) };
+          return render();
+        }
+        state.commentWarn = null;
+        p.comments.push(makeUserComment(text, CURRENT_USER, nextId));
+        notifyMentions(text, "Într-un comentariu");
+        touchStreak(); // commenting counts as today's activity
+        // Commenting on someone ELSE's post is real "given" activity.
+        if (p.authorId !== CURRENT_USER.id) {
+          recordGiven({
+            kind: "comment",
+            action: `ai comentat la postarea lui ${p.name}`,
+            snippet: text.slice(0, 90),
+            context: `${postType(p.type).label} · „${String(p.text).replace(/<[^>]*>/g, "").slice(0, 50)}…”`,
+            postId: p.id,
+          });
+        }
+        return render();
+      }
+      case "post-report": {
+        const p = findPost(id);
+        if (p) {
+          reportPost(p);
+          showToast("⚑ Semnalat — profesorul va arunca o privire", { kind: "success" });
+        }
+        state.postMenu = null;
+        return render();
+      }
+
+      // ---- image lightbox ----
+      case "open-image":
+        state.lightbox = { postId: id, i: Number(btn.dataset.i) };
+        return render();
+      case "lb-close":
+        state.lightbox = null;
+        return render();
+      case "lb-prev":
+      case "lb-next": {
+        const p = findPost(state.lightbox?.postId);
+        const n = p?.media?.images?.length || 0;
+        if (!n) return;
+        const dir = action === "lb-next" ? 1 : -1;
+        state.lightbox.i = (state.lightbox.i + dir + n) % n;
+        return render();
+      }
+      case "lb-copy": {
+        const p = findPost(state.lightbox?.postId);
+        const im = p?.media?.images?.[state.lightbox?.i];
+        if (!im?.src) return;
+        // Copy the actual pixels to the clipboard (falls back gracefully).
+        fetch(im.src)
+          .then((r) => r.blob())
+          .then((blob) => navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })]))
+          .then(() => showToast("📋 Imagine copiată în clipboard", { kind: "success" }))
+          .catch(() => showToast("Nu s-a putut copia imaginea în acest browser", { kind: "error" }));
+        return;
+      }
+      case "lb-save":
+        // The <a download> does the job natively; just confirm it.
+        showToast("💾 Descărcarea a pornit", { kind: "success" });
+        return;
+      case "lb-share": {
+        const p = findPost(state.lightbox?.postId);
+        toggleShare(p); // its own toast; the lightbox stays open
+        return render();
+      }
+      case "lb-reply": {
+        const lb = state.lightbox;
+        if (!lb) return;
+        state.lightbox = null;
+        state.openComments.add(lb.postId);
+        render();
+        // Prefill a comment about THAT image and put the caret ready to type.
+        const box = mount.querySelector(`[data-post-id="${lb.postId}"] [data-role="post-comment-input"]`);
+        if (box) {
+          box.value = `Referitor la imaginea ${lb.i + 1}: `;
+          box.focus();
+          box.setSelectionRange(box.value.length, box.value.length);
+          box.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
+        return;
+      }
+
+      // ---- manage own posts (author) / any post (admin) ----
+      case "post-edit": {
+        const p = findPost(id);
+        if (!p || !canEditPost(p)) return;
+        state.editingPost = id;
+        return render();
+      }
+      case "post-cancel-edit":
+        state.editingPost = null;
+        return render();
+      case "post-save": {
+        const p = findPost(id);
+        if (!p || !canEditPost(p)) return;
+        const box = btn.closest("[data-post-id]")?.querySelector('[data-role="edit-post"]');
+        const text = box?.value.trim();
+        if (!text) return;
+        const bad = moderate(text);
+        if (bad.length) {
+          state.notice = FILTER_MESSAGE;
+          queueBlockedComment({
+            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches: bad, context: "Editare postare",
+          });
+          state.editingPost = null;
+          return render();
+        }
+        p.text = escapeHtml(text);
+        p.edited = true;
+        state.editingPost = null;
+        return render();
+      }
+      case "post-del": {
+        const p = findPost(id);
+        if (!p || !canManagePost(p)) return;
+        if (!confirm("Ștergi definitiv postarea? Nu se poate anula.")) return;
+        removePost(id);
+        if (isAdmin() && p.authorId !== CURRENT_USER.id) logAdmin(`🗑 ai șters o postare a lui ${p.name}`);
+        return render();
+      }
+
+      // ---- activity ----
+      case "act-tab":
+        state.activityTab = btn.dataset.id;
+        return render();
+      case "act-open":
+        return goToPost(id);
+
+      // ---- leaderboard: applause + poke ----
+      case "clap": {
+        const uid = Number(btn.dataset.uid);
+        const u = userById(uid);
+        if (u && giveClap(uid)) showToast(`👏 Aplauze trimise lui ${u.name.split(" ")[0]}!`, { kind: "success" });
+        return render();
+      }
+      case "poke": {
+        const uid = Number(btn.dataset.uid);
+        const u = userById(uid);
+        if (u && givePoke(uid)) {
+          showToast(`👉 Poke trimis lui ${u.name.split(" ")[0]} — știe acum că te apropii!`, { kind: "success" });
+          recordGiven({
+            kind: "poke",
+            action: `i-ai dat un poke lui ${u.name}`,
+            snippet: "Te ajung din urmă! 👀",
+            context: "Clasament",
+          });
+        }
+        return render();
+      }
+
+      // ---- exercises: pending / history tabs ----
+      case "ex-tab":
+        state.exTab = btn.dataset.id;
+        return render();
+      case "hist-sort": {
+        const key = btn.dataset.id;
+        const s = state.histSort;
+        // Same column → flip direction; new column → sensible default.
+        state.histSort = s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "date" ? "desc" : "asc" };
+        return render();
+      }
+      case "hist-filter":
+        state.histFilter = btn.dataset.id;
+        return render();
+
+      // ---- discover: challenge (once per calendar day, persisted) ----
+      case "challenge":
+        if (state.challengeAnswer === null) {
+          state.challengeAnswer = Number(btn.dataset.i);
+          localStorage.setItem(CHALLENGE_KEY, JSON.stringify({ date: todayStr(), answer: state.challengeAnswer }));
+          touchStreak(); // showing up for the daily challenge keeps the flame
+          // Members earn points; the teacher and guests don't (the guest
+          // version is the "taste" that invites an account).
+          const todayCh = challengeOfToday();
+          if (state.challengeAnswer === todayCh.correct && isLoggedIn() && !isAdmin()) {
+            awardPoints("Provocarea zilei rezolvată", todayCh.reward);
+            localStorage.setItem(SOLVED_KEY, String(challengesSolved() + 1));
+            pointsFx(todayCh.reward); // burst around the cursor
+          }
+        }
+        return render();
+
+      // ---- groups (topics) ----
+      case "group-create-toggle":
+        syncComposer();
+        state.groupCreateOpen = !state.groupCreateOpen;
+        state.composer.type = state.groupCreateOpen ? "grup" : "discutie";
+        return render();
+      case "open-group": {
+        remember();
+        state.openGroup = id;
+        state.addMemberOpen = false;
+        state.openComments.clear();
+        // Visiting clears this group's "nou" pulse.
+        const seen = groupSeen();
+        seen[id] = Date.now();
+        store.set("atelier_group_seen", seen);
+        return render();
+      }
+      case "group-toggle": {
+        const g = findGroup(id);
+        if (g) {
+          const i = g.memberIds.indexOf(CURRENT_USER.id);
+          if (i >= 0) g.memberIds.splice(i, 1);
+          else g.memberIds.push(CURRENT_USER.id);
+        }
+        return render();
+      }
+      case "toggle-addmember":
+        state.addMemberOpen = !state.addMemberOpen;
+        return render();
+      case "add-member": {
+        const g = findGroup(state.openGroup);
+        const uid = Number(btn.dataset.uid);
+        if (g && canAddMembers(g) && !g.memberIds.includes(uid)) g.memberIds.push(uid);
+        return render();
+      }
+      case "toggle-members-add": {
+        const g = findGroup(id);
+        if (g && (g.creatorId === CURRENT_USER.id || isAdmin())) g.allowMembersAdd = !g.allowMembersAdd;
+        return render();
+      }
+      case "group-post": {
+        const g = findGroup(id);
+        const box = mount.querySelector("#cx-group-post");
+        const text = box?.value.trim();
+        if (!g || !text) return;
+        const bad = moderate(text);
+        if (bad.length) {
+          state.groupWarn = "Postarea conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.";
+          queueBlockedComment({
+            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches: bad,
+            context: `Postare în grupul „${g.name}”`,
+          });
+          return render();
+        }
+        const badM = invalidMentions(text, (u) =>
+          g.memberIds.includes(u.id) ? true : "nu e membru al acestui grup"
+        );
+        if (badM.length) {
+          state.groupWarn = mentionMsg(badM);
+          return render();
+        }
+        state.groupWarn = null;
+        g.posts.unshift(newGroupPost(CURRENT_USER.id, escapeHtml(text)));
+        touchStreak(); // group activity counts too
+        return render();
+      }
+      case "group-edit":
+        state.editingGroup = true;
+        return render();
+      case "group-edit-cancel":
+        state.editingGroup = false;
+        return render();
+      case "group-set-icon": {
+        const g = findGroup(state.openGroup);
+        if (g) {
+          g.iconId = Number(btn.dataset.id);
+          g.color = groupColor(g.iconId);
+        }
+        return render();
+      }
+      case "group-save": {
+        const g = findGroup(id);
+        const name = mount.querySelector("#cx-editgroup-name")?.value.trim();
+        const desc = mount.querySelector("#cx-editgroup-desc")?.value.trim();
+        if (g && name) {
+          const bad = moderate(`${name} ${desc || ""}`);
+          if (bad.length) {
+            state.groupWarn = "Numele sau descrierea conțin limbaj nepotrivit.";
+            return render();
+          }
+          state.groupWarn = null;
+          g.name = escapeHtml(name);
+          g.description = escapeHtml(desc || "");
+        }
+        state.editingGroup = false;
+        return render();
+      }
+      case "group-del": {
+        const g = findGroup(id);
+        if (g && (g.creatorId === CURRENT_USER.id || isAdmin())) {
+          if (!confirm(`Ștergi grupul „${g.name}” cu tot cu postările lui?`)) return;
+          removeGroup(id);
+          state.openGroup = null;
+          state.editingGroup = false;
+          if (isAdmin()) logAdmin(`🗑 ai șters grupul „${g.name}”`);
+        }
+        return render();
+      }
+
+      // ---- events ----
+      case "event-go": {
+        const ev = state.events.find((x) => x.id === id);
+        if (ev) ev.going = !ev.going;
+        return render();
+      }
+      case "admin-new-event":
+        if (!isAdmin()) return;
+        state.newEventOpen = true;
+        state.editingEvent = null;
+        return render();
+      case "admin-edit-event":
+        if (!isAdmin()) return;
+        state.editingEvent = id;
+        state.newEventOpen = false;
+        return render();
+      case "admin-event-cancel":
+        state.newEventOpen = false;
+        state.editingEvent = null;
+        return render();
+      case "admin-create-event": {
+        if (!isAdmin()) return;
+        const title = mount.querySelector("#cx-ev-title")?.value.trim();
+        if (!title) return;
+        state.events.push({
+          id: nextId(),
+          title: escapeHtml(title),
+          kind: mount.querySelector("#cx-ev-kind")?.value || "live",
+          when: escapeHtml(mount.querySelector("#cx-ev-when")?.value.trim() || "curând"),
+          host: escapeHtml(mount.querySelector("#cx-ev-host")?.value.trim() || "Atelierul"),
+          going: false,
+        });
+        state.newEventOpen = false;
+        return render();
+      }
+      case "admin-save-event": {
+        if (!isAdmin()) return;
+        const ev = state.events.find((x) => x.id === id);
+        const title = mount.querySelector("#cx-ev-title")?.value.trim();
+        if (ev && title) {
+          ev.title = escapeHtml(title);
+          ev.kind = mount.querySelector("#cx-ev-kind")?.value || ev.kind;
+          ev.when = escapeHtml(mount.querySelector("#cx-ev-when")?.value.trim() || ev.when);
+          ev.host = escapeHtml(mount.querySelector("#cx-ev-host")?.value.trim() || ev.host);
+        }
+        state.editingEvent = null;
+        return render();
+      }
+      case "admin-del-event": {
+        if (!isAdmin()) return;
+        const i = state.events.findIndex((x) => x.id === id);
+        if (i >= 0) state.events.splice(i, 1);
+        return render();
+      }
+
+      // ---- admin ----
+      case "grant-events": {
+        const uid = Number(btn.dataset.uid);
+        state.eventsGranted.has(uid) ? state.eventsGranted.delete(uid) : state.eventsGranted.add(uid);
+        return render();
+      }
+      case "admin-view":
+        state.adminViewUser = Number(btn.dataset.uid);
+        return render();
+      case "admin-closeview":
+        state.adminViewUser = null;
+        return render();
+      case "sim-reset":
+        state.simLevel = null;
+        state.simPrestige = 0;
+        setPreview(null, 0);
+        return render();
+      case "admin-tab":
+        if (!isAdmin()) return;
+        state.adminTab = btn.dataset.id;
+        state.section = "admin";
+        // Shareable, quick-panel-compatible URL for this exact tab.
+        history.replaceState(null, "", `#admin/${ADMIN_SLUG_BY_TAB[state.adminTab] || "prezentare"}`);
+        return render();
+      case "admin-user-sort":
+        if (!isAdmin()) return;
+        state.adminUserSort = btn.dataset.key;
+        state.adminUserPage = 1;
+        return render();
+      case "admin-user-page":
+        if (!isAdmin()) return;
+        state.adminUserPage = Math.max(1, state.adminUserPage + Number(btn.dataset.dir));
+        return render();
+
+      // ---- admin: scheduled daily challenges ----
+      case "ch-new":
+        if (!isAdmin()) return;
+        state.chEditId = "new";
+        state.chWarn = null;
+        return render();
+      case "ch-edit":
+        if (!isAdmin()) return;
+        state.chEditId = btn.dataset.chid;
+        state.chWarn = null;
+        return render();
+      case "ch-cancel":
+        state.chEditId = null;
+        state.chWarn = null;
+        return render();
+      case "ch-del":
+        if (!isAdmin()) return;
+        deleteCustomChallenge(btn.dataset.chid);
+        showToast("🗑 Provocare ștearsă");
+        return render();
+      case "ch-save": {
+        if (!isAdmin()) return;
+        const val = (sel) => mount.querySelector(sel)?.value.trim() || "";
+        const prompt = val("#chf-prompt");
+        const options = [0, 1, 2, 3].map((i) => val(`#chf-opt-${i}`)).filter(Boolean);
+        const picked = Number(mount.querySelector('input[name="chf-correct"]:checked')?.value ?? 0);
+        const correctText = val(`#chf-opt-${picked}`);
+        if (!prompt || options.length < 2 || !correctText) {
+          state.chWarn = "Completează întrebarea și cel puțin 2 variante, cu răspunsul corect bifat.";
+          return render();
+        }
+        upsertCustomChallenge({
+          id: btn.dataset.chid || undefined,
+          date: val("#chf-date") || null,
+          prompt,
+          options,
+          correct: options.indexOf(correctText),
+          explanation: val("#chf-explanation"),
+          reward: Math.max(5, Math.min(50, Number(val("#chf-reward")) || 15)),
+        });
+        state.chEditId = null;
+        state.chWarn = null;
+        showToast("⚡ Provocare salvată", { kind: "success" });
+        return render();
+      }
+
+      // ---- moderation queue ----
+      case "mod-filter":
+        state.modFilter = btn.dataset.id;
+        return render();
+      case "mod-approve": {
+        if (!isAdmin()) return;
+        const item = resolveModerationItem(id, "approved");
+        if (item?.post) state.posts.unshift(item.post); // publish the held post
+        logAdmin(`✓ ai publicat postarea reținută a lui ${item?.name || "?"}`);
+        return render();
+      }
+      case "mod-reject":
+        if (!isAdmin()) return;
+        resolveModerationItem(id, "rejected");
+        logAdmin("✕ ai respins o postare reținută");
+        return render();
+      case "mod-dismiss":
+        if (!isAdmin()) return;
+        resolveModerationItem(id, "dismissed");
+        return render();
+      case "mod-delete-target": {
+        if (!isAdmin()) return;
+        if (!confirm("Ștergi definitiv conținutul raportat?")) return;
+        const item = MODERATION_QUEUE.find((i) => i.id === id);
+        if (item) {
+          if (item.targetType === "post") removePost(item.targetId);
+          else for (const p of allPosts()) if (removeComment(p.comments, item.targetId)) break;
+          resolveModerationItem(id, "deleted");
+          logAdmin(`🗑 ai șters conținut raportat (${item.targetType === "post" ? "postare" : "comentariu"})`);
+        }
+        return render();
+      }
+      case "mod-reopen": {
+        if (!isAdmin()) return;
+        const item = MODERATION_QUEUE.find((i) => i.id === id);
+        if (!item) return;
+        // Undo: an approved held post leaves the feed again.
+        if (item.kind === "held-post" && item.resolution === "approved" && item.post) {
+          state.posts = state.posts.filter((p) => p.id !== item.post.id);
+        }
+        item.status = "open";
+        item.resolution = null;
+        state.modFilter = "all";
+        logAdmin("↩ ai redeschis un caz de moderare");
+        showToast("↩ Caz redeschis — e din nou în coadă");
+        return render();
+      }
+
+      // ---- exercises ----
+      case "ex-toggle":
+        state.exComposer.open = !state.exComposer.open;
+        state.exEditId = null; // one exf-* form at a time
+        state.exPreview = false;
+        return render();
+      case "ex-preview": {
+        // Keep what's typed: preview re-renders the form with live values.
+        const keep = {
+          prompt: mount.querySelector("#cx-ex-prompt")?.value || "",
+          lesson: mount.querySelector("#cx-ex-lesson")?.value || state.exComposer.lesson,
+        };
+        state.exPreview = !state.exPreview;
+        const form = readExerciseForm(mount, state.exComposer.kind);
+        render();
+        const pr = mount.querySelector("#cx-ex-prompt");
+        if (pr) pr.value = keep.prompt;
+        const ls = mount.querySelector("#cx-ex-lesson");
+        if (ls) ls.value = keep.lesson;
+        // Re-fill the structured fields from what was just read.
+        if (form.ok && form.data) {
+          const d = form.data;
+          if (state.exComposer.kind === "choice")
+            d.options.forEach((o, i) => { const el = mount.querySelector(`#exf-opt-${i}`); if (el) el.value = o; });
+          if (state.exComposer.kind === "fill") {
+            const el = mount.querySelector("#exf-answer");
+            if (el) el.value = d.answer.split("|").join(" / ");
+          }
+          if (state.exComposer.kind === "match")
+            d.pairs.forEach(([l, r], i) => {
+              const le = mount.querySelector(`#exf-l-${i}`);
+              const re2 = mount.querySelector(`#exf-r-${i}`);
+              if (le) le.value = l;
+              if (re2) re2.value = r;
+            });
+        }
+        return;
+      }
+
+      // ---- admin: edit a proposal before approving it ----
+      case "ex-admin-edit":
+        if (!isAdmin()) return;
+        state.exEditId = id;
+        state.exEditWarn = null;
+        state.exComposer.open = false; // one exf-* form at a time
+        // From the Moderare tab, jump to Exerciții where the editor lives.
+        if (state.section === "admin") {
+          state.section = "exercitii";
+          state.exTab = "pending";
+          history.replaceState(null, "", "#exercitii");
+        }
+        return render();
+      case "ex-admin-cancel":
+        state.exEditId = null;
+        state.exEditWarn = null;
+        return render();
+      case "ex-admin-save": {
+        if (!isAdmin()) return;
+        const ex = state.proposed.find((x) => x.id === id);
+        if (!ex) return;
+        const prompt = mount.querySelector("#exf-prompt")?.value.trim();
+        if (!prompt) {
+          state.exEditWarn = "Enunțul nu poate rămâne gol.";
+          return render();
+        }
+        const form = readExerciseForm(mount, ex.kind);
+        if (!form.ok) {
+          state.exEditWarn = form.error;
+          return render();
+        }
+        ex.prompt = escapeHtml(prompt);
+        ex.data = form.data;
+        ex.editedByAdmin = true;
+        state.exEditId = null;
+        state.exEditWarn = null;
+        showToast("✎ Propunere actualizată — o poți aproba acum", { kind: "success" });
+        return render();
+      }
+      case "ex-kind":
+        state.exComposer.kind = btn.dataset.key;
+        return render();
+      case "ex-vote": {
+        const ex = state.proposed.find((x) => x.id === id);
+        // Same rule as likes: never your own proposal.
+        if (ex && ex.authorId !== CURRENT_USER.id) {
+          ex.votedByMe = !ex.votedByMe;
+          ex.votes += ex.votedByMe ? 1 : -1;
+        }
+        return render();
+      }
+      case "admin-approve-ex":
+      case "admin-reject-ex": {
+        if (!isAdmin()) return;
+        const approved = action === "admin-approve-ex";
+        const ex = decideExercise(id, approved ? "approved" : "rejected");
+        if (ex) logAdmin(`${approved ? "✓ ai aprobat" : "✕ ai respins"} exercițiul lui ${ex.name}`);
+        // Approving a proposal rewards its author (a real contribution) —
+        // unless the author is the teacher himself (admin earns nothing).
+        if (ex && approved) {
+          const REWARD = 40;
+          if (ex.authorId === CURRENT_USER.id) {
+            if (!isAdmin()) {
+              awardPoints("Exercițiu aprobat — publicat la lecție", REWARD);
+              pointsFx(REWARD);
+              notifyReceived({
+                actorId: 0, kind: "award",
+                action: `ți-a aprobat exercițiul propus (+${REWARD} puncte)`,
+                snippet: String(ex.prompt).slice(0, 90),
+                context: `Publicat la «${ex.lessonTitle}»`,
+                goSection: "exercitii",
+              });
+            }
+          } else {
+            const u = userById(ex.authorId);
+            if (u) u.points += REWARD;
+            notifyUser(ex.authorId, { actorId: 0, kind: "award", action: "ți-a aprobat exercițiul propus", snippet: String(ex.prompt).slice(0, 90), context: `Publicat la «${ex.lessonTitle}»` });
+          }
+        }
+        return render();
+      }
+      case "admin-del-ex": {
+        if (!isAdmin()) return;
+        if (!confirm("Ștergi definitiv propunerea de exercițiu?")) return;
+        const i = state.proposed.findIndex((x) => x.id === id);
+        if (i >= 0) {
+          state.proposed.splice(i, 1);
+          logAdmin("🗑 ai șters o propunere de exercițiu");
+        }
+        return render();
+      }
+      case "ex-submit": {
+        const lesson = mount.querySelector("#cx-ex-lesson")?.value || state.exComposer.lesson;
+        const prompt = mount.querySelector("#cx-ex-prompt")?.value.trim();
+        if (!prompt) return;
+        const badEx = moderate(prompt);
+        if (badEx.length) {
+          state.exWarn = "Enunțul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.";
+          queueBlockedComment({
+            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text: prompt, matches: badEx,
+            context: "Propunere de exercițiu",
+          });
+          return render();
+        }
+        // Structured fields → the exercise becomes solvable once approved.
+        const form = readExerciseForm(mount, state.exComposer.kind);
+        if (!form.ok) {
+          state.exWarn = form.error;
+          return render();
+        }
+        state.exWarn = null;
+        const fav = MY_PROFILE.favorites.find((f) => f.title === lesson);
+        const slug = fav ? fav.href.split("/").pop().replace(".html", "") : "";
+        state.proposed.unshift(
+          newExercise({
+            lessonSlug: slug,
+            lessonTitle: lesson,
+            authorId: CURRENT_USER.id,
+            kind: state.exComposer.kind,
+            prompt: escapeHtml(prompt),
+            data: form.data,
+          })
+        );
+        state.exComposer.open = false;
+        touchStreak(); // proposing counts as today's activity
+        return render();
+      }
+
+      // ---- messages ----
+      case "msg-tab":
+        state.msgTab = btn.dataset.id;
+        state.msgReplyTo = null;
+        return render();
+      case "msg-cat":
+        state.msgCat = Number(btn.dataset.i);
+        return render();
+      case "msg-template": {
+        const toId = Number(mount.querySelector("#cx-msg-to")?.value ?? NaN);
+        const target = userById(toId);
+        if (!target) return;
+        sendMessage({
+          fromId: CURRENT_USER.id,
+          fromName: CURRENT_USER.name,
+          toId,
+          text: btn.dataset.text,
+          template: true,
+        });
+        state.msgTo = toId;
+        state.msgTab = "outbox";
+        showToast(`✉️ Trimis lui ${target.name.split(" ")[0]}`, { kind: "success" });
+        touchStreak();
+        return render();
+      }
+      case "msg-admin-send": {
+        const box = mount.querySelector("#cx-msg-admin");
+        const text = box?.value.trim();
+        if (!text) return;
+        // Free text — but still civilised, even toward the teacher.
+        if (moderate(text).length) {
+          state.msgWarn = "Mesajul conține limbaj nepotrivit — reformulează, te rog.";
+          return render();
+        }
+        state.msgWarn = null;
+        sendMessage({ fromId: CURRENT_USER.id, fromName: CURRENT_USER.name, toAdmin: true, text });
+        state.msgTab = "outbox";
+        showToast("✉️ Mesaj trimis profesorului", { kind: "success" });
+        return render();
+      }
+      case "msg-reply":
+        if (!isAdmin()) return;
+        state.msgReplyTo = id;
+        return render();
+      case "msg-reply-cancel":
+        state.msgReplyTo = null;
+        return render();
+      case "msg-reply-send": {
+        if (!isAdmin()) return;
+        const src = inboxFor(true).find((m) => m.id === id);
+        const box = btn.closest(".cx-msg")?.querySelector('[data-role="msg-reply-text"]');
+        const text = box?.value.trim();
+        if (!src || !text) return;
+        sendMessage({
+          fromId: 0,
+          fromName: "Profesorul",
+          toId: src.fromId ?? 0,
+          fromTeacher: true,
+          text,
+        });
+        state.msgReplyTo = null;
+        showToast("✉️ Răspuns trimis", { kind: "success" });
+        return render();
+      }
+
+      // ---- notebook / status ----
+      case "add-note": {
+        const t = mount.querySelector("#cx-note-title")?.value.trim();
+        const x = mount.querySelector("#cx-note-text")?.value.trim();
+        const lessonHref = mount.querySelector("#cx-note-lesson")?.value || null;
+        if (!x) return;
+        addNote({ title: t, text: x, lessonHref });
+        state.notes = getNotes();
+        return render();
+      }
+      case "note-edit":
+        state.editingNote = id;
+        return render();
+      case "note-cancel":
+        state.editingNote = null;
+        return render();
+      case "note-save": {
+        const box = btn.closest("[data-note-id]");
+        const title = box?.querySelector('[data-role="note-title"]')?.value.trim();
+        const text = box?.querySelector('[data-role="note-text"]')?.value.trim();
+        if (text) updateNote(id, { title, text });
+        state.notes = getNotes();
+        state.editingNote = null;
+        return render();
+      }
+      case "note-del":
+        deleteNote(id);
+        state.notes = getNotes();
+        return render();
+      case "save-status": {
+        const box = mount.querySelector("#cx-status");
+        const words = box.value.trim().split(/\s+/).filter(Boolean).slice(0, 10);
+        const next = words.join(" ");
+        if (!next) return render();
+        if (moderate(next).length) {
+          state.profileWarn = "Starea conține limbaj nepotrivit. Alege altă formulare, te rog.";
+          return render();
+        }
+        state.profileWarn = null;
+        MY_PROFILE.status = next; // persists on the profile — others see it
+        return render();
+      }
+
+      // ---- profile ----
+      case "edit-profile":
+        state.editingProfile = true;
+        state.pickAvatar = MY_PROFILE.avatar; // path or null
+        return render();
+      case "cancel-profile":
+        state.editingProfile = false;
+        return render();
+      case "profile-pick":
+        state.pickAvatar = btn.dataset.gif || null;
+        return render();
+      case "save-profile": {
+        const val = (id) => mount.querySelector(id)?.value.trim() || "";
+        // The whole profile passes through the language filter at once.
+        const combined = ["#pf-first", "#pf-last", "#pf-grade", "#pf-school", "#pf-locality", "#pf-passions", "#pf-challenges"]
+          .map(val)
+          .join(" ");
+        if (moderate(combined).length) {
+          state.profileWarn = "Unul dintre câmpuri conține limbaj nepotrivit. Corectează-l, te rog.";
+          return render();
+        }
+        state.profileWarn = null;
+        MY_PROFILE.firstName = escapeHtml(val("#pf-first"));
+        MY_PROFILE.lastName = escapeHtml(val("#pf-last"));
+        MY_PROFILE.grade = escapeHtml(val("#pf-grade"));
+        MY_PROFILE.school = escapeHtml(val("#pf-school"));
+        MY_PROFILE.locality = escapeHtml(val("#pf-locality"));
+        MY_PROFILE.passions = escapeHtml(val("#pf-passions"));
+        MY_PROFILE.challenges = escapeHtml(val("#pf-challenges"));
+        MY_PROFILE.avatar = state.pickAvatar === undefined ? MY_PROFILE.avatar : state.pickAvatar;
+        const vis = mount.querySelector("#pf-vis")?.value;
+        if (vis) MY_PROFILE.visibility = vis;
+        state.editingProfile = false;
+        return render();
+      }
+    }
+  });
+
+  // Image uploads → object URLs (real client-side preview, no backend).
+  // At most 3 images per post — extra files are ignored with a heads-up.
+  const MAX_POST_IMAGES = 3;
+  mount.addEventListener("change", (e) => {
+    if (e.target.id !== "cx-file") return;
+    const files = [...e.target.files].filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    if (files.length > MAX_POST_IMAGES) {
+      showToast(`Poți atașa cel mult ${MAX_POST_IMAGES} imagini per postare — le-am păstrat pe primele ${MAX_POST_IMAGES}.`);
+    }
+    syncComposer();
+    const images = files.slice(0, MAX_POST_IMAGES).map((f) => ({ src: URL.createObjectURL(f) }));
+    state.composer.media = { kind: "images", images };
+    render();
+  });
+
+  // Esc closes the image lightbox; ←/→ walk between the post's images.
+  document.addEventListener("keydown", (e) => {
+    if (!state.lightbox) return;
+    if (e.key === "Escape") {
+      state.lightbox = null;
+      render();
+    } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      const p = findPost(state.lightbox.postId);
+      const n = p?.media?.images?.length || 0;
+      if (n > 1) {
+        state.lightbox.i = (state.lightbox.i + (e.key === "ArrowRight" ? 1 : -1) + n) % n;
+        render();
+      }
+    }
+  });
+
+  // @mentions autocomplete — the context decides who's eligible: the post
+  // composer accepts any friend; a group box only that group's members;
+  // boxes under a post follow the post's audience. Other textareas
+  // (profil, caiet, exerciții) have no mentions.
+  initMentions(mount, (box) => {
+    if (box.id === "cx-post-text") return () => true;
+    if (box.id === "cx-group-post") {
+      const g = findGroup(state.openGroup);
+      if (!g) return null;
+      return (u) => (g.memberIds.includes(u.id) ? true : "nu e membru al acestui grup");
+    }
+    const scope = box.closest("[data-post-id]");
+    if (scope) {
+      const post = findPost(Number(scope.dataset.postId));
+      if (post) return mentionEligibleForPost(post);
+    }
+    return null;
+  });
+
+  // Re-render triggered while typing in a search box: keep the caret where
+  // it was so the search feels live, not jumpy.
+  function rerenderKeepingFocus(inputId) {
+    render();
+    const el = mount.querySelector(`#${inputId}`);
+    if (el) {
+      const end = el.value.length;
+      el.focus();
+      el.setSelectionRange(end, end);
+    }
+  }
+
+  // Live word counter on the profile status, live searches (forum + admin
+  // users) and the admin level simulator.
+  mount.addEventListener("input", (e) => {
+    if (e.target.id === "cx-feed-search") {
+      state.feedQuery = e.target.value;
+      state.feedLimit = 6; // new search → first page
+      return rerenderKeepingFocus("cx-feed-search");
+    }
+    if (e.target.id === "cx-note-search") {
+      state.noteQuery = e.target.value;
+      return rerenderKeepingFocus("cx-note-search");
+    }
+    if (e.target.id === "cx-admin-usearch") {
+      state.adminUserQuery = e.target.value;
+      return rerenderKeepingFocus("cx-admin-usearch");
+    }
+    if (e.target.id === "cx-status") {
+      const n = e.target.value.trim().split(/\s+/).filter(Boolean).length;
+      const out = mount.querySelector("#cx-wordcount");
+      if (out) out.textContent = `${n}/10 cuvinte`;
+      return;
+    }
+    if (!isAdmin()) return;
+    const syncSimPreview = () => {
+      const local = mount.querySelector("#cx-simpreview");
+      if (local) applyBar(local, state.simLevel || 1, 62, state.simPrestige || 0);
+    };
+    if (e.target.id === "cx-simlevel") {
+      const v = Number(e.target.value);
+      state.simLevel = v;
+      setPreview(v, state.simPrestige || 0); // updates the real top bar live
+      const out = mount.querySelector("#cx-simlevel-out");
+      if (out) out.textContent = `${v}`;
+      syncSimPreview(); // …and the preview RIGHT NEXT to the sliders
+    } else if (e.target.id === "cx-simprestige") {
+      const v = Number(e.target.value);
+      state.simPrestige = v;
+      setPreview(state.simLevel || 1, v);
+      const out = mount.querySelector("#cx-simprestige-out");
+      if (out) out.textContent = `${v}`;
+      syncSimPreview();
+    }
+  });
+
+  // Role changed via the global 🎭 switcher: sections that don't exist for
+  // the new role fall back to the forum, then everything re-renders.
+  window.addEventListener("atelier:role", () => {
+    if (state.section === "admin" && !isAdmin()) state.section = "forum";
+    state.thread.openReplyId = state.thread.openEditId = state.thread.openReactId = null;
+    render();
+  });
+
+  // Shareable links opened directly / pasted / via back-forward: re-sync the
+  // view from the URL hash. (replaceState above does NOT fire this.)
+  window.addEventListener("hashchange", () => {
+    remember(); // real-link navigation (profile anchors) is a jump too
+    if (applyUserHash()) return render();
+    if (applyAdminHash()) return render();
+    const h = location.hash.slice(1);
+    state.viewUser = null;
+    if (ALL_SECTIONS.includes(h)) state.section = h;
+    render();
+  });
+
+  render();
+}

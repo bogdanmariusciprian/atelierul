@@ -1,0 +1,1133 @@
+/* =========================================================
+   Lesson layout & interactive exercises.
+   Load AFTER shared/styles/main.css. Reused by every lesson.
+   A lesson can set --lesson-color to tint its accents.
+   ========================================================= */
+
+.lesson {
+  --lesson-color: var(--color-primary);
+  max-width: 780px;
+  margin-inline: auto;
+  padding-block: var(--space-lg);
+}
+
+/* Breadcrumb + title block */
+.lesson__breadcrumb {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.lesson__tag {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--lesson-color);
+  margin-bottom: var(--space-sm);
+}
+
+.lesson__title {
+  margin-bottom: var(--space-xs);
+}
+
+.lesson__intro {
+  color: var(--color-text-muted);
+  font-size: 1.05rem;
+}
+
+/* Sections */
+.lesson-section {
+  margin-block: var(--space-xl);
+}
+
+.lesson-section__title {
+  padding-bottom: var(--space-xs);
+  border-bottom: 2px solid var(--lesson-color);
+}
+
+/* Objectives list */
+.objectives {
+  list-style: none;
+  display: grid;
+  gap: var(--space-sm);
+  padding: 0;
+}
+
+.objectives li {
+  padding-left: 1.8rem;
+  position: relative;
+}
+
+.objectives li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--lesson-color);
+  font-weight: 700;
+}
+
+/* Highlight / example boxes */
+.callout {
+  border-left: 4px solid var(--lesson-color);
+  background: var(--color-surface);
+  padding: var(--space-md);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-block: var(--space-md);
+}
+
+.example {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  margin-block: var(--space-md);
+}
+
+.example em { color: var(--lesson-color); font-style: normal; font-weight: 600; }
+
+/* Data tables (e.g. cases) */
+.lesson-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: var(--space-md);
+}
+
+.lesson-table th,
+.lesson-table td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-sm);
+  text-align: left;
+  vertical-align: top;
+}
+
+.lesson-table th {
+  background: var(--color-surface);
+}
+
+/* =========================================================
+   Interactive exercises
+   ========================================================= */
+.exercise {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  margin-block: var(--space-md);
+  background: var(--color-bg);
+}
+
+.exercise__q {
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+/* Multiple choice */
+.exercise__options {
+  list-style: none;
+  display: grid;
+  gap: var(--space-sm);
+  padding: 0;
+  margin: 0;
+}
+
+.option {
+  width: 100%;
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.option:hover {
+  border-color: var(--lesson-color);
+}
+
+.option.is-correct {
+  border-color: var(--color-success);
+  background: #dcfce7;
+}
+
+.option.is-wrong {
+  border-color: var(--color-danger);
+  background: #fee2e2;
+}
+
+/* Fill-in-the-blank inputs */
+.blank {
+  border: none;
+  border-bottom: 2px solid var(--lesson-color);
+  background: transparent;
+  font: inherit;
+  padding: 0.1rem 0.3rem;
+  min-width: 8ch;
+}
+
+.blank.is-correct { color: var(--color-success); border-color: var(--color-success); }
+.blank.is-wrong { color: var(--color-danger); border-color: var(--color-danger); }
+
+/* Matching */
+.match {
+  list-style: none;
+  display: grid;
+  gap: var(--space-sm);
+  padding: 0;
+}
+
+.match li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.match__prompt { flex: 1 1 12rem; }
+
+.match__select {
+  font: inherit;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.match__select.is-correct { border-color: var(--color-success); }
+.match__select.is-wrong { border-color: var(--color-danger); }
+
+/* Check button + feedback */
+.exercise__check {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: var(--radius);
+  background: var(--lesson-color);
+  color: #fff;
+  font-weight: 600;
+}
+
+.exercise__feedback {
+  margin-top: var(--space-sm);
+  font-weight: 600;
+  min-height: 1.2em;
+}
+
+.exercise__feedback.is-correct { color: var(--color-success); }
+.exercise__feedback.is-wrong { color: var(--color-danger); }
+
+/* =========================================================
+   Lessons hub (list grouped by domain)
+   ========================================================= */
+.domain-group {
+  --accent: var(--card-color, var(--color-primary));
+  margin-block: var(--space-xl);
+  scroll-margin-top: var(--space-lg);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Domain heading: accent-colored, with a rounded accent bar in front. */
+.domain-group__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: var(--space-md);
+  font-size: 1.35rem;
+  color: var(--accent);
+}
+
+.domain-group__title::before {
+  content: "";
+  width: 0.45rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* Lessons indented under the domain, joined by a vertical accent line. */
+/* =========================================================
+   Lesson completion card + "select → În caiet" bubble + hub hint
+   ========================================================= */
+.lesson-done__card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.1rem;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(135deg, #7c3aed, #db2777, #0891b2) border-box;
+  box-shadow: var(--shadow-sm);
+}
+.lesson-done__card--done {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1px solid #86efac;
+}
+.lesson-done__ic { font-size: 1.6rem; }
+.lesson-done__body { flex: 1; min-width: 14rem; }
+.lesson-done__body b { display: block; margin-bottom: 0.1rem; }
+.lesson-done__body p { margin: 0; font-size: 0.88rem; color: var(--color-text-muted); }
+
+/* The floating "add to notebook" bubble over a text selection. */
+.lesson-clip {
+  position: fixed;
+  z-index: 2147482200;
+  transform: translateX(-50%);
+  border: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  box-shadow: 0 10px 24px -10px rgba(124, 58, 237, 0.7);
+  cursor: pointer;
+  animation: lesson-clip-in 0.15s ease;
+}
+@keyframes lesson-clip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Planned lessons are visibly NOT clickable — no more dead clicks. */
+.track-node--soon { opacity: 0.55; filter: grayscale(0.35); cursor: default; }
+.track-node--soon .track-node__title { font-style: italic; }
+
+/* "Așa va arăta exercițiul tău" — live preview on lesson pages. */
+.propose__preview {
+  margin-top: 0.7rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  border: 1px dashed var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg));
+}
+.propose__preview__label {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+/* Guest hint under the lessons search (why the rings exist). */
+.lessons-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+.lessons-hint a { font-weight: 700; }
+
+/* Author tag on the lesson's own (hand-written) exercises — injected
+   automatically by lesson-engine's initExercisesIn. */
+.exercise { position: relative; }
+.exercise__author {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.08rem 0.55rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* =========================================================
+   Global lesson search — above the explorer; results overlay it.
+   ========================================================= */
+.lessons-search {
+  position: relative;
+  margin-top: var(--space-lg);
+  max-width: 34rem;
+}
+.lessons-search__input {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font: inherit;
+  font-size: 0.95rem;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.lessons-search__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+.lessons-search__results {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 0.4rem;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 20px 46px -18px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.lessons-search__results[hidden] { display: none; }
+.lessons-search__hit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background 0.12s ease;
+}
+a.lessons-search__hit:hover,
+a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-primary) 8%, transparent); text-decoration: none; }
+.lessons-search__hit--soon { opacity: 0.6; cursor: default; }
+.lessons-search__hit em { margin-left: auto; font-size: 0.74rem; color: var(--color-text-muted); }
+.lessons-search__chip {
+  flex: none;
+  padding: 0.08rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--c, var(--color-primary));
+}
+.lessons-search__none { margin: 0; padding: 0.5rem 0.6rem; font-size: 0.86rem; color: var(--color-text-muted); }
+
+/* =========================================================
+   Lessons explorer: domain tabs (left) + selected domain's
+   lesson track (right). One domain shown at a time.
+   ========================================================= */
+.lessons-explorer {
+  display: grid;
+  grid-template-columns: minmax(200px, 250px) 1fr;
+  gap: var(--space-xl);
+  align-items: start;
+  margin-block: var(--space-lg);
+}
+
+/* Left: domain tabs */
+.domain-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  position: sticky;
+  top: var(--sticky-top, 104px); /* clear the sticky header + XP bar */
+}
+
+.domain-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.9rem var(--space-md);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--card-color);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: left;
+  user-select: none;
+  transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+/* When a domain is selected, the other tabs look disabled: dimmed and
+   pulled back (reverse indent), while the active one juts out. */
+.domain-tabs:has(.is-active) .domain-tab:not(.is-active) {
+  opacity: 0.4;
+  transform: translateX(-10px);
+}
+
+.domain-tabs:has(.is-active) .domain-tab:not(.is-active):hover {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.domain-tab__icon {
+  flex: none;
+  display: inline-block;
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: 1.15rem; /* fallback if a domain has no SVG watermark */
+  line-height: 1;
+}
+
+.domain-tab__label {
+  flex: 1;
+}
+
+.domain-tab:hover {
+  background: color-mix(in srgb, var(--card-color) 7%, var(--color-bg));
+  transform: translateX(2px);
+}
+
+.domain-tab.is-active {
+  background: color-mix(in srgb, var(--card-color) 12%, var(--color-bg));
+  color: var(--card-color);
+  box-shadow: var(--shadow-md);
+  transform: translateX(12px) scale(1.08);
+}
+
+.domain-tab__count {
+  flex: none;
+  font-size: 0.8rem;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  color: var(--card-color);
+  background: color-mix(in srgb, var(--card-color) 16%, var(--color-bg));
+}
+
+/* Right: one panel per domain, only the active one visible.
+   The viewport scrolls; the header stays fixed (sticky) on top. */
+.domain-panel {
+  display: none;
+  position: relative;
+  /* Capped to the height of the domain-tabs column so the panel's bottom
+     lines up with the last tab. --panel-h is measured in JS. */
+  max-height: var(--panel-h, 72vh);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Scrolling area — native scrollbar hidden, replaced by the dot stepper. */
+.domain-panel__viewport {
+  max-height: var(--panel-h, 72vh);
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox: hide native */
+}
+
+.domain-panel__viewport::-webkit-scrollbar {
+  display: none; /* WebKit: hide native */
+}
+
+/* Progressive blur at the top/bottom edges: content grows blurry as it
+   approaches the fixed header and the panel bottom. A masked backdrop
+   blur (strong at the edge, fading toward the center). */
+.panel-blur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 34px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.panel-blur--top {
+  top: var(--head-h, 0px); /* sits right below the sticky header */
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+
+.panel-blur--bottom {
+  bottom: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  -webkit-mask-image: linear-gradient(to top, #000, transparent);
+  mask-image: linear-gradient(to top, #000, transparent);
+}
+
+.panel-blur.is-visible {
+  opacity: 1;
+}
+
+/* Inner shadow at top + bottom of the scroll area → "engraved" look. */
+.panel-inset {
+  position: absolute;
+  top: var(--head-h, 0px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: inset 0 8px 7px -8px rgba(0, 0, 0, 0.22),
+    inset 0 -8px 7px -8px rgba(0, 0, 0, 0.22);
+}
+
+/* Side dot stepper: one dot per lesson, current one highlighted. */
+.scroll-dots {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  z-index: 3;
+}
+
+.scroll-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--card-color) 28%, transparent);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.scroll-dot:hover {
+  transform: scale(1.35);
+  background: var(--card-color);
+}
+
+.scroll-dot.is-active {
+  background: var(--card-color);
+  transform: scale(1.45);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--card-color) 20%, transparent);
+}
+
+.domain-panel.is-active {
+  display: block;
+}
+
+/* =========================================================
+   Expand / collapse: a bar along the panel's bottom edge.
+   Compact (default): the panel is capped and scrolls. Click to expand —
+   the panel grows to the full lesson list and stops scrolling.
+   The bar is hidden unless the compact panel actually overflows (or it is
+   currently expanded, so the user can collapse again).
+   ========================================================= */
+.domain-panel__expand {
+  display: none;
+  position: absolute; /* overlays the bottom edge while compact */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1px 0; /* just a hairline strip */
+  border: none;
+  background: transparent;
+  color: var(--card-color);
+  cursor: pointer;
+  opacity: 0.3; /* barely there until hovered */
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.domain-panel__expand:hover {
+  opacity: 0.85;
+  background: color-mix(in srgb, var(--card-color) 8%, transparent);
+}
+
+.domain-panel.has-overflow .domain-panel__expand,
+.domain-panel.is-expanded .domain-panel__expand {
+  display: flex;
+}
+
+.domain-panel__expand-icon {
+  width: 0.8em;
+  height: 0.8em;
+  transition: transform 0.25s ease;
+}
+
+/* Label kept for screen readers only — the strip shows just the chevron. */
+.domain-panel__expand-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Compact + overflowing: small gap so the last node clears the strip. */
+.domain-panel.has-overflow:not(.is-expanded) .lesson-track {
+  padding-bottom: calc(var(--space-lg) + 16px);
+}
+
+/* Expanded: drop the cap, stop scrolling, grow to fit the whole track. */
+.domain-panel.is-expanded {
+  max-height: none;
+  overflow: visible;
+}
+
+.domain-panel.is-expanded .domain-panel__viewport {
+  max-height: none;
+  overflow: visible;
+}
+
+/* The bar now flows below the track instead of overlaying it. */
+.domain-panel.is-expanded .domain-panel__expand {
+  position: relative;
+}
+
+.domain-panel.is-expanded .domain-panel__expand-icon {
+  transform: rotate(180deg);
+}
+
+/* No scroll → the scroll-UX affordances make no sense. */
+.domain-panel.is-expanded .scroll-dots,
+.domain-panel.is-expanded .panel-blur,
+.domain-panel.is-expanded .panel-inset {
+  display: none;
+}
+
+/* Sticky colored header band with icon + big faint watermark. */
+.domain-panel__head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: calc(var(--space-lg) * 0.85); /* ~15% shorter header */
+  border-radius: var(--radius) var(--radius) 0 0;
+  box-shadow: var(--shadow-sm);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--card-color) 20%, var(--color-bg)),
+    color-mix(in srgb, var(--card-color) 5%, var(--color-bg))
+  );
+}
+
+.domain-panel__watermark {
+  position: absolute;
+  right: -0.2rem;
+  top: -1.2rem;
+  width: 116px;
+  height: 116px;
+  opacity: 0.16;
+  background: var(--card-color);
+  transform: rotate(-8deg);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.6s ease;
+  pointer-events: none;
+}
+
+/* Hover the header → the watermark playfully swings + grows. */
+.domain-panel__head:hover .domain-panel__watermark {
+  transform: rotate(10deg) scale(1.2) translate(-8px, 6px);
+  opacity: 0.2;
+}
+
+.domain-panel__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  font-size: 1.6rem;
+  border-radius: 14px;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* SVG icon inside the header badge, tinted with the domain color. */
+.domain-panel__iconimg {
+  display: block;
+  width: 58%;
+  height: 58%;
+}
+
+.domain-panel__title {
+  margin: 0;
+  color: var(--card-color);
+}
+
+.domain-panel__meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+/* Vertical lesson track with a subtle spine through the rings. */
+.lesson-track {
+  list-style: none;
+  position: relative;
+  margin: 0;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.lesson-track::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-lg) + 36px);
+  bottom: calc(var(--space-lg) + 36px);
+  left: calc(var(--space-lg) + 36px);
+  transform: translateX(-50%);
+  width: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-color) 30%, transparent);
+}
+
+.track-node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+/* Circular node: index number + progress ring. */
+.node {
+  --accent: var(--card-color);
+  flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.node__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg); /* start progress at 12 o'clock */
+}
+
+.node__track {
+  fill: var(--color-bg);
+  stroke: color-mix(in srgb, var(--accent) 22%, transparent);
+  stroke-width: 6;
+}
+
+.node__progress {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.4s ease;
+}
+
+.node__index {
+  position: relative;
+  z-index: 1;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.node:hover {
+  transform: scale(1.07);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 10px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.track-node__label {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.track-node__title {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* "în curând" pill + empty-state title: non-selectable like other titles. */
+.track-node__soon,
+.lesson-track__empty {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.track-node__label:hover .track-node__title {
+  color: var(--card-color);
+}
+
+.track-node__summary {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.15rem;
+}
+
+.lesson-track__empty {
+  color: var(--color-text-muted);
+}
+
+/* Planned (not-yet-built) lessons: dimmed + "în curând" pill. */
+.track-node--soon {
+  opacity: 0.6;
+}
+
+.track-node--soon .node {
+  cursor: default;
+}
+
+.track-node__soon {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+/* Narrow screens: tabs become a horizontal scroll row above panels. */
+@media (max-width: 720px) {
+  .lessons-explorer {
+    grid-template-columns: 1fr;
+  }
+  .domain-tabs {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: var(--space-xs);
+  }
+  .domain-tab {
+    flex: none;
+  }
+  .domain-panel {
+    max-height: none;
+  }
+  .domain-panel__viewport {
+    max-height: none;
+    overflow: visible; /* use the native page scroll on small screens */
+  }
+  .domain-panel__head {
+    position: static; /* don't stick on mobile */
+  }
+  .scroll-dots,
+  .panel-blur,
+  .domain-panel__expand {
+    display: none;
+  }
+}
+
+/* Lesson navigation (prev/next, back to hub) */
+.lesson-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+/* =========================================================
+   Lesson comments (threaded, likes + reactions, gated)
+   ========================================================= */
+.comments__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* Preview-only Logat/Vizitator switch (remove once auth is wired). */
+.comments__demo {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.comments__seg {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  padding: 0.15rem 0.6rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.comments__seg:first-of-type { border-radius: 999px 0 0 999px; }
+.comments__seg:last-of-type { border-radius: 0 999px 999px 0; border-left: none; }
+.comments__seg.on {
+  background: color-mix(in srgb, var(--lesson-color) 14%, var(--color-bg));
+  color: var(--lesson-color);
+  font-weight: 600;
+}
+
+/* Composer + guest bar */
+.cmt-composer {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  margin-block: var(--space-md);
+}
+
+.cmt-guestbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding: var(--space-md);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  margin-block: var(--space-md);
+}
+.cmt-guestbar a { margin-left: auto; font-weight: 600; }
+
+.cmt__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.6rem;
+  resize: vertical;
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+/* Comment node */
+.cmt {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.cmt__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--a, var(--lesson-color));
+}
+
+.cmt__body { flex: 1; min-width: 0; }
+
+.cmt__meta { margin: 0; font-size: 0.9rem; }
+.cmt__name { font-weight: 700; }
+.cmt__replyto { color: var(--lesson-color); font-size: 0.8rem; margin-left: 0.4rem; }
+.cmt__time { color: var(--color-text-muted); margin-left: 0.4rem; font-size: 0.8rem; }
+
+.cmt__text { margin: 0.15rem 0 0.4rem; line-height: 1.55; }
+
+.cmt__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.cmt__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.cmt__act:hover { color: var(--color-text); }
+.cmt__act.is-liked { color: var(--color-danger); font-weight: 600; }
+
+.cmt__reacts { display: inline-flex; align-items: center; gap: 0.3rem; position: relative; }
+
+.cmt__chip {
+  font-size: 0.8rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.cmt__addreact {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.cmt__picker {
+  position: absolute;
+  bottom: 130%;
+  left: 0;
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-md);
+  z-index: 5;
+}
+.cmt__emoji {
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+  border-radius: 50%;
+}
+.cmt__emoji:hover { background: var(--color-surface); }
+
+/* Nested replies: indented, joined by an accent line. */
+.cmt__replies {
+  margin-top: var(--space-sm);
+  padding-left: var(--space-md);
+  border-left: 2px solid color-mix(in srgb, var(--lesson-color) 30%, var(--color-border));
+}
+
+.cmt__reply { margin-top: var(--space-sm); }
+.cmt__replyactions { display: flex; gap: var(--space-sm); margin-top: var(--space-xs); }
+
+.btn-mini {
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--lesson-color);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.btn-mini--ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+/* Guest gating: everything marked .gated is disabled for visitors. */
+.comments.is-guest .gated {
+  pointer-events: none;
+  opacity: 0.45;
+}

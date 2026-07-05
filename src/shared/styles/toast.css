@@ -1,0 +1,39 @@
+/* =========================================================
+   Site-wide toasts (toast.js) — bottom-center pills, stack of max 3.
+   ========================================================= */
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 1.6rem;
+  transform: translateX(-50%);
+  z-index: 2147482500; /* above the admin frame, below points-fx */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  max-width: min(92vw, 34rem);
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(30, 27, 46, 0.92);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.toast.is-in { opacity: 1; transform: translateY(0); }
+.toast--success { background: linear-gradient(135deg, #15803d, #16a34a); }
+.toast--error { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { transform: none; transition: opacity 0.22s ease; }
+}

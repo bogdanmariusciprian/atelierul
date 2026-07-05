@@ -1,0 +1,420 @@
+/* =========================================================
+   XP bar — fixed strip under the header (JS sets its top to the header's
+   bottom; .xp-spacer reserves its height in flow). 20 progressively
+   fancier skins: features accumulate with level. Subtle/feathered.
+   Loaded via main.css.
+   ========================================================= */
+
+.xp {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0; /* JS updates this to the header's bottom */
+  z-index: 95;
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.3s ease;
+}
+.xp-spacer { flex: none; }
+
+.xp__inner {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-block: 0.35rem;
+}
+
+/* Emblem + rotating shine ring */
+.xp__emblem {
+  position: relative;
+  flex: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+}
+.xp__emblem-ic { position: relative; z-index: 1; font-size: 1.1rem; line-height: 1; }
+.xp__ring { position: absolute; inset: -3px; border-radius: 50%; display: none; }
+.xp--ring .xp__ring {
+  display: block;
+  background: conic-gradient(from 0deg, transparent 0 55%, color-mix(in srgb, var(--color-primary) 80%, #fff) 80%, transparent);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: xp-ring 3s linear infinite;
+}
+@keyframes xp-ring { to { transform: rotate(360deg); } }
+
+.xp__badge { display: inline-flex; align-items: baseline; gap: 0.28rem; white-space: nowrap; }
+.xp__lvl { font-size: 1rem; line-height: 1; color: var(--color-primary); font-weight: 800; }
+.xp__lvl-lbl { font-size: 0.66rem; font-weight: 700; color: var(--color-text-muted); }
+.xp--max .xp__lvl {
+  background: linear-gradient(135deg, #7c3aed, #db2777 55%, #0891b2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Wrap holds the prestige stars + the track */
+.xp__wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* Prestige stars — permanent, earned by completing the whole bar. Only
+   shown from prestige 1 up, drawn progressively bigger (size set inline). */
+.xp__stars { display: flex; align-items: center; gap: 3px; line-height: 1; }
+.xp__stars:not(:empty) { margin-bottom: 5px; } /* space above the bar, only when stars exist */
+.xp__star {
+  line-height: 1;
+  background: linear-gradient(180deg, #fde68a, #f59e0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(180, 120, 0, 0.25));
+}
+.xp__star--more { -webkit-text-fill-color: initial; color: var(--color-accent); font-size: 0.72rem; font-weight: 800; align-self: center; }
+
+/* Track — thickens ~1px per level */
+.xp__track {
+  position: relative;
+  height: calc(8px + var(--lvl, 1) * 1px);
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-border) 55%, var(--color-surface));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.xp__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--xp-fill, #c7ccd6);
+  transition: width 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 1;
+}
+.xp__meta { flex: none; font-size: 0.68rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Decorative fill layers */
+.xp__shine, .xp__spark, .xp__seg, .xp__wave { position: absolute; inset: 0; display: none; pointer-events: none; }
+
+/* segments / pips — thin separators cut across the whole track (L5+) */
+.xp--seg .xp__track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(100% / var(--seg, 6) - 2px),
+    color-mix(in srgb, var(--color-surface) 85%, #000) calc(100% / var(--seg, 6) - 2px) calc(100% / var(--seg, 6))
+  );
+}
+
+/* milestone flags on the track (L8+) */
+.xp__flag { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 2; display: none; background: color-mix(in srgb, var(--color-text-muted) 45%, transparent); }
+.xp__flag::before { content: "⚑"; position: absolute; top: -2px; left: -3px; font-size: 0.6rem; color: var(--color-text-muted); opacity: 0.6; }
+.xp--flags .xp__flag { display: block; }
+.xp__flag.is-passed { background: color-mix(in srgb, var(--color-accent) 70%, transparent); }
+.xp__flag.is-passed::before { color: var(--color-accent); opacity: 1; }
+
+/* stripes (L7+) */
+.xp--stripes .xp__fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 14px);
+  background-size: 20px 20px;
+}
+.xp--stripes-move .xp__fill::after { animation: xp-stripes 0.9s linear infinite; }
+@keyframes xp-stripes { to { background-position: 20px 0; } }
+
+/* shimmer sweep (L10+) */
+.xp--shimmer .xp__shine {
+  display: block;
+  left: -45%;
+  width: 45%;
+  right: auto;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  animation: xp-shine 2.6s ease-in-out infinite;
+}
+@keyframes xp-shine { 0% { left: -45%; } 55%, 100% { left: 130%; } }
+
+/* animated gradient flow (L12+) */
+.xp--flow .xp__fill { background-size: 220% 100%; animation: xp-flow 6s ease infinite; }
+.xp--max .xp__fill { animation-duration: 3.6s; }
+@keyframes xp-flow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+/* glossy top highlight (L14+) */
+.xp--gloss .xp__fill::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 55% 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+  z-index: 1;
+}
+
+/* sparkle dots (L16+) */
+.xp--sparkle .xp__spark {
+  display: block;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.9) 1px, transparent 1.6px);
+  background-size: 15px 15px;
+  opacity: 0.5;
+  mix-blend-mode: screen;
+  animation: xp-spark 3s linear infinite;
+}
+@keyframes xp-spark { to { background-position: 30px 0; } }
+
+/* animated holographic border around the track (L18+) */
+.xp--frameborder .xp__track::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  padding: 2px;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(90deg, #a78bfa, #f472b6, #fbbf24, #34d399, #22d3ee, #a78bfa);
+  background-size: 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: xp-flow 5s linear infinite;
+}
+
+/* max (L20) — refined outline + faster flow (no harsh glow) */
+.xp--max .xp__track { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent); }
+
+/* wavy "sea" surface on the level-20 fill: two wave layers drifting in
+   opposite directions. Subtle (soft-light) over the holographic gradient. */
+.xp--max .xp__wave {
+  display: block;
+  z-index: 1;
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='90'%20height='20'%3E%3Cpath%20d='M0%2010%20Q22%202%2045%2010%20T90%2010%20V20%20H0%20Z'%20fill='rgba(255,255,255,0.30)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='20'%3E%3Cpath%20d='M0%2012%20Q15%206%2030%2012%20T60%2012%20V20%20H0%20Z'%20fill='rgba(255,255,255,0.22)'/%3E%3C/svg%3E");
+  background-repeat: repeat-x, repeat-x;
+  background-size: 90px 100%, 60px 100%;
+  background-position: 0 0, 0 0;
+  mix-blend-mode: soft-light;
+  animation: xp-wave 2.6s linear infinite;
+}
+@keyframes xp-wave { to { background-position: 90px 0, -60px 0; } }
+
+/* Completed bar (after finishing bar 20 once): stays "drawn" full and
+   breathes gently, looping — from here on only the stars grow. */
+.xp--complete .xp__track { animation: xp-complete 3.4s ease-in-out infinite; }
+@keyframes xp-complete {
+  0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 22%, transparent); }
+  50% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-primary) 52%, transparent); }
+}
+.xp--complete .xp__emblem { animation: xp-complete-em 3.4s ease-in-out infinite; }
+@keyframes xp-complete-em { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+/* points "arrive" → quick pulse */
+.xp--hit .xp__track { animation: xp-hit 0.5s ease; }
+@keyframes xp-hit { 0% { transform: scale(1); } 30% { transform: scale(1.03); filter: brightness(1.25); } 100% { transform: scale(1); } }
+
+/* level-up flourish + "molt" shake as the full bar transforms to the next */
+.xp--levelup .xp__emblem { animation: xp-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
+.xp--levelup .xp__fill { animation: xp-flash 0.7s ease; }
+.xp--molt .xp__track { animation: xp-molt 0.55s ease; }
+@keyframes xp-molt {
+  0%, 100% { transform: translateX(0) skewX(0); }
+  12% { transform: translateX(-3px) skewX(-2.5deg); }
+  26% { transform: translateX(3px) skewX(2.5deg); }
+  40% { transform: translateX(-2.5px) skewX(-1.5deg); }
+  54% { transform: translateX(2px) skewX(1deg); }
+  70% { transform: translateX(-1.5px); }
+  85% { transform: translateX(1px); }
+}
+@keyframes xp-pop { 0% { transform: scale(1); } 40% { transform: scale(1.45) rotate(-8deg); } 100% { transform: scale(1) rotate(0); } }
+@keyframes xp-flash { 0% { filter: brightness(1); } 35% { filter: brightness(1.55); } 100% { filter: brightness(1); } }
+
+/* toast */
+.xp__toast {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-6px) scale(0.9);
+  opacity: 0;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #7c3aed, #db2777 55%, #0891b2);
+  box-shadow: 0 10px 24px -12px rgba(124, 58, 237, 0.7);
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.xp__toast.is-in { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+/* =========================================================
+   Level 20 — animated holographic frame around the whole page
+   ========================================================= */
+.xp-frame { position: fixed; inset: 0; z-index: 180; pointer-events: none; }
+.xp-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 5px;
+  background: linear-gradient(120deg, #a78bfa, #f472b6, #fbbf24, #34d399, #22d3ee, #a78bfa);
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: xp-frame-flow 8s linear infinite;
+}
+@keyframes xp-frame-flow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+/* =========================================================
+   Admin preview: stacked mini bars, one per level (uses .xp--preview)
+   ========================================================= */
+.xp-prev-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.xp-prev-row { display: grid; grid-template-columns: 66px 1fr; align-items: center; gap: 0.7rem; }
+.xp-prev-lbl { font-size: 0.78rem; font-weight: 700; color: var(--color-text-muted); }
+.xp--preview {
+  position: static;
+  z-index: auto;
+  border: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.xp--preview .xp__inner { padding: 0.4rem 0.6rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .xp__fill, .xp__shine, .xp__spark, .xp__ring, .xp--max .xp__wave,
+  .xp--stripes-move .xp__fill::after,
+  .xp--frameborder .xp__track::before,
+  .xp-frame::before, .xp--complete .xp__track, .xp--complete .xp__emblem,
+  .xp--levelup .xp__emblem, .xp--levelup .xp__fill, .xp--molt .xp__track, .xp--hit .xp__track { animation: none !important; }
+  .xp__fill { transition: width 0.3s ease; }
+}
+
+/* =========================================================
+   "What's next" popup — click the live bar to peek at the next level.
+   Retracts on any click / wheel / Esc (wired in xp-bar.js).
+   ========================================================= */
+.xp-pop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482300;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 12, 26, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  cursor: pointer; /* the whole overlay closes it */
+}
+.xp-pop.is-in { opacity: 1; }
+.xp-pop__card {
+  width: min(94vw, 34rem);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.6);
+  padding: 1.1rem 1.3rem 0.9rem;
+  transform: translateY(10px) scale(0.97);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.xp-pop.is-in .xp-pop__card { transform: translateY(0) scale(1); }
+.xp-pop__title { margin: 0 0 0.15rem; font-size: 1.15rem; font-weight: 800; }
+.xp-pop__sub { margin: 0 0 0.7rem; font-size: 0.9rem; color: var(--color-text-muted); }
+.xp-pop__bar { margin-bottom: 0.7rem; }
+.xp-pop__perks {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  font-size: 0.88rem;
+  display: grid;
+  gap: 0.15rem;
+}
+.xp-pop__perks li::marker { content: "✨ "; }
+.xp-pop__hint {
+  margin: 0.8rem 0 0;
+  text-align: center;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  opacity: 0.8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-pop,
+  .xp-pop__card { transition: opacity 0.2s ease; transform: none; }
+}
+
+/* The member's identity ON the progress row — avatar + name + the
+   notifications badge. It's a button: click = the notification center. */
+.xp__user {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.55rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  flex: none;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem 0.1rem 0.1rem;
+  transition: background 0.15s ease;
+}
+.xp__user:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.xp__user-badge {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.15rem;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  border: 2px solid var(--color-bg);
+}
+.xp__user-av {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  flex: none;
+}
+.xp__user-av--init {
+  display: grid;
+  place-items: center;
+  background: var(--a, var(--color-primary));
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+.xp__user-name { font-size: 0.8rem; white-space: nowrap; }
+
+/* Narrow screens: keep it compact. */
+@media (max-width: 560px) {
+  .xp__meta { display: none; }
+  .xp__lvl-lbl { display: none; }
+  .xp__stars { display: none; }
+  .xp__user-name { display: none; }
+}

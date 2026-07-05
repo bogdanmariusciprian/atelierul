@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Atelierul-LRO — Limba și literatura română, pe înțelesul tău</title>
+  <meta name="description" content="Lecții interactive de limba și literatura română pentru gimnaziu și liceu, exerciții cu feedback instant și o comunitate de elevi cu puncte, streak și provocări zilnice." />
+  <meta property="og:title" content="Atelierul-LRO — Limba și literatura română" />
+  <meta property="og:description" content="Lecții interactive, exerciții cu feedback instant și o comunitate vie pentru gimnaziu și liceu." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="src/shared/styles/main.css" />
+  <link rel="stylesheet" href="src/site/styles/news.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <section class="page-hero">
+      <h1>Stăpânește româna. De la gramatică la nota maximă.</h1>
+      <p class="page-hero__lead">
+        Lecții interactive, exerciții cu feedback și o comunitate care te împinge
+        înainte — pregătire temeinică pentru examen, olimpiadă și o exprimare impecabilă.
+      </p>
+
+      <div class="hero__actions">
+        <a class="btn btn--primary btn--hero" href="src/site/pages/lessons.html">Începe cu o lecție →</a>
+        <a class="btn btn--ghost" href="src/community/pages/spatiul-meu.html#forum">Aruncă un ochi în Atelier</a>
+      </div>
+
+      <div class="hero__stats">
+        <span class="hero__stat"><strong>6</strong> domenii</span>
+        <span class="hero__stat"><strong>zeci de</strong> exerciții</span>
+        <span class="hero__stat"><strong>comunitate</strong> activă</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="home-domains">
+        <div>
+          <h2>Lecții pe domenii</h2>
+          <div id="domain-cards" class="card-grid"></div>
+        </div>
+        <div id="leaderboard"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Noutăți</h2>
+      <div id="news-hub"></div>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "./src/shared/components/site-chrome.js";
+    import { renderDomainCards } from "./src/site/scripts/home.js";
+    import { renderLeaderboard } from "./src/site/scripts/leaderboard.js";
+    import { renderNews } from "./src/site/scripts/news-hub.js";
+    renderChrome(""); // root page: no prefix needed
+    renderDomainCards("");
+    renderLeaderboard();
+    renderNews();
+  </script>
+</body>
+</html>

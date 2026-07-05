@@ -1,0 +1,694 @@
+/* =========================================================
+   Home "Noutăți" section: useful links (left) + rotating cards
+   (right). Load AFTER shared/styles/main.css. A card tints its accents
+   via --card-color, set inline per card.
+   ========================================================= */
+
+/* Domain cards (left) + leaderboard (right), higher up the page. */
+.home-domains {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+.news {
+  display: grid;
+  grid-template-columns: minmax(170px, 210px) minmax(0, 1fr);
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+/* ---- Left: useful links (dexonline etc.) ---- */
+.news-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  position: sticky;
+  top: var(--sticky-top, 104px); /* clear the sticky header + XP bar */
+}
+
+.news-links__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 var(--space-xs);
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+.news-links__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--color-bg);
+  text-decoration: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.news-links__item:hover {
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg));
+  transform: translateX(2px);
+}
+
+.news-links__label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.news-links__note {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* ---- Middle: spotlight (one card at a time) ---- */
+.news-spotlight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.news-spotlight__slot {
+  min-height: 200px;
+  opacity: 1;
+  transition: opacity 0.18s ease;
+}
+
+.news-spotlight__slot.is-fading {
+  opacity: 0;
+}
+
+.news-spotlight__hint {
+  margin: 0;
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.news-spotlight__next {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.news-spotlight__next:hover {
+  text-decoration: underline;
+}
+
+.news-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.news-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* The changelog card stretches across the whole grid, like a footer. */
+.news-card--wide {
+  grid-column: 1 / -1;
+}
+
+/* Colored tag: icon + card name. */
+.news-card__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  margin-bottom: var(--space-sm);
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--card-color);
+  background: color-mix(in srgb, var(--card-color) 12%, var(--color-bg));
+}
+
+.news-card__icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.news-card__title {
+  margin: 0 0 var(--space-xs);
+  font-size: 1.1rem;
+}
+
+.news-card__pos {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.news-card__text {
+  margin: 0;
+  color: var(--color-text);
+  line-height: 1.55;
+}
+
+.news-card__quote {
+  margin: var(--space-sm) 0 0;
+  font-style: italic;
+  color: var(--color-text);
+}
+
+.news-card__quote--big {
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+
+.news-card__author {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-text-muted);
+}
+
+.news-card__link {
+  margin-top: var(--space-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--card-color);
+  text-decoration: none;
+}
+
+.news-card__link:hover {
+  text-decoration: underline;
+}
+
+/* Greșeala săptămânii: wrong/right rows + note. */
+.news-card__row {
+  margin: 0.2rem 0 0;
+  color: var(--color-text);
+}
+
+.news-card__mark {
+  font-weight: 700;
+}
+
+.news-card__mark--x { color: var(--color-danger); }
+.news-card__mark--ok { color: var(--color-success); }
+
+.news-card__note {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* Provocarea zilei: reveal button + hidden answer. */
+.news-card__reveal {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--card-color);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--card-color);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.news-card__reveal:hover {
+  background: color-mix(in srgb, var(--card-color) 10%, var(--color-bg));
+}
+
+.news-card__answer {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-sm);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--card-color) 8%, var(--color-bg));
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* Ce-i nou pe Atelier: bullet list with accent markers. */
+.news-card__newlist {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.news-card__new {
+  padding-left: 1.4rem;
+  position: relative;
+  color: var(--color-text);
+}
+
+.news-card__new::before {
+  content: "＋";
+  position: absolute;
+  left: 0;
+  color: var(--card-color);
+  font-weight: 700;
+}
+
+/* ---- Right: leaderboard ---- */
+.leaderboard {
+  position: sticky;
+  top: var(--sticky-top, 104px); /* clear the sticky header + XP bar */
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  /* A little slack at the bottom absorbs the hover "unfold" so the list can
+     extend without reflowing the page (the footer holds the bottom). */
+  display: flex;
+  flex-direction: column;
+  min-height: 32rem;
+}
+.leaderboard__foot { margin-top: auto; padding-top: var(--space-sm); }
+
+.leaderboard__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 var(--space-sm);
+  font-size: 1.05rem;
+}
+
+.lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lb-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.9rem auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.35rem;
+  border-radius: var(--radius);
+  /* Ranks 4→10 fade in one by one, and rest clearly fainter toward 10. */
+  opacity: calc(1 - var(--i, 0) * 0.11);
+  animation: lb-fade 0.5s ease both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+  transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+@keyframes lb-fade {
+  from { opacity: 0; transform: translateX(10px); }
+}
+.lb-row:hover {
+  background: var(--color-surface);
+  transform: translateX(3px);
+  opacity: 1; /* full clarity on hover, even for lower ranks */
+  z-index: 6; /* keep the status bubble above neighbouring rows */
+}
+/* On hover the ringed avatar enlarges (gifs are native 150px, so it stays
+   crisp) and the ring stays visible, pulsing "victoriously" the whole time. */
+.lb-ring { will-change: transform; }
+.lb-avatar { position: relative; }
+.lb-row:hover .lb-ring { z-index: 30; animation: lb-victory-row 0.8s ease-in-out infinite; }
+.lb-pod:hover .lb-ring { z-index: 30; animation: lb-victory-pod 0.8s ease-in-out infinite; }
+@keyframes lb-victory-row {
+  0%, 100% { transform: scale(1.55); box-shadow: 0 0 0 3px rgba(252, 211, 77, 0.45), 0 8px 18px -8px rgba(0, 0, 0, 0.35); }
+  50% { transform: scale(1.72); box-shadow: 0 0 0 6px rgba(252, 211, 77, 0.18), 0 10px 22px -8px rgba(0, 0, 0, 0.4); }
+}
+@keyframes lb-victory-pod {
+  0%, 100% { transform: translateY(-3px) scale(1.6); box-shadow: 0 0 0 3px rgba(252, 211, 77, 0.5), 0 12px 26px -8px rgba(0, 0, 0, 0.35); }
+  50% { transform: translateY(-6px) scale(1.78); box-shadow: 0 0 0 7px rgba(252, 211, 77, 0.22), 0 14px 30px -8px rgba(0, 0, 0, 0.4); }
+}
+/* The name slides right on hover to make room for the enlarged avatar. */
+.lb-name { transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1); }
+.lb-row:hover .lb-name { transform: translateX(0.7rem); }
+
+/* Status bubble (speech balloon) shown above the row on hover. */
+.lb-status {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 4px);
+  transform: translate(-50%, -2px);
+  width: max-content;
+  max-width: 210px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+  background: var(--color-text);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 7;
+}
+
+.lb-status::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--color-text);
+}
+
+.lb-row:hover .lb-status {
+  opacity: 1;
+  transform: translate(-50%, -6px);
+}
+
+.lb-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  gap: 1px;
+}
+.lb-rank__n { font-weight: 800; font-size: 0.92rem; color: var(--color-text-muted); }
+.lb-trend { font-size: 0.58rem; font-weight: 800; letter-spacing: -0.5px; }
+.lb-trend--up { color: #16a34a; }
+.lb-trend--down { color: #dc2626; }
+.lb-trend--same { color: var(--color-text-muted); opacity: 0.55; }
+
+/* Name + a detail line that unfolds on hover (level, streak, status). */
+.lb-main { min-width: 0; display: flex; flex-direction: column; }
+/* The status unfolds inline on hover; the container's bottom slack absorbs
+   the growth so the page never reflows. */
+.lb-detail {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  font-size: 0.72rem;
+  transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
+}
+.lb-row:hover .lb-detail { max-height: 1.7rem; opacity: 1; margin-top: 2px; }
+.lb-badge {
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.6rem;
+  border-radius: 999px;
+  padding: 0.06rem 0.42rem;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+.lb-streak { color: var(--color-accent); font-weight: 700; white-space: nowrap; }
+.lb-quote {
+  color: var(--color-text-muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-avatar {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--a, var(--color-primary));
+}
+.lb-avatar--gif {
+  background-color: #fff;
+  background-size: cover;
+  background-position: center;
+  color: transparent;
+  border: 1px solid var(--color-border);
+}
+
+.lb-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap; /* full name; the column is wide enough now */
+}
+
+.lb-points {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* Top 3 — gold / silver / bronze podium (winner centered + crowned) */
+.lb-podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  align-items: end;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0.9rem;
+}
+.lb-pod {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.lb-pod__crown { font-size: 1.1rem; line-height: 1; }
+.lb-pod--1 .lb-pod__crown { font-size: 1.55rem; }
+/* Level-styled ring around every avatar — same gradient as that user's
+   XP progress bar; higher levels flow, prestige users get a golden glow. */
+.lb-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  padding: 3px;
+  line-height: 0;
+  background: var(--ring, var(--color-primary));
+  background-size: 220% 220%;
+  transition: transform 0.15s ease;
+}
+.lb-ring .lb-avatar { border: 2px solid #fff; }
+
+/* Level + streak badges sit ON the ring (they scale with it on hover). */
+.lb-badge-lvl,
+.lb-badge-streak {
+  position: absolute;
+  z-index: 2;
+  line-height: 1.3;
+  font-weight: 800;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-bg);
+  white-space: nowrap;
+}
+.lb-badge-lvl {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 1rem;
+  padding: 0 0.24rem;
+  text-align: center;
+  color: #fff;
+  font-size: 0.56rem;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
+.lb-badge-streak {
+  top: -5px;
+  right: -6px;
+  padding: 0 0.22rem;
+  background: #fff5e6;
+  color: #b45309;
+  font-size: 0.54rem;
+}
+.lb-ring--flow { animation: lb-ring-flow 5s ease infinite; }
+@keyframes lb-ring-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.lb-ring--prestige { box-shadow: 0 0 0 1.5px #fcd34d, 0 3px 10px -3px rgba(245, 158, 11, 0.5); }
+
+/* Podium + list avatar sizes (the ring wraps the avatar) */
+.lb-pod .lb-avatar { width: 3rem; height: 3rem; }
+.lb-pod--1 .lb-avatar { width: 3.9rem; height: 3.9rem; }
+.lb-pod--1 .lb-ring { box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.28); }
+.lb-pod:hover .lb-ring { transform: translateY(-2px); }
+/* Crown / medals grow and lift on hover so they clear the name below. */
+.lb-pod__crown { transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1); transform-origin: center bottom; }
+.lb-pod:hover .lb-pod__crown { transform: translateY(-30px) scale(1.5); }
+.lb-row .lb-avatar { width: 2.15rem; height: 2.15rem; }
+.lb-pod__name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-pod__pts { font-size: 0.76rem; font-weight: 800; color: var(--color-primary); }
+.lb-pod .lb-badge { margin-top: 1px; }
+/* Winner gently floats; hover pauses it and unfolds the status quote. */
+.lb-pod--1 .lb-avatar { animation: lb-float 3s ease-in-out infinite; }
+.lb-pod--1:hover .lb-avatar { animation: none; }
+@keyframes lb-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.lb-pod__quote {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  text-align: center;
+  font-size: 0.64rem;
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+  transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
+}
+.lb-pod:hover .lb-pod__quote { max-height: 2.6rem; opacity: 1; margin-top: 2px; }
+.lb-pod__base {
+  margin-top: 0.15rem;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  border-radius: 8px 8px 0 0;
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.15);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.lb-pod--1 .lb-pod__base { height: 3rem; font-size: 1.3rem; background: linear-gradient(180deg, #fcd34d, #f59e0b); }
+.lb-pod--2 .lb-pod__base { height: 2.1rem; background: linear-gradient(180deg, #e5e7eb, #9ca3af); }
+.lb-pod--3 .lb-pod__base { height: 1.5rem; background: linear-gradient(180deg, #fdba74, #c2734a); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-row { animation: none; opacity: 1; }
+  .lb-ring--flow { animation: none; }
+  .lb-row:hover .lb-ring { animation: none; transform: scale(2.3); }
+  .lb-pod:hover .lb-ring { animation: none; transform: translateY(-3px) scale(1.6); }
+}
+
+.leaderboard__foot {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* =========================================================
+   Leaderboard — social & "magic" layer (aura, riser chip, applause)
+   ========================================================= */
+/* A soft animated aura behind each podium member — the top feels seen. */
+.lb-pod__aura {
+  position: absolute;
+  top: 0.4rem;
+  left: 50%;
+  width: 92px;
+  height: 92px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(245, 158, 11, 0.3), transparent 70%);
+  filter: blur(2px);
+  pointer-events: none;
+  animation: lb-aura 3.4s ease-in-out infinite;
+}
+.lb-pod--2 .lb-pod__aura { background: radial-gradient(closest-side, rgba(148, 163, 184, 0.32), transparent 70%); }
+.lb-pod--3 .lb-pod__aura { background: radial-gradient(closest-side, rgba(180, 83, 9, 0.26), transparent 70%); }
+@keyframes lb-aura {
+  0%, 100% { opacity: 0.65; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.12); }
+}
+
+/* "🚀 în formă" — the week's biggest climber. */
+.lb-riser {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #9a3412;
+  background: linear-gradient(135deg, #ffedd5, #fed7aa);
+  border: 1px solid #fdba74;
+  white-space: nowrap;
+  animation: lb-riser 2.8s ease-in-out infinite;
+}
+@keyframes lb-riser {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+/* 👏 applause — once per member per day. */
+.lb-clap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
+}
+.lb-clap:hover { border-color: var(--color-primary); color: var(--color-primary); transform: scale(1.06); }
+.lb-clap.is-done { border-color: #f59e0b; color: #b45309; background: #fffbeb; cursor: default; transform: none; }
+.lb-clap__float {
+  position: absolute;
+  left: 50%;
+  top: -0.2rem;
+  transform: translateX(-50%);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #b45309;
+  pointer-events: none;
+  animation: lb-clapfloat 0.85s ease forwards;
+}
+@keyframes lb-clapfloat {
+  from { opacity: 0; transform: translate(-50%, 4px) scale(0.7); }
+  25% { opacity: 1; }
+  to { opacity: 0; transform: translate(-50%, -18px) scale(1.1); }
+}
+.lb-row .lb-clap { flex: none; margin-right: 0.4rem; }
+
+/* Placeholder while GIFs are lazy-loading + list rendering deferral. */
+.lb-avatar[data-bg] { background: linear-gradient(135deg, #ede9fe, #e0f2fe); }
+.lb-list { content-visibility: auto; contain-intrinsic-size: 400px; }
+/* Aura animations run only once the board is on screen (.is-live). */
+.leaderboard:not(.is-live) .lb-pod__aura { animation: none; opacity: 0.5; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-pod__aura, .lb-riser { animation: none; }
+}
+
+/* Narrow screens: everything stacks to one column, full width. */
+@media (max-width: 900px) {
+  .home-domains,
+  .news {
+    grid-template-columns: 1fr;
+  }
+  .news-links {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .news-links__item {
+    flex: 1 1 45%;
+  }
+  .leaderboard {
+    position: static;
+  }
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Atelierul-LRO — Planner</title>
+  <link rel="stylesheet" href="../../../src/shared/styles/main.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <section class="page-hero">
+      <h1>Planificator meditații</h1>
+      <p>Acces restricționat: doar elevii selectați de profesor.</p>
+    </section>
+    <!-- TODO: access guard (teacher-granted), tutoring schedule view -->
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "../../../src/shared/components/site-chrome.js";
+    renderChrome("../../../");
+  </script>
+</body>
+</html>

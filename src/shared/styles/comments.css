@@ -1,0 +1,611 @@
+/* =========================================================
+   Threaded discussion — shared by lesson comments and forum posts (DRY).
+   The nesting is color-coded per depth (--c set inline) with a connector
+   line + avatar ring so it's obvious who replied to whom.
+   Load via main.css (after base/layout).
+   ========================================================= */
+
+/* Small buttons used across community + threads */
+.btn-mini {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 0.34rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.btn-mini:hover { background: var(--color-surface); border-color: var(--color-primary); }
+.btn-mini:active { transform: translateY(1px); }
+.btn-mini--ghost { border-color: transparent; background: transparent; color: var(--color-text-muted); }
+.btn-mini--ghost:hover { background: var(--color-surface); border-color: transparent; }
+
+.btn--sm { padding: 0.4rem 0.9rem; font-size: 0.9rem; border-radius: 999px; }
+
+/* ---------- Thread tree ---------- */
+.thr { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.thr__c {
+  --c: var(--color-primary);
+  position: relative;
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.thr__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  margin-top: 0.15rem; /* line the circle up with the name, not the box top */
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--a, var(--color-primary));
+  user-select: none;
+}
+.thr__avatar--ring {
+  box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--c);
+}
+.thr__avatar--gif {
+  background-color: #fff;
+  background-size: cover;
+  background-position: center;
+  color: transparent;
+  border: 1px solid var(--color-border);
+}
+
+/* Level ring + level/streak badges around a comment author's avatar
+   (same idea as the leaderboard, sized down for the thread). */
+.thr__avwrap {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  margin-top: 0.15rem;
+}
+.thr__lvlring {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  padding: 3px;
+  background: var(--ring, var(--color-primary));
+}
+.thr__lvlring .thr__avatar {
+  margin-top: 0;
+  border: 2px solid #fff;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.thr__badge-lvl,
+.thr__badge-streak {
+  position: absolute;
+  z-index: 2;
+  line-height: 1.25;
+  font-weight: 800;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-bg);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+.thr__badge-lvl {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 0.95rem;
+  padding: 0 0.2rem;
+  text-align: center;
+  color: #fff;
+  font-size: 0.52rem;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
+.thr__badge-streak {
+  top: -5px;
+  right: -7px;
+  padding: 0 0.18rem;
+  background: #fff5e6;
+  color: #b45309;
+  font-size: 0.5rem;
+}
+
+.thr__body {
+  flex: 1;
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 0.5rem 0.75rem;
+}
+
+.thr__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.15rem;
+}
+.thr__meta .thr__name { font-weight: 700; font-size: 0.92rem; }
+
+/* Clickable user name/avatar links — shared, so they also work in lesson-page
+   comments (where community.css isn't loaded). No underline; colour on hover. */
+.cx-userlink {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+}
+.cx-userlink:hover { color: var(--color-primary); text-decoration: none; }
+.cx-avlink { display: inline-flex; text-decoration: none; color: inherit; cursor: pointer; border-radius: 50%; transition: transform 0.18s ease; }
+.cx-avlink:hover { transform: scale(1.18); z-index: 2; }
+.cx-teacher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #6d28d9;
+  background: #ede9fe;
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  padding: 0.02rem 0.42rem;
+  vertical-align: middle;
+  white-space: nowrap;
+  user-select: none;
+}
+.thr__replyto {
+  font-size: 0.76rem;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  font-weight: 600;
+}
+.thr__time { font-size: 0.76rem; color: var(--color-text-muted); }
+.thr__text { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+
+.thr__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.thr__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.thr__act:hover { background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c); }
+.thr__act.is-liked { color: var(--color-danger); }
+/* Admin "mark correct" control */
+.thr__act--admin { border: 1px dashed var(--color-border); }
+.thr__act--admin:hover { background: color-mix(in srgb, var(--color-success) 14%, transparent); color: var(--color-success); border-color: var(--color-success); }
+.thr__act--admin.on { background: var(--color-success); color: #fff; border-color: var(--color-success); }
+/* "Delete comment" control (author's own; admin any) */
+.thr__act--del { border: 1px dashed var(--color-border); }
+.thr__act--del:hover { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: var(--color-danger); }
+/* "Report to the teacher" control (others' comments only) */
+.thr__act--report:hover { background: color-mix(in srgb, var(--color-danger) 10%, transparent); color: var(--color-danger); }
+.thr__act--reported { opacity: 0.6; cursor: default; }
+/* Inline warning when the language filter stops a reply/edit/comment */
+.thr__warn {
+  margin: 0.4rem 0 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: var(--color-danger);
+  font-size: 0.82rem;
+}
+
+/* =========================================================
+   Right-click menu on user names (user-menu.js, site-wide)
+   ========================================================= */
+.user-menu {
+  position: fixed;
+  z-index: 2147482600;
+  min-width: 13rem;
+  padding: 0.3rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.user-menu__item {
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.user-menu__item:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); }
+
+/* =========================================================
+   @mentions — autocomplete panel + rendered mention highlight
+   ========================================================= */
+.mentions {
+  position: fixed;
+  z-index: 2147482600;
+  min-width: 15rem;
+  max-width: 22rem;
+  padding: 0.3rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.mentions__opt {
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.mentions__opt:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); }
+.mentions__opt--off { opacity: 0.55; cursor: not-allowed; }
+.mentions__opt--off:hover { background: color-mix(in srgb, var(--color-danger) 8%, transparent); color: var(--color-text); }
+.mentions__why { display: block; font-size: 0.72rem; font-weight: 500; color: var(--color-danger); }
+
+/* A rendered @mention inside post/comment text. */
+.cx-mention {
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+  border-radius: 6px;
+  padding: 0 0.25rem;
+}
+/* Badge shown on a reply an admin has marked correct */
+.thr__correct {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 16%, var(--color-bg));
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+.thr__reacts { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.thr__chip {
+  font-size: 0.8rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+}
+/* Your own reaction — highlighted + removable on click. */
+.thr__chip.is-mine {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg));
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+}
+.thr__chip.is-mine:hover { border-color: var(--color-primary); }
+.thr__addreact {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 1px dashed var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  line-height: 1;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.thr__addreact:hover { border-color: var(--c); color: var(--c); transform: scale(1.08); }
+.thr__picker {
+  display: inline-flex;
+  gap: 0.15rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.15rem 0.3rem;
+  box-shadow: var(--shadow-sm);
+}
+.thr__emoji { border: none; background: transparent; font-size: 1rem; padding: 0.1rem 0.2rem; border-radius: 50%; transition: transform 0.1s ease; }
+.thr__emoji:hover { transform: scale(1.25); }
+
+.thr__input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  resize: vertical;
+  min-height: 2.4rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.thr__input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent); }
+
+.thr__edit { margin-top: 0.5rem; }
+.thr__reply { margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: flex-start; }
+.thr__reply .thr__avatar { margin-top: 0.15rem; }
+.thr__replybody { flex: 1; min-width: 0; }
+.thr__replyactions, .thr__editactions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+.thr__editnote { font-size: 0.74rem; color: var(--color-text-muted); }
+
+.thr__empty {
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 1rem;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+}
+
+/* Nested replies: indentation + a color-coded connector line */
+.thr__replies {
+  --c: var(--color-primary);
+  position: relative;
+  margin-top: 0.7rem;
+  margin-left: 1.05rem;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.thr__replies::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -0.3rem;
+  bottom: 1.1rem;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--c), color-mix(in srgb, var(--c) 20%, transparent));
+}
+/* Elbow connecting the line to each reply's avatar */
+.thr__elbow {
+  position: absolute;
+  left: -1.15rem;
+  top: 0.95rem;
+  width: 1.05rem;
+  height: 0.9rem;
+  border-left: 2px solid var(--c);
+  border-bottom: 2px solid var(--c);
+  border-bottom-left-radius: 10px;
+  opacity: 0.75;
+}
+
+/* ---------- Lesson comments wrapper ---------- */
+.comments { margin-top: var(--space-lg); }
+.comments__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.comments__demo { font-size: 0.78rem; color: var(--color-text-muted); }
+.comments__seg {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.comments__seg.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+.cmt-composer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0.9rem 0 1.3rem;
+}
+.cmt-composer .btn-mini { flex: none; }
+
+.cmt-guestbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  padding: 0.8rem 1rem;
+  margin: 0.9rem 0 1.3rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.comments__list { display: flex; flex-direction: column; gap: 0.9rem; }
+
+/* =========================================================
+   Shared UI primitives (used by community hub + lesson pages, DRY):
+   text inputs, labels, exercise "kind" pills and status tags.
+   ========================================================= */
+.cx-muted { color: var(--color-text-muted); }
+
+.cx-input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-bg);
+  resize: vertical;
+}
+.cx-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.cx-label { font-size: 0.82rem; font-weight: 700; color: var(--color-text-muted); margin-top: 0.3rem; }
+
+.cx-kinds { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.cx-kind {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.cx-kind:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.cx-kind.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+.cx-propose {
+  width: 100%;
+  border: 1.5px dashed var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  color: var(--color-primary);
+  border-radius: 18px;
+  padding: 0.9rem;
+  font-weight: 700;
+  transition: background 0.15s ease;
+}
+.cx-propose:hover { background: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+
+.cx-tag {
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-weight: 700;
+  font-size: 0.74rem;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+.cx-tag--choice { background: #dbeafe; color: #1d4ed8; }
+.cx-tag--fill { background: #dcfce7; color: #15803d; }
+.cx-tag--match { background: #ede9fe; color: #6d28d9; }
+/* Status tints mix with the page background → they adapt to dark mode
+   and to every palette automatically (no more frozen pastel chips). */
+.cx-tag--ok { background: color-mix(in srgb, var(--color-success) 16%, var(--color-bg)); color: var(--color-success); }
+.cx-tag--wait { background: color-mix(in srgb, var(--color-accent) 20%, var(--color-bg)); color: color-mix(in srgb, var(--color-accent) 60%, var(--color-text)); }
+.cx-tag--no { background: color-mix(in srgb, var(--color-danger) 14%, var(--color-bg)); color: var(--color-danger); }
+
+/* Approve / reject action buttons (admin) */
+.btn-mini--ok { border-color: #16a34a; color: #15803d; }
+.btn-mini--ok:hover { background: color-mix(in srgb, var(--color-success) 14%, var(--color-bg)); border-color: #16a34a; }
+.btn-mini--no { border-color: #dc2626; color: #b91c1c; }
+.btn-mini--no:hover { background: color-mix(in srgb, var(--color-danger) 12%, var(--color-bg)); border-color: #dc2626; }
+
+/* =========================================================
+   "Propose an exercise" block on lesson pages.
+   ========================================================= */
+.propose { margin-top: var(--space-lg); }
+.propose__lead { color: var(--color-text-muted); margin-top: -0.4rem; }
+.propose__invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  padding: 0.8rem 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+.propose__invite__btns { display: inline-flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+/* Own proposal — vote arrow replaced by an inert dash */
+.propose__up--own { opacity: 0.5; cursor: default; }
+/* Admin decision bar on a lesson-page proposal (approve/reject/delete). */
+.propose__admin { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin-top: 0.45rem; }
+
+/* Structured proposal fields (exercise-form.js — lesson + hub composers) */
+.exf__opt { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
+.exf__opt input[type="radio"] { flex: none; accent-color: var(--color-primary); width: 1.05rem; height: 1.05rem; cursor: pointer; }
+.exf__pair { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
+.exf__pair span { color: var(--color-text-muted); flex: none; }
+.propose__compose {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.propose__actions { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+.propose__list { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.4rem; margin-bottom: var(--space-md); }
+.propose__subh { font-size: 0.9rem; font-weight: 800; color: var(--color-text-muted); margin: var(--space-md) 0 0.2rem; }
+.propose__empty {
+  color: var(--color-text-muted);
+  padding: 1rem;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  text-align: center;
+}
+.propose__ex {
+  display: flex;
+  gap: 0.8rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  padding: 0.9rem 1rem;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.propose__ex:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+/* Published (approved) exercises get a subtle green accent + no vote column. */
+.propose__ex--pub { border-left: 3px solid #16a34a; }
+.propose__vote { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; flex: none; }
+.propose__up {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+.propose__up:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.propose__up.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.propose__exbody { min-width: 0; }
+.propose__prompt { margin: 0 0 0.4rem; line-height: 1.5; }
+.propose__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+.propose__by { color: var(--color-text-muted); }

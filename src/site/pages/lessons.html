@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Lecții — Atelierul-LRO</title>
+  <meta name="description" content="Toate lecțiile de limba română pe domenii: morfologie, sintaxă, vocabular, fonetică, redactare și lectură — cu exerciții interactive și progres salvat." />
+  <meta property="og:title" content="Lecții de limba română — Atelierul-LRO" />
+  <meta property="og:description" content="Morfologie, sintaxă, vocabular, fonetică, redactare și lectură — lecții interactive cu progres salvat." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="../../../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../../../src/site/styles/lesson.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <section class="page-hero">
+      <h1>Lecții</h1>
+      <p class="page-hero__lead">Alege un domeniu și începe. Fiecare lecție are teorie, exemple și exerciții interactive.</p>
+    </section>
+
+    <div id="lessons-hub"></div>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "../../../src/shared/components/site-chrome.js";
+    import { renderLessonsHub } from "../../../src/site/scripts/lessons-hub.js";
+    import { initFancyScroll } from "../../../src/site/scripts/fancy-scroll.js";
+    renderChrome("../../../");
+    renderLessonsHub("../../../");
+    initFancyScroll();
+  </script>
+</body>
+</html>

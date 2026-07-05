@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Pagina s-a rătăcit — Atelierul-LRO</title>
+  <meta name="description" content="Pagina căutată nu există. Melcul te duce înapoi." />
+  <link rel="stylesheet" href="src/shared/styles/main.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <section class="page-hero notfound">
+      <div id="notfound-mascot" aria-hidden="true"></div>
+      <h1>404 — pagina asta s-a rătăcit</h1>
+      <p>Melcul a căutat-o peste tot, dar în ritmul lui… încă n-a găsit-o. Între timp, hai înapoi pe drumul bun:</p>
+      <div class="notfound__actions">
+        <a class="btn btn--primary" href="index.html">Acasă</a>
+        <a class="btn btn--ghost" href="src/site/pages/lessons.html">Vezi lecțiile</a>
+        <a class="btn btn--ghost" href="src/community/pages/spatiul-meu.html#forum">Mergi la forum</a>
+      </div>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "./src/shared/components/site-chrome.js";
+    import { mascotSvg } from "./src/shared/scripts/mascot.js";
+    renderChrome("");
+    document.getElementById("notfound-mascot").innerHTML = mascotSvg("lost", 150);
+  </script>
+</body>
+</html>

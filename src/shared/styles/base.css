@@ -1,0 +1,141 @@
+/* =========================================================
+   Base / reset — global element defaults
+   Depends on variables.css (import it first).
+   ========================================================= */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: var(--font-size-base);
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary) transparent;
+}
+
+/* Modern global scrollbar (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 3px solid var(--color-surface); /* slim floating pill */
+  background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-dark);
+  background-clip: padding-box;
+}
+
+body {
+  font-family: var(--font-body);
+  line-height: var(--line-height-base);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+
+  /* SELECTABLE POLICY (Marius): nothing is selectable by default. The ONLY
+     selectable things are re-enabled below: the lessons' actual text, the
+     comments' text, the posts' text — plus form fields (typing needs it). */
+  user-select: none;
+  -webkit-user-select: none;
+
+  /* Sticky footer: fill at least the viewport height and stack
+     header / main / footer vertically. main grows to push the
+     footer to the bottom even when content is short. */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* The whitelist — everything else inherits `none` from body. The lesson
+   selector skips the comments/propose sections (they have their own rule:
+   only .thr__text, the comment's actual text, is selectable there). */
+input,
+textarea,
+[contenteditable],
+.post__text,
+.thr__text,
+.lesson-section:not(.comments):not(.propose) :is(p, li, td, blockquote) {
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* Sub-elements of selectable text (bold, links in a paragraph…) follow it. */
+.post__text *,
+.thr__text * {
+  user-select: inherit;
+  -webkit-user-select: inherit;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  line-height: 1.25;
+  margin-bottom: var(--space-md);
+  /* Titles are not meant to be selected (see also links/buttons). */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+p {
+  margin-bottom: var(--space-md);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  /* Links (and buttons below) are non-selectable by default. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Keyboard users always see where they are — one visible ring, everywhere.
+   (:focus-visible fires only for keyboard focus, so mouse clicks stay clean.) */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Pages breathe in instead of popping — subtle, modern, cheap. */
+@media (prefers-reduced-motion: no-preference) {
+  main {
+    animation: page-in 0.28s ease both;
+  }
+  @keyframes page-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
