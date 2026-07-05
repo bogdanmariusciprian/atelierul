@@ -15,7 +15,8 @@
     <section class="page-hero">
       <h1>Autentificare</h1>
       <p>Conectează-te pentru a participa în comunitate: postezi, comentezi, câștigi puncte și streak.</p>
-      <button id="google-signin" class="btn btn--primary">Continuă cu Google</button>
+      <div id="google-btn" class="google-btn"></div>
+      <button id="google-fallback" class="btn btn--primary" hidden>Continuă cu Google</button>
       <p id="login-note" class="login-note">Conectează-te cu contul tău Google.</p>
     </section>
   </main>
@@ -26,14 +27,12 @@
     import { renderChrome } from "../../src/shared/components/site-chrome.js";
     import { supabase } from "../../src/shared/scripts/supabase-client.js";
     import { signInWithGoogle } from "../../src/shared/scripts/auth.js";
+    import { mountGoogleSignIn } from "../../src/shared/scripts/google-onetap.js";
     renderChrome("../../");
 
-    const btn = document.getElementById("google-signin");
-
-    // Already signed in? Go straight to the community hub. This also fires
-    // right after Google sends the user back here, so login feels seamless.
+    // Already signed in? Straight to the community hub. Also fires right
+    // after a successful One Tap / Google sign-in, so login feels seamless.
     const goToHub = () => window.location.replace("../#forum");
-
     supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) goToHub();
     });
@@ -44,7 +43,18 @@
     if (session?.user) {
       goToHub();
     } else {
-      btn.addEventListener("click", () => signInWithGoogle());
+      // In-page Google login (official button + One Tap card). If Google's
+      // script can't load (adblock / offline), fall back to the classic
+      // redirect button so login always works.
+      mountGoogleSignIn(document.getElementById("google-btn"), {
+        oneTap: true,
+        onError: () => {
+          document.getElementById("google-btn").hidden = true;
+          const fb = document.getElementById("google-fallback");
+          fb.hidden = false;
+          fb.addEventListener("click", () => signInWithGoogle());
+        },
+      });
     }
   </script>
 </body>

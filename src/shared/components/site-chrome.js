@@ -29,6 +29,7 @@ import { MY_PROFILE, userById } from "../scripts/community-data.js";
 import { findProfanity } from "../scripts/moderation.js";
 import { showToast } from "../scripts/toast.js";
 import { CURRENT_USER } from "../scripts/session.js";
+import { supabase } from "../scripts/supabase-client.js";
 
 // Public navigation (visible to everyone). Labels are in Romanian
 // (UI language); code identifiers stay in English.
@@ -56,6 +57,7 @@ export function renderChrome(basePath = "") {
   initAdminFrame(); // pulsing page border while in the admin role
   initAdminQuickPanel(basePath); // floating 🛡️ toolbox on EVERY page (admin)
   initContactFloat(basePath); // floating ✉️ "Scrie profesorului" (non-admin)
+  initGuestOneTap(); // Google One Tap card for signed-out visitors (site-wide)
   initUserMenu(); // right-click on any user name → copy/open/copy-link
   renderHeader(basePath);
   renderPageBreadcrumbs(basePath); // "Acasă › Lecții › …" on deep pages
@@ -74,6 +76,27 @@ function initTheme() {
   const applyRoleClass = () => document.body.classList.toggle("is-logged", isLoggedIn());
   applyRoleClass();
   window.addEventListener("atelier:role", applyRoleClass);
+}
+
+/**
+ * Google One Tap for signed-out visitors — the small "Sign in with Google"
+ * card Google shows (top-right) so login can happen from ANY page without
+ * leaving it. The login page runs its own button + prompt, so we skip it
+ * here. On a successful sign-in we reload so member/admin gating refreshes.
+ */
+function initGuestOneTap() {
+  if (window.__oneTapOn) return;
+  if (isLoggedIn()) return; // already signed in — nothing to prompt
+  if (location.pathname.includes("/comunitate/login")) return; // login page owns it
+  window.__oneTapOn = true;
+
+  import("../scripts/google-onetap.js")
+    .then(({ mountGoogleSignIn }) => mountGoogleSignIn(null, { oneTap: true }))
+    .catch(() => {}); // Google's script blocked → simply no One Tap, no error
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" && session?.user) window.location.reload();
+  });
 }
 
 /**

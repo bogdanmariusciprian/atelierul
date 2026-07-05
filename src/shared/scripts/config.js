@@ -9,5 +9,11 @@
 export const SUPABASE_URL = "https://xfxfjxalovyutbtmjozd.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_jcWk0HEh5zCc2EzC0-ZdUA_Ze1aZm3Y";
 
+// Google OAuth client ID — PUBLIC (safe in the browser). Used by
+// Google One Tap / "Sign in with Google" (GIS). Same client as the
+// Supabase Google provider.
+export const GOOGLE_CLIENT_ID =
+  "587355094798-dkuo9avemtd1korg2lgeiev5906o4ct8.apps.googleusercontent.com";
+
 // App-wide constants.
 export const APP_NAME = "Atelierul-LRO";

@@ -4,6 +4,14 @@
    Uses only theme tokens (variables.css) so it follows palette/dark.
    ========================================================= */
 
+/* ---- Google Sign-In button container (login page) ---- */
+.google-btn {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  margin-block: var(--space-sm);
+}
+
 /* ---- Logout icon in the header nav (shown when signed in) ---- */
 .nav-logout {
   display: inline-grid;
