@@ -29,7 +29,6 @@ import { MY_PROFILE, userById } from "../scripts/community-data.js";
 import { findProfanity } from "../scripts/moderation.js";
 import { showToast } from "../scripts/toast.js";
 import { CURRENT_USER } from "../scripts/session.js";
-import { store } from "../scripts/store.js";
 
 // Public navigation (visible to everyone). Labels are in Romanian
 // (UI language); code identifiers stay in English.
@@ -64,79 +63,17 @@ export function renderChrome(basePath = "") {
 }
 
 // =========================================================
-// THEME SYSTEM — ONE button, SIX looks (Marius's rule): each click steps
-// through palette × light/dark:
-//   Electric ☀️ → Electric 🌙 → Apus ☀️ → Apus 🌙 → Arcade ☀️ → Arcade 🌙 → …
-// Persisted via store.js. On the FIRST visit (nothing chosen yet) the
-// light/dark half follows the OS setting.
+// THEME — the site has ONE look, "Arcade mentă" (light). It's the default
+// palette in variables.css, so there's no palette/dark switching and no
+// theme button. This only keeps the body.is-logged class in sync with the
+// session (CSS uses it to hide guest-only nav links).
 // =========================================================
-const THEME_STEPS = [
-  { palette: "electric", dark: false, label: "Violet electric · luminos", icon: "🎨" },
-  { palette: "electric", dark: true, label: "Violet electric · întunecat", icon: "🎨" },
-  { palette: "apus", dark: false, label: "Apus cald · luminos", icon: "🌅" },
-  { palette: "apus", dark: true, label: "Apus cald · întunecat", icon: "🌅" },
-  { palette: "arcade", dark: false, label: "Arcade mentă · luminos", icon: "🕹️" },
-  { palette: "arcade", dark: true, label: "Arcade mentă · întunecat", icon: "🕹️" },
-];
-
-function themeState() {
-  return {
-    palette: store.get("atelier_theme_palette", "electric"),
-    mode: store.get("atelier_theme_mode", "auto"),
-  };
-}
-
-/** The current position in the 6-step cycle (auto resolves via the OS). */
-function themeStepIndex() {
-  const { palette, mode } = themeState();
-  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const dark = mode === "dark" || (mode === "auto" && systemDark);
-  const i = THEME_STEPS.findIndex((s) => s.palette === palette && s.dark === dark);
-  return i === -1 ? 0 : i;
-}
-
-function applyTheme() {
-  const { palette, mode } = themeState();
-  const root = document.documentElement;
-  if (palette === "electric") root.removeAttribute("data-palette");
-  else root.setAttribute("data-palette", palette);
-  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const dark = mode === "dark" || (mode === "auto" && systemDark);
-  if (dark) root.setAttribute("data-mode", "dark");
-  else root.removeAttribute("data-mode");
-}
-
 function initTheme() {
   if (window.__themeOn) return;
   window.__themeOn = true;
-  applyTheme();
-  // Before the first explicit choice, follow the OS live.
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
-
-  // body.is-logged lets CSS react to the role (e.g. hide guest-only links).
   const applyRoleClass = () => document.body.classList.toggle("is-logged", isLoggedIn());
   applyRoleClass();
   window.addEventListener("atelier:role", applyRoleClass);
-}
-
-/** ONE theme button in the header nav — every click = the next look. */
-function initThemeControls(slot) {
-  if (!slot) return;
-  const build = () => {
-    const s = THEME_STEPS[themeStepIndex()];
-    slot.innerHTML = `
-      <button type="button" class="theme-btn" id="theme-cycle" title="Temă: ${s.label} — click pentru următoarea">${s.dark ? "🌙" : s.icon}</button>`;
-  };
-  slot.addEventListener("click", (e) => {
-    if (!e.target.closest("#theme-cycle")) return;
-    const next = THEME_STEPS[(themeStepIndex() + 1) % THEME_STEPS.length];
-    store.set("atelier_theme_palette", next.palette);
-    store.set("atelier_theme_mode", next.dark ? "dark" : "light");
-    applyTheme();
-    build();
-    showToast(`${next.dark ? "🌙" : next.icon} ${next.label}`);
-  });
-  build();
 }
 
 /**
@@ -529,9 +466,9 @@ function renderHeader(basePath) {
     // guest-only links are hidden via CSS once body.is-logged is set —
     // so the nav reacts live to the 🎭 role switch, no re-render needed.
     const cls = link.guestOnly ? ' class="nav-guest-only"' : "";
-    // Mark the link matching the current page so CSS can color it —
-    // resolved to an absolute path, so folder URLs compare exactly.
-    const href = basePath + link.href || "./"; // home from the root page
+    // Absolute paths from the domain root — robust with clean URLs and no
+    // longer dependent on how deep the current page is (basePath).
+    const href = "/" + link.href; // "Acasă" → "/", "despre/" → "/despre/", …
     const linkPath = new URL(href, window.location.href).pathname;
     const isActive = canonicalPath(linkPath) === herePath;
     const active = isActive ? ' aria-current="page"' : "";
@@ -544,12 +481,11 @@ function renderHeader(basePath) {
     <a class="skip-link" href="#continut">Sari la conținut</a>
     <header class="site-header">
       <div class="container site-header__inner">
-        <a class="site-header__brand" href="${basePath || "./"}">
+        <a class="site-header__brand" href="/">
           <img class="site-header__logo" src="${basePath}assets/logo/logo.png" alt="${APP_NAME}" />
         </a>
         <nav class="main-nav" aria-label="Primary">
           ${links}
-          <span class="theme-slot"></span>
           <span class="nav-user-slot"></span>
         </nav>
       </div>
@@ -559,7 +495,6 @@ function renderHeader(basePath) {
   const main = document.querySelector("main");
   if (main && !main.id) main.id = "continut";
 
-  initThemeControls(mount.querySelector(".theme-slot"));
   initNavUser(mount.querySelector(".nav-user-slot"), basePath);
   initNotifCenter(basePath);
 
@@ -609,7 +544,7 @@ function initNavUser(slot, basePath) {
 
   const build = () => {
     if (!isLoggedIn()) {
-      slot.innerHTML = `<a class="btn btn--primary nav-cta" href="${basePath}comunitate/login/">Intră în cont</a>`;
+      slot.innerHTML = `<a class="btn btn--primary nav-cta" href="/comunitate/login/">Intră în cont</a>`;
       return;
     }
     // MEMBERS live on the XP bar row (name + avatar there, one row with the
@@ -868,15 +803,15 @@ function renderFooter(basePath) {
         </div>
         <nav class="site-footer__col" aria-label="Navigare">
           <p class="site-footer__head">Navigare</p>
-          <a href="${basePath || "./"}">Acasă</a>
-          <a href="${basePath}despre/">Despre</a>
-          <a href="${basePath}lectii/">Lecții</a>
-          <a href="${basePath}comunitate/#forum">Atelier</a>
+          <a href="/">Acasă</a>
+          <a href="/despre/">Despre</a>
+          <a href="/lectii/">Lecții</a>
+          <a href="/comunitate/#forum">Atelier</a>
         </nav>
         <nav class="site-footer__col" aria-label="Legal">
           <p class="site-footer__head">Legal</p>
-          <a href="${basePath}termeni/">Termeni de utilizare</a>
-          <a href="${basePath}confidentialitate/">Confidențialitate</a>
+          <a href="/termeni/">Termeni de utilizare</a>
+          <a href="/confidentialitate/">Confidențialitate</a>
         </nav>
         <div class="site-footer__col">
           <p class="site-footer__head">Contact</p>
@@ -896,7 +831,7 @@ function renderFooter(basePath) {
       fab.click();
       fab.scrollIntoView({ block: "end", behavior: "smooth" });
     } else {
-      window.location.href = `${basePath}comunitate/#mesaje`;
+      window.location.href = "/comunitate/#mesaje";
     }
   });
 }
