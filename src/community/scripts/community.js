@@ -54,7 +54,7 @@ import { exerciseFormFields, readExerciseForm, exerciseEditFormHtml } from "../.
 import { touchStreak, getStreakInfo } from "../../shared/scripts/streak.js";
 import { store } from "../../shared/scripts/store.js";
 import { getNotes, addNote, updateNote, deleteNote } from "../../shared/scripts/notebook.js";
-import { MESSAGE_TEMPLATES, sendMessage, unreadMessages, conversationsFor, markConversationRead, searchTemplates } from "../../shared/scripts/messages.js";
+import { MESSAGE_TEMPLATES, sendMessage, unreadMessages, conversationsFor, markConversationRead, searchTemplates, templateStats } from "../../shared/scripts/messages.js";
 import { mascotSvg } from "../../shared/scripts/mascot.js";
 import { MAX_LEVEL, xpSkin, levelInfo, setPreview, xpBarMarkup, applyBar } from "../../shared/scripts/xp-bar.js";
 import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
@@ -1474,7 +1474,11 @@ export function renderCommunity(basePath = "") {
 
   // The template picker: search + category chips + grid; every pick lands
   // in the compose strip, so ONE message can chain several templates.
+  // Templates above your LEVEL show locked (🔒) — levelling up literally
+  // gives you more to say.
   function templatePicker() {
+    const level = levelInfo(MY_PROFILE.points).level;
+    const stats = templateStats(level);
     const q = state.msgQuery.trim();
     const catIdx = state.msgCat;
     const chips = [`<button type="button" class="cx-fchip${catIdx === -1 && !q ? " on" : ""}" data-action="msg-cat" data-i="-1">✨ Toate</button>`]
@@ -1482,20 +1486,23 @@ export function renderCommunity(basePath = "") {
         (c, i) => `<button type="button" class="cx-fchip${i === catIdx && !q ? " on" : ""}" data-action="msg-cat" data-i="${i}">${c.cat}</button>`
       ))
       .join("");
-    let items;
+    let items; // [{ t, lvl }]
     if (q) {
-      items = searchTemplates(q).map((h) => h.item);
+      items = searchTemplates(q);
       if (!items.length) items = null;
     } else if (catIdx === -1) {
-      items = MESSAGE_TEMPLATES.flatMap((c) => c.items.slice(0, 2)); // a taste of everything
+      items = MESSAGE_TEMPLATES.flatMap((c) => c.items.slice(0, 3)); // a taste of everything
     } else {
       items = MESSAGE_TEMPLATES[Math.min(catIdx, MESSAGE_TEMPLATES.length - 1)].items;
     }
+    const tpl = (i) =>
+      i.lvl > level
+        ? `<button type="button" class="cx-msgtpl cx-msgtpl--locked" data-action="msg-locked" data-lvl="${i.lvl}" title="Se deblochează la nivelul ${i.lvl}">🔒 ${escapeHtml(i.t)}<span class="cx-msgtpl__lvl">niv. ${i.lvl}</span></button>`
+        : `<button type="button" class="cx-msgtpl" data-action="msg-pick" data-text="${escapeHtml(i.t)}">${escapeHtml(i.t)}</button>`;
     const grid = items
-      ? `<div class="cx-msggrid">${items
-          .map((t) => `<button type="button" class="cx-msgtpl" data-action="msg-pick" data-text="${escapeHtml(t)}">${escapeHtml(t)}</button>`)
-          .join("")}</div>`
+      ? `<div class="cx-msggrid">${items.map(tpl).join("")}</div>`
       : `<p class="cx-muted">Niciun șablon nu se potrivește căutării. Încearcă alt cuvânt.</p>`;
+    const statsLine = `<p class="cx-msgstats">🧩 <b>${stats.unlocked}</b> din <b>${stats.total}</b> șabloane deblocate${stats.nextLvl ? ` · următoarele vin la <b>nivelul ${stats.nextLvl}</b>` : " · le ai pe toate! 🎉"}</p>`;
     const strip = state.msgParts.length
       ? `<div class="cx-compose">
            <p class="cx-compose__label">Mesajul tău (${state.msgParts.length}${state.msgParts.length >= MSG_MAX_PARTS ? " · maxim atins" : ""}):</p>
@@ -1508,6 +1515,7 @@ export function renderCommunity(basePath = "") {
       : `<p class="cx-muted cx-compose__hint">Apasă pe șabloane ca să-ți compui mesajul — poți înlănțui până la ${MSG_MAX_PARTS}.</p>`;
     return `
       <input class="cx-input cx-msgsearch" id="cx-msg-search" type="search" placeholder="🔍 Caută un șablon… (ex: „felicitări”, „test”, „ajutor”)" value="${escapeHtml(q)}" />
+      ${statsLine}
       <div class="cx-msgchips">${chips}</div>
       ${grid}
       ${strip}`;
@@ -3977,6 +3985,10 @@ export function renderCommunity(basePath = "") {
         state.msgCat = Number(btn.dataset.i);
         state.msgQuery = "";
         return render();
+      case "msg-locked":
+        // Locked template tapped: a nudge, not a wall — say HOW to get it.
+        showToast(`🔒 Se deblochează la nivelul ${btn.dataset.lvl} — adună puncte!`);
+        return;
       case "msg-pick": {
         if (state.msgParts.length >= MSG_MAX_PARTS) {
           showToast(`Maxim ${MSG_MAX_PARTS} șabloane într-un mesaj`, { kind: "warn" });
@@ -3997,6 +4009,14 @@ export function renderCommunity(basePath = "") {
         const toId = conv?.startsWith("u") ? Number(conv.slice(1)) : NaN;
         const target = userById(toId);
         if (!target || !state.msgParts.length) return;
+        // Defense in depth: every part must be UNLOCKED at my level too.
+        const myLevel = levelInfo(MY_PROFILE.points).level;
+        const locked = MESSAGE_TEMPLATES.flatMap((c) => c.items)
+          .some((i) => i.lvl > myLevel && state.msgParts.includes(i.t));
+        if (locked) {
+          showToast("🔒 Un șablon din mesaj nu e încă deblocat la nivelul tău.", { kind: "warn" });
+          return;
+        }
         const sent = sendMessage({
           fromId: CURRENT_USER.id,
           fromName: CURRENT_USER.name,

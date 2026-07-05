@@ -35,7 +35,8 @@ import { store } from "../scripts/store.js";
 // (UI language); code identifiers stay in English.
 // Logged-in users will get additional links, added later.
 const NAV_LINKS = [
-  { label: "Acasă", href: "index.html" },
+  // Home = the bare domain (atelierulderomana.ro), not …/index.html.
+  { label: "Acasă", href: "" },
   { label: "Despre", href: "despre/" },
   { label: "Lecții", href: "lectii/" },
   { label: "Teste", href: "teste/" },
@@ -373,7 +374,7 @@ function renderPageBreadcrumbs(basePath) {
   nav.setAttribute("aria-label", "Unde te afli");
   nav.innerHTML = `
     <div class="container page-crumbs__inner">
-      <a href="${basePath}index.html">Acasă</a>
+      <a href="${basePath || "./"}">Acasă</a>
       <span aria-hidden="true">›</span>
       <a href="${basePath}lectii/">Lecții</a>
       ${domain ? `<span aria-hidden="true">›</span><span class="page-crumbs__domain">${domain.label}</span>` : ""}
@@ -522,19 +523,20 @@ function renderHeader(basePath) {
     const cls = link.guestOnly ? ' class="nav-guest-only"' : "";
     // Mark the link matching the current page so CSS can color it —
     // resolved to an absolute path, so folder URLs compare exactly.
-    const linkPath = new URL(basePath + link.href, window.location.href).pathname;
+    const href = basePath + link.href || "./"; // home from the root page
+    const linkPath = new URL(href, window.location.href).pathname;
     const isActive = canonicalPath(linkPath) === herePath;
     const active = isActive ? ' aria-current="page"' : "";
     const title = link.title ? ` title="${link.title}"` : "";
     // data-label lets CSS reserve the bold width up front (no hover shift).
-    return `<a${cls}${active}${title} data-label="${link.label}" href="${basePath}${link.href}">${link.label}</a>`;
+    return `<a${cls}${active}${title} data-label="${link.label}" href="${href}">${link.label}</a>`;
   }).join("");
 
   mount.innerHTML = `
     <a class="skip-link" href="#continut">Sari la conținut</a>
     <header class="site-header">
       <div class="container site-header__inner">
-        <a class="site-header__brand" href="${basePath}index.html">
+        <a class="site-header__brand" href="${basePath || "./"}">
           <img class="site-header__logo" src="${basePath}assets/logo/logo.png" alt="${APP_NAME}" />
         </a>
         <nav class="main-nav" aria-label="Primary">
@@ -845,7 +847,7 @@ function renderFooter(basePath) {
         </div>
         <nav class="site-footer__col" aria-label="Navigare">
           <p class="site-footer__head">Navigare</p>
-          <a href="${basePath}index.html">Acasă</a>
+          <a href="${basePath || "./"}">Acasă</a>
           <a href="${basePath}despre/">Despre</a>
           <a href="${basePath}lectii/">Lecții</a>
           <a href="${basePath}comunitate/#forum">Atelier</a>

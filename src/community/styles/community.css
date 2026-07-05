@@ -2635,6 +2635,32 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
 
 .cx-chat__composer { border-top: 1px solid var(--color-border); padding-top: 0.6rem; margin-top: 0.5rem; }
 .cx-msgsearch { width: 100%; margin-bottom: 0.4rem; }
+.cx-msgstats {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+/* Locked templates: visible (they tease the grind) but clearly not yours
+   yet — a lock, lower contrast, and the unlock level as a mini-tag. */
+.cx-msgtpl--locked {
+  opacity: 0.55;
+  cursor: help;
+  border-style: dashed;
+  position: relative;
+}
+.cx-msgtpl--locked:hover { opacity: 0.75; }
+.cx-msgtpl__lvl {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  vertical-align: middle;
+}
 .cx-compose {
   margin-top: 0.5rem;
   border: 1px dashed color-mix(in srgb, var(--color-primary) 40%, var(--color-border));

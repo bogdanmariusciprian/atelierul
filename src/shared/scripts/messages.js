@@ -11,199 +11,51 @@
 // =========================================================
 import { store } from "./store.js";
 import { userById } from "./community-data.js";
+import { TEMPLATE_CATALOGUE } from "./message-templates.js";
 
 const KEY = "atelier_messages";
 
-// ---------- The template catalogue (member ↔ member vocabulary) ----------
-// A message can CHAIN several templates ("Salut! 👋" + "Vrei să învățăm
-// împreună azi?") — each part is validated against this catalogue, so the
-// whole message stays safe by construction.
-export const MESSAGE_TEMPLATES = [
-  {
-    cat: "👋 Salutări",
-    items: [
-      "Salut! 👋",
-      "Bună! Ce mai faci?",
-      "Hei, ce faci?",
-      "Mă bucur că ești online!",
-      "Bine ai revenit în Atelier!",
-      "Nu ne-am mai „văzut” de ceva vreme! 😊",
-      "Bună dimineața! Gata de lecții?",
-      "Bună seara! Mai înveți ceva azi?",
-    ],
-  },
-  {
-    cat: "📚 Studiu împreună",
-    items: [
-      "Vrei să învățăm împreună azi?",
-      "Facem un grup de studiu pentru test?",
-      "Îmi explici și mie lecția de azi, te rog?",
-      "Hai să rezolvăm împreună provocarea zilei!",
-      "Ai terminat lecția? Eu tocmai am marcat-o. 🏁",
-      "Ce lecție îmi recomanzi să fac azi?",
-      "Hai pe forum, e o discuție interesantă!",
-      "Ne vedem în grupul de studiu diseară?",
-      "Repetăm împreună la gramatică?",
-    ],
-  },
-  {
-    cat: "📖 Despre lecții",
-    items: [
-      "Lecția despre substantiv m-a lămurit total!",
-      "Cazurile îmi dădeau bătăi de cap — acum am înțeles!",
-      "Ai făcut lecția despre verb? E foarte bună.",
-      "Exercițiile de la finalul lecției sunt geniale.",
-      "Diftongul și triftongul nu mai au secrete pentru mine! 😎",
-      "Textul argumentativ e mai simplu decât credeam.",
-      "Am adăugat o grămadă de notițe în caiet azi.",
-      "Recomand lecția de vocabular — chiar ajută.",
-    ],
-  },
-  {
-    cat: "🧩 Exerciții",
-    items: [
-      "Ai rezolvat exercițiul propus de la lecție?",
-      "Am propus un exercițiu nou — vezi dacă îl prinzi! 🧩",
-      "Exercițiul tău a fost aprobat? Felicitări!",
-      "M-am blocat la un exercițiu… îmi dai un indiciu?",
-      "Exercițiul propus de tine mi-a plăcut mult!",
-      "Hai să vedem cine rezolvă mai multe exerciții azi!",
-    ],
-  },
-  {
-    cat: "🎉 Felicitări",
-    items: [
-      "Felicitări pentru streak! 🔥",
-      "Bravo pentru locul din clasament! 🏆",
-      "Super postarea ta de azi! 👏",
-      "Felicitări pentru exercițiul aprobat! ⭐",
-      "Se vede că ai muncit — respect!",
-      "Felicitări pentru insigna nouă! 🥇",
-      "Ai urcat în clasament — meriți!",
-      "Wow, ce nivel ai atins! 🚀",
-    ],
-  },
-  {
-    cat: "🙏 Mulțumiri",
-    items: [
-      "Mulțumesc pentru ajutor! 🙏",
-      "Mi-a fost foarte util răspunsul tău!",
-      "Mulțumesc pentru aplauze! 😊",
-      "Mersi că m-ai adăugat în grup!",
-      "Mulțumesc pentru sfat — a funcționat!",
-      "Ești un coleg de nota 10! 🌟",
-    ],
-  },
-  {
-    cat: "⚔️ Provocări",
-    items: [
-      "Te provoc la un duel de puncte săptămâna asta! ⚔️",
-      "Vezi că te ajung din urmă în clasament! 👀",
-      "Cine termină prima lecția de azi? 🏁",
-      "Pariu că iau mai multe puncte azi? 😄",
-      "Azi îmi apăr locul în clasament! 🛡️",
-      "Streak-ul meu îl întrece pe al tău! 🔥",
-      "Provocarea zilei în sub un minut — poți mai repede?",
-    ],
-  },
-  {
-    cat: "❓ Întrebări",
-    items: [
-      "Ai înțeles lecția de azi? Eu m-am blocat puțin.",
-      "Ce notă ai luat la ultimul test?",
-      "Cu ce lecție începi azi?",
-      "Care e trucul tău ca să ții minte regulile?",
-      "Cât timp înveți pe zi, de obicei?",
-      "Ce faci când nu-ți iese un exercițiu?",
-      "Tu cum te pregătești pentru examen?",
-      "Care e lecția ta preferată de până acum?",
-    ],
-  },
-  {
-    cat: "💬 Răspunsuri",
-    items: [
-      "Da, am înțeles — te pot ajuta eu!",
-      "Și eu m-am blocat acolo, hai să ne uităm împreună.",
-      "Încă n-am ajuns la ea, dar o fac azi.",
-      "Da! A fost mai ușor decât părea.",
-      "Nu pot acum, dar diseară te ajut sigur.",
-      "Mulțumesc de întrebare — mi-ai amintit că am de repetat!",
-      "Sigur, cu plăcere!",
-      "Da, hai! Sunt liber(ă) după ora 17.",
-      "Nu știu încă, dar aflu și îți zic.",
-      "Îmi pare rău, azi nu reușesc. Mâine?",
-    ],
-  },
-  {
-    cat: "📝 Teste & examene",
-    items: [
-      "Succes la test mâine!",
-      "Cum a fost testul?",
-      "Hai să repetăm împreună pentru examen!",
-      "Nu te stresa — ai muncit, o să fie bine! 💪",
-      "Eu la teste încep mereu cu subiectele ușoare.",
-      "După test, îmi zici cum a fost?",
-    ],
-  },
-  {
-    cat: "💪 Încurajări",
-    items: [
-      "Nu renunța, ești aproape!",
-      "Toți greșim la început — așa se învață.",
-      "Puțin câte puțin, în fiecare zi. Poți!",
-      "Ai progresat enorm în ultima vreme!",
-      "O lecție pe zi și nimeni nu te mai prinde! 🚀",
-      "Azi n-a mers? Mâine sigur merge.",
-    ],
-  },
-  {
-    cat: "🤝 Prietenie",
-    items: [
-      "Ți-am trimis o cerere de prietenie! 🤝",
-      "Mulțumesc că mi-ai acceptat cererea!",
-      "Mă bucur că suntem prieteni în Atelier!",
-      "Colegii ca tine fac comunitatea mai faină!",
-    ],
-  },
-  {
-    cat: "😅 Scuze",
-    items: [
-      "Scuze că răspund târziu!",
-      "Îmi pare rău, am uitat complet!",
-      "Scuze, ieri n-am mai apucat să intru.",
-      "N-am vrut să sune așa — pace? 🕊️",
-    ],
-  },
-  {
-    cat: "☀️ De încheiere",
-    items: [
-      "Ne auzim mai târziu!",
-      "Spor la învățat! 📚",
-      "O zi frumoasă! ☀️",
-      "Noapte bună! Mâine continuăm.",
-      "Pa! Mă întorc diseară.",
-      "Ne vedem în clasament! 😄",
-    ],
-  },
-];
+// ---------- The template catalogue ----------
+// The ~520 one-liners live in message-templates.js (28 categories).
+// About HALF of them UNLOCK at progress-bar levels — growing in level
+// literally gives you more to say. Normalized here to { t, lvl }.
+export const MESSAGE_TEMPLATES = TEMPLATE_CATALOGUE.map((c) => ({
+  cat: c.cat,
+  items: c.items.map((it) => (Array.isArray(it) ? { t: it[0], lvl: it[1] } : { t: it, lvl: 1 })),
+}));
 
-// One flat set of every template — validation of chained messages.
-const TEMPLATE_SET = new Set(MESSAGE_TEMPLATES.flatMap((c) => c.items));
+// One flat set of every template — SAFETY validation of chained messages.
+// (Locked templates are safe text too; the lock is gamification, enforced
+// in the UI + composer, not a security boundary.)
+const TEMPLATE_SET = new Set(MESSAGE_TEMPLATES.flatMap((c) => c.items.map((i) => i.t)));
 
 /** True if the text is exactly one of the safe templates. */
 export function isTemplate(text) {
   return TEMPLATE_SET.has(text);
 }
 
-/** Diacritics-insensitive template search → [{cat, item}]. */
+/** Catalogue numbers for a member level: how much is unlocked, and the
+ *  NEXT level that brings new templates (teasing the grind). */
+export function templateStats(level) {
+  let total = 0, unlocked = 0, nextLvl = null;
+  for (const c of MESSAGE_TEMPLATES)
+    for (const i of c.items) {
+      total++;
+      if (i.lvl <= level) unlocked++;
+      else if (nextLvl === null || i.lvl < nextLvl) nextLvl = i.lvl;
+    }
+  return { total, unlocked, nextLvl };
+}
+
+/** Diacritics-insensitive template search → [{cat, t, lvl}]. */
 export function searchTemplates(query) {
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const q = norm(query.trim());
   if (!q) return [];
   const hits = [];
   for (const c of MESSAGE_TEMPLATES)
-    for (const item of c.items)
-      if (norm(item).includes(q)) hits.push({ cat: c.cat, item });
+    for (const i of c.items)
+      if (norm(i.t).includes(q)) hits.push({ cat: c.cat, t: i.t, lvl: i.lvl });
   return hits;
 }
 
