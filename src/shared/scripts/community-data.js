@@ -66,9 +66,24 @@ export function avatarColor(id) {
   return AVATAR_COLORS[id % AVATAR_COLORS.length];
 }
 
-/** Look up a community user by id (for friend lists). */
+/** Runtime registry of REAL (Supabase) users, keyed by a client-side numeric
+ *  surrogate id, so the numeric-id render helpers resolve real users too.
+ *  Populated by the forum data layer (forum-repo.js). */
+const REAL_USERS = new Map();
+
+/** Register a real user so userById / userMeta / slugForUser resolve it. */
+export function registerRealUser(u) {
+  REAL_USERS.set(u.id, u);
+  let s = slugify(u.name) || `user-${u.id}`;
+  if (ID_BY_SLUG[s] !== undefined && ID_BY_SLUG[s] !== u.id) s = `${s}-${u.id}`;
+  SLUG_BY_ID[u.id] = s;
+  ID_BY_SLUG[s] = u.id;
+  return u.id;
+}
+
+/** Look up a community user by id — real users first, then seed users. */
 export function userById(id) {
-  return COMMUNITY_USERS.find((u) => u.id === id);
+  return REAL_USERS.get(id) || COMMUNITY_USERS.find((u) => u.id === id);
 }
 
 /** Mock weekly trend for a user (stable): did they rise/fall and by how

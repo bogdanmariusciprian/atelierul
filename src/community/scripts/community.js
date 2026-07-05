@@ -19,6 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
+import { fetchFeed, createPost } from "../../shared/scripts/forum-repo.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
 import {
@@ -192,7 +193,8 @@ export function renderCommunity(basePath = "") {
     section: location.hash.slice(1) || "forum",
     // ONE unified post list (Facebook model): the forum shows every public
     // post; "Pagina mea" is just the filter of your own. Sorted newest-first.
-    posts: [...FORUM_POSTS, ...myWallPosts()].sort((a, b) => b.createdAt - a.createdAt),
+    posts: [], // real posts load from Supabase (loadFeed) on first render
+    _feedLoaded: false,
     notes: getNotes(), // persistent notebook (store.js adapter)
     noteQuery: "",
     editingNote: null, // note id being edited
@@ -514,7 +516,10 @@ export function renderCommunity(basePath = "") {
   const userAvatar = (id, cls = "") => {
     if (id === CURRENT_USER.id) return meAvatar(cls);
     const u = userById(id) || {};
-    const inner = `<span class="cx-av cx-av--gif ${cls}" style="background-image:url('${basePath}${avatarForUser(id)}')" role="img" aria-label="${escapeHtml(u.name || "")}"></span>`;
+    // Real (Supabase) users have no gif → initials avatar in their colour.
+    const inner = u.real
+      ? `<span class="cx-av ${cls}" style="--a:${u.color || "#7c5cff"}">${escapeHtml(u.initials || "?")}</span>`
+      : `<span class="cx-av cx-av--gif ${cls}" style="background-image:url('${basePath}${avatarForUser(id)}')" role="img" aria-label="${escapeHtml(u.name || "")}"></span>`;
     return badged(id, inner);
   };
 
@@ -2902,7 +2907,21 @@ export function renderCommunity(basePath = "") {
   }
 
   let podiumCelebrated = false;
+  // Load the REAL forum feed once (on first paint), then re-render.
+  async function loadFeed() {
+    try {
+      state.posts = await fetchFeed();
+      render();
+    } catch (e) {
+      console.warn("feed:", e.message);
+    }
+  }
+
   function render() {
+    if (!state._feedLoaded) {
+      state._feedLoaded = true;
+      loadFeed();
+    }
     // Member-only sections don't exist for the teacher; guests get the
     // read-only subset (everything else lands on the public forum).
     if (isAdmin() && ADMIN_HIDDEN_SECTIONS.has(state.section)) state.section = "forum";
@@ -3237,6 +3256,14 @@ export function renderCommunity(basePath = "") {
           return render();
         }
         state.posts.unshift(post);
+        // REAL: persist to Supabase (raw composer text, not the escaped copy).
+        createPost({
+          type: post.type,
+          bg: post.bg,
+          audience: post.audience,
+          text: state.composer.text,
+          media: post.media,
+        });
         state.notice = null;
         notifyMentions(state.composer.text, "Într-o postare din forum");
         state.composer = freshComposer();
