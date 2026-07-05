@@ -25,43 +25,27 @@
   <script type="module">
     import { renderChrome } from "../../src/shared/components/site-chrome.js";
     import { supabase } from "../../src/shared/scripts/supabase-client.js";
-    import { signInWithGoogle, signOut } from "../../src/shared/scripts/auth.js";
+    import { signInWithGoogle } from "../../src/shared/scripts/auth.js";
     renderChrome("../../");
 
     const btn = document.getElementById("google-signin");
-    const note = document.getElementById("login-note");
 
-    // Reflect the REAL Supabase session. Shows the signed-in user after
-    // returning from Google, and offers sign-out. (Wiring the rest of the
-    // site to this real session is the next step.)
-    function render(user) {
-      if (user) {
-        const name =
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.email;
-        note.textContent = "Ești conectat ca " + name + " ✔";
-        btn.textContent = "Deconectează-te";
-        btn.onclick = async () => {
-          await signOut();
-          location.reload();
-        };
-      } else {
-        note.textContent = "Conectează-te cu contul tău Google.";
-        btn.textContent = "Continuă cu Google";
-        btn.onclick = () => signInWithGoogle();
-      }
-    }
+    // Already signed in? Go straight to the community hub. This also fires
+    // right after Google sends the user back here, so login feels seamless.
+    const goToHub = () => window.location.replace("../#forum");
 
-    // Fires on login/logout AND right after Google sends the user back.
-    supabase.auth.onAuthStateChange((_event, session) =>
-      render(session?.user ?? null)
-    );
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) goToHub();
+    });
 
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    render(session?.user ?? null);
+    if (session?.user) {
+      goToHub();
+    } else {
+      btn.addEventListener("click", () => signInWithGoogle());
+    }
   </script>
 </body>
 </html>

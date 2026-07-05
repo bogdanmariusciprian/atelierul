@@ -1,0 +1,121 @@
+/* =========================================================
+   Auth UI — the header logout icon + the "sign out?" confirm
+   dialog whose backdrop blurs the whole page behind it.
+   Uses only theme tokens (variables.css) so it follows palette/dark.
+   ========================================================= */
+
+/* ---- Logout icon in the header nav (shown when signed in) ---- */
+.nav-logout {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.nav-logout svg {
+  width: 20px;
+  height: 20px;
+}
+.nav-logout:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+  transform: translateY(-1px);
+}
+.nav-logout:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---- Confirmation modal ---- */
+.logout-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+}
+
+.logout-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 10, 24, 0.35);
+  backdrop-filter: blur(8px) saturate(110%);
+  -webkit-backdrop-filter: blur(8px) saturate(110%);
+  animation: logout-fade 0.18s ease-out;
+}
+
+.logout-modal__card {
+  position: relative;
+  width: min(380px, 100%);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) * 1.6);
+  box-shadow: var(--shadow-md), 0 24px 60px rgba(0, 0, 0, 0.25);
+  padding: var(--space-lg);
+  text-align: center;
+  animation: logout-pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.logout-modal__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--space-sm);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+}
+.logout-modal__icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.logout-modal__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.logout-modal__text {
+  margin: 0 0 var(--space-lg);
+  color: var(--color-text-muted);
+}
+
+.logout-modal__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
+}
+.logout-modal__actions .btn {
+  min-width: 120px;
+}
+
+@keyframes logout-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes logout-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* The page shouldn't scroll behind the open dialog. */
+body.has-modal {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logout-modal__backdrop,
+  .logout-modal__card {
+    animation: none;
+  }
+}

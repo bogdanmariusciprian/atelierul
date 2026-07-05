@@ -90,16 +90,21 @@
     import { renderCommunityStats } from "../../src/community/scripts/community-stats.js";
     import { initLandingInteractive } from "../../src/community/scripts/landing-interactive.js";
     import { initBenefits } from "../../src/community/scripts/benefits.js";
-    import { setLoggedIn } from "../../src/shared/scripts/session.js";
+    import { isLoggedIn } from "../../src/shared/scripts/session.js";
     renderChrome("../../");
     renderCommunityStats("community-stats", "../../");
     initBenefits("benefits");
     initLandingInteractive();
 
-    // Preview: "Intră în comunitate" logs you in (mock) so you land straight
-    // in the app as if you had an account. Remove once real auth is wired.
+    // "Intră în comunitate" → the hub if you're signed in, otherwise the
+    // real Google login page (no more mock sign-in).
     document.querySelectorAll('a[href="../"]').forEach((a) => {
-      a.addEventListener("click", () => setLoggedIn(true));
+      a.addEventListener("click", (e) => {
+        if (!isLoggedIn()) {
+          e.preventDefault();
+          window.location.href = "../login/";
+        }
+      });
     });
 
     // Reveal benefits & steps on scroll (CSS handles the animation).

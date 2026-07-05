@@ -1,63 +1,112 @@
 // =========================================================
-// Mock session (preview only). Real auth lives in auth.js (Supabase);
-// until that's wired, this fakes the current user + role so gated
-// features can be built and demoed.
+// Session — the REAL, signed-in user (Supabase auth).
 //
-// Three roles (per Marius): admin (him), member (logged in), guest.
-// A 3-state demo switch flips the role; it persists in localStorage.
-// Swap this module for real auth later — same tiny API.
+// Kept intentionally SYNCHRONOUS so the ~120 call sites that read
+// `CURRENT_USER`, `isAdmin()`, `isLoggedIn()` don't need to become async:
+//   • at module load we read the session straight from localStorage
+//     (supabase-js persists it there) — instant, good for the first paint;
+//   • onAuthStateChange then keeps everything correct (initial session,
+//     login, logout, silent token refresh) and fires "atelier:role" so the
+//     UI (header, XP bar, admin frame…) re-renders live.
+//
+// The role is DERIVED from the e-mail (never chosen by the client) and the
+// same rule is enforced server-side by Supabase RLS — this only drives UI.
 // =========================================================
+import { supabase } from "./supabase-client.js";
+import { SUPABASE_URL } from "./config.js";
 
-const KEY = "atelier_mock_role"; // "admin" | "member" | "guest"
-const LEGACY_KEY = "atelier_mock_logged"; // older 0/1 flag (kept in sync)
-
-/** The admin is Marius, recognised by this address once real auth exists. */
+/** The admin is Marius, recognised by this e-mail (the teacher). */
 export const ADMIN_EMAIL = "bogdanmariusciprian@gmail.com";
 
-/**
- * PRODUCTION RULE (wire this when Supabase auth lands, then DELETE the
- * demo switch + localStorage role below): the role is derived from the
- * authenticated Google account's email — never chosen by the client.
- *   ADMIN_EMAIL  → "admin" (the teacher)
- *   anything else→ "member"
- *   no session   → "guest"
- * The same rule must be enforced server-side (RLS / policies) — this
- * helper only drives the UI.
- */
+/** admin (the teacher) · member (any other signed-in user) · guest (none). */
 export function roleForEmail(email) {
   if (!email) return "guest";
   return email.trim().toLowerCase() === ADMIN_EMAIL ? "admin" : "member";
 }
 
-/** The current (fake) user. Replace with the real profile later. */
-export const CURRENT_USER = {
-  id: 0,
-  name: "Marius",
-  initials: "MA",
-  color: "#7c3aed",
-  email: ADMIN_EMAIL,
-};
+// ---------------------------------------------------------
+// Read the persisted Supabase session synchronously from localStorage.
+// supabase-js stores it under `sb-<project-ref>-auth-token` (occasionally
+// split into `.0`, `.1` chunks, or "base64-"-prefixed). Best-effort only:
+// onAuthStateChange below corrects anything this misses.
+// ---------------------------------------------------------
+const PROJECT_REF = new URL(SUPABASE_URL).hostname.split(".")[0];
+const STORAGE_KEY = `sb-${PROJECT_REF}-auth-token`;
 
-export const ROLES = ["admin", "member", "guest"];
-
-/** Current role. Defaults to "member" (logged-in, non-admin). */
-export function getRole() {
-  const r = localStorage.getItem(KEY);
-  if (r && ROLES.includes(r)) return r;
-  // Fall back to the legacy 0/1 flag if present.
-  if (localStorage.getItem(LEGACY_KEY) === "0") return "guest";
-  return "member";
+function readStoredRaw() {
+  try {
+    const direct = localStorage.getItem(STORAGE_KEY);
+    if (direct != null) return direct;
+    let out = "";
+    for (let i = 0; ; i++) {
+      const chunk = localStorage.getItem(`${STORAGE_KEY}.${i}`);
+      if (chunk == null) break;
+      out += chunk;
+    }
+    return out || null;
+  } catch {
+    return null;
+  }
 }
 
-export function setRole(role) {
-  if (!ROLES.includes(role)) return;
-  localStorage.setItem(KEY, role);
-  // Keep the legacy flag consistent for any code still reading it.
-  localStorage.setItem(LEGACY_KEY, role === "guest" ? "0" : "1");
-  // Let UI (e.g. the XP bar) react to role changes.
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("atelier:role", { detail: { role } }));
+function readStoredUser() {
+  try {
+    let raw = readStoredRaw();
+    if (!raw) return null;
+    if (raw.startsWith("base64-")) raw = atob(raw.slice(7));
+    const parsed = JSON.parse(raw);
+    const session = parsed?.currentSession ?? parsed;
+    const user = session?.user ?? parsed?.user ?? null;
+    return user?.email ? user : null;
+  } catch {
+    return null;
   }
+}
+
+function initialsOf(name) {
+  return (name || "")
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function nameOf(user) {
+  return (
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    (user?.email ? user.email.split("@")[0] : "Tu")
+  );
+}
+
+// The current user. A STABLE object (mutated in place, never reassigned) so
+// any module that captured the reference keeps seeing fresh values.
+// `id: 0` stays the sentinel for "me" while the community content is still
+// local mock; `authId` carries the real Supabase UUID for when it isn't.
+export const CURRENT_USER = {
+  id: 0,
+  authId: null,
+  name: "Tu",
+  initials: "TU",
+  color: "#7c3aed",
+  email: null,
+};
+
+// Module-level cache of the signed-in user (null = guest).
+let _user = readStoredUser();
+
+function syncCurrentUser() {
+  const name = _user ? nameOf(_user) : "Tu";
+  CURRENT_USER.authId = _user?.id ?? null;
+  CURRENT_USER.email = _user?.email ?? null;
+  CURRENT_USER.name = name;
+  CURRENT_USER.initials = _user ? initialsOf(name) : "TU";
+}
+syncCurrentUser();
+
+export function getRole() {
+  return _user ? roleForEmail(_user.email) : "guest";
 }
 
 export function isAdmin() {
@@ -69,7 +118,19 @@ export function isLoggedIn() {
   return getRole() !== "guest";
 }
 
-/** Back-compat with the old 2-state switch (member <-> guest). */
-export function setLoggedIn(on) {
-  setRole(on ? "member" : "guest");
+/** Sign the user out (used by the header logout). */
+export async function signOut() {
+  await supabase.auth.signOut();
 }
+
+// Keep the session fresh and tell the UI to re-render. Fires for
+// INITIAL_SESSION (client boot), SIGNED_IN, SIGNED_OUT and TOKEN_REFRESHED.
+supabase.auth.onAuthStateChange((_event, session) => {
+  _user = session?.user ?? null;
+  syncCurrentUser();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("atelier:role", { detail: { role: getRole() } })
+    );
+  }
+});

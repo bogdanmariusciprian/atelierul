@@ -23,7 +23,7 @@ import { initUserMenu } from "../scripts/user-menu.js";
 import { openModerationItems } from "../scripts/moderation.js";
 import { pendingExercises, pendingForLesson } from "../scripts/exercises-data.js";
 import { notifTotal, trayRequests, trayMessages, trayActivity, consumeTray, relTime } from "../scripts/notif.js";
-import { isLoggedIn, getRole, setRole } from "../scripts/session.js";
+import { isLoggedIn, signOut } from "../scripts/session.js";
 import { sendMessage } from "../scripts/messages.js";
 import { MY_PROFILE, userById } from "../scripts/community-data.js";
 import { findProfanity } from "../scripts/moderation.js";
@@ -57,7 +57,6 @@ export function renderChrome(basePath = "") {
   initAdminFrame(); // pulsing page border while in the admin role
   initAdminQuickPanel(basePath); // floating 🛡️ toolbox on EVERY page (admin)
   initContactFloat(basePath); // floating ✉️ "Scrie profesorului" (non-admin)
-  initRoleSwitcher(); // ONE discreet 🎭 preview switch (replaces in-page ones)
   initUserMenu(); // right-click on any user name → copy/open/copy-link
   renderHeader(basePath);
   renderPageBreadcrumbs(basePath); // "Acasă › Lecții › …" on deep pages
@@ -218,57 +217,66 @@ function initContactFloat(basePath) {
   window.addEventListener("atelier:role", apply);
 }
 
+// The "log out" glyph used by the header logout button (a door + arrow).
+const LOGOUT_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`;
+
 /**
- * The demo role preview (Admin / Logat / Vizitator) — ONE discreet 🎭
- * button, bottom-left, on every page. It replaces the old switches that
- * sat inside the sidebar / comments and made the site look under
- * construction. REMOVE together with session.js mock roles before
- * production — this is a preview-only affordance.
+ * "Sign out?" confirmation dialog — a centered card over a backdrop that
+ * blurs the whole page behind it. Escape / backdrop / "Anulează" dismiss;
+ * "Ieși din cont" calls Supabase signOut and returns home, cleanly logged
+ * out. Built on demand (only when the user clicks the logout icon).
  */
-function initRoleSwitcher() {
-  if (window.__roleSwitcherOn || typeof document === "undefined") return;
-  window.__roleSwitcherOn = true;
+function confirmLogout(basePath) {
+  if (document.querySelector(".logout-modal")) return;
 
-  const el = document.createElement("div");
-  el.className = "role-switch";
-  document.body.appendChild(el);
-
-  const LABELS = { admin: "Admin", member: "Logat", guest: "Vizitator" };
-  const build = (open) => {
-    const role = getRole();
-    const opts = Object.entries(LABELS)
-      .map(([r, label]) => `<button type="button" class="role-switch__opt${role === r ? " on" : ""}" data-role="${r}">${label}</button>`)
-      .join("");
-    el.innerHTML = `
-      <div class="role-switch__row">
-        <button type="button" class="role-switch__fab" title="Previzualizare rol (demo)" aria-expanded="${open}">🎭</button>
-        <span class="role-switch__now">${LABELS[role]}</span>
+  const overlay = document.createElement("div");
+  overlay.className = "logout-modal";
+  overlay.innerHTML = `
+    <div class="logout-modal__backdrop"></div>
+    <div class="logout-modal__card" role="dialog" aria-modal="true" aria-labelledby="logout-title">
+      <span class="logout-modal__icon">${LOGOUT_ICON}</span>
+      <p class="logout-modal__title" id="logout-title">Ieși din cont?</p>
+      <p class="logout-modal__text">Te vom deconecta de pe acest dispozitiv.</p>
+      <div class="logout-modal__actions">
+        <button type="button" class="btn btn--ghost" data-act="cancel">Anulează</button>
+        <button type="button" class="btn btn--primary" data-act="confirm">Ieși din cont</button>
       </div>
-      <div class="role-switch__panel" ${open ? "" : "hidden"}>
-        <span class="role-switch__title">rol demo</span>
-        ${opts}
-      </div>`;
-  };
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.classList.add("has-modal");
 
-  el.addEventListener("click", (e) => {
-    const opt = e.target.closest(".role-switch__opt");
-    if (opt) {
-      e.stopPropagation();
-      setRole(opt.dataset.role); // dispatches atelier:role — pages react live
-      build(false);
+  const close = () => {
+    overlay.remove();
+    document.body.classList.remove("has-modal");
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") close();
+  };
+  document.addEventListener("keydown", onKey);
+
+  overlay.addEventListener("click", async (e) => {
+    if (
+      e.target.classList.contains("logout-modal__backdrop") ||
+      e.target.closest("[data-act='cancel']")
+    ) {
+      close();
       return;
     }
-    if (e.target.closest(".role-switch__fab")) {
-      e.stopPropagation();
-      const isOpen = !el.querySelector(".role-switch__panel").hidden;
-      build(!isOpen);
+    const confirmBtn = e.target.closest("[data-act='confirm']");
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "Se iese…";
+      try {
+        await signOut();
+      } catch {
+        /* even if the network call fails, send them home */
+      }
+      window.location.href = basePath || "./";
     }
   });
-  document.addEventListener("click", (e) => {
-    if (!el.contains(e.target)) build(false);
-  });
 
-  build(false);
+  overlay.querySelector("[data-act='cancel']")?.focus();
 }
 
 /**
@@ -391,7 +399,7 @@ function renderPageBreadcrumbs(basePath) {
  * A gently pulsing border around the whole viewport (+ a small "MOD ADMIN"
  * tag) whenever the ADMIN role is active — on every page, so Marius always
  * knows which hat he's wearing. Follows role changes live via the
- * "atelier:role" event (dispatched by session.setRole). Purely visual;
+ * "atelier:role" event (dispatched by session.js on auth changes). Purely visual;
  * the real gating stays in the role checks.
  */
 function initAdminFrame() {
@@ -596,16 +604,19 @@ function initNavUser(slot, basePath) {
   if (!slot) return;
   const HUB = `${basePath}comunitate/`;
 
+  // The logout icon — same on every page for anyone signed in.
+  const logoutBtn = `<button type="button" class="nav-logout" id="nav-logout" title="Ieși din cont" aria-label="Ieși din cont">${LOGOUT_ICON}</button>`;
+
   const build = () => {
     if (!isLoggedIn()) {
       slot.innerHTML = `<a class="btn btn--primary nav-cta" href="${basePath}comunitate/login/">Intră în cont</a>`;
       return;
     }
     // MEMBERS live on the XP bar row (name + avatar there, one row with the
-    // progress — see xp-bar.js); the nav stays clean. The ADMIN has no XP
-    // bar, so his identity chip stays here.
+    // progress — see xp-bar.js); the nav stays clean apart from logout. The
+    // ADMIN has no XP bar, so his identity chip stays here.
     if (!isAdmin()) {
-      slot.innerHTML = "";
+      slot.innerHTML = logoutBtn;
       return;
     }
     const avatar = MY_PROFILE.avatar
@@ -620,8 +631,18 @@ function initNavUser(slot, basePath) {
           <span class="nav-user__meta">🎓 Profesor</span>
         </span>
         ${total ? `<b class="nav-user__badge">${total}</b>` : ""}
-      </button>`;
+      </button>
+      ${logoutBtn}`;
   };
+
+  // The logout icon opens the confirm dialog (delegated: the slot is rebuilt
+  // on role/notif changes, so we listen on the stable slot element).
+  slot.addEventListener("click", (e) => {
+    if (e.target.closest("#nav-logout")) {
+      e.preventDefault();
+      confirmLogout(basePath);
+    }
+  });
 
   build();
   window.addEventListener("atelier:role", build);
