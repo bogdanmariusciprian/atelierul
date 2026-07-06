@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
@@ -475,15 +475,20 @@ export function renderCommunity(basePath = "") {
   }
   function reportComment(c) {
     if (c.reportedByMe) return;
-    c.reportedByMe = true;
-    queueReport({
-      targetType: "comment",
-      targetId: c.id,
-      authorId: c.authorId,
-      name: c.name,
-      snippet: String(c.text).slice(0, 120),
-      reporterId: CURRENT_USER.id,
-      reporterName: CURRENT_USER.name,
+    confirmDialog("Comentariul va fi trimis profesorului spre verificare.", { title: "Raportezi comentariul?", okLabel: "Raportează" }).then((ok) => {
+      if (!ok) return;
+      c.reportedByMe = true;
+      queueReport({
+        targetType: "comment",
+        targetId: c.id,
+        authorId: c.authorId,
+        name: c.name,
+        snippet: String(c.text).slice(0, 120),
+        reporterId: CURRENT_USER.id,
+        reporterName: CURRENT_USER.name,
+      });
+      showToast("⚑ Semnalat — profesorul va arunca o privire", { kind: "success" });
+      render();
     });
   }
 
@@ -676,9 +681,11 @@ export function renderCommunity(basePath = "") {
         ...g,
         // The teacher's sidebar hides the member-only, gamified sections;
         // a guest's shows only what guests may open.
-        items: g.items.filter((i) =>
-          guest ? GUEST_SECTIONS.has(i.id) && i.id !== "profil" : !isAdmin() || !ADMIN_HIDDEN_SECTIONS.has(i.id)
-        ),
+        items: g.items.filter((i) => {
+          // "Evenimente" shows only for the teacher or members granted access.
+          if (i.id === "evenimente" && !isAdmin() && !MY_PROFILE.eventsAccess) return false;
+          return guest ? GUEST_SECTIONS.has(i.id) && i.id !== "profil" : !isAdmin() || !ADMIN_HIDDEN_SECTIONS.has(i.id);
+        }),
       })).filter((g) => g.items.length),
       ...(isAdmin() ? [{ title: "Administrare", items: [{ id: "admin", label: "Panou admin" }] }] : []),
     ];
@@ -2913,6 +2920,7 @@ export function renderCommunity(basePath = "") {
     try {
       state.posts = await fetchFeed();
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
+      MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
       render();
     } catch (e) {
       console.warn("feed:", e.message);
@@ -3426,12 +3434,16 @@ export function renderCommunity(basePath = "") {
       }
       case "post-report": {
         const p = findPost(id);
-        if (p) {
-          reportPost(p);
-          showToast("⚑ Semnalat — profesorul va arunca o privire", { kind: "success" });
-        }
+        if (!p) return;
         state.postMenu = null;
-        return render();
+        confirmDialog("Postarea va fi trimisă profesorului spre verificare.", { title: "Raportezi postarea?", okLabel: "Raportează" }).then((ok) => {
+          if (ok) {
+            reportPost(p);
+            showToast("⚑ Semnalat — profesorul va arunca o privire", { kind: "success" });
+          }
+          render();
+        });
+        return;
       }
 
       // ---- image lightbox ----

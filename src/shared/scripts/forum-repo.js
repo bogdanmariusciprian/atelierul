@@ -326,6 +326,17 @@ export async function toggleCommentLike(commentSurrogate, liked) {
   }
 }
 
+/** Whether the current user has been granted Events access by the teacher. */
+export async function fetchMyEventsAccess() {
+  if (!CURRENT_USER.authId) return false;
+  const { data } = await supabase
+    .from("event_access")
+    .select("user_id")
+    .eq("user_id", CURRENT_USER.authId)
+    .maybeSingle();
+  return !!data;
+}
+
 export async function toggleCommentReaction(commentSurrogate, emoji, added) {
   const cid = commentUuidBySurr.get(commentSurrogate);
   if (!cid || !CURRENT_USER.authId) return;
