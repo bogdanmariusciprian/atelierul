@@ -505,7 +505,9 @@ export function renderCommunity(basePath = "") {
   const isUserOnline = (id) =>
     id === CURRENT_USER.id ? true : isOnlineSince((userById(id) || {}).lastSeen);
   const presenceDot = (id) =>
-    `<span class="cx-presence${isUserOnline(id) ? " is-on" : ""}" title="${isUserOnline(id) ? "activ acum" : "offline"}" aria-hidden="true"></span>`;
+    isProfessor(id)
+      ? "" // the teacher isn't part of presence — no online/offline dot
+      : `<span class="cx-presence${isUserOnline(id) ? " is-on" : ""}" title="${isUserOnline(id) ? "activ acum" : "offline"}" aria-hidden="true"></span>`;
 
   const badged = (id, inner) => {
     // The teacher wears no level ring / badges — he's not in the game.
@@ -1059,7 +1061,7 @@ export function renderCommunity(basePath = "") {
              userHref: (c) => userProfileHref(c.authorId),
              isProfessor: (authorId) => isProfessor(authorId),
              onReport: isLoggedIn() ? reportComment : undefined,
-             isOnline: (authorId) => isUserOnline(authorId),
+             isOnline: (authorId) => (isProfessor(authorId) ? null : isUserOnline(authorId)),
              decorateText: (t) => highlightQuery(decorateText(t)),
            })}
          </div>`
