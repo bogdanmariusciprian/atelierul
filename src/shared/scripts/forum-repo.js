@@ -84,6 +84,7 @@ function mapPost(row) {
     type: row.type,
     bg: row.background || "none",
     audience: row.audience || "public",
+    surface: row.surface || "forum",
     text: esc(row.body || ""),
     media: row.media || null,
     edited: !!row.edited_at,
@@ -123,15 +124,16 @@ function mapCommentRow(row, childrenByParent, commentByUuid) {
 
 /** Recent forum posts (newest first) WITH comments, likes, reactions and the
  *  current user's saved/liked state. RLS decides visibility. */
-export async function fetchFeed({ limit = 40 } = {}) {
+export async function fetchFeed({ limit = 40, surface = "forum" } = {}) {
   const myUuid = CURRENT_USER.authId;
 
   const { data: postRows, error } = await supabase
     .from("posts")
     .select(
-      "id, author_id, body, type, background, audience, share_of, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, points)"
+      "id, author_id, body, type, background, audience, share_of, surface, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, points)"
     )
     .eq("moderation_status", "visible")
+    .eq("surface", surface)
     .is("share_of", null)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -238,7 +240,7 @@ export async function fetchFeed({ limit = 40 } = {}) {
 // Writes. All fire-and-forget from the hub (optimistic UI already updated).
 // supabase-js returns { error } instead of throwing, so no unhandled rejects.
 // ---------------------------------------------------------
-export async function createPost({ type, bg, audience, text, media }) {
+export async function createPost({ type, bg, audience, text, media, surface }) {
   const { data, error } = await supabase
     .from("posts")
     .insert({
@@ -247,6 +249,7 @@ export async function createPost({ type, bg, audience, text, media }) {
       type: type || "discutie",
       background: bg || "none",
       audience: audience || "public",
+      surface: surface === "wall" ? "wall" : "forum",
       media: media ?? null,
     })
     .select("id")

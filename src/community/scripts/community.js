@@ -316,7 +316,7 @@ export function renderCommunity(basePath = "") {
 
   // A user's wall = their posts from the unified feed that I may see.
   // Group posts stay INSIDE their group (they never leak onto walls).
-  const wallPostsOf = (id) => state.posts.filter((p) => p.authorId === id && canSeePost(p));
+  const wallPostsOf = (id) => state.posts.filter((p) => p.authorId === id && p.surface === "wall" && canSeePost(p));
 
   // Remove a post from wherever it lives; reshares of it disappear too
   // (a share without its original is meaningless).
@@ -448,6 +448,7 @@ export function renderCommunity(basePath = "") {
         sharedByMe: false,
         followed: false,
         comments: [],
+        surface: "forum",
         shareOf: p.id,
       });
       showToast("↪ Redistribuit — postarea apare acum pe Pagina ta", { kind: "success" });
@@ -896,7 +897,9 @@ export function renderCommunity(basePath = "") {
     const im = p?.media?.images?.[state.lightbox.i];
     if (!p || !im) return "";
     const real = !!im.src;
-    const canShare = !p.shareOf && !p.inGroup && p.audience !== "friends";
+    // Resharing is off until the author-consent flow (needs notifications):
+    // a post can't be pushed to the forum without its author's approval.
+    const canShare = false;
     const visual = real
       ? `style="background-image:url('${im.src}')"`
       : `style="background:${im.gradient}"`;
@@ -1114,7 +1117,7 @@ export function renderCommunity(basePath = "") {
   // Search covers the post text, the author AND the comments underneath.
   function visibleForumPosts() {
     const q = state.feedQuery.trim().toLowerCase();
-    let list = state.posts.filter(canSeePost);
+    let list = state.posts.filter((p) => p.surface === "forum" && canSeePost(p));
     if (state.feedType !== "all") list = list.filter((p) => p.type === state.feedType);
     if (q)
       list = list.filter(
@@ -1145,7 +1148,7 @@ export function renderCommunity(basePath = "") {
   function sectionForum() {
     // Spotlight only over posts everyone can actually see (a friends-only
     // post must never be quoted publicly) and never over reshares.
-    const spot = topPost(state.posts.filter((p) => canSeePost(p) && !p.shareOf && p.audience === "public"));
+    const spot = topPost(state.posts.filter((p) => p.surface === "forum" && canSeePost(p) && !p.shareOf && p.audience === "public"));
     const st = spot
       ? `<div class="cx-spotlight">
            <span class="cx-spotlight__badge">⭐ Postarea săptămânii</span>
@@ -1188,7 +1191,7 @@ export function renderCommunity(basePath = "") {
       ? mine.map(postCard).join("")
       : emptyState("Nicio postare încă", "Ce ai învățat azi? Spune-le prietenilor tăi.");
     return `
-      ${sectionHead("Pagina mea", "Peretele tău personal — postările tale, într-un singur loc. Ce publici aici apare și în forum.")}
+      ${sectionHead("Pagina mea", "Peretele tău personal. Ce publici aici NU apare în forum — rămâne pe pagina ta, vizibil publicului sau doar prietenilor, cum alegi.")}
       ${composer()}
       ${composerNotice()}
       <div class="cx-feed">${feed}</div>`;
@@ -2918,7 +2921,9 @@ export function renderCommunity(basePath = "") {
   // Load the REAL forum feed once (on first paint), then re-render.
   async function loadFeed() {
     try {
-      state.posts = await fetchFeed();
+      const forumPosts = await fetchFeed({ surface: "forum" });
+      const wallPosts = await fetchFeed({ surface: "wall" });
+      state.posts = [...forumPosts, ...wallPosts];
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
       MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
       const fr = await fetchMyFriends(); // real friend graph
@@ -3021,6 +3026,8 @@ export function renderCommunity(basePath = "") {
       type: c.type,
       bg: c.bg,
       audience: c.audience || "public",
+      // Where you post decides the surface: your page → wall, else the forum.
+      surface: state.section === "pagina-mea" ? "wall" : "forum",
       text: escapeHtml(text),
       media: c.media,
       likes: 0,
@@ -3315,6 +3322,7 @@ export function renderCommunity(basePath = "") {
           audience: post.audience,
           text: state.composer.text,
           media: post.media,
+          surface: post.surface,
         }).then((row) => {
           if (row) mapPostSurrogate(post.id, row.id);
         });
