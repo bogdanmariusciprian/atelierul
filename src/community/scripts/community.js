@@ -561,8 +561,11 @@ export function renderCommunity(basePath = "") {
   // The teacher/admin account. Their name & avatar are shown with a
   // "Profesor" tag and are NOT clickable — students must never be routed to
   // an admin surface. (Real role check still happens in the handlers.)
-  const PROFESSOR_ID = CURRENT_USER.id; // the admin is the teacher (id 0)
-  const isProfessor = (id) => id === PROFESSOR_ID;
+  // The professor = the ADMIN (by role), NOT "whoever is logged in". For me
+  // (id 0) that's only true when I'm the admin; for other users it's their
+  // real role. (Fixes a regular member showing up tagged "Profesor".)
+  const isProfessor = (id) =>
+    id === CURRENT_USER.id ? isAdmin() : (userById(id) || {}).role === "admin";
   const teacherTag = `<span class="cx-teacher" title="Profesor · cadru didactic">🎓 Profesor</span>`;
 
   // A user still exists (0 = me/professor; otherwise must be in the user
@@ -1054,8 +1057,9 @@ export function renderCommunity(basePath = "") {
              avatarUrl: (c) => avatarUrlFor(c.authorId),
              userMeta: (c) => (isAdmin() && c.authorId === CURRENT_USER.id ? null : userMeta(c.authorId)),
              userHref: (c) => userProfileHref(c.authorId),
-             professorId: PROFESSOR_ID,
+             isProfessor: (authorId) => isProfessor(authorId),
              onReport: isLoggedIn() ? reportComment : undefined,
+             isOnline: (authorId) => isUserOnline(authorId),
              decorateText: (t) => highlightQuery(decorateText(t)),
            })}
          </div>`

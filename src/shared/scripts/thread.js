@@ -192,11 +192,15 @@ function commentHtml(c, depth, parentName, state, user, opts) {
   // The caller provides a profile URL per author via opts.userHref (null =
   // not linkable). The professor (teacher/admin) is never linkable and wears
   // a "Profesor" tag. Real links, so they work on any page (community + lessons).
-  const isProf = opts.professorId != null && c.authorId === opts.professorId;
+  const isProf = opts.isProfessor
+    ? opts.isProfessor(c.authorId)
+    : opts.professorId != null && c.authorId === opts.professorId;
+  const online = opts.isOnline ? opts.isOnline(c.authorId) : null;
+  const dot = online === null ? "" : `<span class="thr__presence${online ? " is-on" : ""}" aria-hidden="true"></span>`;
   const href = !isProf && opts.userHref ? opts.userHref(c) : null;
   const avatarBlock = href
-    ? `<a class="cx-avlink" href="${href}" title="Vezi profilul">${avatarInner}</a>`
-    : avatarInner;
+    ? `<a class="cx-avlink thr__avpos" href="${href}" title="Vezi profilul">${avatarInner}${dot}</a>`
+    : `<span class="thr__avpos">${avatarInner}${dot}</span>`;
   const teacherTag = isProf ? ` <span class="cx-teacher" title="Profesor · cadru didactic">🎓 Profesor</span>` : "";
   const nameBlock = href
     ? `<a class="thr__name cx-userlink" href="${href}">${escapeHtml(c.name)}</a>`

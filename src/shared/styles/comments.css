@@ -34,6 +34,15 @@
   align-items: flex-start;
 }
 
+/* Presence dot on a comment author's avatar (green = active, red = offline). */
+.thr__avpos { position: relative; display: inline-grid; place-items: center; flex: none; }
+.thr__presence {
+  position: absolute; left: 0; top: 0; z-index: 3;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #ef4444; border: 2px solid var(--color-bg);
+}
+.thr__presence.is-on { background: #22c55e; }
+
 .thr__avatar {
   flex: none;
   display: grid;
