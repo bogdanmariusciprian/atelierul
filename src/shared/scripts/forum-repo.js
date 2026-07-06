@@ -46,12 +46,13 @@ function surrogateForAuthor(profile) {
   const sid = ++_userSurrogate;
   userSurrByUuid.set(profile.id, sid);
   userUuidBySurr.set(sid, profile.id);
+  const isAdminUser = profile.role === "admin";
   registerRealUser({
     id: sid,
     real: true,
     avatar: null,
-    name: profile.display_name || "Membru",
-    initials: initialsOf(profile.display_name || "Membru"),
+    name: isAdminUser ? "Profesor" : profile.display_name || "Membru",
+    initials: isAdminUser ? "🎓" : initialsOf(profile.display_name || "Membru"),
     color: profile.avatar_color || "#7c5cff",
     points: profile.points || 0,
     streak: 0,

@@ -97,11 +97,14 @@ export const CURRENT_USER = {
 let _user = readStoredUser();
 
 function syncCurrentUser() {
-  const name = _user ? nameOf(_user) : "Tu";
+  // The teacher (admin) is shown ONLY as "Profesor" everywhere — never by
+  // name — with a 🎓 avatar. Regular users show their (editable) display name.
+  const admin = _user ? roleForEmail(_user.email) === "admin" : false;
+  const name = _user ? (admin ? "Profesor" : nameOf(_user)) : "Tu";
   CURRENT_USER.authId = _user?.id ?? null;
   CURRENT_USER.email = _user?.email ?? null;
   CURRENT_USER.name = name;
-  CURRENT_USER.initials = _user ? initialsOf(name) : "TU";
+  CURRENT_USER.initials = _user ? (admin ? "🎓" : initialsOf(name)) : "TU";
 }
 syncCurrentUser();
 

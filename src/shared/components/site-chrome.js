@@ -587,8 +587,8 @@ function initNavUser(slot, basePath) {
       <button type="button" class="nav-user" title="Click: profilul tău · Hover: noutățile tale">
         ${avatar}
         <span class="nav-user__id">
-          <b class="nav-user__name">${CURRENT_USER.name}</b>
-          <span class="nav-user__meta">🎓 Profesor</span>
+          <b class="nav-user__name">🎓 Profesor</b>
+          <span class="nav-user__meta">cadru didactic</span>
         </span>
         ${total ? `<b class="nav-user__badge">${total}</b>` : ""}
       </button>
@@ -699,6 +699,9 @@ function initNotifCenter(basePath) {
           <b>Noutățile tale</b>
           ${notifTotal() ? `<span class="notif__total">${notifTotal()} noi</span>` : ""}
         </div>
+        ${!isAdmin() && CURRENT_USER.email
+          ? `<div class="notif__me" title="Adresa ta de email (doar tu o vezi)">✉️ ${CURRENT_USER.email.replace(/[<>&"]/g, "")}</div>`
+          : ""}
         <div class="notif__list">
           ${rows.join("") || `<p class="notif__empty">Ești la zi! 🎉 Tot istoricul e la „Activitatea mea”.</p>`}
         </div>

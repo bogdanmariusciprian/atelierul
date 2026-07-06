@@ -594,7 +594,7 @@ export function renderCommunity(basePath = "") {
   // (inert text + "Profesor" tag) and deleted accounts' (plain text).
   const userNameLink = (id, name, extraCls = "") =>
     isProfessor(id)
-      ? `<span class="cx-username ${extraCls}">${escapeHtml(name)} ${teacherTag}</span>`
+      ? `<span class="cx-username ${extraCls}">${teacherTag}</span>`
       : !userExists(id)
         ? `<span class="cx-username ${extraCls}" title="Cont șters">${escapeHtml(name)}</span>`
         : `<a class="cx-userlink ${extraCls}" href="${profileHref(id)}">${escapeHtml(name)}</a>`;
@@ -739,7 +739,7 @@ export function renderCommunity(basePath = "") {
       : `<div class="cx-side__me">
            ${meAvatar("cx-av--lg")}
            <div class="cx-side__meid">
-             <b>${CURRENT_USER.name}${isAdmin() ? ' <span class="cx-adminchip">admin</span>' : ""}</b>
+             <b>${isAdmin() ? "🎓 Profesor" : escapeHtml(CURRENT_USER.name)}${isAdmin() ? ' <span class="cx-adminchip">admin</span>' : ""}</b>
              <span class="cx-side__mini">
                ${isAdmin()
                  ? `<span>🎓 profesor · fără puncte</span>`
@@ -1869,10 +1869,10 @@ export function renderCommunity(basePath = "") {
     }
 
     // ---- View mode ----
-    const fullName = [P.firstName, P.lastName].filter(Boolean).join(" ") || CURRENT_USER.name;
+    const fullName = isAdmin() ? "Profesor" : ([P.firstName, P.lastName].filter(Boolean).join(" ") || CURRENT_USER.name);
     // The teacher's profile is just an identity — no student fields.
     const rows = (isAdmin()
-      ? [["Nume complet", fullName]]
+      ? []
       : [
           ["Nume complet", fullName],
           ["Clasa", P.grade],
@@ -1892,7 +1892,7 @@ export function renderCommunity(basePath = "") {
         <div class="cx-profile__row">
           ${meAvatar("cx-av--xl")}
           <div class="cx-profile__id">
-            <h3>${escapeHtml(fullName)}${isAdmin() ? " " + teacherTag : ""}</h3>
+            <h3>${isAdmin() ? teacherTag : escapeHtml(fullName)}</h3>
             <p class="cx-muted">„${escapeHtml(P.status)}” · ${isAdmin() ? "profesor · cont de administrare" : `membru din ${P.joined}`}</p>
             <span class="cx-vis"><span aria-hidden="true">👁️</span> ${VIS_LABELS[P.visibility]}</span>
           </div>
@@ -2966,10 +2966,13 @@ export function renderCommunity(basePath = "") {
         if (prof.created_at)
           MY_PROFILE.joined = new Date(prof.created_at).toLocaleDateString("ro-RO", { month: "long", year: "numeric" });
         if (prof.avatar_color) CURRENT_USER.color = prof.avatar_color;
-        const dn = (prof.display_name || CURRENT_USER.name || "").replace(/[<>]/g, "");
-        if (dn) {
-          CURRENT_USER.name = dn;
-          CURRENT_USER.initials = dn.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+        // The admin stays "Profesor" (set in session.js) — never their name.
+        if (!isAdmin()) {
+          const dn = (prof.display_name || CURRENT_USER.name || "").replace(/[<>]/g, "");
+          if (dn) {
+            CURRENT_USER.name = dn;
+            CURRENT_USER.initials = dn.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+          }
         }
       }
       render();

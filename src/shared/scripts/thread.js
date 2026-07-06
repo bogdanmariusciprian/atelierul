@@ -202,9 +202,11 @@ function commentHtml(c, depth, parentName, state, user, opts) {
     ? `<a class="cx-avlink thr__avpos" href="${href}" title="Vezi profilul">${avatarInner}${dot}</a>`
     : `<span class="thr__avpos">${avatarInner}${dot}</span>`;
   const teacherTag = isProf ? ` <span class="cx-teacher" title="Profesor · cadru didactic">🎓 Profesor</span>` : "";
-  const nameBlock = href
-    ? `<a class="thr__name cx-userlink" href="${href}">${escapeHtml(c.name)}</a>`
-    : `<span class="thr__name">${escapeHtml(c.name)}${teacherTag}</span>`;
+  const nameBlock = isProf
+    ? `<span class="thr__name">${teacherTag.trim()}</span>`
+    : href
+      ? `<a class="thr__name cx-userlink" href="${href}">${escapeHtml(c.name)}</a>`
+      : `<span class="thr__name">${escapeHtml(c.name)}</span>`;
 
   return `
     <div class="thr__c" data-depth="${depth}" style="--c:${color}">

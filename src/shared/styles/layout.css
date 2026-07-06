@@ -750,6 +750,16 @@ body.is-logged .nav-guest-only { display: none; }
   border-bottom: 1px solid var(--color-border);
 }
 .notif__head b { font-size: 0.95rem; }
+/* The viewer's OWN email (only they see it). */
+.notif__me {
+  padding: 0.4rem 0.95rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .notif__total {
   font-size: 0.68rem;
   font-weight: 800;
