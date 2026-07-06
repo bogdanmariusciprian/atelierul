@@ -116,6 +116,62 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* ---- Generic confirm dialog (same look as logout) ---- */
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+}
+.confirm-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 10, 24, 0.35);
+  backdrop-filter: blur(8px) saturate(110%);
+  -webkit-backdrop-filter: blur(8px) saturate(110%);
+  animation: logout-fade 0.18s ease-out;
+}
+.confirm-modal__card {
+  position: relative;
+  width: min(400px, 100%);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) * 1.6);
+  box-shadow: var(--shadow-md), 0 24px 60px rgba(0, 0, 0, 0.25);
+  padding: var(--space-lg);
+  text-align: center;
+  animation: logout-pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.confirm-modal__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.confirm-modal__text {
+  margin: 0 0 var(--space-lg);
+  color: var(--color-text-muted);
+}
+.confirm-modal__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
+}
+.confirm-modal__actions .btn {
+  min-width: 120px;
+}
+/* Destructive confirm (delete) — red action button. */
+.confirm-modal__ok--danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #fff;
+}
+.confirm-modal__ok--danger:hover {
+  filter: brightness(0.94);
+}
+
 /* The page shouldn't scroll behind the open dialog. */
 body.has-modal {
   overflow: hidden;

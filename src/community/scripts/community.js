@@ -20,6 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction } from "../../shared/scripts/forum-repo.js";
+import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
 import {
@@ -2960,6 +2961,27 @@ export function renderCommunity(basePath = "") {
         }
       }
     }
+
+    // Auto-focus a freshly revealed input so the user can type immediately
+    // (reply box, edit box, or anything flagged via state.pendingFocus). The
+    // "typing" guard avoids stealing focus if the user is already in a field.
+    const focusSel =
+      state.pendingFocus ||
+      (state.thread.openReplyId ? ".thr__reply .thr__input" : null) ||
+      (state.thread.openEditId ? ".thr__edit .thr__input" : null);
+    state.pendingFocus = null;
+    if (focusSel) {
+      const el = mount.querySelector(focusSel);
+      const a = document.activeElement;
+      const typing = a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT");
+      if (el && !typing) {
+        el.focus();
+        if (el.setSelectionRange) {
+          const n = el.value.length;
+          el.setSelectionRange(n, n);
+        }
+      }
+    }
   }
 
   // Keep the composer textarea across re-renders triggered by its own controls.
@@ -3350,10 +3372,13 @@ export function renderCommunity(basePath = "") {
       case "post-menu":
         state.postMenu = state.postMenu === id ? null : id;
         return render();
-      case "toggle-comments":
-        state.openComments.has(id) ? state.openComments.delete(id) : state.openComments.add(id);
+      case "toggle-comments": {
+        const opening = !state.openComments.has(id);
+        opening ? state.openComments.add(id) : state.openComments.delete(id);
+        if (opening) state.pendingFocus = `[data-post-id="${id}"] [data-role="post-comment-input"]`;
         state.commentWarn = null;
         return render();
+      }
       case "play-yt":
         state.playing.add(id);
         return render();
@@ -3468,6 +3493,7 @@ export function renderCommunity(basePath = "") {
         const p = findPost(id);
         if (!p || !canEditPost(p)) return;
         state.editingPost = id;
+        state.pendingFocus = `[data-post-id="${id}"] [data-role="edit-post"]`;
         return render();
       }
       case "post-cancel-edit":
@@ -3497,11 +3523,14 @@ export function renderCommunity(basePath = "") {
       case "post-del": {
         const p = findPost(id);
         if (!p || !canManagePost(p)) return;
-        if (!confirm("Ștergi definitiv postarea? Nu se poate anula.")) return;
-        deletePost(p.id); // REAL: persist the deletion
-        removePost(id);
-        if (isAdmin() && p.authorId !== CURRENT_USER.id) logAdmin(`🗑 ai șters o postare a lui ${p.name}`);
-        return render();
+        confirmDialog("Postarea va fi ștearsă definitiv — nu se poate anula.", { title: "Ștergi postarea?", okLabel: "Șterge", danger: true }).then((ok) => {
+          if (!ok) return;
+          deletePost(p.id); // REAL: persist the deletion
+          removePost(id);
+          if (isAdmin() && p.authorId !== CURRENT_USER.id) logAdmin(`🗑 ai șters o postare a lui ${p.name}`);
+          render();
+        });
+        return;
       }
 
       // ---- activity ----
@@ -3664,14 +3693,16 @@ export function renderCommunity(basePath = "") {
       }
       case "group-del": {
         const g = findGroup(id);
-        if (g && (g.creatorId === CURRENT_USER.id || isAdmin())) {
-          if (!confirm(`Ștergi grupul „${g.name}” cu tot cu postările lui?`)) return;
+        if (!g || !(g.creatorId === CURRENT_USER.id || isAdmin())) return;
+        confirmDialog(`Grupul „${g.name}” va fi șters, cu tot cu postările lui.`, { title: "Ștergi grupul?", okLabel: "Șterge", danger: true }).then((ok) => {
+          if (!ok) return;
           removeGroup(id);
           state.openGroup = null;
           state.editingGroup = false;
           if (isAdmin()) logAdmin(`🗑 ai șters grupul „${g.name}”`);
-        }
-        return render();
+          render();
+        });
+        return;
       }
 
       // ---- events ----
@@ -3831,15 +3862,18 @@ export function renderCommunity(basePath = "") {
         return render();
       case "mod-delete-target": {
         if (!isAdmin()) return;
-        if (!confirm("Ștergi definitiv conținutul raportat?")) return;
-        const item = MODERATION_QUEUE.find((i) => i.id === id);
-        if (item) {
-          if (item.targetType === "post") removePost(item.targetId);
-          else for (const p of allPosts()) if (removeComment(p.comments, item.targetId)) break;
-          resolveModerationItem(id, "deleted");
-          logAdmin(`🗑 ai șters conținut raportat (${item.targetType === "post" ? "postare" : "comentariu"})`);
-        }
-        return render();
+        confirmDialog("Conținutul raportat va fi șters definitiv.", { title: "Ștergi conținutul?", okLabel: "Șterge", danger: true }).then((ok) => {
+          if (!ok) return;
+          const item = MODERATION_QUEUE.find((i) => i.id === id);
+          if (item) {
+            if (item.targetType === "post") removePost(item.targetId);
+            else for (const p of allPosts()) if (removeComment(p.comments, item.targetId)) break;
+            resolveModerationItem(id, "deleted");
+            logAdmin(`🗑 ai șters conținut raportat (${item.targetType === "post" ? "postare" : "comentariu"})`);
+          }
+          render();
+        });
+        return;
       }
       case "mod-reopen": {
         if (!isAdmin()) return;
@@ -3979,13 +4013,16 @@ export function renderCommunity(basePath = "") {
       }
       case "admin-del-ex": {
         if (!isAdmin()) return;
-        if (!confirm("Ștergi definitiv propunerea de exercițiu?")) return;
-        const i = state.proposed.findIndex((x) => x.id === id);
-        if (i >= 0) {
-          state.proposed.splice(i, 1);
-          logAdmin("🗑 ai șters o propunere de exercițiu");
-        }
-        return render();
+        confirmDialog("Propunerea de exercițiu va fi ștearsă definitiv.", { title: "Ștergi propunerea?", okLabel: "Șterge", danger: true }).then((ok) => {
+          if (!ok) return;
+          const i = state.proposed.findIndex((x) => x.id === id);
+          if (i >= 0) {
+            state.proposed.splice(i, 1);
+            logAdmin("🗑 ai șters o propunere de exercițiu");
+          }
+          render();
+        });
+        return;
       }
       case "ex-submit": {
         const lesson = mount.querySelector("#cx-ex-lesson")?.value || state.exComposer.lesson;
