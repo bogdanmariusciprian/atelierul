@@ -156,11 +156,11 @@ export const MY_PROFILE = {
   challenges: "Virgula și cratima încă îmi dau bătăi de cap.",
   avatar: "assets/avatars/profileIcon01.gif", // chosen gif (or null = initials)
   visibility: "members", // "members" | "friends" | "everyone"
-  friendIds: [1, 2, 3, 6, 9, 12, 13, 18, 20, 22, 25, 26, 27, 29],
-  // Friend requests (mock). Incoming = people who want to befriend me;
-  // outgoing = requests I've sent, awaiting their acceptance. None overlap
-  // with friendIds above.
-  friendReqIncoming: [7, 11, 17, 23],
+  // Friend graph — starts EMPTY; the real values load from Supabase
+  // (fetchMyFriends) on first render. No mock friends/requests, so no
+  // phantom "cereri de prietenie" badge flashes before the real data arrives.
+  friendIds: [],
+  friendReqIncoming: [],
   friendReqOutgoing: [],
 
   favorites: [
