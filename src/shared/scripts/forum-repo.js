@@ -1,25 +1,27 @@
 // =========================================================
 // Forum data layer (Supabase) → mapped into the hub's existing MOCK shapes.
 //
-// The hub (community.js) is wired to NUMERIC ids everywhere (posts looked up
-// with Number(id), users by numeric id, slugs, friends…). Real Supabase ids
-// are uuids. To avoid rewriting hundreds of call sites, each real post/user
-// gets a client-side NUMERIC "surrogate" id, and a map translates it back to
-// the uuid for writes. The render plumbing stays untouched.
+// The hub (community.js) is wired to NUMERIC ids everywhere (posts/users/
+// comments looked up with Number(id)). Real Supabase ids are uuids. To avoid
+// rewriting hundreds of call sites, each real post/user/comment gets a
+// client-side NUMERIC "surrogate" id, and maps translate them back to uuids
+// for writes. The render plumbing stays untouched.
 //
-// My OWN posts are mapped to author id 0 (the existing "me" sentinel) so the
-// "is this mine?" logic keeps working. Real users have no gif avatar → the
-// hub renders their initials (see userAvatar in community.js).
+// My OWN content is mapped to author id 0 (the existing "me" sentinel) so the
+// "is this mine?" logic keeps working. Real users have no gif → the hub
+// renders their initials.
 // =========================================================
 import { supabase } from "./supabase-client.js";
 import { CURRENT_USER } from "./session.js";
 import { registerRealUser, initials as initialsOf } from "./community-data.js";
 import { relTime } from "./forum-data.js";
 
-let _userSurrogate = 1_000_000; // real user ids start well above mock ids (1–30)
+let _userSurrogate = 1_000_000; // real user ids start above mock ids (1–30)
 let _postSurrogate = 2_000_000;
-const userSurrByUuid = new Map(); // profile uuid -> numeric surrogate
-const postUuidBySurr = new Map(); // numeric surrogate -> post uuid
+let _commentSurrogate = 3_000_000;
+const userSurrByUuid = new Map(); // profile uuid -> numeric
+const postUuidBySurr = new Map(); // numeric -> post uuid
+const commentUuidBySurr = new Map(); // numeric -> comment uuid
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -27,9 +29,17 @@ function esc(s) {
   );
 }
 
-/** The real post uuid behind a surrogate id (for future like/comment/delete). */
+/** Real uuid behind a surrogate id (for writes / debugging). */
 export function postUuid(surrogateId) {
   return postUuidBySurr.get(surrogateId) || null;
+}
+/** Register a surrogate→uuid mapping (e.g. for an optimistic new post). */
+export function mapPostSurrogate(surrogateId, uuid) {
+  if (surrogateId && uuid) postUuidBySurr.set(surrogateId, uuid);
+}
+/** Register a surrogate→uuid mapping for a freshly created comment. */
+export function mapComment(surrogateId, uuid) {
+  if (surrogateId && uuid) commentUuidBySurr.set(surrogateId, uuid);
 }
 
 // A real author profile → a numeric id the render code understands.
@@ -55,19 +65,24 @@ function surrogateForAuthor(profile) {
   return sid;
 }
 
-function mapPost(row) {
-  const author = row.author || {};
+function authorFields(author) {
   const authorId = surrogateForAuthor(author);
   const isMe = authorId === 0;
+  return {
+    authorId,
+    name: isMe ? CURRENT_USER.name : author.display_name || "Membru",
+    initials: isMe ? CURRENT_USER.initials : initialsOf(author.display_name || "Membru"),
+    color: isMe ? CURRENT_USER.color : author.avatar_color || "#7c5cff",
+  };
+}
+
+function mapPost(row) {
   const sid = ++_postSurrogate;
   postUuidBySurr.set(sid, row.id);
   const createdAt = new Date(row.created_at).getTime();
   return {
     id: sid,
-    authorId,
-    name: isMe ? CURRENT_USER.name : author.display_name || "Membru",
-    initials: isMe ? CURRENT_USER.initials : initialsOf(author.display_name || "Membru"),
-    color: isMe ? CURRENT_USER.color : author.avatar_color || "#7c5cff",
+    ...authorFields(row.author || {}),
     createdAt,
     time: relTime(Math.max(0, Date.now() - createdAt)),
     type: row.type,
@@ -80,14 +95,36 @@ function mapPost(row) {
     shares: 0,
     sharedByMe: false,
     followed: false,
-    comments: [],
+    comments: [], // filled in below (fetchFeed)
   };
 }
 
-/** Recent forum posts (newest first), in the hub's post shape. RLS decides
- *  what the caller may see (public + own + friends-only if friends + admin). */
+// Recursively map a comment row + its children into the hub's comment shape.
+function mapCommentRow(row, childrenByParent) {
+  const sid = ++_commentSurrogate;
+  commentUuidBySurr.set(sid, row.id);
+  const createdAt = new Date(row.created_at).getTime();
+  const kids = (childrenByParent.get(row.id) || []).map((r) =>
+    mapCommentRow(r, childrenByParent)
+  );
+  return {
+    id: sid,
+    ...authorFields(row.author || {}),
+    createdAt,
+    time: relTime(Math.max(0, Date.now() - createdAt)),
+    text: esc(row.body || ""),
+    likes: 0,
+    likedByMe: false,
+    reactions: {},
+    edited: !!row.edited_at,
+    replies: kids,
+  };
+}
+
+/** Recent forum posts (newest first) WITH their comment trees, in the hub's
+ *  shapes. RLS decides visibility (public + own + friends-only if friends). */
 export async function fetchFeed({ limit = 40 } = {}) {
-  const { data, error } = await supabase
+  const { data: postRows, error } = await supabase
     .from("posts")
     .select(
       "id, author_id, body, type, background, audience, share_of, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, points)"
@@ -100,7 +137,46 @@ export async function fetchFeed({ limit = 40 } = {}) {
     console.warn("fetchFeed:", error.message);
     return [];
   }
-  return (data || []).map(mapPost);
+
+  const posts = [];
+  const byUuid = new Map();
+  for (const row of postRows || []) {
+    const p = mapPost(row);
+    byUuid.set(row.id, p);
+    posts.push(p);
+  }
+  if (posts.length === 0) return posts;
+
+  // Fetch the comments for these posts in one query, then nest them.
+  const postIds = [...byUuid.keys()];
+  const { data: commentRows, error: cErr } = await supabase
+    .from("comments")
+    .select(
+      "id, post_id, parent_id, body, edited_at, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, points)"
+    )
+    .in("post_id", postIds)
+    .eq("moderation_status", "visible")
+    .order("created_at", { ascending: true });
+  if (cErr) {
+    console.warn("fetchFeed comments:", cErr.message);
+    return posts; // posts still show, just without comments
+  }
+
+  const childrenByParent = new Map(); // parent uuid -> [rows]
+  const topByPost = new Map(); // post uuid -> [rows]
+  for (const row of commentRows || []) {
+    if (row.parent_id) {
+      if (!childrenByParent.has(row.parent_id)) childrenByParent.set(row.parent_id, []);
+      childrenByParent.get(row.parent_id).push(row);
+    } else {
+      if (!topByPost.has(row.post_id)) topByPost.set(row.post_id, []);
+      topByPost.get(row.post_id).push(row);
+    }
+  }
+  for (const [uuid, p] of byUuid) {
+    p.comments = (topByPost.get(uuid) || []).map((r) => mapCommentRow(r, childrenByParent));
+  }
+  return posts;
 }
 
 /** Create a post authored by the current user. Returns { id: uuid } or null. */
@@ -119,6 +195,29 @@ export async function createPost({ type, bg, audience, text, media }) {
     .single();
   if (error) {
     console.warn("createPost:", error.message);
+    return null;
+  }
+  return data;
+}
+
+/** Create a comment (or reply) on a post. postSurrogate/parentSurrogate are
+ *  the hub's numeric ids. Returns { id: uuid } or null. */
+export async function createComment({ postSurrogate, parentSurrogate = null, text }) {
+  const postId = postUuidBySurr.get(postSurrogate);
+  if (!postId) return null; // post not persisted yet (rare, same-session edge)
+  const parentId = parentSurrogate ? commentUuidBySurr.get(parentSurrogate) : null;
+  const { data, error } = await supabase
+    .from("comments")
+    .insert({
+      post_id: postId,
+      parent_id: parentId,
+      author_id: CURRENT_USER.authId,
+      body: text,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.warn("createComment:", error.message);
     return null;
   }
   return data;

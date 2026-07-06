@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, createPost } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate } from "../../shared/scripts/forum-repo.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
 import {
@@ -3061,6 +3061,11 @@ export function renderCommunity(basePath = "") {
             return bad.length ? mentionMsg(bad) : null;
           },
           onReply: (parent, text) => {
+            // REAL: persist the reply; map the new reply's id to its uuid.
+            const newReply = parent.replies[parent.replies.length - 1];
+            createComment({ postSurrogate: post.id, parentSurrogate: parent.id, text }).then((row) => {
+              if (row && newReply) mapComment(newReply.id, row.id);
+            });
             touchStreak(); // replying counts as today's activity
             notifyMentions(text, "Într-un răspuns");
             if (post.authorId !== CURRENT_USER.id || parent.authorId !== CURRENT_USER.id) {
@@ -3263,6 +3268,8 @@ export function renderCommunity(basePath = "") {
           audience: post.audience,
           text: state.composer.text,
           media: post.media,
+        }).then((row) => {
+          if (row) mapPostSurrogate(post.id, row.id);
         });
         state.notice = null;
         notifyMentions(state.composer.text, "Într-o postare din forum");
@@ -3366,6 +3373,11 @@ export function renderCommunity(basePath = "") {
         }
         state.commentWarn = null;
         p.comments.push(makeUserComment(text, CURRENT_USER, nextId));
+        // REAL: persist the comment to Supabase, then map its id to the uuid.
+        const newC = p.comments[p.comments.length - 1];
+        createComment({ postSurrogate: p.id, text }).then((row) => {
+          if (row) mapComment(newC.id, row.id);
+        });
         notifyMentions(text, "Într-un comentariu");
         touchStreak(); // commenting counts as today's activity
         // Commenting on someone ELSE's post is real "given" activity.
