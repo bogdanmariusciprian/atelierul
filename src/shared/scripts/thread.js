@@ -295,6 +295,7 @@ export function handleThreadClick(e, opts) {
         if (c.authorId === user.id) return; // no self-like
         c.likedByMe = !c.likedByMe;
         c.likes += c.likedByMe ? 1 : -1;
+        opts.onLike?.(c, c.likedByMe);
       });
       break;
 
@@ -308,6 +309,7 @@ export function handleThreadClick(e, opts) {
         const em = btn.dataset.emoji;
         c.reactions[em] = (c.reactions[em] || 0) + 1;
         c.myReaction = em;
+        opts.onReact?.(c, em, true);
       });
       state.openReactId = null;
       break;
@@ -315,8 +317,10 @@ export function handleThreadClick(e, opts) {
     case "t-remove-react":
       walk(comments, id, (c) => {
         if (!c.myReaction) return;
-        c.reactions[c.myReaction] = Math.max(0, (c.reactions[c.myReaction] || 0) - 1);
+        const em = c.myReaction;
+        c.reactions[em] = Math.max(0, (c.reactions[em] || 0) - 1);
         c.myReaction = null;
+        opts.onReact?.(c, em, false);
       });
       break;
 
@@ -396,6 +400,7 @@ export function handleThreadClick(e, opts) {
         if (!opts.isAdmin && !canEdit(c, user)) return;
         c.text = escapeHtml(text);
         c.edited = true;
+        opts.onEdit?.(c, text);
       });
       state.openEditId = null;
       state.warnId = state.warnMsg = null;
@@ -414,10 +419,13 @@ export function handleThreadClick(e, opts) {
     case "t-del": {
       // The author may delete their own comment; admin may delete any.
       let allowed = false;
+      let target = null;
       walk(comments, id, (c) => {
         allowed = opts.isAdmin || c.authorId === user.id;
+        target = c;
       });
       if (!allowed) return true;
+      opts.onDelete?.(target);
       removeComment(comments, id);
       state.openEditId = state.openReplyId = null;
       break;

@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction } from "../../shared/scripts/forum-repo.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
 import {
@@ -198,7 +198,7 @@ export function renderCommunity(basePath = "") {
     notes: getNotes(), // persistent notebook (store.js adapter)
     noteQuery: "",
     editingNote: null, // note id being edited
-    saved: new Set(store.get("atelier_saved_posts", [])), // persistent 🔖
+    saved: new Set(), // real: populated from Supabase (saved_posts) in loadFeed
     feedLimit: 6, // forum pagination ("Încarcă mai mult")
     groupCreateOpen: false, // the "create group" composer in Grupuri
     proposed: PROPOSED_EXERCISES,
@@ -2911,6 +2911,7 @@ export function renderCommunity(basePath = "") {
   async function loadFeed() {
     try {
       state.posts = await fetchFeed();
+      state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
       render();
     } catch (e) {
       console.warn("feed:", e.message);
@@ -3055,6 +3056,11 @@ export function renderCommunity(basePath = "") {
               context: `Răspuns la postarea „${String(post.text).replace(/<[^>]*>/g, "").slice(0, 60)}…”`,
             }),
           onReport: reportComment,
+          // REAL: persist comment interactions to Supabase.
+          onLike: (c, liked) => toggleCommentLike(c.id, liked),
+          onReact: (c, emoji, added) => toggleCommentReaction(c.id, emoji, added),
+          onEdit: (c, text) => updateComment(c.id, text),
+          onDelete: (c) => deleteComment(c.id),
           decorateText,
           validate: (text) => {
             const bad = invalidMentions(text, mentionEligibleForPost(post));
@@ -3313,7 +3319,7 @@ export function renderCommunity(basePath = "") {
           state.saved.add(id);
           showToast("🔖 Salvat — îl găsești în „Salvate”", { kind: "success" });
         }
-        store.set("atelier_saved_posts", [...state.saved]); // persists reloads
+        toggleSave(id, state.saved.has(id)); // REAL: persist to saved_posts
         return render();
       }
 
@@ -3484,6 +3490,7 @@ export function renderCommunity(basePath = "") {
         }
         p.text = escapeHtml(text);
         p.edited = true;
+        updatePost(p.id, text); // REAL: persist the edit
         state.editingPost = null;
         return render();
       }
@@ -3491,6 +3498,7 @@ export function renderCommunity(basePath = "") {
         const p = findPost(id);
         if (!p || !canManagePost(p)) return;
         if (!confirm("Ștergi definitiv postarea? Nu se poate anula.")) return;
+        deletePost(p.id); // REAL: persist the deletion
         removePost(id);
         if (isAdmin() && p.authorId !== CURRENT_USER.id) logAdmin(`🗑 ai șters o postare a lui ${p.name}`);
         return render();
