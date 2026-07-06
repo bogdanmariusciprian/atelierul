@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike } from "../../shared/scripts/forum-repo.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
 import {
@@ -3323,6 +3323,7 @@ export function renderCommunity(basePath = "") {
         if (p && p.authorId !== CURRENT_USER.id) {
           p.likedByMe = !p.likedByMe;
           p.likes += p.likedByMe ? 1 : -1;
+          togglePostLike(p.id, p.likedByMe); // REAL: persist to post_reactions
         }
         return render();
       }

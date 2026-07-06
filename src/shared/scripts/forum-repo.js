@@ -23,6 +23,8 @@ const userSurrByUuid = new Map(); // profile uuid -> numeric
 const postUuidBySurr = new Map(); // numeric -> post uuid
 const commentUuidBySurr = new Map(); // numeric -> comment uuid
 
+const LIKE_EMOJI = "♥"; // a "like" is stored as a ♥ reaction row
+
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
@@ -176,7 +178,39 @@ export async function fetchFeed({ limit = 40 } = {}) {
   for (const [uuid, p] of byUuid) {
     p.comments = (topByPost.get(uuid) || []).map((r) => mapCommentRow(r, childrenByParent));
   }
+
+  // Like counts + whether the current user liked each post (♥ reactions).
+  const myUuid = CURRENT_USER.authId;
+  const { data: likeRows } = await supabase
+    .from("post_reactions")
+    .select("post_id, user_id")
+    .in("post_id", postIds)
+    .eq("emoji", LIKE_EMOJI);
+  if (likeRows) {
+    for (const [uuid, p] of byUuid) {
+      p.likes = likeRows.filter((r) => r.post_id === uuid).length;
+      p.likedByMe = !!myUuid && likeRows.some((r) => r.post_id === uuid && r.user_id === myUuid);
+    }
+  }
   return posts;
+}
+
+/** Add or remove the current user's ♥ like on a post (by surrogate id). */
+export async function togglePostLike(postSurrogate, liked) {
+  const postId = postUuidBySurr.get(postSurrogate);
+  if (!postId || !CURRENT_USER.authId) return;
+  if (liked) {
+    await supabase
+      .from("post_reactions")
+      .insert({ post_id: postId, user_id: CURRENT_USER.authId, emoji: LIKE_EMOJI });
+  } else {
+    await supabase
+      .from("post_reactions")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", CURRENT_USER.authId)
+      .eq("emoji", LIKE_EMOJI);
+  }
 }
 
 /** Create a post authored by the current user. Returns { id: uuid } or null. */
