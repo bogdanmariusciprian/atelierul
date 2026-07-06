@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
@@ -1843,9 +1843,11 @@ export function renderCommunity(basePath = "") {
           <div class="cx-fieldgrid">
             <div><label class="cx-label">Prenume</label><input class="cx-input" id="pf-first" value="${escapeHtml(P.firstName)}" /></div>
             <div><label class="cx-label">Nume</label><input class="cx-input" id="pf-last" value="${escapeHtml(P.lastName)}" /></div>
+            ${isAdmin() ? "" : `
             <div><label class="cx-label">Clasa</label><input class="cx-input" id="pf-grade" value="${escapeHtml(P.grade)}" placeholder="ex: clasa a X-a" /></div>
-            <div><label class="cx-label">Localitate</label><input class="cx-input" id="pf-locality" value="${escapeHtml(P.locality)}" /></div>
+            <div><label class="cx-label">Localitate</label><input class="cx-input" id="pf-locality" value="${escapeHtml(P.locality)}" /></div>`}
           </div>
+          ${isAdmin() ? "" : `
           <label class="cx-label">Școală <span class="cx-muted">(opțional)</span></label>
           <input class="cx-input" id="pf-school" value="${escapeHtml(P.school)}" />
           <label class="cx-label">Pasiuni</label>
@@ -1856,7 +1858,7 @@ export function renderCommunity(basePath = "") {
           <label class="cx-label">Cine îmi poate vedea profilul</label>
           <select class="cx-input" id="pf-vis">
             ${Object.entries(VIS_LABELS).map(([k, v]) => `<option value="${k}"${P.visibility === k ? " selected" : ""}>${v}</option>`).join("")}
-          </select>
+          </select>`}
 
           ${state.profileWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.profileWarn)}</p>` : ""}
           <div class="cx-excompose__actions">
@@ -1868,15 +1870,18 @@ export function renderCommunity(basePath = "") {
 
     // ---- View mode ----
     const fullName = [P.firstName, P.lastName].filter(Boolean).join(" ") || CURRENT_USER.name;
-    const rows = [
-      ["Nume complet", fullName],
-      ["Clasa", P.grade],
-      ["Școală", P.school],
-      ["Localitate", P.locality],
-      ["Pasiuni", P.passions],
-      // Personal struggles are between you and the teacher — never public.
-      ["Provocări 🔒", P.challenges, "doar tu și profesorul vedeți asta"],
-    ]
+    // The teacher's profile is just an identity — no student fields.
+    const rows = (isAdmin()
+      ? [["Nume complet", fullName]]
+      : [
+          ["Nume complet", fullName],
+          ["Clasa", P.grade],
+          ["Școală", P.school],
+          ["Localitate", P.locality],
+          ["Pasiuni", P.passions],
+          // Personal struggles are between you and the teacher — never public.
+          ["Provocări 🔒", P.challenges, "doar tu și profesorul vedeți asta"],
+        ])
       .map(([k, v, hint]) => `<div class="cx-inforow"><span class="cx-inforow__k">${k}${hint ? ` <span class="cx-inforow__hint" title="${hint}">privat</span>` : ""}</span><span class="cx-inforow__v">${v ? escapeHtml(v) : "—"}</span></div>`)
       .join("");
 
@@ -1887,7 +1892,7 @@ export function renderCommunity(basePath = "") {
         <div class="cx-profile__row">
           ${meAvatar("cx-av--xl")}
           <div class="cx-profile__id">
-            <h3>${escapeHtml(fullName)}</h3>
+            <h3>${escapeHtml(fullName)}${isAdmin() ? " " + teacherTag : ""}</h3>
             <p class="cx-muted">„${escapeHtml(P.status)}” · ${isAdmin() ? "profesor · cont de administrare" : `membru din ${P.joined}`}</p>
             <span class="cx-vis"><span aria-hidden="true">👁️</span> ${VIS_LABELS[P.visibility]}</span>
           </div>
@@ -2944,6 +2949,29 @@ export function renderCommunity(basePath = "") {
       MY_PROFILE.friendIds = fr.friendIds;
       MY_PROFILE.friendReqIncoming = fr.incoming;
       MY_PROFILE.friendReqOutgoing = fr.outgoing;
+      // My own editable profile (settings) → the real, persisted values.
+      const prof = await fetchMyProfile();
+      if (prof) {
+        MY_PROFILE.firstName = prof.first_name || "";
+        MY_PROFILE.lastName = prof.last_name || "";
+        MY_PROFILE.grade = prof.grade || "";
+        MY_PROFILE.locality = prof.locality || "";
+        MY_PROFILE.school = prof.school || "";
+        MY_PROFILE.passions = prof.passions || "";
+        MY_PROFILE.challenges = prof.challenges || "";
+        MY_PROFILE.visibility = prof.visibility || "members";
+        MY_PROFILE.avatar = prof.avatar || null;
+        if (prof.status_line != null) MY_PROFILE.status = prof.status_line;
+        if (prof.points != null) MY_PROFILE.points = prof.points;
+        if (prof.created_at)
+          MY_PROFILE.joined = new Date(prof.created_at).toLocaleDateString("ro-RO", { month: "long", year: "numeric" });
+        if (prof.avatar_color) CURRENT_USER.color = prof.avatar_color;
+        const dn = (prof.display_name || CURRENT_USER.name || "").replace(/[<>]/g, "");
+        if (dn) {
+          CURRENT_USER.name = dn;
+          CURRENT_USER.initials = dn.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+        }
+      }
       render();
     } catch (e) {
       console.warn("feed:", e.message);
@@ -4272,6 +4300,27 @@ export function renderCommunity(basePath = "") {
         MY_PROFILE.avatar = state.pickAvatar === undefined ? MY_PROFILE.avatar : state.pickAvatar;
         const vis = mount.querySelector("#pf-vis")?.value;
         if (vis) MY_PROFILE.visibility = vis;
+        // REAL: persist to Supabase. Store raw (stripped of <> for safety —
+        // the UI escapes on render) so it round-trips without double-escaping.
+        const clean = (s) => s.replace(/[<>]/g, "").trim();
+        const displayName =
+          [clean(val("#pf-first")), clean(val("#pf-last"))].filter(Boolean).join(" ") || CURRENT_USER.name;
+        updateMyProfile({
+          display_name: displayName,
+          first_name: clean(val("#pf-first")),
+          last_name: clean(val("#pf-last")),
+          grade: clean(val("#pf-grade")),
+          locality: clean(val("#pf-locality")),
+          school: clean(val("#pf-school")),
+          passions: clean(val("#pf-passions")),
+          challenges: clean(val("#pf-challenges")),
+          visibility: MY_PROFILE.visibility,
+          avatar: MY_PROFILE.avatar || null,
+        });
+        CURRENT_USER.name = displayName;
+        CURRENT_USER.initials = displayName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+        window.dispatchEvent(new CustomEvent("atelier:role")); // refresh nav/XP name
+        showToast("✓ Profil salvat", { kind: "success" });
         state.editingProfile = false;
         return render();
       }

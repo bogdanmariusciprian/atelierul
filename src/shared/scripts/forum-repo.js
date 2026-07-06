@@ -405,6 +405,27 @@ export async function removeFriend(userSurrogate) {
   );
 }
 
+/** The current user's own profile (settings) row, or null. */
+export async function fetchMyProfile() {
+  const me = CURRENT_USER.authId;
+  if (!me) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select(
+      "display_name, avatar_color, avatar, status_line, first_name, last_name, grade, locality, school, passions, challenges, visibility, points, created_at"
+    )
+    .eq("id", me)
+    .maybeSingle();
+  return data;
+}
+
+/** Save edited profile fields to the current user's own row. */
+export async function updateMyProfile(fields) {
+  const me = CURRENT_USER.authId;
+  if (!me) return;
+  await supabase.from("profiles").update(fields).eq("id", me);
+}
+
 /** Whether the current user has been granted Events access by the teacher. */
 export async function fetchMyEventsAccess() {
   if (!CURRENT_USER.authId) return false;
