@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
@@ -196,6 +196,7 @@ export function renderCommunity(basePath = "") {
     // ONE unified post list (Facebook model): the forum shows every public
     // post; "Pagina mea" is just the filter of your own. Sorted newest-first.
     posts: [], // real posts load from Supabase (loadFeed) on first render
+    members: [], // real member directory (surrogate ids, points desc) — leaderboard
     _feedLoaded: false,
     notes: getNotes(), // persistent notebook (store.js adapter)
     noteQuery: "",
@@ -2043,21 +2044,30 @@ export function renderCommunity(basePath = "") {
   }
 
   function sectionLeaderboard() {
-    const top = topUsers(10);
-    const sorted = [...COMMUNITY_USERS].sort((a, b) => b.points - a.points);
-    const myRank = sorted.filter((u) => u.points > MY_PROFILE.points).length + 1;
+    // REAL members from Supabase (points desc), me included as id 0. No more
+    // invented colleagues — this is the actual community.
+    const memberRow = (id) =>
+      id === CURRENT_USER.id
+        ? { id, name: CURRENT_USER.name, points: MY_PROFILE.points, lessons: MY_PROFILE.lessons, streak: MY_PROFILE.streak }
+        : userById(id);
+    const rows = state.members
+      .map(memberRow)
+      .filter(Boolean)
+      .sort((a, b) => (b.points || 0) - (a.points || 0));
 
-    // The week's biggest climber (shared trend mock — same as the homepage).
-    const riser = [...top].sort((a, b) => {
-      const ta = trendOf(a), tb = trendOf(b);
-      return (tb.dir === "up" ? tb.n : -1) - (ta.dir === "up" ? ta.n : -1);
-    })[0];
-    const riserChip = (u) =>
-      riser && u.id === riser.id && trendOf(u).dir === "up"
-        ? `<span class="cx-riser" title="Cel mai mare urcuș săptămâna aceasta">🚀 în formă</span>`
-        : "";
+    // Honest low/empty state — we NEVER invent people to fill the board.
+    if (rows.length < 3) {
+      return `
+        ${sectionHead("Clasament", "Cei mai activi membri ai comunității.")}
+        ${emptyState("Clasamentul prinde viață în curând", "Pe măsură ce membrii termină lecții și adună puncte, urcă aici — iar primii din top primesc aplauze.")}`;
+    }
 
-    // Podium (top 3) — crowned, with animated auras + applause.
+    const top = rows.slice(0, 10);
+    const myIndex = rows.findIndex((r) => r.id === CURRENT_USER.id);
+    const myRank = myIndex >= 0 ? myIndex + 1 : null;
+
+    // Podium (top 3) — crowned, with animated auras + applause. You can't
+    // applaud yourself (same spirit as no self-like).
     const CROWNS = ["👑", "🥈", "🥉"];
     const pod = (u, i) =>
       u
@@ -2065,76 +2075,77 @@ export function renderCommunity(basePath = "") {
             <span class="cx-pod__aura" aria-hidden="true"></span>
             <span class="cx-pod__crown" aria-hidden="true">${CROWNS[i]}</span>
             ${userAvatar(u.id, "cx-av--lg")}
-            <b class="cx-pod__name" data-user-name>${escapeHtml(u.name.split(" ")[0])}</b>
-            <span class="cx-pod__pts">${u.points.toLocaleString("ro-RO")}</span>
-            ${riserChip(u)}
-            ${clapBtnCx(u)}
+            <b class="cx-pod__name" data-user-name>${escapeHtml((u.name || "Membru").split(" ")[0])}</b>
+            <span class="cx-pod__pts">${(u.points || 0).toLocaleString("ro-RO")}</span>
+            ${u.id === CURRENT_USER.id ? "" : clapBtnCx(u)}
             <span class="cx-pod__base">${i + 1}</span>
           </div>`
         : "";
     const podium = `<div class="cx-podium">${pod(top[1], 1)}${pod(top[0], 0)}${pod(top[2], 2)}</div>`;
 
     // Ranks 4–10.
-    const rows = top
+    const list = top
       .slice(3)
       .map((u, i) => {
-        const tr = trendOf(u);
-        const arrow = tr.dir === "up" ? `<span class="cx-lb__trend cx-lb__trend--up">▲${tr.n}</span>` : tr.dir === "down" ? `<span class="cx-lb__trend cx-lb__trend--down">▼${tr.n}</span>` : `<span class="cx-lb__trend">•</span>`;
+        const meta = [u.lessons ? `${u.lessons} lecții` : "", u.streak ? `🔥 ${u.streak}` : ""].filter(Boolean).join(" · ");
         return `<div class="cx-lb__row">
-          <span class="cx-lb__rank">${i + 4}${arrow}</span>
+          <span class="cx-lb__rank">${i + 4}</span>
           ${userAvatar(u.id)}
-          <div class="cx-lb__id"><b data-user-name>${escapeHtml(u.name)}</b> ${riserChip(u)}<span class="cx-muted">${u.lessons} lecții · 🔥 ${u.streak}</span></div>
-          ${clapBtnCx(u)}
-          <span class="cx-lb__pts">${u.points.toLocaleString("ro-RO")}</span>
+          <div class="cx-lb__id"><b data-user-name>${escapeHtml(u.name || "Membru")}</b>${meta ? `<span class="cx-muted">${meta}</span>` : ""}</div>
+          ${u.id === CURRENT_USER.id ? "" : clapBtnCx(u)}
+          <span class="cx-lb__pts">${(u.points || 0).toLocaleString("ro-RO")}</span>
         </div>`;
       })
       .join("");
 
-    // ---- "Zona ta": neighbours + progress + Poke + snail ----
-    const above = sorted[myRank - 2] || null; // the one right above me
-    const below = sorted.filter((u) => u.points <= MY_PROFILE.points).sort((a, b) => b.points - a.points)[0] || null;
+    // ---- "Zona ta": my neighbours + progress + Poke + snail. Members only
+    // (the teacher and guests have no rank). ----
     let zone = "";
-    // Only members race — the teacher and guests have no rank here.
-    if (above && isLoggedIn() && !isAdmin()) {
-      const gap = above.points - MY_PROFILE.points;
-      const pct = Math.max(4, Math.min(96, (MY_PROFILE.points / above.points) * 100));
-      const poked = hasPoked(above.id);
-      const pokeUi = poked
-        ? `<span class="cx-poke is-done" title="Poke trimis azi">👉 Poke trimis ✓</span>`
-        : `<button type="button" class="cx-poke" data-action="poke" data-uid="${above.id}"
-             title="Dă-i de știre că te apropii">👉 Poke</button>`;
-      const snail = poked
-        ? `<span class="cx-zone__snail" style="--from:${pct}%" title="Melcul tău urcă spre ${escapeHtml(above.name.split(" ")[0])}…">🐌</span>`
-        : "";
-      zone = `
-        <div class="cx-zone">
-          <div class="cx-zone__head"><h3>Zona ta</h3><span class="cx-muted">locul <b>#${myRank}</b> din ${sorted.length + 1}</span></div>
-          <div class="cx-zone__row cx-zone__row--target">
-            ${userAvatar(above.id, "cx-av--sm")}
-            <span class="cx-zone__who"><b data-user-name>${escapeHtml(above.name)}</b> <span class="cx-muted">· #${myRank - 1} · ${above.points.toLocaleString("ro-RO")} pct</span></span>
-            ${pokeUi}
-          </div>
-          <div class="cx-zone__trackwrap">
-            <div class="cx-zone__track"><span class="cx-zone__fill" style="width:${pct}%"></span>${snail}</div>
-            <span class="cx-zone__gap">îți mai trebuie <b>${gap.toLocaleString("ro-RO")}</b> puncte ca să-l întreci</span>
-          </div>
-          <div class="cx-zone__row cx-zone__row--me">
-            ${meAvatar("cx-av--sm")}
-            <span class="cx-zone__who"><b>Tu</b> <span class="cx-muted">· #${myRank} · ${MY_PROFILE.points.toLocaleString("ro-RO")} pct</span></span>
-          </div>
-          ${below
-            ? `<div class="cx-zone__row cx-zone__row--chaser">
-                ${userAvatar(below.id, "cx-av--sm")}
-                <span class="cx-zone__who"><b data-user-name>${escapeHtml(below.name)}</b> <span class="cx-muted">· e la ${(MY_PROFILE.points - below.points).toLocaleString("ro-RO")} puncte în spatele tău — nu te lăsa!</span></span>
-              </div>`
-            : ""}
-        </div>`;
+    if (isLoggedIn() && !isAdmin() && myIndex >= 0) {
+      const above = rows[myIndex - 1] || null;
+      const below = rows[myIndex + 1] || null;
+      if (above) {
+        const gap = Math.max(0, (above.points || 0) - MY_PROFILE.points);
+        const pct = Math.max(4, Math.min(96, above.points ? (MY_PROFILE.points / above.points) * 100 : 100));
+        const poked = hasPoked(above.id);
+        const pokeUi = poked
+          ? `<span class="cx-poke is-done" title="Poke trimis azi">👉 Poke trimis ✓</span>`
+          : `<button type="button" class="cx-poke" data-action="poke" data-uid="${above.id}" title="Dă-i de știre că te apropii">👉 Poke</button>`;
+        const snail = poked
+          ? `<span class="cx-zone__snail" style="--from:${pct}%" title="Melcul tău urcă spre ${escapeHtml((above.name || "").split(" ")[0])}…">🐌</span>`
+          : "";
+        zone = `
+          <div class="cx-zone">
+            <div class="cx-zone__head"><h3>Zona ta</h3><span class="cx-muted">locul <b>#${myRank}</b> din ${rows.length}</span></div>
+            <div class="cx-zone__row cx-zone__row--target">
+              ${userAvatar(above.id, "cx-av--sm")}
+              <span class="cx-zone__who"><b data-user-name>${escapeHtml(above.name || "Membru")}</b> <span class="cx-muted">· #${myRank - 1} · ${(above.points || 0).toLocaleString("ro-RO")} pct</span></span>
+              ${pokeUi}
+            </div>
+            <div class="cx-zone__trackwrap">
+              <div class="cx-zone__track"><span class="cx-zone__fill" style="width:${pct}%"></span>${snail}</div>
+              <span class="cx-zone__gap">îți mai trebuie <b>${gap.toLocaleString("ro-RO")}</b> puncte ca să-l întreci</span>
+            </div>
+            <div class="cx-zone__row cx-zone__row--me">
+              ${meAvatar("cx-av--sm")}
+              <span class="cx-zone__who"><b>Tu</b> <span class="cx-muted">· #${myRank} · ${MY_PROFILE.points.toLocaleString("ro-RO")} pct</span></span>
+            </div>
+            ${below
+              ? `<div class="cx-zone__row cx-zone__row--chaser">
+                  ${userAvatar(below.id, "cx-av--sm")}
+                  <span class="cx-zone__who"><b data-user-name>${escapeHtml(below.name || "Membru")}</b> <span class="cx-muted">· e la ${Math.max(0, MY_PROFILE.points - (below.points || 0)).toLocaleString("ro-RO")} puncte în spatele tău — nu te lăsa!</span></span>
+                </div>`
+              : ""}
+          </div>`;
+      } else {
+        zone = `<div class="cx-zone"><div class="cx-zone__head"><h3>Zona ta</h3><span class="cx-muted">locul <b>#1</b> — ești în vârf! 👑</span></div></div>`;
+      }
     }
 
     return `
       ${sectionHead("Clasament", "Cei mai activi membri ai comunității. Aplaudă-i pe cei din top — și ia-le locul.")}
       ${podium}
-      <div class="cx-lb">${rows}</div>
+      <div class="cx-lb">${list}</div>
       ${zone}`;
   }
 
@@ -2947,6 +2958,7 @@ export function renderCommunity(basePath = "") {
       const forumPosts = await fetchFeed({ surface: "forum" });
       const wallPosts = await fetchFeed({ surface: "wall" });
       state.posts = [...forumPosts, ...wallPosts];
+      state.members = await fetchMembers(); // real leaderboard directory (points desc)
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
       MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
       const fr = await fetchMyFriends(); // real friend graph

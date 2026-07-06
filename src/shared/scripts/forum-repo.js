@@ -57,7 +57,7 @@ function surrogateForAuthor(profile) {
     points: profile.points || 0,
     streak: 0,
     lessons: 0,
-    status: "",
+    status: profile.status_line || "",
     role: profile.role || "member",
     lastSeen: profile.last_seen_at ? new Date(profile.last_seen_at).getTime() : 0,
   });
@@ -364,6 +364,26 @@ export async function fetchMyFriends() {
     else out.incoming.push(sid);
   }
   return out;
+}
+
+/** The member directory — real users from `profiles`, for the leaderboard,
+ *  discovery and (later) messaging partners. Each is registered as a surrogate
+ *  user so the numeric-id render helpers resolve them; returns their surrogate
+ *  ids ordered by points (highest first). The current user maps to id 0 ("me").
+ *  The teacher (admin) is excluded — he isn't in the game. Works for guests too
+ *  (public leaderboard). */
+export async function fetchMembers({ limit = 200 } = {}) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_color, status_line, points, last_seen_at, role")
+    .eq("role", "member")
+    .order("points", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.warn("fetchMembers:", error.message);
+    return [];
+  }
+  return (data || []).map((p) => surrogateForAuthor(p));
 }
 
 export async function sendFriendRequest(userSurrogate) {
