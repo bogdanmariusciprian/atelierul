@@ -21,6 +21,7 @@
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
+import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
 import {
@@ -500,13 +501,20 @@ export function renderCommunity(basePath = "") {
   // everywhere a user's name & avatar appear (global consistency). Both the
   // data (userMeta) and the badge markup (badgeHtml) come from the shared
   // badges.js, so the leaderboard, hub and threads never drift apart.
+  // Presence: green dot = active now, red = offline. "Me" is always here.
+  const isUserOnline = (id) =>
+    id === CURRENT_USER.id ? true : isOnlineSince((userById(id) || {}).lastSeen);
+  const presenceDot = (id) =>
+    `<span class="cx-presence${isUserOnline(id) ? " is-on" : ""}" title="${isUserOnline(id) ? "activ acum" : "offline"}" aria-hidden="true"></span>`;
+
   const badged = (id, inner) => {
     // The teacher wears no level ring / badges — he's not in the game.
-    if (isAdmin() && id === CURRENT_USER.id) return `<span class="cx-avwrap">${inner}</span>`;
+    if (isAdmin() && id === CURRENT_USER.id) return `<span class="cx-avwrap">${inner}${presenceDot(id)}</span>`;
     const m = userMeta(id);
     return `<span class="cx-avwrap">
         <span class="cx-ring" style="--ring:${m.fill}">${inner}</span>
         ${badgeHtml(m, "cx-bdg")}
+        ${presenceDot(id)}
       </span>`;
   };
 

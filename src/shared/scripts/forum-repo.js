@@ -57,6 +57,7 @@ function surrogateForAuthor(profile) {
     streak: 0,
     lessons: 0,
     status: "",
+    lastSeen: profile.last_seen_at ? new Date(profile.last_seen_at).getTime() : 0,
   });
   return sid;
 }
@@ -130,7 +131,7 @@ export async function fetchFeed({ limit = 40, surface = "forum" } = {}) {
   const { data: postRows, error } = await supabase
     .from("posts")
     .select(
-      "id, author_id, body, type, background, audience, share_of, surface, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, points)"
+      "id, author_id, body, type, background, audience, share_of, surface, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, points, last_seen_at)"
     )
     .eq("moderation_status", "visible")
     .eq("surface", surface)
@@ -157,7 +158,7 @@ export async function fetchFeed({ limit = 40, surface = "forum" } = {}) {
   const { data: commentRows, error: cErr } = await supabase
     .from("comments")
     .select(
-      "id, post_id, parent_id, body, edited_at, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, points)"
+      "id, post_id, parent_id, body, edited_at, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, points, last_seen_at)"
     )
     .in("post_id", postIds)
     .eq("moderation_status", "visible")
@@ -343,7 +344,7 @@ export async function fetchMyFriends() {
   const { data, error } = await supabase
     .from("friendships")
     .select(
-      "requester_id, addressee_id, status, requester:profiles!friendships_requester_id_fkey(id,display_name,avatar_color,points), addressee:profiles!friendships_addressee_id_fkey(id,display_name,avatar_color,points)"
+      "requester_id, addressee_id, status, requester:profiles!friendships_requester_id_fkey(id,display_name,avatar_color,points,last_seen_at), addressee:profiles!friendships_addressee_id_fkey(id,display_name,avatar_color,points,last_seen_at)"
     )
     .or(`requester_id.eq.${me},addressee_id.eq.${me}`);
   if (error) {

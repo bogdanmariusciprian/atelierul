@@ -852,6 +852,15 @@
 /* Ringed + badged avatar (level ring + level & streak badges) — used
    wherever a user's name & avatar appear, for global consistency. */
 .cx-avwrap { position: relative; display: inline-grid; place-items: center; flex: none; }
+/* Presence dot: green = active now, red = offline. Top-left corner (level
+   badge sits at the bottom, streak top-right, so this stays clear). */
+.cx-presence {
+  position: absolute; left: 0; top: 0; z-index: 3;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: #ef4444; /* offline */
+  border: 2px solid var(--color-bg);
+}
+.cx-presence.is-on { background: #22c55e; } /* active now */
 .cx-ring {
   display: inline-grid;
   place-items: center;
