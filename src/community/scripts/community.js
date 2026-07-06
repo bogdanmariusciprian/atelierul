@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
@@ -2921,6 +2921,10 @@ export function renderCommunity(basePath = "") {
       state.posts = await fetchFeed();
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
       MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
+      const fr = await fetchMyFriends(); // real friend graph
+      MY_PROFILE.friendIds = fr.friendIds;
+      MY_PROFILE.friendReqIncoming = fr.incoming;
+      MY_PROFILE.friendReqOutgoing = fr.outgoing;
       render();
     } catch (e) {
       console.warn("feed:", e.message);
@@ -3206,28 +3210,35 @@ export function renderCommunity(basePath = "") {
       }
       case "friend-add": {
         const uid = Number(btn.dataset.uid);
-        if (!isFriend(uid) && !reqOutgoing(uid) && !reqIncoming(uid)) MY_PROFILE.friendReqOutgoing.push(uid);
+        if (!isFriend(uid) && !reqOutgoing(uid) && !reqIncoming(uid)) {
+          MY_PROFILE.friendReqOutgoing.push(uid);
+          sendFriendRequest(uid); // REAL
+        }
         return render();
       }
       case "friend-cancel": {
         const uid = Number(btn.dataset.uid);
         MY_PROFILE.friendReqOutgoing = MY_PROFILE.friendReqOutgoing.filter((x) => x !== uid);
+        cancelFriendRequest(uid); // REAL
         return render();
       }
       case "friend-accept": {
         const uid = Number(btn.dataset.uid);
         MY_PROFILE.friendReqIncoming = MY_PROFILE.friendReqIncoming.filter((x) => x !== uid);
         if (!isFriend(uid)) MY_PROFILE.friendIds.push(uid);
+        acceptFriendRequest(uid); // REAL
         return render();
       }
       case "friend-decline": {
         const uid = Number(btn.dataset.uid);
         MY_PROFILE.friendReqIncoming = MY_PROFILE.friendReqIncoming.filter((x) => x !== uid);
+        declineFriendRequest(uid); // REAL
         return render();
       }
       case "friend-remove": {
         const uid = Number(btn.dataset.uid);
         MY_PROFILE.friendIds = MY_PROFILE.friendIds.filter((x) => x !== uid);
+        removeFriend(uid); // REAL
         return render();
       }
       case "set-audience":

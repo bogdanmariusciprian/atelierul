@@ -18,6 +18,7 @@ let _commentSurrogate = 3_000_000;
 const userSurrByUuid = new Map(); // profile uuid -> numeric
 const postUuidBySurr = new Map(); // numeric -> post uuid
 const commentUuidBySurr = new Map(); // numeric -> comment uuid
+const userUuidBySurr = new Map(); // numeric user surrogate -> profile uuid
 
 const LIKE_EMOJI = "♥"; // a "like" is stored as a ♥ reaction row
 
@@ -44,6 +45,7 @@ function surrogateForAuthor(profile) {
   if (existing) return existing;
   const sid = ++_userSurrogate;
   userSurrByUuid.set(profile.id, sid);
+  userUuidBySurr.set(sid, profile.id);
   registerRealUser({
     id: sid,
     real: true,
@@ -324,6 +326,78 @@ export async function toggleCommentLike(commentSurrogate, liked) {
   } else {
     await supabase.from("comment_reactions").delete().eq("comment_id", cid).eq("user_id", CURRENT_USER.authId).eq("emoji", LIKE_EMOJI);
   }
+}
+
+// ---------------------------------------------------------
+// Friends (friendships). Surrogate ids ↔ uuids as everywhere.
+// ---------------------------------------------------------
+/** The current user's friend graph as surrogate ids:
+ *  { friendIds, incoming (they asked me), outgoing (I asked them) }. */
+export async function fetchMyFriends() {
+  const me = CURRENT_USER.authId;
+  const empty = { friendIds: [], incoming: [], outgoing: [] };
+  if (!me) return empty;
+  const { data, error } = await supabase
+    .from("friendships")
+    .select(
+      "requester_id, addressee_id, status, requester:profiles!friendships_requester_id_fkey(id,display_name,avatar_color,points), addressee:profiles!friendships_addressee_id_fkey(id,display_name,avatar_color,points)"
+    )
+    .or(`requester_id.eq.${me},addressee_id.eq.${me}`);
+  if (error) {
+    console.warn("fetchMyFriends:", error.message);
+    return empty;
+  }
+  const out = { friendIds: [], incoming: [], outgoing: [] };
+  for (const f of data || []) {
+    const iAmRequester = f.requester_id === me;
+    const other = iAmRequester ? f.addressee : f.requester;
+    if (!other) continue;
+    const sid = surrogateForAuthor(other); // registers + maps the other user
+    if (f.status === "accepted") out.friendIds.push(sid);
+    else if (iAmRequester) out.outgoing.push(sid);
+    else out.incoming.push(sid);
+  }
+  return out;
+}
+
+export async function sendFriendRequest(userSurrogate) {
+  const other = userUuidBySurr.get(userSurrogate);
+  if (!other || !CURRENT_USER.authId) return;
+  await supabase.from("friendships").insert({
+    requester_id: CURRENT_USER.authId,
+    addressee_id: other,
+    status: "pending",
+  });
+}
+
+export async function cancelFriendRequest(userSurrogate) {
+  const other = userUuidBySurr.get(userSurrogate);
+  if (!other || !CURRENT_USER.authId) return;
+  await supabase.from("friendships").delete()
+    .eq("requester_id", CURRENT_USER.authId).eq("addressee_id", other);
+}
+
+export async function acceptFriendRequest(userSurrogate) {
+  const other = userUuidBySurr.get(userSurrogate);
+  if (!other || !CURRENT_USER.authId) return;
+  await supabase.from("friendships").update({ status: "accepted" })
+    .eq("requester_id", other).eq("addressee_id", CURRENT_USER.authId);
+}
+
+export async function declineFriendRequest(userSurrogate) {
+  const other = userUuidBySurr.get(userSurrogate);
+  if (!other || !CURRENT_USER.authId) return;
+  await supabase.from("friendships").delete()
+    .eq("requester_id", other).eq("addressee_id", CURRENT_USER.authId);
+}
+
+export async function removeFriend(userSurrogate) {
+  const other = userUuidBySurr.get(userSurrogate);
+  if (!other || !CURRENT_USER.authId) return;
+  const me = CURRENT_USER.authId;
+  await supabase.from("friendships").delete().or(
+    `and(requester_id.eq.${me},addressee_id.eq.${other}),and(requester_id.eq.${other},addressee_id.eq.${me})`
+  );
 }
 
 /** Whether the current user has been granted Events access by the teacher. */
