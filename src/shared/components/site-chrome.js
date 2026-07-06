@@ -31,6 +31,7 @@ import { showToast } from "../scripts/toast.js";
 import { CURRENT_USER } from "../scripts/session.js";
 import { supabase } from "../scripts/supabase-client.js";
 import { startPresence } from "../scripts/presence.js";
+import { store } from "../scripts/store.js";
 
 // Public navigation (visible to everyone). Labels are in Romanian
 // (UI language); code identifiers stay in English.
@@ -50,6 +51,7 @@ const NAV_LINKS = [
 ];
 
 export function renderChrome(basePath = "") {
+  seedIdentityFromCache(); // paint the RIGHT avatar instantly — no flash
   initTheme(); // palette + light/dark BEFORE anything paints brand colors
   injectSvgFilters();
   initSmoothPageScroll();
@@ -64,7 +66,45 @@ export function renderChrome(basePath = "") {
   renderHeader(basePath);
   renderPageBreadcrumbs(basePath); // "Acasă › Lecții › …" on deep pages
   renderFooter(basePath);
+  if (!window.__identityCacheOn) {
+    window.__identityCacheOn = true;
+    // Re-cache whenever identity changes (login, profile save, hydrate).
+    window.addEventListener("atelier:role", cacheIdentity);
+  }
   hydrateMemberIdentity(); // member's real avatar/identity, on EVERY page
+}
+
+// Identity cache (localStorage) so the correct avatar/name paints INSTANTLY on
+// the next page instead of a split-second flash of the default. `seed` runs
+// synchronously BEFORE the XP chip paints; `cache` refreshes it whenever the
+// identity changes. Members only (the teacher has no avatar chip).
+const IDENTITY_KEY = "atelier_identity";
+function seedIdentityFromCache() {
+  if (!isLoggedIn() || isAdmin() || !CURRENT_USER.authId) return;
+  const c = store.get(IDENTITY_KEY, null);
+  if (c && c.authId === CURRENT_USER.authId) {
+    if ("avatar" in c) MY_PROFILE.avatar = c.avatar || null;
+    if (c.color) CURRENT_USER.color = c.color;
+    if (typeof c.points === "number") MY_PROFILE.points = c.points;
+    if (c.name) {
+      CURRENT_USER.name = c.name;
+      CURRENT_USER.initials = c.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    }
+  } else {
+    // No cache for this user yet → paint NEUTRAL initials (not a stale default
+    // gif) until the async hydrate brings the real avatar.
+    MY_PROFILE.avatar = null;
+  }
+}
+function cacheIdentity() {
+  if (!isLoggedIn() || isAdmin() || !CURRENT_USER.authId) return;
+  store.set(IDENTITY_KEY, {
+    authId: CURRENT_USER.authId,
+    avatar: MY_PROFILE.avatar || null,
+    color: CURRENT_USER.color,
+    name: CURRENT_USER.name,
+    points: MY_PROFILE.points,
+  });
 }
 
 // Load the signed-in MEMBER's own profile (avatar, name, colour, points)
