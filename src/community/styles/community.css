@@ -643,6 +643,10 @@
 .post__act__ic svg { width: 100%; height: 100%; }
 .post__act:hover { background: var(--color-surface); color: var(--color-text); }
 .post__act.is-liked { color: var(--color-danger); }
+/* Own post: received-likes shown as a quiet, non-clickable indicator (you
+   can't like yourself, but you still see how many likes you got). */
+.post__act--static { cursor: default; opacity: 0.7; }
+.post__act--static:hover { background: transparent; color: var(--color-text-muted); }
 .post__act.on { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .post__act.is-shared { color: var(--color-success); }
 

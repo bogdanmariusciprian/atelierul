@@ -204,6 +204,10 @@
 }
 .thr__act:hover { background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c); }
 .thr__act.is-liked { color: var(--color-danger); }
+/* Own comment: received-likes shown as a quiet, non-clickable indicator
+   (no self-like, but the count of likes you got stays visible). */
+.thr__act--static { cursor: default; opacity: 0.7; }
+.thr__act--static:hover { background: transparent; color: var(--color-text-muted); }
 /* Admin "mark correct" control */
 .thr__act--admin { border: 1px dashed var(--color-border); }
 .thr__act--admin:hover { background: color-mix(in srgb, var(--color-success) 14%, transparent); color: var(--color-success); border-color: var(--color-success); }
@@ -351,6 +355,10 @@
 }
 .thr__emoji { border: none; background: transparent; font-size: 1rem; padding: 0.1rem 0.2rem; border-radius: 50%; transition: transform 0.1s ease; }
 .thr__emoji:hover { transform: scale(1.25); }
+/* Current reaction highlighted in the picker (so "change" is obvious). */
+.thr__emoji.is-mine { background: color-mix(in srgb, var(--c) 22%, transparent); transform: scale(1.1); }
+/* The "change reaction" trigger (⟳) reads as active, not a fresh "+" . */
+.thr__addreact--change { border-color: var(--c); color: var(--c); }
 
 .thr__input {
   width: 100%;

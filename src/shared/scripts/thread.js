@@ -81,10 +81,13 @@ function avatarHtml(c, ring = false, gifUrl = null) {
   return `<span class="thr__avatar${ring ? " thr__avatar--ring" : ""}" style="--a:${c.color}">${escapeHtml(c.initials || "?")}</span>`;
 }
 
-function reactionsHtml(c, state) {
-  // One reaction per user. Your own reaction is a removable chip; everyone
-  // else's reactions are inert counts you can't touch.
+function reactionsHtml(c, state, user) {
+  // One reaction per user, and ONLY on other people's comments (you can't
+  // react to your own — same rule as likes). Your reaction is a removable
+  // chip; everyone else's are inert counts. If you already reacted, the
+  // picker lets you SWAP to a different emoji (you never stack two).
   const mine = c.myReaction || null;
+  const isOwn = user && c.authorId === user.id;
   const chips = Object.entries(c.reactions || {})
     .filter(([, n]) => n > 0)
     .map(([e, n]) =>
@@ -93,16 +96,17 @@ function reactionsHtml(c, state) {
         : `<span class="thr__chip">${e} ${n}</span>`
     )
     .join("");
-  // The "add" button + picker appear only if you haven't reacted yet.
-  const adder = mine
-    ? ""
-    : `<button type="button" class="thr__addreact" data-action="t-react" data-id="${c.id}" aria-label="Adaugă reacție">+</button>${
-        state.openReactId === c.id
-          ? `<span class="thr__picker">${REACTION_EMOJIS.map(
-              (e) => `<button type="button" class="thr__emoji" data-action="t-add-react" data-id="${c.id}" data-emoji="${e}">${e}</button>`
-            ).join("")}</span>`
-          : ""
-      }`;
+  // No self-reaction: on your OWN comment you only see the counts, no adder.
+  if (isOwn) return `<span class="thr__reacts">${chips}</span>`;
+  const picker =
+    state.openReactId === c.id
+      ? `<span class="thr__picker">${REACTION_EMOJIS.map(
+          (e) => `<button type="button" class="thr__emoji${e === mine ? " is-mine" : ""}" data-action="t-add-react" data-id="${c.id}" data-emoji="${e}">${e}</button>`
+        ).join("")}</span>`
+      : "";
+  // ONE trigger, always available on others' comments; its icon/label says
+  // whether you're adding a reaction (+) or changing an existing one (⟳).
+  const adder = `<button type="button" class="thr__addreact${mine ? " thr__addreact--change" : ""}" data-action="t-react" data-id="${c.id}" aria-label="${mine ? "Schimbă reacția" : "Adaugă reacție"}" title="${mine ? "Schimbă reacția" : "Adaugă reacție"}">${mine ? "⟳" : "+"}</button>${picker}`;
   return `<span class="thr__reacts">${chips} ${adder}</span>`;
 }
 
@@ -123,10 +127,11 @@ function commentHtml(c, depth, parentName, state, user, opts) {
   const liked = c.likedByMe ? " is-liked" : "";
   const editing = state.openEditId === c.id;
 
-  // Own comments show no like button at all (you can't like yourself).
+  // Own comments: no like BUTTON (you can't like yourself), but the count of
+  // likes you RECEIVED stays visible as a static (non-clickable) indicator.
   const likeBtn = canLike(c, user)
     ? `<button type="button" class="thr__act${liked}" data-action="t-like" data-id="${c.id}">♥ <span>${c.likes}</span></button>`
-    : "";
+    : `<span class="thr__act thr__act--static" title="Aprecieri primite — nu-ți poți aprecia propriul comentariu">♥ <span>${c.likes}</span></span>`;
 
   // Admin can mark a reply "correct" → its author earns points.
   const adminBtn = opts.isAdmin
@@ -222,7 +227,7 @@ function commentHtml(c, depth, parentName, state, user, opts) {
         ${editing ? editorHtml(c, opts) : `<p class="thr__text">${opts.decorateText ? opts.decorateText(c.text) : c.text}</p>`}
         <div class="thr__actions">
           ${likeBtn}
-          ${reactionsHtml(c, state)}
+          ${reactionsHtml(c, state, user)}
           <button type="button" class="thr__act" data-action="t-reply" data-id="${c.id}">↩ Răspunde</button>
           ${editBtn}
           ${delBtn}
@@ -311,8 +316,15 @@ export function handleThreadClick(e, opts) {
 
     case "t-add-react":
       walk(comments, id, (c) => {
-        if (c.myReaction) return; // one reaction per user — can't add another
+        if (c.authorId === user.id) return; // no reacting to your own comment
         const em = btn.dataset.emoji;
+        if (c.myReaction === em) return; // tapped the one you already have → keep it
+        if (c.myReaction) {
+          // Swap: drop the previous reaction first (one reaction per user).
+          const prev = c.myReaction;
+          c.reactions[prev] = Math.max(0, (c.reactions[prev] || 0) - 1);
+          opts.onReact?.(c, prev, false);
+        }
         c.reactions[em] = (c.reactions[em] || 0) + 1;
         c.myReaction = em;
         opts.onReact?.(c, em, true);

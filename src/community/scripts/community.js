@@ -966,10 +966,14 @@ export function renderCommunity(basePath = "") {
       post.bg === "none" ? "" : `style="--postfrom:${bg.from};--postto:${bg.to}"`;
     const isMine = isLoggedIn() && post.authorId === CURRENT_USER.id;
     const isShare = !!post.shareOf;
-    // Own posts show no like button at all (you can't like yourself).
-    // Guests SEE the button — clicking invites them to join (toast).
+    // Own posts: no like BUTTON (you can't like yourself), but the count of
+    // likes you RECEIVED stays visible as a static (non-clickable) indicator.
+    // Others — and guests (clicking invites them to join) — get the button.
+    // The teacher likes others' content and sees his own received likes too.
     const likeBtn = isMine
-      ? ""
+      ? `<span class="post__act post__act--static" title="Aprecieri primite — nu-ți poți aprecia propria postare" aria-label="${post.likes} aprecieri primite">
+            <span class="post__act__ic">${ACTION_ICONS.like}</span><span>${post.likes}</span>
+          </span>`
       : `<button type="button" class="post__act${post.likedByMe ? " is-liked" : ""}" data-action="like" data-id="${post.id}">
             <span class="post__act__ic">${ACTION_ICONS.like}</span><span>${post.likes}</span>
           </button>`;

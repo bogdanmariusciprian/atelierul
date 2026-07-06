@@ -64,6 +64,38 @@ export function renderChrome(basePath = "") {
   renderHeader(basePath);
   renderPageBreadcrumbs(basePath); // "Acasă › Lecții › …" on deep pages
   renderFooter(basePath);
+  hydrateMemberIdentity(); // member's real avatar/identity, on EVERY page
+}
+
+// Load the signed-in MEMBER's own profile (avatar, name, colour, points)
+// from Supabase on EVERY page, so their avatar & identity look the SAME
+// everywhere — home, lessons, hub. Before this, only the community hub
+// fetched it, so other pages fell back to the default avatar (the bug where
+// the top-left chip and the Home chip showed an old/default picture).
+// Members only — the teacher isn't in the game and has no avatar chip.
+let _identityHydratedFor = null;
+async function hydrateMemberIdentity() {
+  if (!isLoggedIn() || isAdmin() || !CURRENT_USER.authId) return;
+  if (_identityHydratedFor === CURRENT_USER.authId) return; // once per user
+  _identityHydratedFor = CURRENT_USER.authId;
+  try {
+    const { data, error } = await supabase.rpc("get_my_profile");
+    if (error) return;
+    const prof = Array.isArray(data) ? data[0] : data;
+    if (!prof) return;
+    MY_PROFILE.avatar = prof.avatar || null;
+    if (prof.points != null) MY_PROFILE.points = prof.points;
+    if (prof.avatar_color) CURRENT_USER.color = prof.avatar_color;
+    const dn = (prof.display_name || CURRENT_USER.name || "").replace(/[<>]/g, "");
+    if (dn) {
+      CURRENT_USER.name = dn;
+      CURRENT_USER.initials = dn.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    }
+    // Re-render the XP chip / nav with the fresh identity.
+    window.dispatchEvent(new CustomEvent("atelier:role"));
+  } catch {
+    /* offline / RPC missing → keep defaults, never crash the page */
+  }
 }
 
 // =========================================================
