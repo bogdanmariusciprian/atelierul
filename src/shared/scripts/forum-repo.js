@@ -406,18 +406,34 @@ export async function removeFriend(userSurrogate) {
   );
 }
 
-/** The current user's own profile (settings) row, or null. */
+/** The current user's own profile (settings) row, or null.
+ *  Via the get_my_profile() RPC: since migration 0009 locks the sensitive
+ *  columns (names, school, town, class, passions, challenges) out of the
+ *  public Data API, the owner reads their OWN full row through a
+ *  security-definer function instead of a raw table select. */
 export async function fetchMyProfile() {
   const me = CURRENT_USER.authId;
   if (!me) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select(
-      "display_name, avatar_color, avatar, status_line, first_name, last_name, grade, locality, school, passions, challenges, visibility, points, created_at"
-    )
-    .eq("id", me)
-    .maybeSingle();
-  return data;
+  const { data, error } = await supabase.rpc("get_my_profile");
+  if (error) {
+    console.warn("fetchMyProfile:", error.message);
+    return null;
+  }
+  // The function returns the composite `profiles` row (object or 1-row array).
+  return Array.isArray(data) ? data[0] || null : data || null;
+}
+
+/** Another member's profile, VISIBILITY-ENFORCED on the server.
+ *  Returns the bounded public fields (never `challenges` unless you're the
+ *  owner or the teacher), or null when the target's visibility forbids it. */
+export async function fetchPublicProfile(uuid) {
+  if (!uuid) return null;
+  const { data, error } = await supabase.rpc("get_public_profile", { p_id: uuid });
+  if (error) {
+    console.warn("fetchPublicProfile:", error.message);
+    return null;
+  }
+  return Array.isArray(data) ? data[0] || null : data || null;
 }
 
 /** Save edited profile fields to the current user's own row. */
