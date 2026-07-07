@@ -2697,6 +2697,15 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
 /* Clear day separators inside a conversation. */
 .cx-daysep { display: flex; align-items: center; justify-content: center; margin: 0.6rem 0 0.4rem; }
 .cx-daysep span { padding: 0.15rem 0.7rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface)); border: 1px solid var(--color-border); }
+/* Free-text message box (quota that grows with points) */
+.cx-freebox { padding: 0.5rem 0.6rem; border: 1px solid var(--color-primary); border-radius: 12px; background: var(--color-surface); margin-bottom: 0.5rem; }
+.cx-freebox--empty { border-style: dashed; }
+.cx-freecount { display: inline-block; font-size: 0.78rem; font-weight: 700; color: var(--color-primary); margin-bottom: 0.35rem; }
+.cx-freerow { display: flex; gap: 0.4rem; }
+.cx-freerow .cx-input { flex: 1; }
+.cx-tplhint { margin: 0.4rem 0 0.2rem; font-size: 0.78rem; }
+.cx-bubble__report { border: none; background: transparent; cursor: pointer; color: var(--color-text-muted); font-size: 0.72rem; padding: 0 0.15rem; opacity: 0.55; }
+.cx-bubble__report:hover { opacity: 1; color: var(--color-danger); }
 .cx-bubble__text { margin: 0; font-size: 0.9rem; line-height: 1.45; overflow-wrap: anywhere; }
 .cx-bubble__meta {
   display: flex;

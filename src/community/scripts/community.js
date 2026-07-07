@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
@@ -1536,11 +1536,15 @@ export function renderCommunity(basePath = "") {
     return `<span class="cx-tick" title="Trimis">✓</span>`;
   }
   function msgBubble(m, mine, partnerOnline) {
+    // Incoming messages from a member (not the teacher) can be reported.
+    const reportBtn = !mine && !m.fromTeacher && m.id
+      ? `<button type="button" class="cx-bubble__report" data-action="msg-report-msg" data-id="${m.id}" title="Raportează profesorului">⚑</button>`
+      : "";
     return `<div class="cx-bubble${mine ? " cx-bubble--me" : ""}${m.fromTeacher ? " cx-bubble--teacher" : ""}${!mine && !m.read ? " is-unread" : ""}">
         <p class="cx-bubble__text">${escapeHtml(m.text).replace(/\n/g, "<br>")}</p>
         <span class="cx-bubble__meta">${msgTime(m.createdAt)}
           ${m.template ? `<span title="Mesaj din șabloanele sigure">🧩</span>` : ""}
-          ${mine ? msgTicks(m, partnerOnline) : ""}
+          ${mine ? msgTicks(m, partnerOnline) : reportBtn}
         </span>
       </div>`;
   }
@@ -1588,6 +1592,29 @@ export function renderCommunity(basePath = "") {
           <button type="button" class="btn-mini" data-action="msg-slot-add">Adaugă la mesaj</button>
           <button type="button" class="btn-mini btn-mini--ghost" data-action="msg-slot-cancel">Renunță</button>
         </div>
+      </div>`;
+  }
+
+  // Free-text quota: 3 free messages per conversation + 1 for each 100 points.
+  // A free message is ≤ 30 chars; templates stay unlimited. The SERVER enforces
+  // this (send_free_message RPC) — the counter here just mirrors it.
+  const freeAllowance = () => 3 + Math.floor((MY_PROFILE.points || 0) / 100);
+  function freeMsgComposer(conv) {
+    const used = conv.msgs.filter((m) => m.fromId === 0 && !m.fromTeacher && !m.template).length;
+    const remaining = Math.max(0, freeAllowance() - used);
+    const label = `<span class="cx-freecount">✍️ <b>${remaining}</b> ${remaining === 1 ? "mesaj liber rămas" : "mesaje libere rămase"}</span>`;
+    if (remaining <= 0) {
+      return `<div class="cx-freebox cx-freebox--empty">${label}
+          <p class="cx-muted">Ai folosit mesajele libere aici. Adună puncte ca să primești altele — sau folosește șabloanele (nelimitate).</p>
+        </div>`;
+    }
+    return `<div class="cx-freebox">
+        ${label}
+        <div class="cx-freerow">
+          <input class="cx-input" id="cx-free-msg" type="text" maxlength="30" placeholder="Scrie liber (max 30 caractere)…" />
+          <button type="button" class="btn-mini" data-action="msg-free-user">Trimite</button>
+        </div>
+        ${state.msgWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.msgWarn)}</p>` : ""}
       </div>`;
   }
 
@@ -1817,7 +1844,8 @@ export function renderCommunity(basePath = "") {
                </div>
              </div>`
           : `<div class="cx-chat__composer">
-               <p class="cx-muted">Ca totul să rămână prietenos, mesajele dintre colegi se compun din șabloane. Cuvintele tale ajung doar la profesor.</p>
+               ${freeMsgComposer(open)}
+               <p class="cx-muted cx-tplhint">…sau alege un șablon (nelimitate):</p>
                ${templatePicker()}
              </div>`;
       // Admin: label the member conversation right under the header.
@@ -4617,6 +4645,35 @@ export function renderCommunity(basePath = "") {
         showToast(`✉️ Trimis lui ${(target.name || "").split(" ")[0]}`, { kind: "success" });
         touchStreak();
         return render();
+      }
+      case "msg-free-user": {
+        // Member → member FREE text (≤30 chars), quota enforced by the server.
+        const conv = state.msgOpen;
+        const toId = conv?.startsWith("u") ? Number(conv.slice(1)) : NaN;
+        const target = userById(toId);
+        const box = mount.querySelector("#cx-free-msg");
+        const text = box?.value.trim();
+        if (!target || !text) return;
+        if (text.length > 30) { state.msgWarn = "Maxim 30 de caractere pentru un mesaj liber."; return render(); }
+        if (moderate(text).length) { state.msgWarn = "Mesajul conține limbaj nepotrivit — reformulează, te rog."; return render(); }
+        state.msgWarn = null;
+        sendFreeMsg(toId, text).then((res) => {
+          if (res && res.error === "quota") showToast("Ai terminat mesajele libere cu acest coleg — adună puncte pentru altele.", { kind: "warn" });
+          else if (res && res.error) showToast("Mesajul liber n-a putut fi trimis.", { kind: "error" });
+          reloadConversations();
+        });
+        touchStreak();
+        return render();
+      }
+      case "msg-report-msg": {
+        const mid = btn.dataset.id; // real message uuid
+        if (!mid) return;
+        confirmDialog("Mesajul va fi trimis profesorului spre verificare.", { title: "Raportezi mesajul?", okLabel: "Raportează" }).then((ok) => {
+          if (!ok) return;
+          reportMessage(mid);
+          showToast("⚑ Semnalat — profesorul va verifica.", { kind: "success" });
+        });
+        return;
       }
       case "msg-free-send": {
         // Free text: member → teacher, or the teacher → anyone.

@@ -604,6 +604,31 @@ export async function fetchEventAccessUsers() {
   return new Set((data || []).map((r) => r.user_id));
 }
 
+/** Member → member FREE text (max 30 chars), gated by a points-earned quota
+ *  the SERVER enforces (send_free_message RPC). Returns { ok|error, allowance,
+ *  used, remaining }. */
+export async function sendFreeMsg(recipientSurrogate, body) {
+  const to = uuidForSurrogate(recipientSurrogate);
+  if (!to || !CURRENT_USER.authId) return null;
+  const { data, error } = await supabase.rpc("send_free_message", { p_recipient: to, p_body: body });
+  if (error) {
+    console.warn("sendFreeMsg:", error.message);
+    return { error: error.message };
+  }
+  return data;
+}
+
+/** Report a message to the teacher (moderation queue). */
+export async function reportMessage(messageId, reason) {
+  if (!messageId || !CURRENT_USER.authId) return;
+  await supabase.from("reports").insert({
+    reporter_id: CURRENT_USER.authId,
+    target_type: "message",
+    target_id: messageId,
+    reason: reason || null,
+  });
+}
+
 /** Mark the incoming (not-mine) messages of ONE conversation as read. */
 export async function markConversationReadReal(conv, asAdmin) {
   if (!conv || !CURRENT_USER.authId) return;
