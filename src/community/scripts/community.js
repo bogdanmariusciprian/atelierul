@@ -1648,7 +1648,18 @@ export function renderCommunity(basePath = "") {
     const shownConvs = asAdmin && state.msgLabelFilter !== "all"
       ? convs.filter((c) => (state.msgLabelFilter === "evenimente" ? convHasEvents(c) : convLabelId(c) === state.msgLabelFilter))
       : convs;
-    const open = convs.find((c) => c.key === state.msgOpen) || null;
+    let open = convs.find((c) => c.key === state.msgOpen) || null;
+    // Brand-new conversation (no messages yet) → synthesize an EMPTY one so the
+    // composer shows. This is how you message ANYONE — no friendship needed.
+    if (!open && state.msgOpen) {
+      if (state.msgOpen === "t") {
+        open = { key: "t", partnerId: null, partnerName: "Profesorul", teacher: true, guest: false, msgs: [], unread: 0 };
+      } else if (state.msgOpen.startsWith("u")) {
+        const pid = Number(state.msgOpen.slice(1));
+        const u = userById(pid);
+        if (u && pid !== CURRENT_USER.id) open = { key: state.msgOpen, partnerId: pid, partnerName: u.name || "Membru", teacher: false, guest: false, msgs: [], unread: 0 };
+      }
+    }
 
     // --- left rail: conversations + "new message" (real members) ---
     const partnersInConvs = new Set(convs.map((c) => c.partnerId));
@@ -1888,7 +1899,10 @@ export function renderCommunity(basePath = "") {
           ${status ? `<p class="cx-muted">„${escapeHtml(status)}”</p>` : ""}
           <span class="cx-vis"><span aria-hidden="true">👁️</span> ${VIS_LABELS[p.visibility] || VIS_LABELS.members}</span>
         </div>
-        ${isLoggedIn() && !isAdmin() ? friendButton(id) : ""}
+        <div class="cx-profileacts">
+          ${isLoggedIn() && id !== CURRENT_USER.id ? `<button type="button" class="btn-mini cx-msgbtn" data-action="msg-to" data-uid="${id}">✉️ Mesaj</button>` : ""}
+          ${isLoggedIn() && !isAdmin() ? friendButton(id) : ""}
+        </div>
       </div>`;
 
     const badges = [
@@ -4433,6 +4447,20 @@ export function renderCommunity(basePath = "") {
       }
 
       // ---- messages (chat) ----
+      case "msg-to": {
+        // "✉️ Mesaj" on a member's profile → open (or start) their chat.
+        const uid = Number(btn.dataset.uid);
+        if (!isLoggedIn() || uid === CURRENT_USER.id || !userById(uid)) return;
+        remember();
+        state.section = "mesaje";
+        state.msgOpen = `u${uid}`;
+        state.viewUser = null;
+        state.msgParts = [];
+        state.msgSlot = null;
+        state.msgWarn = null;
+        history.replaceState(null, "", "#mesaje");
+        return render();
+      }
       case "msg-open": {
         const key = btn.dataset.key;
         state.msgOpen = key;
