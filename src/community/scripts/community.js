@@ -232,6 +232,7 @@ export function renderCommunity(basePath = "") {
     simLevel: null, // admin: simulate a level to preview the bar/frame
     simPrestige: 0, // admin: simulate prestige stars
     editingProfile: false, // profile edit mode
+    needsName: false, // member must set first+last name before using the hub
     pickAvatar: undefined, // avatar chosen while editing (path or null)
     viewUser: null, // when set, the profile section shows this user's profile
     viewUserProfile: null, // { sid, loaded, data } — the viewed member's REAL profile (get_public_profile)
@@ -2037,6 +2038,25 @@ export function renderCommunity(basePath = "") {
       ${wall}`;
   }
 
+  // Mandatory-name onboarding — a member with a Google nickname must set a real
+  // first + last name before entering the community (so only that name shows).
+  function nameGateScreen() {
+    return `
+      <div class="cx-namegate">
+        <div class="cx-namegate__card">
+          <span class="cx-namegate__ic" aria-hidden="true">👋</span>
+          <h2>Bun venit! Cum te cheamă?</h2>
+          <p>Ca să te recunoască colegii și profesorul, pune-ți numele real. Așa vei apărea peste tot cu numele tău — nu cu cel de la contul de Google.</p>
+          <div class="cx-fieldgrid">
+            <div><label class="cx-label">Prenume</label><input class="cx-input" id="ng-first" value="${escapeHtml(MY_PROFILE.firstName || "")}" placeholder="ex: Andrei" /></div>
+            <div><label class="cx-label">Nume</label><input class="cx-input" id="ng-last" value="${escapeHtml(MY_PROFILE.lastName || "")}" placeholder="ex: Popescu" /></div>
+          </div>
+          ${state.profileWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.profileWarn)}</p>` : ""}
+          <button type="button" class="btn btn--primary" data-action="save-name">Continuă →</button>
+        </div>
+      </div>`;
+  }
+
   function sectionProfile() {
     if (state.viewUser && state.viewUser !== CURRENT_USER.id) return otherProfile(state.viewUser);
     // A guest has no own profile — invite them to make one.
@@ -3379,6 +3399,9 @@ export function renderCommunity(basePath = "") {
             CURRENT_USER.initials = dn.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
           }
         }
+        // Mandatory name: a member with no first+last name must set it before
+        // using the community, so the Google nickname never shows to others.
+        state.needsName = !isAdmin() && (!prof.first_name || !prof.last_name);
       }
       render();
     } catch (e) {
@@ -3395,6 +3418,13 @@ export function renderCommunity(basePath = "") {
     // read-only subset (everything else lands on the public forum).
     if (isAdmin() && ADMIN_HIDDEN_SECTIONS.has(state.section)) state.section = "forum";
     if (!isLoggedIn() && !GUEST_SECTIONS.has(state.section)) state.section = "forum";
+    // Mandatory name gate: a member with no real name sets it before anything.
+    if (state.needsName && isLoggedIn() && !isAdmin()) {
+      mount.innerHTML = `<div class="cx-shell cx-shell--gate">${nameGateScreen()}</div>`;
+      const f = mount.querySelector("#ng-first");
+      if (f && document.activeElement !== f) f.focus();
+      return;
+    }
     mount.innerHTML = `
       <div class="cx-shell">
         ${sidebar()}
@@ -4758,6 +4788,32 @@ export function renderCommunity(basePath = "") {
         }
         state.profileWarn = null;
         MY_PROFILE.status = next; // persists on the profile — others see it
+        return render();
+      }
+
+      // ---- mandatory name onboarding ----
+      case "save-name": {
+        const first = mount.querySelector("#ng-first")?.value.trim() || "";
+        const last = mount.querySelector("#ng-last")?.value.trim() || "";
+        if (first.length < 2 || last.length < 2) {
+          state.profileWarn = "Completează prenumele și numele (minim 2 litere fiecare).";
+          return render();
+        }
+        if (moderate(`${first} ${last}`).length) {
+          state.profileWarn = "Nume nepotrivit — folosește numele tău real.";
+          return render();
+        }
+        const clean = (s) => s.replace(/[<>]/g, "").trim();
+        const displayName = `${clean(first)} ${clean(last)}`;
+        MY_PROFILE.firstName = escapeHtml(first);
+        MY_PROFILE.lastName = escapeHtml(last);
+        CURRENT_USER.name = displayName;
+        CURRENT_USER.initials = displayName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+        updateMyProfile({ first_name: clean(first), last_name: clean(last), display_name: displayName }); // REAL → Supabase
+        state.needsName = false;
+        state.profileWarn = null;
+        window.dispatchEvent(new CustomEvent("atelier:role")); // refresh chip/nav + re-cache the name
+        showToast(`✓ Bun venit, ${escapeHtml(first)}!`, { kind: "success" });
         return render();
       }
 
