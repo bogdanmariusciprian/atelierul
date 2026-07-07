@@ -267,6 +267,8 @@ export function renderCommunity(basePath = "") {
     msgWarn: null,
     conversations: [], // REAL conversations (Supabase) — loaded in loadFeed
     msgSlot: null, // a slotted template being filled ({opera}/{zi} pick)
+    msgNewQuery: "", // "Conversație nouă" — search a member by name
+    pendingMsgUuid: null, // #msg/<uuid> deep link → open that conversation after load
     convLabels: {}, // admin inbox: member UUID → 'curent'|'incheiat'|'amanat'
     eventAccessUuids: new Set(), // members with Events access (auto "Evenimente")
     msgLabelFilter: "all", // admin inbox filter
@@ -308,6 +310,17 @@ export function renderCommunity(basePath = "") {
     state.section = "profil";
     state.viewUser = u && u.id !== CURRENT_USER.id ? u.id : null;
     loadViewUser(state.viewUser); // fetch their REAL profile (get_public_profile)
+    return true;
+  }
+
+  // Notification deep link: ...#msg/<sender-uuid> → open that conversation
+  // (resolved to the surrogate id once conversations have loaded).
+  applyMsgHash();
+  function applyMsgHash() {
+    const h = location.hash.slice(1);
+    if (!h.startsWith("msg/")) return false;
+    state.section = "mesaje";
+    state.pendingMsgUuid = decodeURIComponent(h.slice(4));
     return true;
   }
 
@@ -1513,14 +1526,44 @@ export function renderCommunity(basePath = "") {
   // discussion is always visible. Members talk through PREDEFINED
   // templates only (chainable into one message, searchable); free text
   // exists ONLY to/from the teacher.
-  function msgBubble(m, mine) {
-    return `<div class="cx-bubble${mine ? " cx-bubble--me" : ""}${!mine && !m.read ? " is-unread" : ""}">
+  const msgTime = (ts) => new Date(ts).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+  // WhatsApp-style delivery ticks, only on MY sent messages:
+  //   ✓ gray = sent (recipient offline) · ✓✓ gray = delivered (online) ·
+  //   ✓✓ blue = read.
+  function msgTicks(m, partnerOnline) {
+    if (m.read) return `<span class="cx-tick cx-tick--read" title="Citit">✓✓</span>`;
+    if (partnerOnline) return `<span class="cx-tick" title="Livrat — e online">✓✓</span>`;
+    return `<span class="cx-tick" title="Trimis">✓</span>`;
+  }
+  function msgBubble(m, mine, partnerOnline) {
+    return `<div class="cx-bubble${mine ? " cx-bubble--me" : ""}${m.fromTeacher ? " cx-bubble--teacher" : ""}${!mine && !m.read ? " is-unread" : ""}">
         <p class="cx-bubble__text">${escapeHtml(m.text).replace(/\n/g, "<br>")}</p>
-        <span class="cx-bubble__meta">${relTime(Math.max(0, Date.now() - m.createdAt))}
+        <span class="cx-bubble__meta">${msgTime(m.createdAt)}
           ${m.template ? `<span title="Mesaj din șabloanele sigure">🧩</span>` : ""}
-          ${mine ? `<span title="Mesajul a plecat">✓</span>` : ""}
+          ${mine ? msgTicks(m, partnerOnline) : ""}
         </span>
       </div>`;
+  }
+  // A clear day separator between messages from different days.
+  function msgDayLabel(ts) {
+    const d = new Date(ts);
+    const sameDay = (a, b) => a.toDateString() === b.toDateString();
+    if (sameDay(d, new Date())) return "Azi";
+    if (sameDay(d, new Date(Date.now() - 864e5))) return "Ieri";
+    return d.toLocaleDateString("ro-RO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  }
+  function renderBubbles(msgs, mineIs, partnerOnline) {
+    let out = "";
+    let lastDay = null;
+    for (const m of msgs) {
+      const day = new Date(m.createdAt).toDateString();
+      if (day !== lastDay) {
+        out += `<div class="cx-daysep"><span>${msgDayLabel(m.createdAt)}</span></div>`;
+        lastDay = day;
+      }
+      out += msgBubble(m, mineIs(m), partnerOnline);
+    }
+    return out;
   }
 
   // The template picker: search + category chips + grid; every pick lands
@@ -1642,6 +1685,46 @@ export function renderCommunity(basePath = "") {
     return `<div class="cx-labelset"><span class="cx-muted">Etichetă:</span> ${CONV_LABELS.map(btn).join("")}${cur ? `<button type="button" class="cx-labelbtn cx-labelbtn--clear" data-action="msg-label" data-uid="${conv.partnerId}" data-label="">✕</button>` : ""}${convHasEvents(conv) ? ` <span class="cx-convlabel" style="--l:#7c3aed">🎟️ Evenimente (auto)</span>` : ""}</div>`;
   }
 
+  // "Conversație nouă" — a search box + result cards (no giant dropdown). The
+  // auto handle (@slug) disambiguates identical names; no user-chosen usernames
+  // (safer for minors — nothing inappropriate to moderate).
+  function newConversationBox(existingPartnerIds) {
+    const q = state.msgNewQuery.trim();
+    const ql = q.toLowerCase();
+    const teacherOpt = !state.conversations.some((c) => c.teacher)
+      ? `<button type="button" class="cx-newconv__item" data-action="msg-to-teacher">
+           <span class="cx-av" style="--a:#7c3aed">🎓</span>
+           <span class="cx-newconv__id"><b>Profesorul</b><span class="cx-muted">scrie-i cu cuvintele tale</span></span>
+         </button>`
+      : "";
+    let results = "";
+    if (ql.length >= 1) {
+      const matches = state.members
+        .map((id) => userById(id))
+        .filter((u) => u && u.id !== CURRENT_USER.id && !existingPartnerIds.has(u.id) && (u.name || "").toLowerCase().includes(ql))
+        .slice(0, 8);
+      const nameCount = {};
+      matches.forEach((u) => { const n = (u.name || "").toLowerCase(); nameCount[n] = (nameCount[n] || 0) + 1; });
+      results = matches.length
+        ? `<div class="cx-newconv__list">${matches
+            .map((u) => {
+              const dup = nameCount[(u.name || "").toLowerCase()] > 1;
+              const meta = [u.status ? `„${escapeHtml(u.status)}”` : `Nivel ${levelInfo(u.points || 0).level}`, dup ? `@${slugForUser(u.id)}` : ""].filter(Boolean).join(" · ");
+              return `<button type="button" class="cx-newconv__item" data-action="msg-to" data-uid="${u.id}">
+                  ${userAvatar(u.id)}
+                  <span class="cx-newconv__id"><b>${escapeHtml(u.name)}</b><span class="cx-muted">${meta}</span></span>
+                </button>`;
+            })
+            .join("")}</div>`
+        : `<p class="cx-muted cx-newconv__empty">Niciun coleg „${escapeHtml(q)}".${state.members.filter((id) => id !== CURRENT_USER.id).length ? "" : " Încă nu-s alți elevi înscriși."}</p>`;
+    }
+    return `<div class="cx-newconv">
+        <input class="cx-input" id="cx-msg-search-user" type="search" placeholder="🔍 Scrie unui coleg — caută după nume…" value="${escapeHtml(q)}" />
+        ${teacherOpt}
+        ${results}
+      </div>`;
+  }
+
   function sectionMessages() {
     const asAdmin = isAdmin();
     const convs = state.conversations; // REAL conversations (Supabase)
@@ -1661,22 +1744,12 @@ export function renderCommunity(basePath = "") {
       }
     }
 
-    // --- left rail: conversations + "new message" (real members) ---
+    // --- left rail: conversations + "new message" (SEARCH real members) ---
     const partnersInConvs = new Set(convs.map((c) => c.partnerId));
-    const newOpts = state.members
-      .map((id) => userById(id))
-      .filter((u) => u && u.id !== CURRENT_USER.id && !partnersInConvs.has(u.id))
-      .map((u) => `<option value="u${u.id}">${escapeHtml(u.name)}</option>`)
-      .join("");
-    const newBox = `
-      <div class="cx-chat__new">
-        <select class="cx-input" id="cx-msg-newto" title="Începe o conversație nouă">
-          <option value="">➕ Conversație nouă…</option>
-          ${!asAdmin && !convs.some((c) => c.teacher) ? `<option value="t">🎓 Profesorul</option>` : ""}
-          ${newOpts}
-        </select>
-      </div>`;
-    const rail = convs.length || newOpts
+    // Members start conversations via a search box (not a giant dropdown); the
+    // teacher only replies to incoming ones.
+    const newBox = asAdmin ? "" : newConversationBox(partnersInConvs);
+    const rail = convs.length || !asAdmin
       ? `<aside class="cx-chat__list">
           ${newBox}
           ${asAdmin ? adminLabelBar() : ""}
@@ -1717,7 +1790,8 @@ export function renderCommunity(basePath = "") {
         </div>`;
     } else {
       const mineIs = (m) => (asAdmin ? m.fromTeacher === true : m.fromId === 0 && !m.fromTeacher);
-      const bubbles = open.msgs.map((m) => msgBubble(m, mineIs(m))).join("");
+      const partnerOnline = open.partnerId != null && !open.teacher ? isUserOnline(open.partnerId) : false;
+      const bubbles = renderBubbles(open.msgs, mineIs, partnerOnline);
       const who = open.teacher
         ? `<span class="cx-teacher">🎓 Profesorul</span>`
         : open.guest
@@ -3238,6 +3312,14 @@ export function renderCommunity(basePath = "") {
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
       }
+      // A #msg/<uuid> notification link → open that person's conversation.
+      if (state.pendingMsgUuid) {
+        const conv = state.conversations.find(
+          (c) => c.partnerId != null && uuidForSurrogate(c.partnerId) === state.pendingMsgUuid
+        );
+        if (conv) state.msgOpen = conv.key;
+        state.pendingMsgUuid = null;
+      }
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
       MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
       const fr = await fetchMyFriends(); // real friend graph
@@ -4458,7 +4540,16 @@ export function renderCommunity(basePath = "") {
         state.msgParts = [];
         state.msgSlot = null;
         state.msgWarn = null;
+        state.msgNewQuery = "";
         history.replaceState(null, "", "#mesaje");
+        return render();
+      }
+      case "msg-to-teacher": {
+        // "Conversație nouă → Profesorul" (member free-text channel).
+        state.section = "mesaje";
+        state.msgOpen = "t";
+        state.msgNewQuery = "";
+        state.msgWarn = null;
         return render();
       }
       case "msg-open": {
@@ -4678,14 +4769,6 @@ export function renderCommunity(basePath = "") {
   mount.addEventListener("change", (e) => {
     // "Conversație nouă…" — the select in the chat rail opens (or creates)
     // that partner's conversation.
-    if (e.target.id === "cx-msg-newto") {
-      const v = e.target.value;
-      if (!v) return;
-      state.msgOpen = v;
-      state.msgParts = [];
-      state.msgWarn = null;
-      return render();
-    }
     if (e.target.id !== "cx-file") return;
     const files = [...e.target.files].filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
@@ -4761,6 +4844,10 @@ export function renderCommunity(basePath = "") {
       state.memberQuery = e.target.value;
       return rerenderKeepingFocus("cx-member-search");
     }
+    if (e.target.id === "cx-msg-search-user") {
+      state.msgNewQuery = e.target.value;
+      return rerenderKeepingFocus("cx-msg-search-user");
+    }
     if (e.target.id === "cx-msg-search") {
       state.msgQuery = e.target.value;
       return rerenderKeepingFocus("cx-msg-search");
@@ -4810,6 +4897,15 @@ export function renderCommunity(basePath = "") {
   window.addEventListener("hashchange", () => {
     remember(); // real-link navigation (profile anchors) is a jump too
     if (applyUserHash()) return render();
+    if (applyMsgHash()) {
+      // Conversations are already loaded → resolve + open immediately.
+      const conv = state.conversations.find(
+        (c) => c.partnerId != null && uuidForSurrogate(c.partnerId) === state.pendingMsgUuid
+      );
+      if (conv) state.msgOpen = conv.key;
+      state.pendingMsgUuid = null;
+      return render();
+    }
     if (applyAdminHash()) return render();
     const h = location.hash.slice(1);
     state.viewUser = null;

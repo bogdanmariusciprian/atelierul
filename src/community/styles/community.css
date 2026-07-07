@@ -2436,6 +2436,19 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
 /* Profile action buttons (Message + friend) */
 .cx-profileacts { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
 .cx-msgbtn { border-color: var(--color-primary); color: var(--color-primary); }
+/* "Conversație nouă" — search box + result cards */
+.cx-newconv { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.5rem; border-bottom: 1px solid var(--color-border); }
+.cx-newconv__list { display: flex; flex-direction: column; gap: 0.25rem; max-height: 240px; overflow-y: auto; }
+.cx-newconv__item {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  padding: 0.4rem 0.5rem; border: 1px solid transparent; border-radius: 10px;
+  background: transparent; cursor: pointer; text-align: left; transition: background 0.12s ease, border-color 0.12s ease;
+}
+.cx-newconv__item:hover { background: color-mix(in srgb, var(--color-primary) 8%, transparent); border-color: color-mix(in srgb, var(--color-primary) 25%, transparent); }
+.cx-newconv__id { display: flex; flex-direction: column; min-width: 0; }
+.cx-newconv__id b { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-newconv__id .cx-muted { font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-newconv__empty { padding: 0.4rem 0.3rem; font-size: 0.82rem; }
 .cx-msg__sent { font-size: 0.72rem; font-weight: 700; color: var(--color-success); }
 
 /* Exercise proposal preview (hub, simple rendition) */
@@ -2672,6 +2685,18 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
   border-radius: 14px 14px 4px 14px;
 }
 .cx-bubble.is-unread { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 45%, transparent); }
+/* Teacher's messages wear the admin purple (default 🎓 accent). */
+.cx-bubble--teacher {
+  background: color-mix(in srgb, #7c3aed 16%, var(--color-surface));
+  border-color: color-mix(in srgb, #7c3aed 40%, var(--color-border));
+}
+.cx-bubble--teacher.cx-bubble--me { border-radius: 14px 14px 4px 14px; }
+/* WhatsApp-style delivery ticks: gray = sent/delivered, blue = read. */
+.cx-tick { color: var(--color-text-muted); font-weight: 700; letter-spacing: -2px; }
+.cx-tick--read { color: #2563eb; }
+/* Clear day separators inside a conversation. */
+.cx-daysep { display: flex; align-items: center; justify-content: center; margin: 0.6rem 0 0.4rem; }
+.cx-daysep span { padding: 0.15rem 0.7rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface)); border: 1px solid var(--color-border); }
 .cx-bubble__text { margin: 0; font-size: 0.9rem; line-height: 1.45; overflow-wrap: anywhere; }
 .cx-bubble__meta {
   display: flex;

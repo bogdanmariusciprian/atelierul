@@ -757,8 +757,12 @@ function initNotifCenter(basePath) {
         default: return `<b>${name}</b>`;
       }
     };
-    const hrefFor = (n) =>
-      n.type === "message" ? `${HUB}#mesaje` : n.type === "friend" ? `${HUB}#profil` : `${HUB}#forum`;
+    const hrefFor = (n) => {
+      const p = n.payload || {};
+      if (n.type === "message") return p.actor ? `${HUB}#msg/${p.actor}` : `${HUB}#mesaje`;
+      if (n.type === "friend") return `${HUB}#profil`;
+      return `${HUB}#forum`;
+    };
     const rows = notifRows().map((n) =>
       row({
         kind: n.type,
