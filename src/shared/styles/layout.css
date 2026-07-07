@@ -527,7 +527,7 @@
    Floating ✉️ "Scrie profesorului" (site-chrome.js) — non-admin, all pages
    ========================================================= */
 /* ============ Floating Messenger widget ============ */
-.msgr { position: fixed; right: 22px; bottom: 26px; z-index: 2147482100; display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+.msgr { position: fixed; right: 22px; bottom: 26px; z-index: 2147482100; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 0.5rem; }
 /* Teacher has the 🛡️ toolbox bottom-right too → move the Messenger left of it. */
 .msgr--admin { right: 90px; }
 .msgr-fab { position: relative; width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer; font-size: 1.5rem; color: #fff; background: linear-gradient(135deg, #7c3aed, #2563eb); box-shadow: 0 12px 28px -8px rgba(124, 58, 237, 0.7); align-self: flex-end; }

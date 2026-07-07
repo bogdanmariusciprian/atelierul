@@ -32,7 +32,7 @@ import { CURRENT_USER } from "../scripts/session.js";
 import { supabase } from "../scripts/supabase-client.js";
 import { startPresence } from "../scripts/presence.js";
 import { store } from "../scripts/store.js";
-import { initMessenger } from "./messenger.js";
+import { initMessenger, openMessenger } from "./messenger.js";
 
 // Public navigation (visible to everyone). Labels are in Romanian
 // (UI language); code identifiers stay in English.
@@ -932,15 +932,6 @@ function renderFooter(basePath) {
       </div>
     </footer>`;
 
-  // "Scrie-i profesorului" opens the floating contact panel (non-admin);
-  // the admin is pointed to his inbox instead.
-  mount.querySelector("#footer-contact")?.addEventListener("click", () => {
-    const fab = document.querySelector(".contact-float__fab");
-    if (fab) {
-      fab.click();
-      fab.scrollIntoView({ block: "end", behavior: "smooth" });
-    } else {
-      window.location.href = "/comunitate/#mesaje";
-    }
-  });
+  // "Scrie-i profesorului" opens the floating Messenger widget.
+  mount.querySelector("#footer-contact")?.addEventListener("click", () => openMessenger());
 }

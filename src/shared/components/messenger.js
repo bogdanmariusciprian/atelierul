@@ -47,6 +47,15 @@ function openConv() {
   return st.convs.find((c) => c.key === st.convKey) || null;
 }
 
+/** Open the Messenger panel (used by the footer "Scrie-i profesorului"). */
+export function openMessenger() {
+  if (!el) return;
+  st.open = true;
+  st.convKey = null;
+  render();
+  el.querySelector(".msgr-fab")?.scrollIntoView({ block: "end", behavior: "smooth" });
+}
+
 // ---- Composer for the open conversation ----
 function composerHtml(conv) {
   const asAdmin = isAdmin();

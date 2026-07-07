@@ -100,11 +100,27 @@ function syncCurrentUser() {
   // The teacher (admin) is shown ONLY as "Profesor" everywhere — never by
   // name — with a 🎓 avatar. Regular users show their (editable) display name.
   const admin = _user ? roleForEmail(_user.email) === "admin" : false;
-  const name = _user ? (admin ? "Profesor" : nameOf(_user)) : "Tu";
+  let name = _user ? (admin ? "Profesor" : nameOf(_user)) : "Tu";
+  let color = null;
+  // Prefer the display name the user set in their profile (cached from the
+  // real row) over the Google name — so the chip doesn't flash the Google
+  // name on every auth event before hydrate corrects it.
+  if (_user && !admin) {
+    try {
+      const c = JSON.parse(localStorage.getItem("atelier_identity") || "null");
+      if (c && c.authId === _user.id) {
+        if (c.name) name = c.name;
+        if (c.color) color = c.color;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
   CURRENT_USER.authId = _user?.id ?? null;
   CURRENT_USER.email = _user?.email ?? null;
   CURRENT_USER.name = name;
   CURRENT_USER.initials = _user ? (admin ? "🎓" : initialsOf(name)) : "TU";
+  if (color) CURRENT_USER.color = color;
 }
 syncCurrentUser();
 

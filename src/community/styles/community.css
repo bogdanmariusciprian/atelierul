@@ -2662,6 +2662,7 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
 }
 .cx-chat__scroll {
   flex: 1;
+  min-height: 0; /* flexbox: without this an overflow child won't actually scroll */
   max-height: 21rem;
   overflow-y: auto;
   display: flex;
