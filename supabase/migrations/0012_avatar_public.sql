@@ -1,0 +1,13 @@
+-- =========================================================
+-- Migration 0012 — make the chosen avatar visible to others.
+--
+-- 0009 locked profiles down to a safe column whitelist to protect pupils'
+-- PII, but it also (unintentionally) hid `avatar` — the gif each pupil picks
+-- for themselves. That's NOT sensitive (it's a cosmetic choice from a fixed
+-- set, exactly like `avatar_color`), so others could only ever see initials.
+-- Add `avatar` to the readable columns so a member's avatar shows in the
+-- feed, the members directory, the leaderboard and on their profile.
+--
+-- Safe to re-run. Depends on 0008 (avatar column) + 0009 (column grants).
+-- =========================================================
+grant select (avatar) on public.profiles to anon, authenticated;

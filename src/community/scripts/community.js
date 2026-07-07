@@ -539,20 +539,24 @@ export function renderCommunity(basePath = "") {
   const userAvatar = (id, cls = "") => {
     if (id === CURRENT_USER.id) return meAvatar(cls);
     const u = userById(id) || {};
-    // Real (Supabase) users have no gif → initials avatar in their colour.
+    // Real (Supabase) users show their CHOSEN gif if they picked one, else
+    // initials in their colour. Seed users use a stable mock gif.
     const inner = u.real
-      ? `<span class="cx-av ${cls}" style="--a:${u.color || "#7c5cff"}">${escapeHtml(u.initials || "?")}</span>`
+      ? (u.avatar
+          ? `<span class="cx-av cx-av--gif ${cls}" style="background-image:url('${basePath}${u.avatar}')" role="img" aria-label="${escapeHtml(u.name || "")}"></span>`
+          : `<span class="cx-av ${cls}" style="--a:${u.color || "#7c5cff"}">${escapeHtml(u.initials || "?")}</span>`)
       : `<span class="cx-av cx-av--gif ${cls}" style="background-image:url('${basePath}${avatarForUser(id)}')" role="img" aria-label="${escapeHtml(u.name || "")}"></span>`;
     return badged(id, inner);
   };
 
   // Avatar URL for a thread comment's author (used by renderThread).
-  const avatarUrlFor = (id) =>
-    id === CURRENT_USER.id
-      ? MY_PROFILE.avatar
-        ? `${basePath}${MY_PROFILE.avatar}`
-        : null
-      : `${basePath}${avatarForUser(id)}`;
+  // Real users → their chosen gif (or null = initials); seed → a mock gif.
+  const avatarUrlFor = (id) => {
+    if (id === CURRENT_USER.id) return MY_PROFILE.avatar ? `${basePath}${MY_PROFILE.avatar}` : null;
+    const u = userById(id) || {};
+    if (u.real) return u.avatar ? `${basePath}${u.avatar}` : null;
+    return `${basePath}${avatarForUser(id)}`;
+  };
 
   // A clickable label linking a proposal back to its source lesson page.
   // Falls back to plain text if the proposal has no known lesson slug.
