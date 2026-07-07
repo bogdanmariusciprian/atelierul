@@ -32,6 +32,7 @@ import { CURRENT_USER } from "../scripts/session.js";
 import { supabase } from "../scripts/supabase-client.js";
 import { startPresence } from "../scripts/presence.js";
 import { store } from "../scripts/store.js";
+import { initMessenger } from "./messenger.js";
 
 // Public navigation (visible to everyone). Labels are in Romanian
 // (UI language); code identifiers stay in English.
@@ -59,7 +60,7 @@ export function renderChrome(basePath = "") {
   initXpBar(basePath); // permanent level/XP bar (+ user identity) for members
   initAdminFrame(); // pulsing page border while in the admin role
   initAdminQuickPanel(basePath); // floating 🛡️ toolbox on EVERY page (admin)
-  initContactFloat(basePath); // floating ✉️ "Scrie profesorului" (non-admin)
+  initMessenger(basePath); // floating 💬 Messenger (members/teacher) + guest contact form
   initGuestOneTap(); // Google One Tap card for signed-out visitors (site-wide)
   startPresence(); // heartbeat → last_seen (green/red presence dots)
   initUserMenu(); // right-click on any user name → copy/open/copy-link

@@ -526,6 +526,49 @@
 /* =========================================================
    Floating ✉️ "Scrie profesorului" (site-chrome.js) — non-admin, all pages
    ========================================================= */
+/* ============ Floating Messenger widget ============ */
+.msgr { position: fixed; right: 22px; bottom: 26px; z-index: 2147482100; display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+/* Teacher has the 🛡️ toolbox bottom-right too → move the Messenger left of it. */
+.msgr--admin { right: 90px; }
+.msgr-fab { position: relative; width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer; font-size: 1.5rem; color: #fff; background: linear-gradient(135deg, #7c3aed, #2563eb); box-shadow: 0 12px 28px -8px rgba(124, 58, 237, 0.7); align-self: flex-end; }
+.msgr-fab:hover { transform: scale(1.07); }
+.msgr-fabbadge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: var(--color-danger); color: #fff; font-size: 0.7rem; line-height: 18px; font-weight: 700; }
+.msgr-panel { width: 340px; max-width: calc(100vw - 32px); height: 460px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.35); overflow: hidden; }
+.msgr-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--color-border); font-size: 0.95rem; background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
+.msgr-back { border: none; background: transparent; font-size: 1.4rem; line-height: 1; cursor: pointer; color: var(--color-text-muted); }
+.msgr-list { overflow-y: auto; flex: 1; }
+.msgr-item { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.55rem 0.7rem; border: none; background: transparent; cursor: pointer; text-align: left; border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); }
+.msgr-item:hover { background: color-mix(in srgb, var(--color-primary) 7%, transparent); }
+.msgr-item.is-unread { font-weight: 600; }
+.msgr-av { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--color-primary) 18%, var(--color-surface)); font-weight: 700; flex: none; }
+.msgr-item__id { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.msgr-item__id b { font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msgr-badge { background: var(--color-danger); color: #fff; border-radius: 999px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.7rem; line-height: 18px; text-align: center; }
+.msgr-scroll { flex: 1; overflow-y: auto; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.msgr-day { text-align: center; margin: 0.3rem 0; }
+.msgr-day span { padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface)); }
+.msgr-b { max-width: 82%; align-self: flex-start; padding: 0.35rem 0.55rem; border-radius: 12px 12px 12px 3px; background: color-mix(in srgb, var(--color-text) 6%, var(--color-surface)); border: 1px solid var(--color-border); }
+.msgr-b--me { align-self: flex-end; border-radius: 12px 12px 3px 12px; background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)); }
+.msgr-b--teacher { background: color-mix(in srgb, #7c3aed 16%, var(--color-surface)); }
+.msgr-b__t { display: block; font-size: 0.85rem; overflow-wrap: anywhere; }
+.msgr-b__m { display: flex; gap: 0.25rem; justify-content: flex-end; font-size: 0.64rem; color: var(--color-text-muted); }
+.msgr-tick { font-weight: 700; letter-spacing: -2px; }
+.msgr-tick--read { color: #2563eb; }
+.msgr-report { border: none; background: transparent; cursor: pointer; color: var(--color-text-muted); font-size: 0.68rem; opacity: 0.6; }
+.msgr-report:hover { color: var(--color-danger); opacity: 1; }
+.msgr-compose { display: flex; gap: 0.35rem; padding: 0.5rem; border-top: 1px solid var(--color-border); }
+.msgr-input { flex: 1; padding: 0.4rem 0.6rem; border: 1px solid var(--color-border); border-radius: 10px; font: inherit; font-size: 0.85rem; background: var(--color-bg, #fff); resize: none; }
+.msgr-send { border: none; background: var(--color-primary); color: #fff; width: 36px; border-radius: 10px; cursor: pointer; font-size: 1rem; flex: none; }
+.msgr-tpls { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0 0.5rem 0.5rem; }
+.msgr-tpl { border: 1px solid var(--color-border); background: transparent; border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 0.76rem; cursor: pointer; }
+.msgr-tpl:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.msgr-muted { color: var(--color-text-muted); font-size: 0.8rem; }
+.msgr-empty { padding: 1rem; text-align: center; }
+.msgr-guest { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.7rem; }
+.msgr-guest .msgr-input { width: 100%; }
+.msgr-guestmail { padding: 0.7rem; }
+.msgr-warn { color: var(--color-danger); font-size: 0.78rem; margin: 0; }
+
 .contact-float {
   position: fixed;
   right: 22px;
