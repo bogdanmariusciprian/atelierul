@@ -35,10 +35,21 @@ function unreadTotal() {
   return st.convs.reduce((n, c) => n + (c.unread || 0), 0);
 }
 
+/** A pupil can ALWAYS reach the teacher — surface that thread even before the
+ *  first message, so it shows in the list and "Scrie-i profesorului" can open
+ *  it directly. The teacher/admin isn't a pupil, so this doesn't apply to them. */
+function ensureTeacherConv() {
+  if (!isLoggedIn() || isAdmin()) return;
+  if (!st.convs.some((c) => c.teacher)) {
+    st.convs.push({ key: "t", partnerId: null, partnerName: "Profesorul", teacher: true, guest: false, guestEmail: null, msgs: [], unread: 0 });
+  }
+}
+
 /** Reload conversations (logged-in only), then re-render. */
 export async function reloadMessenger() {
   if (!isLoggedIn()) { st.convs = []; if (el) render(); return; }
   try { st.convs = await fetchConversations(isAdmin()); } catch { st.convs = []; }
+  ensureTeacherConv();
   if (el) render();
   window.dispatchEvent(new CustomEvent("atelier:notifs"));
 }
@@ -47,13 +58,20 @@ function openConv() {
   return st.convs.find((c) => c.key === st.convKey) || null;
 }
 
-/** Open the Messenger panel (used by the footer "Scrie-i profesorului"). */
-export function openMessenger() {
+/** Open the Messenger panel. `{ teacher: true }` (the footer "Scrie-i
+ *  profesorului") lands a pupil straight in the teacher thread; the teacher
+ *  gets the list and a guest gets the contact form. */
+export function openMessenger(opts = {}) {
   if (!el) return;
   st.open = true;
-  st.convKey = null;
+  if (opts.teacher && isLoggedIn() && !isAdmin()) {
+    ensureTeacherConv();
+    st.convKey = "t";
+    st.focusInput = true;
+  } else {
+    st.convKey = null;
+  }
   render();
-  el.querySelector(".msgr-fab")?.scrollIntoView({ block: "end", behavior: "smooth" });
 }
 
 // ---- Composer for the open conversation ----
@@ -111,14 +129,16 @@ function convView(conv) {
     <div class="msgr-head">
       <button type="button" class="msgr-back" data-act="back" aria-label="Înapoi">‹</button>
       <b>${who}</b>
+      <button type="button" class="msgr-x" data-act="toggle" aria-label="Închide">×</button>
     </div>
     <div class="msgr-scroll" data-role="scroll">${bubbles || `<p class="msgr-muted msgr-empty">Niciun mesaj încă. Scrie primul!</p>`}</div>
     ${composerHtml(conv)}`;
 }
 
 function listView() {
+  const closeX = `<button type="button" class="msgr-x" data-act="toggle" aria-label="Închide">×</button>`;
   if (!st.convs.length) {
-    return `<div class="msgr-head"><b>Mesaje</b></div>
+    return `<div class="msgr-head"><b>Mesaje</b>${closeX}</div>
       <p class="msgr-muted msgr-empty">Nicio conversație încă. Începe una din „Membri" sau de pe profilul unui coleg.</p>`;
   }
   const rows = st.convs.map((c) => {
@@ -130,11 +150,11 @@ function listView() {
         ${c.unread ? `<b class="msgr-badge">${c.unread}</b>` : ""}
       </button>`;
   }).join("");
-  return `<div class="msgr-head"><b>Mesaje</b></div><div class="msgr-list">${rows}</div>`;
+  return `<div class="msgr-head"><b>Mesaje</b>${closeX}</div><div class="msgr-list">${rows}</div>`;
 }
 
 function guestForm() {
-  return `<div class="msgr-head"><b>Scrie-i profesorului</b></div>
+  return `<div class="msgr-head"><b>Scrie-i profesorului</b><button type="button" class="msgr-x" data-act="toggle" aria-label="Închide">×</button></div>
     <div class="msgr-guest">
       <p class="msgr-muted">Nu ai nevoie de cont — lasă un e-mail și profesorul îți răspunde acolo.</p>
       <input class="msgr-input" data-role="g-name" placeholder="Numele tău (opțional)" />
@@ -155,14 +175,21 @@ function render() {
   // The teacher also has the 🛡️ quick-panel bottom-right → shift left to avoid it.
   el.classList.toggle("msgr--admin", isLoggedIn() && isAdmin());
   const unread = isLoggedIn() ? unreadTotal() : 0;
+  // Remember where the user was reading BEFORE we replace the DOM: if they had
+  // scrolled up to read history, a passive background reload must NOT yank them
+  // back to the bottom. Only jump to the newest when they were already there
+  // (or just opened / sent — st.focusInput).
+  const oldSc = el.querySelector('[data-role="scroll"]');
+  const wasAtBottom = oldSc ? oldSc.scrollHeight - oldSc.scrollTop - oldSc.clientHeight < 48 : true;
   el.innerHTML = `
-    <button type="button" class="msgr-fab" data-act="toggle" aria-expanded="${st.open}" title="Mesaje">
+    <button type="button" class="msgr-fab" data-act="toggle" aria-expanded="${st.open}" aria-label="Mesaje" title="Mesaje">
       💬${unread ? `<b class="msgr-fabbadge">${unread}</b>` : ""}
     </button>
-    <div class="msgr-panel" ${st.open ? "" : "hidden"}>${panelHtml()}</div>`;
+    <div class="msgr-panel" ${st.open ? "" : "hidden"} role="dialog" aria-label="Mesaje">${panelHtml()}</div>`;
   if (st.open) {
     const sc = el.querySelector('[data-role="scroll"]');
-    if (sc) sc.scrollTop = sc.scrollHeight;
+    if (sc && (wasAtBottom || st.focusInput)) sc.scrollTop = sc.scrollHeight;
+    if (st.focusInput) { el.querySelector('[data-role="free"]')?.focus(); st.focusInput = false; }
   }
 }
 
@@ -173,6 +200,7 @@ function sendCurrentFree(kind) {
   const text = (box?.value || "").trim();
   if (!text) return;
   if (findProfanity(text).length) { showToast("Mesajul conține limbaj nepotrivit — reformulează.", { kind: "warn" }); return; }
+  st.focusInput = true; // keep the cursor in the composer after the reload
   if (kind === "teacher") {
     if (isAdmin()) { if (conv.partnerId != null) sendTeacherReply(conv.partnerId, text).then(reloadMessenger); }
     else sendTeacherMsg(text).then(reloadMessenger);
@@ -202,6 +230,7 @@ export function initMessenger(basePath = "") {
     if (act === "toggle") { st.open = !st.open; if (!st.open) st.convKey = null; return render(); }
     if (act === "open") {
       st.convKey = t.dataset.key;
+      st.focusInput = true; // land in the conversation ready to type
       const conv = openConv();
       if (conv && conv.unread) { markConversationReadReal(conv, isAdmin()); conv.unread = 0; conv.msgs.forEach((m) => (m.read = true)); window.dispatchEvent(new CustomEvent("atelier:notifs")); }
       return render();
@@ -211,7 +240,7 @@ export function initMessenger(basePath = "") {
     if (act === "send-free") return sendCurrentFree("free");
     if (act === "tpl") {
       const conv = openConv();
-      if (conv && conv.partnerId != null) sendTemplateMsg(conv.partnerId, t.dataset.text, "tpl").then(reloadMessenger);
+      if (conv && conv.partnerId != null) { st.focusInput = true; sendTemplateMsg(conv.partnerId, t.dataset.text, "tpl").then(reloadMessenger); }
       return;
     }
     if (act === "report") {
@@ -240,6 +269,15 @@ export function initMessenger(basePath = "") {
       sendCurrentFree(isAdmin() || openConv()?.teacher ? "teacher" : "free");
     }
   });
+
+  const close = () => { if (!st.open) return; st.open = false; st.convKey = null; render(); };
+  // Click anywhere outside the widget closes it. composedPath() is captured at
+  // dispatch, so it still lists `el` even after our own handler re-rendered and
+  // detached the clicked node — this reliably tells "inside" from "outside".
+  document.addEventListener("click", (e) => {
+    if (st.open && !e.composedPath().includes(el)) close();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 
   // Re-render on role changes; reload when the notif system refreshes.
   window.addEventListener("atelier:role", () => { st.convKey = null; render(); reloadMessenger(); });

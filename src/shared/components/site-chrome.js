@@ -932,6 +932,7 @@ function renderFooter(basePath) {
       </div>
     </footer>`;
 
-  // "Scrie-i profesorului" opens the floating Messenger widget.
-  mount.querySelector("#footer-contact")?.addEventListener("click", () => openMessenger());
+  // "Scrie-i profesorului" opens the floating Messenger straight in the teacher
+  // thread (pupil), the list (teacher) or the contact form (guest).
+  mount.querySelector("#footer-contact")?.addEventListener("click", () => openMessenger({ teacher: true }));
 }
