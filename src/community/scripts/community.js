@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, fetchMembers, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
@@ -33,6 +33,10 @@ import {
   deleteCustomChallenge, isCustomChallenge, GROUP_TOPICS, GROUP_ICONS, groupIcon,
   groupColor, newGroupTopic, newGroupPost, EVENTS, EVENT_KINDS, BADGES,
 } from "../../shared/scripts/discover-data.js";
+import {
+  fetchTodayChallenge, fetchMyChallengeSolve, solveChallenge,
+  listChallenges, createChallenge, updateChallenge, deleteChallenge,
+} from "../../shared/scripts/challenges-repo.js";
 import {
   FORUM_POSTS, myWallPosts, POST_TYPES, postType,
   POST_BACKGROUNDS, postBackground, topPost, nextId, relTime,
@@ -78,6 +82,7 @@ const NAV_ICONS = {
   provocare: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>`,
   clasament: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>`,
   grupuri: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5.5M21 20a6 6 0 0 0-4-5.7"/></svg>`,
+  membri: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M19 8v6M22 11h-6"/></svg>`,
   evenimente: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>`,
   insigne: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M9 14l-1.5 7L12 18l4.5 3L15 14"/></svg>`,
   admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>`,
@@ -102,6 +107,7 @@ const NAV_GROUPS = [
     items: [
       { id: "provocare", label: "Provocarea zilei" },
       { id: "clasament", label: "Clasament" },
+      { id: "membri", label: "Membri" },
       { id: "grupuri", label: "Grupuri de studiu" },
       { id: "evenimente", label: "Evenimente" },
       { id: "insigne", label: "Insigne" },
@@ -175,19 +181,12 @@ export function renderCommunity(basePath = "") {
   const mount = document.getElementById("community");
   if (!mount) return;
 
-  // The daily challenge persists per calendar day (no more answering it
-  // again on every reload — that was free points).
-  const CHALLENGE_KEY = "atelier_daily_challenge";
+  // The daily challenge is REAL now (Supabase `challenges` + the
+  // solve_challenge RPC): it loads in loadFeed (state.challenge /
+  // state.challengeSolve) and the SERVER decides correctness + points.
   const todayStr = () => new Date().toISOString().slice(0, 10);
-  const savedChallenge = (() => {
-    try {
-      const s = JSON.parse(localStorage.getItem(CHALLENGE_KEY) || "null");
-      return s && s.date === todayStr() ? s : null;
-    } catch {
-      return null;
-    }
-  })();
-  // Lifetime count of solved daily challenges (drives the badge).
+  // Lifetime count of solved daily challenges (drives a badge — still local
+  // until badges are derived from real data in a later batch).
   const SOLVED_KEY = "atelier_challenges_solved";
   const challengesSolved = () => Number(localStorage.getItem(SOLVED_KEY) || 0);
 
@@ -200,6 +199,7 @@ export function renderCommunity(basePath = "") {
     _feedLoaded: false,
     notes: getNotes(), // persistent notebook (store.js adapter)
     noteQuery: "",
+    memberQuery: "", // "Membri" (discover) search
     editingNote: null, // note id being edited
     saved: new Set(), // real: populated from Supabase (saved_posts) in loadFeed
     feedLimit: 6, // forum pagination ("Încarcă mai mult")
@@ -216,7 +216,10 @@ export function renderCommunity(basePath = "") {
     exEditWarn: null,
     histSort: { key: "date", dir: "desc" }, // history table sort
     histFilter: "all", // history table: "all" | "approved" | "rejected"
-    challengeAnswer: savedChallenge ? savedChallenge.answer : null,
+    challenge: null, // today's REAL challenge (loaded in loadFeed)
+    challengeSolve: null, // my answer to it: { choice, correct } or null
+    challengePending: false, // waiting for the server's verdict
+    adminChallenges: [], // real challenges list (admin scheduling)
     groups: GROUP_TOPICS.map((g) => ({ ...g })),
     events: EVENTS.map((e) => ({ ...e })),
     openGroup: null, // id of the group topic being viewed
@@ -231,6 +234,7 @@ export function renderCommunity(basePath = "") {
     editingProfile: false, // profile edit mode
     pickAvatar: undefined, // avatar chosen while editing (path or null)
     viewUser: null, // when set, the profile section shows this user's profile
+    viewUserProfile: null, // { sid, loaded, data } — the viewed member's REAL profile (get_public_profile)
     // Forum discovery toolbar.
     feedQuery: "", // free-text search
     feedType: "all", // "all" | a POST_TYPES key
@@ -296,6 +300,7 @@ export function renderCommunity(basePath = "") {
     const u = userBySlug(decodeURIComponent(h.slice(2)));
     state.section = "profil";
     state.viewUser = u && u.id !== CURRENT_USER.id ? u.id : null;
+    loadViewUser(state.viewUser); // fetch their REAL profile (get_public_profile)
     return true;
   }
 
@@ -1720,6 +1725,108 @@ export function renderCommunity(basePath = "") {
   }
 
   // Dispatcher: your own profile, or another member's (respecting privacy).
+  // Fetch a member's REAL public profile (get_public_profile RPC — visibility
+  // enforced server-side) when their profile opens. Seed users (no real uuid)
+  // fall back to the transitional mock until their module goes real.
+  function loadViewUser(sid) {
+    state.viewUserProfile = null;
+    const uuid = sid != null && sid !== CURRENT_USER.id ? uuidForSurrogate(sid) : null;
+    if (!uuid) return;
+    fetchPublicProfile(uuid).then((data) => {
+      state.viewUserProfile = { sid, loaded: true, data: data || null };
+      if (state.section === "profil" && state.viewUser === sid) render();
+    });
+  }
+
+  // Another member's profile — REAL data. The RPC returns a row only if the
+  // target's visibility lets me see it; otherwise a "locked" card. Seed users
+  // (no uuid) use the transitional mock renderer.
+  function otherProfile(id) {
+    const uuid = uuidForSurrogate(id);
+    if (!uuid) return otherProfileMock(id); // seed user (transitional)
+
+    const back = `<div class="cx-profiletools">
+        <button type="button" class="btn-mini cx-sharebtn" data-action="copy-profile-link" data-slug="${slugForUser(id)}">🔗 Copiază link</button>
+      </div>`;
+    const u = userById(id) || {};
+    const nameGuess = u.name || "Membru";
+    const vp = state.viewUserProfile;
+
+    // Still fetching this member's real profile.
+    if (!vp || vp.sid !== id || !vp.loaded) {
+      return `
+        ${sectionHead("Profil", "Cum îi vezi pe ceilalți în comunitate.")}
+        ${back}
+        <div class="cx-box cx-profile">
+          <div class="cx-profile__row">
+            ${avatarLink(id, "cx-av--xl")}
+            <div class="cx-profile__id"><h3>${escapeHtml(nameGuess)}</h3><p class="cx-muted">se încarcă…</p></div>
+          </div>
+        </div>`;
+    }
+
+    const p = vp.data;
+    // No row → the target's visibility forbids me → locked card.
+    if (!p) {
+      return `
+        ${sectionHead("Profil", "Cum îi vezi pe ceilalți în comunitate.")}
+        ${back}
+        <div class="cx-box cx-profile cx-profile--locked">
+          <div class="cx-profile__row">
+            ${avatarLink(id, "cx-av--xl")}
+            <div class="cx-profile__id"><h3>${escapeHtml(nameGuess)}</h3></div>
+            ${isLoggedIn() && !isAdmin() ? friendButton(id) : ""}
+          </div>
+          <div class="cx-locked">
+            <span class="cx-locked__ic" aria-hidden="true">🔒</span>
+            <p>Acest profil este vizibil doar prietenilor. Trimite o cerere de prietenie ca să-l poți vedea.</p>
+          </div>
+        </div>`;
+    }
+
+    const fullName = [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.display_name || nameGuess;
+    const status = p.status_line || "";
+    const firstName = fullName.split(" ")[0] || "El/ea";
+    const head = `<div class="cx-profile__row">
+        ${avatarLink(id, "cx-av--xl")}
+        <div class="cx-profile__id">
+          <h3>${escapeHtml(fullName)}</h3>
+          ${status ? `<p class="cx-muted">„${escapeHtml(status)}”</p>` : ""}
+          <span class="cx-vis"><span aria-hidden="true">👁️</span> ${VIS_LABELS[p.visibility] || VIS_LABELS.members}</span>
+        </div>
+        ${isLoggedIn() && !isAdmin() ? friendButton(id) : ""}
+      </div>`;
+
+    const badges = [
+      { icon: "🏅", label: `${(p.points || 0).toLocaleString("ro-RO")} puncte` },
+      { icon: "📈", label: `Nivel ${levelInfo(p.points || 0).level}` },
+    ].map((b) => `<span class="cx-badge"><span aria-hidden="true">${b.icon}</span> ${b.label}</span>`).join("");
+
+    const rows = [
+      ["Nume complet", fullName],
+      ["Clasa", p.grade],
+      ["Localitate", p.locality],
+      ["Școală", p.school],
+      ["Pasiuni", p.passions],
+    ].map(([k, v]) => `<div class="cx-inforow"><span class="cx-inforow__k">${k}</span><span class="cx-inforow__v">${v ? escapeHtml(v) : "—"}</span></div>`).join("");
+
+    const theirPosts = wallPostsOf(id);
+    const wall = theirPosts.length
+      ? `<div class="cx-feed">${theirPosts.map(postCard).join("")}</div>`
+      : `<p class="cx-muted cx-profile__empty">${escapeHtml(firstName)} n-a postat încă nimic vizibil pentru tine.</p>`;
+
+    return `
+      ${sectionHead("Profil", "Cum îi vezi pe ceilalți în comunitate.")}
+      ${back}
+      <div class="cx-box cx-profile">
+        ${head}
+        <div class="cx-badges">${badges}</div>
+        <div class="cx-info">${rows}</div>
+      </div>
+      <h3 class="cx-profile__ph">Postările lui ${escapeHtml(firstName)}</h3>
+      ${wall}`;
+  }
+
   function sectionProfile() {
     if (state.viewUser && state.viewUser !== CURRENT_USER.id) return otherProfile(state.viewUser);
     // A guest has no own profile — invite them to make one.
@@ -1745,8 +1852,10 @@ export function renderCommunity(basePath = "") {
     return `<button type="button" class="btn btn--primary btn--sm" data-action="friend-add" data-uid="${id}">+ Adaugă prieten</button>`;
   }
 
-  // Another member's profile, gated by their visibility setting.
-  function otherProfile(id) {
+  // TRANSITIONAL mock profile — used ONLY for seed users (from modules not yet
+  // wired to Supabase, e.g. groups). Real members go through otherProfile()
+  // below → real data via get_public_profile. Removed entirely in Batch 6.
+  function otherProfileMock(id) {
     const pp = publicProfileOf(id);
     if (!pp) {
       state.viewUser = null;
@@ -1964,27 +2073,34 @@ export function renderCommunity(basePath = "") {
   // ---------- Section: daily challenge + word of the day ----------
   function sectionChallenge() {
     const w = wordOfToday();
-    const c = challengeOfToday();
-    const answered = state.challengeAnswer !== null;
-    const correct = answered && state.challengeAnswer === c.correct;
-    const opts = c.options
-      .map((o, i) => {
-        let cls = "cx-ch__opt";
-        if (answered) cls += i === c.correct ? " is-correct" : i === state.challengeAnswer ? " is-wrong" : " is-dim";
-        return `<button type="button" class="${cls}" data-action="challenge" data-i="${i}" ${answered ? "disabled" : ""}>${escapeHtml(o)}</button>`;
-      })
-      .join("");
+    const c = state.challenge; // today's REAL challenge (Supabase) or null
+    const solve = state.challengeSolve; // { choice, correct } or null
+    const answered = !!solve;
+    const pending = state.challengePending;
+    const myChoice = solve ? solve.choice : null;
+    const wasCorrect = solve ? solve.correct : false;
+    const opts = c
+      ? c.options
+          .map((o, i) => {
+            let cls = "cx-ch__opt";
+            if (answered) cls += i === c.correct ? " is-correct" : i === myChoice ? " is-wrong" : " is-dim";
+            return `<button type="button" class="${cls}" data-action="challenge" data-i="${i}" ${answered || pending ? "disabled" : ""}>${escapeHtml(o)}</button>`;
+          })
+          .join("")
+      : "";
     const okLabel = !isLoggedIn()
-      ? `✓ Corect! Cu un cont primeai +${c.reward} puncte și streak 😉`
+      ? `✓ Corect! Cu un cont primeai +${c ? c.reward : 15} puncte și streak 😉`
       : isAdmin()
         ? "✓ Corect!"
-        : `✓ Corect! +${c.reward} puncte`;
-    const feedback = answered
-      ? `<div class="cx-ch__feedback ${correct ? "ok" : "no"}">
-           <b>${correct ? okLabel : "✗ Aproape! Uite de ce:"}</b>
-           <p>${escapeHtml(c.explanation)}</p>
-         </div>`
-      : "";
+        : `✓ Corect! +${c ? c.reward : 15} puncte`;
+    const feedback = pending
+      ? `<div class="cx-ch__feedback">⏳ Se verifică…</div>`
+      : answered
+        ? `<div class="cx-ch__feedback ${wasCorrect ? "ok" : "no"}">
+             <b>${wasCorrect ? okLabel : "✗ Aproape! Uite de ce:"}</b>
+             <p>${escapeHtml(c ? c.explanation : "")}</p>
+           </div>`
+        : "";
     // The streak calendar: the last 14 days, active ones lit — the visual
     // memory that makes daily streaks addictive (in the healthy way).
     const cal = (() => {
@@ -2022,9 +2138,11 @@ export function renderCommunity(basePath = "") {
         </div>
         <div class="cx-ch">
           <span class="cx-ch__badge">Provocare</span>
-          <p class="cx-ch__q">${escapeHtml(c.prompt)}</p>
+          ${c
+            ? `<p class="cx-ch__q">${escapeHtml(c.prompt)}</p>
           <div class="cx-ch__opts">${opts}</div>
-          ${feedback}
+          ${feedback}`
+            : `<p class="cx-ch__q cx-muted">Nicio provocare azi. Revino mâine — profesorul pregătește una nouă.</p>`}
         </div>
       </div>`;
   }
@@ -2147,6 +2265,32 @@ export function renderCommunity(basePath = "") {
       ${podium}
       <div class="cx-lb">${list}</div>
       ${zone}`;
+  }
+
+  // ---------- Section: members directory (discover REAL people) ----------
+  function sectionMembers() {
+    const q = state.memberQuery.trim().toLowerCase();
+    const list = state.members
+      .filter((id) => id !== CURRENT_USER.id)
+      .map((id) => userById(id))
+      .filter(Boolean);
+    const filtered = q ? list.filter((u) => (u.name || "").toLowerCase().includes(q)) : list;
+    const card = (u) => `
+      <div class="cx-membercard">
+        ${avatarLink(u.id)}
+        <div class="cx-membercard__id">
+          ${userNameLink(u.id, u.name)}
+          <span class="cx-muted">${u.status ? `„${escapeHtml(u.status)}”` : `${(u.points || 0).toLocaleString("ro-RO")} pct · Nivel ${levelInfo(u.points || 0).level}`}</span>
+        </div>
+        ${isLoggedIn() && !isAdmin() ? friendButton(u.id) : ""}
+      </div>`;
+    const grid = filtered.length
+      ? `<div class="cx-membergrid">${filtered.map(card).join("")}</div>`
+      : emptyState(q ? "Niciun membru găsit" : "Încă nu sunt membri de descoperit", q ? "Încearcă alt nume." : "Pe măsură ce se alătură colegi, apar aici.");
+    return `
+      ${sectionHead("Membri", "Descoperă colegi din comunitate și adaugă-i ca prieteni.")}
+      <input class="cx-input cx-members__search" id="cx-member-search" type="search" placeholder="Caută un membru după nume…" value="${escapeHtml(state.memberQuery)}" />
+      ${grid}`;
   }
 
   // ---------- Section: study groups (list) + group topic (detail) ----------
@@ -2720,53 +2864,53 @@ export function renderCommunity(basePath = "") {
   }
 
   function adminTabChallenges() {
-    const today = challengeOfToday();
+    const list = state.adminChallenges || []; // REAL challenges (Supabase)
+    const todayId = state.challenge ? state.challenge.id : null;
+    const todayISO = new Date().toISOString().slice(0, 10);
     // The next 7 days at a glance — plan with your eyes open.
     const week = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(Date.now() + i * 864e5);
       const iso = d.toISOString().slice(0, 10);
-      const pinned = allChallenges().find((c) => c.date === iso);
-      return `<span class="cx-week__day${pinned ? " on" : ""}" title="${pinned ? escapeHtml(pinned.prompt) : "rotație automată"}">
+      const pinned = list.find((c) => c.date === iso);
+      return `<span class="cx-week__day${pinned ? " on" : ""}" title="${pinned ? escapeHtml(pinned.prompt) : "neprogramată"}">
           <b>${d.toLocaleDateString("ro-RO", { weekday: "short" })}</b>
           <span>${d.getDate()}</span>
-          <em>${pinned ? "⚡ fixată" : "♻️ rotație"}</em>
+          <em>${pinned ? "⚡ fixată" : "— liberă"}</em>
         </span>`;
     }).join("");
-    const rows = allChallenges()
-      .map((c) => {
-        const custom = isCustomChallenge(c.id);
-        const isToday = c.id === today.id;
-        const expired = c.date && c.date < new Date().toISOString().slice(0, 10);
-        const when = c.date
-          ? `📅 ${new Date(c.date + "T12:00").toLocaleDateString("ro-RO")}${expired ? ` <span class="cx-tag cx-tag--no">expirată</span>` : ""}`
-          : "♻️ în rotație";
-        const act = custom
-          ? `<span class="cx-moditem__act">
-               <button type="button" class="btn-mini" data-action="ch-edit" data-chid="${c.id}">✎ Editează</button>
-               <button type="button" class="btn-mini btn-mini--no" data-action="ch-del" data-chid="${c.id}">🗑</button>
-             </span>`
-          : `<span class="cx-muted">implicit</span>`;
-        return `<div class="cx-moditem${isToday ? " cx-moditem--exercise" : ""}">
-            <span class="cx-moditem__ic">${isToday ? "⭐" : "⚡"}</span>
-            <div class="cx-moditem__body">
-              <p class="cx-moditem__head"><b>${when}</b>${isToday ? ` <span class="cx-tag cx-tag--ok">azi</span>` : ""} <span class="cx-muted">· +${c.reward} pct</span></p>
-              <p class="cx-moditem__text">„${escapeHtml(c.prompt)}”</p>
-              <p class="cx-moditem__meta"><span class="cx-muted">${(c.options || []).map((o, i) => (i === c.correct ? `✔ ${escapeHtml(o)}` : escapeHtml(o))).join(" · ")}</span></p>
-            </div>
-            ${act}
-          </div>`;
-      })
-      .join("");
+    const rows = list.length
+      ? list
+          .map((c) => {
+            const isToday = c.id === todayId;
+            const expired = c.date && c.date < todayISO;
+            const when = c.date
+              ? `📅 ${new Date(c.date + "T12:00").toLocaleDateString("ro-RO")}${expired ? ` <span class="cx-tag cx-tag--no">expirată</span>` : ""}`
+              : "fără dată";
+            return `<div class="cx-moditem${isToday ? " cx-moditem--exercise" : ""}">
+                <span class="cx-moditem__ic">${isToday ? "⭐" : "⚡"}</span>
+                <div class="cx-moditem__body">
+                  <p class="cx-moditem__head"><b>${when}</b>${isToday ? ` <span class="cx-tag cx-tag--ok">azi</span>` : ""} <span class="cx-muted">· +${c.reward} pct</span></p>
+                  <p class="cx-moditem__text">„${escapeHtml(c.prompt)}”</p>
+                  <p class="cx-moditem__meta"><span class="cx-muted">${(c.options || []).map((o, i) => (i === c.correct ? `✔ ${escapeHtml(o)}` : escapeHtml(o))).join(" · ")}</span></p>
+                </div>
+                <span class="cx-moditem__act">
+                  <button type="button" class="btn-mini" data-action="ch-edit" data-chid="${c.id}">✎ Editează</button>
+                  <button type="button" class="btn-mini btn-mini--no" data-action="ch-del" data-chid="${c.id}">🗑</button>
+                </span>
+              </div>`;
+          })
+          .join("")
+      : `<p class="cx-muted">Nicio provocare programată încă. Adaugă una și fix-o pe o zi.</p>`;
 
     const editing = state.chEditId !== null;
     const form = editing
-      ? challengeForm(state.chEditId === "new" ? {} : allChallenges().find((c) => c.id === state.chEditId) || {})
+      ? challengeForm(state.chEditId === "new" ? {} : list.find((c) => c.id === state.chEditId) || {})
       : `<button type="button" class="cx-propose" data-action="ch-new">+ Programează o provocare nouă</button>`;
 
     return `
       <div class="cx-box">
         <div class="cx-admin__head"><h3>Provocarea zilei · planificare</h3></div>
-        <p class="cx-muted">O provocare fixată pe o zi câștigă acea zi; zilele fără provocare fixată rotesc automat lista „în rotație”. Cele adăugate de tine rămân salvate local (Supabase mai târziu).</p>
+        <p class="cx-muted">Fixează o provocare pe o zi — atunci elevii o primesc și câștigă puncte rezolvând-o corect (o singură dată, verificat de server). Salvate în Supabase.</p>
         <div class="cx-week">${week}</div>
         ${form}
         <div class="cx-modlist">${rows}</div>
@@ -2897,6 +3041,7 @@ export function renderCommunity(basePath = "") {
     exercitii: sectionExercises,
     provocare: sectionChallenge,
     clasament: sectionLeaderboard,
+    membri: sectionMembers,
     grupuri: sectionGroups,
     evenimente: sectionEvents,
     insigne: sectionBadges,
@@ -2952,6 +3097,15 @@ export function renderCommunity(basePath = "") {
   }
 
   let podiumCelebrated = false;
+  // Reload the challenge data after the teacher schedules/edits/deletes one,
+  // so both the admin list and today's card reflect it right away.
+  async function reloadChallenges() {
+    if (isAdmin()) state.adminChallenges = await listChallenges();
+    state.challenge = await fetchTodayChallenge();
+    state.challengeSolve = state.challenge ? await fetchMyChallengeSolve(state.challenge.id) : null;
+    render();
+  }
+
   // Load the REAL forum feed once (on first paint), then re-render.
   async function loadFeed() {
     try {
@@ -2959,6 +3113,10 @@ export function renderCommunity(basePath = "") {
       const wallPosts = await fetchFeed({ surface: "wall" });
       state.posts = [...forumPosts, ...wallPosts];
       state.members = await fetchMembers(); // real leaderboard directory (points desc)
+      // Today's REAL daily challenge + whether I've already answered it.
+      state.challenge = await fetchTodayChallenge();
+      state.challengeSolve = state.challenge ? await fetchMyChallengeSolve(state.challenge.id) : null;
+      if (isAdmin()) state.adminChallenges = await listChallenges();
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
       MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
       const fr = await fetchMyFriends(); // real friend graph
@@ -3255,6 +3413,7 @@ export function renderCommunity(basePath = "") {
         state.viewUser = uid === CURRENT_USER.id ? null : uid;
         state.editingProfile = false;
         state.section = "profil";
+        loadViewUser(state.viewUser); // fetch their REAL profile
         // Shareable URL for this profile (deep link).
         history.replaceState(null, "", `#u/${slugForUser(uid)}`);
         return render();
@@ -3669,22 +3828,32 @@ export function renderCommunity(basePath = "") {
         state.histFilter = btn.dataset.id;
         return render();
 
-      // ---- discover: challenge (once per calendar day, persisted) ----
-      case "challenge":
-        if (state.challengeAnswer === null) {
-          state.challengeAnswer = Number(btn.dataset.i);
-          localStorage.setItem(CHALLENGE_KEY, JSON.stringify({ date: todayStr(), answer: state.challengeAnswer }));
-          touchStreak(); // showing up for the daily challenge keeps the flame
-          // Members earn points; the teacher and guests don't (the guest
-          // version is the "taste" that invites an account).
-          const todayCh = challengeOfToday();
-          if (state.challengeAnswer === todayCh.correct && isLoggedIn() && !isAdmin()) {
-            awardPoints("Provocarea zilei rezolvată", todayCh.reward);
-            localStorage.setItem(SOLVED_KEY, String(challengesSolved() + 1));
-            pointsFx(todayCh.reward); // burst around the cursor
-          }
+      // ---- discover: challenge — the SERVER decides + awards (cheat-safe) ----
+      case "challenge": {
+        if (!state.challenge || state.challengeSolve || state.challengePending) return;
+        const choice = Number(btn.dataset.i);
+        // Guests & the teacher get a LOCAL "taste"/preview — no points, no
+        // server write (guests have no account; the teacher isn't in the game).
+        if (!isLoggedIn() || isAdmin()) {
+          state.challengeSolve = { choice, correct: choice === state.challenge.correct };
+          return render();
         }
-        return render();
+        // Members: solve_challenge decides correctness + awards points ONCE.
+        state.challengePending = true;
+        render();
+        solveChallenge(state.challenge.id, choice).then((res) => {
+          state.challengePending = false;
+          if (!res || res.error) return render();
+          state.challengeSolve = { choice, correct: !!res.correct };
+          touchStreak(); // showing up for the challenge keeps the flame
+          if (res.correct && res.awarded) {
+            awardPoints("Provocarea zilei rezolvată", res.awarded); // sync total + history
+            pointsFx(res.awarded);
+          }
+          render();
+        });
+        return;
+      }
 
       // ---- groups (topics) ----
       case "group-create-toggle":
@@ -3901,11 +4070,12 @@ export function renderCommunity(basePath = "") {
         state.chEditId = null;
         state.chWarn = null;
         return render();
-      case "ch-del":
+      case "ch-del": {
         if (!isAdmin()) return;
-        deleteCustomChallenge(btn.dataset.chid);
+        deleteChallenge(btn.dataset.chid).then(reloadChallenges); // REAL delete
         showToast("🗑 Provocare ștearsă");
         return render();
+      }
       case "ch-save": {
         if (!isAdmin()) return;
         const val = (sel) => mount.querySelector(sel)?.value.trim() || "";
@@ -3917,15 +4087,17 @@ export function renderCommunity(basePath = "") {
           state.chWarn = "Completează întrebarea și cel puțin 2 variante, cu răspunsul corect bifat.";
           return render();
         }
-        upsertCustomChallenge({
-          id: btn.dataset.chid || undefined,
+        const fields = {
           date: val("#chf-date") || null,
           prompt,
           options,
           correct: options.indexOf(correctText),
           explanation: val("#chf-explanation"),
           reward: Math.max(5, Math.min(50, Number(val("#chf-reward")) || 15)),
-        });
+        };
+        const chid = btn.dataset.chid; // "" for a new one, uuid for an edit
+        // REAL: insert or update in Supabase, then refresh the list + today.
+        (chid ? updateChallenge(chid, fields) : createChallenge(fields)).then(reloadChallenges);
         state.chEditId = null;
         state.chWarn = null;
         showToast("⚡ Provocare salvată", { kind: "success" });
@@ -4430,6 +4602,10 @@ export function renderCommunity(basePath = "") {
     if (e.target.id === "cx-note-search") {
       state.noteQuery = e.target.value;
       return rerenderKeepingFocus("cx-note-search");
+    }
+    if (e.target.id === "cx-member-search") {
+      state.memberQuery = e.target.value;
+      return rerenderKeepingFocus("cx-member-search");
     }
     if (e.target.id === "cx-msg-search") {
       state.msgQuery = e.target.value;

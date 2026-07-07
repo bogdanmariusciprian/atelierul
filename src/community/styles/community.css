@@ -993,6 +993,21 @@
 .cx-friendrow:first-child { border-top: none; }
 .cx-friendrow__name { flex: 1; font-weight: 700; }
 .cx-friendrow__act { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; }
+/* Members directory ("Membri" / discover real people) */
+.cx-members__search { margin: 0.6rem 0 1rem; }
+.cx-membergrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.7rem; }
+.cx-membercard {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 14px);
+  background: var(--color-surface);
+}
+.cx-membercard__id { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
+.cx-membercard__id .cx-muted { font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-membercard .cx-friendbtns, .cx-membercard .btn-mini, .cx-membercard .btn { flex: none; }
 .cx-friendgrid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
 .cx-friendchip {
   display: inline-flex;

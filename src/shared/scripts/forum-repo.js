@@ -37,6 +37,11 @@ export function mapPostSurrogate(surrogateId, uuid) {
 export function mapComment(surrogateId, uuid) {
   if (surrogateId && uuid) commentUuidBySurr.set(surrogateId, uuid);
 }
+/** The real Supabase uuid behind a numeric surrogate user id (or null for a
+ *  seed/mock user that has none). Lets the hub fetch a real member's profile. */
+export function uuidForSurrogate(surrogateId) {
+  return userUuidBySurr.get(surrogateId) || null;
+}
 
 function surrogateForAuthor(profile) {
   const myUuid = CURRENT_USER.authId;
