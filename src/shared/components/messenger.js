@@ -30,6 +30,10 @@ const dayLabel = (ts) => {
 
 let el = null;
 const st = { open: false, convKey: null, convs: [] };
+// A programmatic open (footer "Scrie-i profesorului") comes from a click
+// OUTSIDE the widget; that same click bubbles to the outside-close handler and
+// would slam the panel shut. This one-shot flag swallows exactly that click.
+let ignoreDocClick = false;
 
 function unreadTotal() {
   return st.convs.reduce((n, c) => n + (c.unread || 0), 0);
@@ -72,6 +76,9 @@ export function openMessenger(opts = {}) {
     st.convKey = null;
   }
   render();
+  // Don't let the opening click (from outside the widget) immediately close us.
+  ignoreDocClick = true;
+  setTimeout(() => { ignoreDocClick = false; }, 0);
 }
 
 // ---- Composer for the open conversation ----
@@ -275,6 +282,7 @@ export function initMessenger(basePath = "") {
   // dispatch, so it still lists `el` even after our own handler re-rendered and
   // detached the clicked node — this reliably tells "inside" from "outside".
   document.addEventListener("click", (e) => {
+    if (ignoreDocClick) { ignoreDocClick = false; return; } // swallow the opening click
     if (st.open && !e.composedPath().includes(el)) close();
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
