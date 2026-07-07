@@ -5,7 +5,11 @@
 // comes from the shared thread.js engine (DRY — same code powers the
 // forum). Mock session; a small 3-state switch previews the roles.
 // =========================================================
-import { getLessonComments, nextId } from "../../shared/scripts/comments-data.js";
+import {
+  fetchLessonComments, addLessonComment, toggleCommentLike, toggleCommentReaction,
+  updateComment, deleteComment, mapComment,
+} from "../../shared/scripts/forum-repo.js";
+import { nextId } from "../../shared/scripts/forum-data.js";
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { MY_PROFILE, userById, slugForUser, awardPoints } from "../../shared/scripts/community-data.js";
 import { findProfanity, queueBlockedComment, queueReport } from "../../shared/scripts/moderation.js";
@@ -38,7 +42,7 @@ export function initLessonComments(basePath = "") {
   const slug = currentLessonSlug();
   if (!slug) return;
   const state = {
-    comments: getLessonComments(slug),
+    comments: [], // real lesson comments (Supabase) — loaded in load()
     openReplyId: null,
     openReactId: null,
     openEditId: null,
@@ -164,7 +168,17 @@ export function initLessonComments(basePath = "") {
       onBlocked: logBlocked,
       onReport: report,
       validate: validateMentions,
+      // REAL: persist comment interactions to Supabase (by comment surrogate id).
+      onLike: (c, liked) => toggleCommentLike(c.id, liked),
+      onReact: (c, emoji, added) => toggleCommentReaction(c.id, emoji, added),
+      onEdit: (c, text) => updateComment(c.id, text),
+      onDelete: (c) => deleteComment(c.id),
       onReply: (parent, text) => {
+        // REAL: persist the reply, then map its optimistic id to the uuid.
+        const newReply = parent.replies[parent.replies.length - 1];
+        addLessonComment({ lessonSlug: slug, parentSurrogate: parent.id, text }).then((row) => {
+          if (row && newReply) mapComment(newReply.id, row.id);
+        });
         touchStreak(); // replying counts as today's activity
         notifyMentions(text);
       },
@@ -199,6 +213,11 @@ export function initLessonComments(basePath = "") {
       }
       state.composerWarn = null;
       state.comments.push(makeUserComment(text, CURRENT_USER, nextId));
+      // REAL: persist the comment, then map its optimistic id to the uuid.
+      const newC = state.comments[state.comments.length - 1];
+      addLessonComment({ lessonSlug: slug, text }).then((row) => {
+        if (row) mapComment(newC.id, row.id);
+      });
       notifyMentions(text);
       touchStreak(); // commenting counts as today's activity
       return render();
@@ -209,11 +228,17 @@ export function initLessonComments(basePath = "") {
   // is eligible (the friends-only rule is enforced by mentions.js itself).
   initMentions(mount, () => () => true);
 
-  // The global 🎭 role switcher changes what this section shows — follow it.
+  // Fetch the lesson's real comments, then render.
+  async function load() {
+    state.comments = await fetchLessonComments(slug);
+    render();
+  }
+
+  // A role change (login/logout) changes what this section shows — reload.
   window.addEventListener("atelier:role", () => {
     state.openReplyId = state.openReactId = state.openEditId = null;
-    render();
+    load();
   });
 
-  render();
+  load();
 }

@@ -2,14 +2,21 @@
 // "Propose an exercise" — per lesson. Logged-in users can suggest an
 // exercise tied to this lesson and up-vote others' suggestions; a teacher
 // later approves them. Guests see everything but are invited to log in or
-// create an account to interact. Shares data with the community hub's
-// "Exerciții propuse" section (exercises-data.js). Mock for now.
+// create an account to interact. Shares the SAME real data as the community
+// hub's "Exerciții propuse" section (exercises-repo.js → Supabase).
+//   • Approved exercises are SOLVABLE here; solving is scored SERVER-side
+//     (solve_exercise RPC, cheat-safe, once per pupil).
+//   • The teacher approves/edits/rejects/deletes right on the lesson page.
 // =========================================================
-import { PROPOSED_EXERCISES, EXERCISE_KINDS, exerciseKind, approvedForLesson, pendingForLesson, newExercise, decideExercise } from "../../shared/scripts/exercises-data.js";
+import {
+  EXERCISE_KINDS, exerciseKind, fetchApprovedForLesson, fetchPendingForLesson,
+  proposeExercise, voteExercise, approveExercise, rejectExercise,
+  updateExercise, deleteExercise, solveExercise,
+} from "../../shared/scripts/exercises-repo.js";
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { escapeHtml } from "../../shared/scripts/thread.js";
 import { findProfanity, queueBlockedComment } from "../../shared/scripts/moderation.js";
-import { awardPoints, userById, slugForUser } from "../../shared/scripts/community-data.js";
+import { userById, slugForUser } from "../../shared/scripts/community-data.js";
 import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { exerciseFormFields, readExerciseForm, exerciseSolverHtml, exerciseEditFormHtml } from "../../shared/scripts/exercise-form.js";
@@ -28,18 +35,20 @@ export function initProposeExercise(basePath = "") {
   const mount = document.createElement("section");
   mount.className = "lesson-section propose";
   mount.id = "propose-exercise";
-  // Place it just before the closing lesson navigation, if present.
   const nav = article.querySelector(".lesson-nav");
   article.insertBefore(mount, nav || null);
 
   const state = { open: false, kind: "choice", warn: null, editId: null, editWarn: null, preview: null };
+  // Real, per-lesson exercise lists (loaded from Supabase).
+  let published = [];
+  let pending = [];
   // Reward a solved community exercise only once (per page visit).
   const solvedOnce = new Set();
 
   // Every exercise wears its author: the professor's tag (inert) or the
   // proposer's CLICKABLE name linking to their community profile.
   const authorLabel = (e) => {
-    if (e.authorId === 0)
+    if (e.isTeacher)
       return `<span class="cx-teacher" title="Profesor · cadru didactic">🎓 Profesor</span>`;
     return userById(e.authorId)
       ? `<a class="cx-userlink" href="${basePath}comunitate/#u/${slugForUser(e.authorId)}" title="Vezi profilul">${escapeHtml(e.name)}</a>`
@@ -48,10 +57,8 @@ export function initProposeExercise(basePath = "") {
 
   function exerciseCard(e) {
     const k = exerciseKind(e.kind);
-    const published = e.status === "approved";
-    // Published exercises are settled — no more voting; pending ones are
-    // votable, but never your own (same rule as self-like).
-    const voteCol = published
+    const published_ = e.status === "approved";
+    const voteCol = published_
       ? ""
       : `<div class="propose__vote">
           ${e.authorId === CURRENT_USER.id
@@ -59,22 +66,18 @@ export function initProposeExercise(basePath = "") {
             : `<button type="button" class="propose__up${e.votedByMe ? " on" : ""}" data-action="vote" data-id="${e.id}" aria-label="Votează">▲</button>`}
           <b>${e.votes}</b>
         </div>`;
-    const tag = published
+    const tag = published_
       ? `<span class="cx-tag cx-tag--ok">✓ publicat</span>`
       : `<span class="cx-tag cx-tag--wait">în așteptare</span>`;
-    // Admin decides right here (same flow as the hub — one logic, two doors):
-    // EDIT (proposals get checked & polished before approval), then
-    // approve/reject pending ones, delete anything (published included).
     const adminBar = isAdmin()
       ? `<div class="propose__admin">
            <button type="button" class="btn-mini" data-action="admin-edit" data-id="${e.id}">✎ Editează</button>
-           ${published ? "" : `<button type="button" class="btn-mini btn-mini--ok" data-action="admin-approve" data-id="${e.id}">✓ Aprobă</button>
+           ${published_ ? "" : `<button type="button" class="btn-mini btn-mini--ok" data-action="admin-approve" data-id="${e.id}">✓ Aprobă</button>
            <button type="button" class="btn-mini btn-mini--no" data-action="admin-reject" data-id="${e.id}">✕ Respinge</button>`}
            <button type="button" class="btn-mini btn-mini--ghost" data-action="admin-del" data-id="${e.id}" title="Șterge propunerea">🗑 Șterge</button>
          </div>`
       : "";
 
-    // Admin edit mode: the card becomes a prefilled form.
     if (isAdmin() && state.editId === e.id) {
       return `<div class="propose__ex propose__ex--editing">
           <div class="propose__exbody propose__compose">
@@ -88,15 +91,14 @@ export function initProposeExercise(basePath = "") {
         </div>`;
     }
 
-    // A PUBLISHED exercise with structured data is fully SOLVABLE — the
-    // exact same engine as the lesson's own exercises. Pending (or old,
-    // unstructured) proposals stay read-only text.
-    const solver = published ? exerciseSolverHtml(e) : null;
+    // A PUBLISHED exercise with structured data is fully SOLVABLE — the same
+    // engine as the lesson's own exercises. Pending (or old) proposals stay text.
+    const solver = published_ ? exerciseSolverHtml(e) : null;
     const body = solver || `<p class="propose__prompt">${escapeHtml(e.prompt)}</p>`;
-    const verified = e.editedByAdmin
+    const verified = e.verified
       ? `<span class="cx-tag" title="Verificată și ajustată de profesor">✎ verificată</span>`
       : "";
-    return `<div class="propose__ex${published ? " propose__ex--pub" : ""}">
+    return `<div class="propose__ex${published_ ? " propose__ex--pub" : ""}">
         ${voteCol}
         <div class="propose__exbody">
           ${body}
@@ -117,10 +119,14 @@ export function initProposeExercise(basePath = "") {
     initExercisesIn(mount);
   }
 
+  /** Fetch this lesson's real exercises, then re-render. */
+  async function reload() {
+    [published, pending] = await Promise.all([fetchApprovedForLesson(slug), fetchPendingForLesson(slug)]);
+    render();
+  }
+
   function renderInner() {
     const logged = isLoggedIn();
-    const published = approvedForLesson(slug);
-    const pending = pendingForLesson(slug);
     const group = (title, items) =>
       items.length
         ? `<h3 class="propose__subh">${title}</h3><div class="propose__list">${items.map(exerciseCard).join("")}</div>`
@@ -177,6 +183,7 @@ export function initProposeExercise(basePath = "") {
     const btn = e.target.closest("[data-action]");
     if (!btn) return;
     const action = btn.dataset.action;
+    const rawId = btn.dataset.id; // exercise ids are Supabase UUIDs
 
     if (!isLoggedIn()) {
       showToast("Conectează-te ca să propui exerciții și să votezi 🔑");
@@ -199,7 +206,6 @@ export function initProposeExercise(basePath = "") {
         }
         const prompt = mount.querySelector("#propose-prompt")?.value.trim() || "";
         const form = readExerciseForm(mount, state.kind);
-        // Keep the fields (exerciseFormFields prefIlls from state.preview.data).
         state.preview = {
           id: `prev-${Date.now()}`,
           kind: state.kind,
@@ -212,12 +218,12 @@ export function initProposeExercise(basePath = "") {
         return;
       }
       case "vote": {
-        const id = Number(btn.dataset.id);
-        const ex = PROPOSED_EXERCISES.find((x) => x.id === id);
+        const ex = pending.find((x) => x.id === rawId);
         // Never your own proposal (same rule as self-like).
         if (ex && ex.authorId !== CURRENT_USER.id) {
           ex.votedByMe = !ex.votedByMe;
           ex.votes += ex.votedByMe ? 1 : -1;
+          voteExercise(ex.id, ex.votedByMe); // persist (real)
         }
         return render();
       }
@@ -225,7 +231,7 @@ export function initProposeExercise(basePath = "") {
       // ---- admin: edit/decide/delete right on the lesson page ----
       case "admin-edit": {
         if (!isAdmin()) return;
-        state.editId = Number(btn.dataset.id);
+        state.editId = rawId;
         state.editWarn = null;
         state.open = false; // one exf-* form at a time
         return render();
@@ -236,7 +242,7 @@ export function initProposeExercise(basePath = "") {
         return render();
       case "admin-save-edit": {
         if (!isAdmin()) return;
-        const ex = PROPOSED_EXERCISES.find((x) => x.id === Number(btn.dataset.id));
+        const ex = [...published, ...pending].find((x) => x.id === rawId);
         if (!ex) return;
         const prompt = mount.querySelector("#exf-prompt")?.value.trim();
         if (!prompt) {
@@ -248,9 +254,8 @@ export function initProposeExercise(basePath = "") {
           state.editWarn = form.error;
           return render();
         }
-        ex.prompt = escapeHtml(prompt);
-        ex.data = form.data;
-        ex.editedByAdmin = true;
+        // Store RAW (escaped at render). Persist as the teacher (RLS admin-only).
+        updateExercise(rawId, { prompt, data: form.data }).then(reload);
         state.editId = null;
         state.editWarn = null;
         showToast("✎ Propunere actualizată — o poți aproba acum", { kind: "success" });
@@ -260,37 +265,20 @@ export function initProposeExercise(basePath = "") {
       case "admin-reject": {
         if (!isAdmin()) return;
         const approved = action === "admin-approve";
-        const ex = decideExercise(Number(btn.dataset.id), approved ? "approved" : "rejected");
-        // Approval rewards the author (+40) — identical to the hub flow.
-        // Exception: the teacher himself never earns points.
-        if (ex && approved) {
-          const REWARD = 40;
-          if (ex.authorId === CURRENT_USER.id) {
-            if (!isAdmin()) {
-              awardPoints("Exercițiu aprobat — publicat la lecție", REWARD);
-              pointsFx(REWARD);
-            }
-          } else {
-            const u = userById(ex.authorId);
-            if (u) u.points += REWARD;
-          }
-        }
+        // The SERVER approves + awards the author (cheat-safe). Then reload.
+        (approved ? approveExercise(rawId) : rejectExercise(rawId)).then(reload);
         showToast(approved ? "✓ Propunere aprobată — publicată la lecție" : "✕ Propunere respinsă", { kind: approved ? "success" : "info" });
-        return render();
+        return;
       }
       case "admin-del": {
         if (!isAdmin()) return;
-        const i = PROPOSED_EXERCISES.findIndex((x) => x.id === Number(btn.dataset.id));
-        if (i >= 0) {
-          PROPOSED_EXERCISES.splice(i, 1);
-          showToast("🗑 Propunere ștearsă");
-        }
-        return render();
+        deleteExercise(rawId).then(reload); // real delete
+        showToast("🗑 Propunere ștearsă");
+        return;
       }
       case "submit": {
         const prompt = mount.querySelector("#propose-prompt")?.value.trim();
         if (!prompt) return;
-        // Same language filter as everywhere else; attempts reach the teacher.
         const bad = findProfanity(prompt);
         if (bad.length) {
           state.warn = "Enunțul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.";
@@ -300,46 +288,62 @@ export function initProposeExercise(basePath = "") {
           });
           return render();
         }
-        // The structured fields make the exercise actually solvable later.
         const form = readExerciseForm(mount, state.kind);
         if (!form.ok) {
           state.warn = form.error;
           return render();
         }
         state.warn = null;
-        PROPOSED_EXERCISES.unshift(
-          newExercise({
-            lessonSlug: slug,
-            lessonTitle,
-            authorId: CURRENT_USER.id,
-            kind: state.kind,
-            prompt: escapeHtml(prompt),
-            data: form.data,
-          })
-        );
+        // Store RAW (escaped at render); status forced 'pending' by RLS.
+        proposeExercise({ lessonSlug: slug, kind: state.kind, prompt, data: form.data }).then(reload);
         state.open = false;
         touchStreak(); // proposing counts as today's activity
+        showToast("✅ Propunere trimisă — profesorul o va verifica.", { kind: "success" });
         return render();
       }
     }
   });
 
-  // Solving a community exercise counts: small reward + streak (members
-  // only, once per exercise per visit). Decoupled via the engine's event.
+  // Solving a community exercise counts: the SERVER decides correctness +
+  // awards points (once, members only). We already know it's correct (the
+  // engine fired), so we submit the matching answer to record + score it.
   mount.addEventListener("exercise:correct", (e) => {
-    const id = Number(e.target.closest(".exercise")?.dataset.exId || 0);
-    if (!id || solvedOnce.has(id)) return;
-    solvedOnce.add(id);
-    if (isLoggedIn() && !isAdmin()) {
-      awardPoints("Exercițiu din comunitate rezolvat", 5);
-      pointsFx(5);
-      touchStreak();
-    }
+    const div = e.target.closest(".exercise");
+    const exId = div?.dataset.exId;
+    if (!exId || solvedOnce.has(exId)) return;
+    solvedOnce.add(exId);
+    if (!isLoggedIn() || isAdmin()) return;
+    solveExercise(exId, answerFromExercise(div)).then((res) => {
+      if (res && res.awarded) { pointsFx(res.awarded); touchStreak(); }
+    });
   });
 
-  // The demo role switch changes what this section may show (admin tools,
-  // composer) — follow it live.
-  window.addEventListener("atelier:role", render);
+  window.addEventListener("atelier:role", reload);
 
-  render();
+  reload();
+}
+
+// Reconstruct the (correct) answer from the solved exercise's DOM, in the shape
+// solve_exercise expects: choice → {choice:"<index>"}, fill → {text}, match →
+// {pairs:[[left,right],…]}. The answer is already in the markup (client-side
+// solving), so this just formats it for the server's re-check + one-time score.
+function answerFromExercise(div) {
+  const kind = div?.dataset.type;
+  if (kind === "choice") {
+    const opts = [...div.querySelectorAll(".option")];
+    const idx = opts.findIndex((o) => o.dataset.correct === "true");
+    return { choice: String(idx) };
+  }
+  if (kind === "fill") {
+    const ans = div.querySelector(".blank")?.dataset.answer || "";
+    return { text: ans.split("|")[0] }; // any accepted variant scores
+  }
+  if (kind === "match") {
+    const pairs = [...div.querySelectorAll(".match__row")].map((row) => {
+      const label = (row.childNodes[0]?.textContent || "").trim();
+      return [label, row.querySelector(".match__select")?.dataset.answer || ""];
+    });
+    return { pairs };
+  }
+  return {};
 }

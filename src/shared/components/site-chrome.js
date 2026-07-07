@@ -21,7 +21,7 @@ import { LESSONS } from "../scripts/lessons-index.js";
 import { LESSON_DOMAINS } from "../scripts/domains.js";
 import { initUserMenu } from "../scripts/user-menu.js";
 import { openModerationItems } from "../scripts/moderation.js";
-import { pendingExercises, pendingForLesson } from "../scripts/exercises-data.js";
+import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications } from "../scripts/notif.js";
 import { isLoggedIn, signOut } from "../scripts/session.js";
 import { contactTeacher, sendTeacherMsg } from "../scripts/forum-repo.js";
@@ -337,14 +337,18 @@ function initAdminQuickPanel(basePath) {
 
   const HUB = `${basePath}comunitate/`;
   let fab = null;
+  // Real pending-exercise counts (Supabase), cached; refreshed async so build()
+  // stays synchronous. Default 0 until the first fetch resolves.
+  let _exPending = 0;
+  let _exLessonPending = 0;
 
   const lessonSlug = () =>
     document.querySelector("[data-lesson-slug]")?.dataset.lessonSlug || null;
 
   const build = () => {
-    const attention = openModerationItems().length + pendingExercises().length;
+    const attention = openModerationItems().length + _exPending;
     const slug = lessonSlug();
-    const here = slug ? pendingForLesson(slug).length : 0;
+    const here = _exLessonPending;
     const link = (href, icon, label, n = 0) =>
       `<a class="admin-quick__item" href="${href}">${icon} ${label}${n ? ` <b class="admin-quick__n">${n}</b>` : ""}</a>`;
     return `
@@ -356,11 +360,31 @@ function initAdminQuickPanel(basePath) {
         ${link(`${HUB}#admin`, "🛡️", "Panou admin")}
         ${link(`${HUB}#admin/moderare`, "⚖️", "Moderare", openModerationItems().length)}
         ${link(`${HUB}#admin/utilizatori`, "👥", "Utilizatori")}
-        ${link(`${HUB}#exercitii`, "🧩", "Exerciții în așteptare", pendingExercises().length)}
+        ${link(`${HUB}#exercitii`, "🧩", "Exerciții în așteptare", _exPending)}
         ${slug ? link("#propose-exercise", "📘", "Propunerile acestei lecții", here) : ""}
         <p class="admin-quick__hint">Editezi/ștergi direct pe conținut — controalele ✎/🗑 apar inline.</p>
       </div>`;
   };
+
+  // Fetch the REAL pending-exercise counts, then refresh the panel/badge
+  // (keeping the panel open if it was). Async so build() stays synchronous.
+  async function refreshCounts() {
+    if (!isAdmin()) return;
+    const slug = lessonSlug();
+    [_exPending, _exLessonPending] = await Promise.all([
+      fetchPendingCount(),
+      slug ? fetchPendingCountForLesson(slug) : Promise.resolve(0),
+    ]);
+    if (!fab) return;
+    const wasOpen = fab.classList.contains("is-open");
+    fab.innerHTML = build();
+    if (wasOpen) {
+      fab.classList.add("is-open");
+      const p = fab.querySelector(".admin-quick__panel");
+      if (p) p.hidden = false;
+      fab.querySelector(".admin-quick__fab")?.setAttribute("aria-expanded", "true");
+    }
+  }
 
   const apply = () => {
     const on = isAdmin();
@@ -381,11 +405,12 @@ function initAdminQuickPanel(basePath) {
         // would misfire and close the panel in the same click.
         e.stopPropagation();
         const willOpen = !fab.classList.contains("is-open");
-        if (willOpen) fab.innerHTML = build(); // fresh counts when opening
+        if (willOpen) fab.innerHTML = build(); // instant (cached counts)
         const panel = fab.querySelector(".admin-quick__panel");
         fab.classList.toggle("is-open", willOpen);
         if (panel) panel.hidden = !willOpen;
         fab.querySelector(".admin-quick__fab")?.setAttribute("aria-expanded", String(willOpen));
+        if (willOpen) refreshCounts(); // then fetch fresh counts + rebuild
       });
       const close = () => {
         if (!fab) return;
@@ -402,6 +427,7 @@ function initAdminQuickPanel(basePath) {
       });
     }
     fab.innerHTML = build();
+    refreshCounts(); // load real counts for the fab badge
   };
 
   apply();

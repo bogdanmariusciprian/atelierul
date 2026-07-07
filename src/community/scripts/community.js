@@ -23,16 +23,22 @@ import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPo
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
-import { clapsFor, hasClapped, giveClap, hasPoked, givePoke } from "../../shared/scripts/kudos.js";
+import { clapsFor, hasClapped, giveClap, hasPoked, givePoke, loadKudos } from "../../shared/scripts/kudos-repo.js";
 import {
   findProfanity, FILTER_MESSAGE, MODERATION_QUEUE, queueHeldPost,
   queueBlockedComment, queueReport, openModerationItems, resolveModerationItem,
 } from "../../shared/scripts/moderation.js";
 import {
-  wordOfToday, challengeOfToday, allChallenges, upsertCustomChallenge,
-  deleteCustomChallenge, isCustomChallenge, GROUP_TOPICS, GROUP_ICONS, groupIcon,
-  groupColor, newGroupTopic, newGroupPost, EVENTS, EVENT_KINDS, BADGES,
+  wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
 } from "../../shared/scripts/discover-data.js";
+import {
+  listEvents, rsvpEvent, createEvent, updateEvent, deleteEvent,
+  grantEventAccess, revokeEventAccess,
+} from "../../shared/scripts/events-repo.js";
+import {
+  listGroups, fetchGroupPosts, postToGroup, createGroup, joinGroup,
+  leaveGroup, addGroupMember, updateGroup, deleteGroup,
+} from "../../shared/scripts/groups-repo.js";
 import {
   fetchTodayChallenge, fetchMyChallengeSolve, solveChallenge,
   listChallenges, createChallenge, updateChallenge, deleteChallenge,
@@ -42,9 +48,10 @@ import {
   POST_BACKGROUNDS, postBackground, topPost, nextId, relTime,
 } from "../../shared/scripts/forum-data.js";
 import {
-  PROPOSED_EXERCISES, EXERCISE_KINDS, exerciseKind, newExercise,
-  pendingExercises, resolvedExercises, decideExercise,
-} from "../../shared/scripts/exercises-data.js";
+  EXERCISE_KINDS, exerciseKind, fetchPendingExercises, fetchExerciseHistory,
+  proposeExercise, voteExercise, approveExercise, rejectExercise,
+  updateExercise, deleteExercise, fetchMyApprovedExerciseCount,
+} from "../../shared/scripts/exercises-repo.js";
 import {
   ACTIVITY_RECEIVED, ACTIVITY_GIVEN, ACTIVITY_KINDS,
   unreadActivityCount, markActivityRead, recordGiven, notifyReceived, notifyUser,
@@ -65,7 +72,7 @@ import { MESSAGE_TEMPLATES, searchTemplates, templateStats, suggestReplies, inte
 import { mascotSvg } from "../../shared/scripts/mascot.js";
 import { MAX_LEVEL, xpSkin, levelInfo, setPreview, xpBarMarkup, applyBar } from "../../shared/scripts/xp-bar.js";
 import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
-import { lessonHrefBySlug } from "../../shared/scripts/lessons-index.js";
+import { lessonHrefBySlug, lessonBySlug, LESSONS } from "../../shared/scripts/lessons-index.js";
 
 // --- Small inline icons for the sidebar (single source, DRY) ----------
 const NAV_ICONS = {
@@ -204,7 +211,8 @@ export function renderCommunity(basePath = "") {
     saved: new Set(), // real: populated from Supabase (saved_posts) in loadFeed
     feedLimit: 6, // forum pagination ("Încarcă mai mult")
     groupCreateOpen: false, // the "create group" composer in Grupuri
-    proposed: PROPOSED_EXERCISES,
+    proposed: [], // real exercises (pending + admin history) — loaded in loadFeed
+    myApprovedEx: 0, // how many of my proposals were approved (badge)
     openComments: new Set(),
     playing: new Set(),
     composer: freshComposer(),
@@ -220,11 +228,10 @@ export function renderCommunity(basePath = "") {
     challengeSolve: null, // my answer to it: { choice, correct } or null
     challengePending: false, // waiting for the server's verdict
     adminChallenges: [], // real challenges list (admin scheduling)
-    groups: GROUP_TOPICS.map((g) => ({ ...g })),
-    events: EVENTS.map((e) => ({ ...e })),
+    groups: [], // real study groups (Supabase) — loaded (with posts) in loadFeed
+    events: [], // real events (Supabase) — loaded in loadFeed (RLS-gated by event_access)
     openGroup: null, // id of the group topic being viewed
     addMemberOpen: false,
-    eventsGranted: new Set(), // admin-granted event access for other users (mock)
     editingPost: null, // post id being edited (author or admin)
     editingGroup: false, // editing the open group's details (admin/creator)
     editingEvent: null, // event id being edited (admin)
@@ -359,11 +366,6 @@ export function renderCommunity(basePath = "") {
     }
     return false;
   }
-  function removeGroup(id) {
-    const i = state.groups.findIndex((g) => g.id === id);
-    if (i >= 0) state.groups.splice(i, 1);
-  }
-
   // The author (or admin) manages a post; members may report others'.
   // Guests manage nothing (they only borrow the id-0 mock identity).
   const canManagePost = (p) => isLoggedIn() && (isAdmin() || p.authorId === CURRENT_USER.id);
@@ -705,7 +707,7 @@ export function renderCommunity(basePath = "") {
     // how many things await the teacher (proposals + moderation).
     // GUESTS get a slim, read-only navigation + a join card.
     const guest = !isLoggedIn();
-    const attention = isAdmin() ? pendingExercises().length + openModerationItems().length : 0;
+    const attention = isAdmin() ? state.proposed.filter((e) => e.status === "pending").length + openModerationItems().length : 0;
     const unread = guest ? 0 : unreadActivityCount();
     const friendReqs = guest || isAdmin() ? 0 : MY_PROFILE.friendReqIncoming.length;
     const groupNews = guest ? 0 : state.groups.filter(groupHasNews).length;
@@ -1373,7 +1375,7 @@ export function renderCommunity(basePath = "") {
 
     // Only proposals still awaiting a decision live in the "pending" tab; once
     // the admin approves/rejects, they move to the "history" tab.
-    const pending = pendingExercises();
+    const pending = state.proposed.filter((e) => e.status === "pending");
     const pendingList = pending.length
       ? pending
           .map((e) => {
@@ -1431,7 +1433,7 @@ export function renderCommunity(basePath = "") {
     if (showHistory) {
       const tabs = [
         { id: "pending", label: "În așteptare", count: pending.length },
-        { id: "history", label: "Istoric", count: resolvedExercises().length },
+        { id: "history", label: "Istoric", count: state.proposed.filter((e) => e.status !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)).length },
       ];
       tabBar = `<div class="cx-tabs cx-tabs--sub">${tabs
         .map(
@@ -2701,7 +2703,8 @@ export function renderCommunity(basePath = "") {
     const cards = state.events
       .map((e) => {
         if (isAdmin() && state.editingEvent === e.id) return eventForm(e, false);
-        const k = EVENT_KINDS[e.kind];
+        const k = EVENT_KINDS[e.kind] || EVENT_KINDS.live; // 'other' kinds fall back
+
         const adminBar = isAdmin()
           ? `<span class="cx-event__admin">
                <button type="button" class="post__adminbtn" data-action="admin-edit-event" data-id="${e.id}" title="Editează">✎</button>
@@ -2766,7 +2769,7 @@ export function renderCommunity(basePath = "") {
     const filter = state.histFilter || "all";
     const sort = state.histSort || { key: "date", dir: "desc" };
 
-    let rows = resolvedExercises();
+    let rows = state.proposed.filter((e) => e.status !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0));
     if (filter !== "all") rows = rows.filter((e) => e.status === filter);
 
     const cmp = {
@@ -2824,7 +2827,7 @@ export function renderCommunity(basePath = "") {
   }
   function proposalHistory() {
     return `<div class="cx-box">
-        <div class="cx-admin__head"><h3>Istoric propuneri · ${resolvedExercises().length}</h3></div>
+        <div class="cx-admin__head"><h3>Istoric propuneri · ${state.proposed.filter((e) => e.status !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)).length}</h3></div>
         <p class="cx-muted">Propunerile de exerciții pe care le-ai aprobat sau respins. Cele aprobate apar în lista de exerciții de la lecția lor.</p>
         ${proposalHistoryTable()}
       </div>`;
@@ -2914,7 +2917,7 @@ export function renderCommunity(basePath = "") {
   // Pending exercise proposals, decidable right here (same handlers as the
   // Exerciții section — one flow, two entry points).
   function adminPendingBox() {
-    const pending = pendingExercises();
+    const pending = state.proposed.filter((e) => e.status === "pending");
     if (!pending.length) return "";
     const rows = pending
       .map(
@@ -2965,7 +2968,7 @@ export function renderCommunity(basePath = "") {
       </div>`;
     const attention = [
       { n: openModerationItems().length, label: "de moderat", tab: "moderation" },
-      { n: pendingExercises().length, label: "exerciții în așteptare", tab: "moderation" },
+      { n: state.proposed.filter((e) => e.status === "pending").length, label: "exerciții în așteptare", tab: "moderation" },
     ].filter((a) => a.n > 0);
     const attentionBox = attention.length
       ? `<div class="cx-attention">
@@ -3029,7 +3032,7 @@ export function renderCommunity(basePath = "") {
     const pages = Math.max(1, Math.ceil(users.length / PER_PAGE));
     const page = Math.min(state.adminUserPage, pages);
     const slice = users.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-    const rows = slice.map((u) => adminUserRow(u, state.eventsGranted.has(u.id), false)).join("");
+    const rows = slice.map((u) => adminUserRow(u, state.eventAccessUuids.has(uuidForSurrogate(u.id)), false)).join("");
     const pager = pages > 1
       ? `<div class="cx-pager">
            <button type="button" class="btn-mini" data-action="admin-user-page" data-dir="-1" ${page === 1 ? "disabled" : ""}>‹</button>
@@ -3177,7 +3180,7 @@ export function renderCommunity(basePath = "") {
 
   function sectionAdmin() {
     if (!isAdmin()) return sectionForum();
-    const modCount = openModerationItems().length + pendingExercises().length;
+    const modCount = openModerationItems().length + state.proposed.filter((e) => e.status === "pending").length;
     const TABS = [
       { id: "overview", label: "Prezentare" },
       { id: "users", label: "Utilizatori" },
@@ -3238,7 +3241,7 @@ export function renderCommunity(basePath = "") {
       case 4: return ACTIVITY_GIVEN.length >= 50;
       case 5: return COMMUNITY_USERS.filter((u) => u.points > MY_PROFILE.points).length + 1 <= 10;
       case 6: return false; // all morphology lessons — needs lesson progress (backend)
-      case 7: return PROPOSED_EXERCISES.some((e) => e.authorId === CURRENT_USER.id && e.status === "approved");
+      case 7: return state.myApprovedEx > 0;
       case 8: return challengesSolved() >= 30;
       default: return false;
     }
@@ -3336,6 +3339,39 @@ export function renderCommunity(basePath = "") {
     render();
   }
 
+  // Reload events after RSVP or an admin create/edit/delete.
+  async function reloadEvents() {
+    if (isLoggedIn()) state.events = await listEvents();
+    render();
+  }
+
+  // Reload study groups (+ walls) after create/join/leave/post/edit/delete.
+  async function reloadGroups() {
+    state.groups = await listGroups();
+    await Promise.all(state.groups.map(async (g) => {
+      g.posts = await fetchGroupPosts(g.id);
+      g.color = groupColor(g.iconId);
+    }));
+    render();
+  }
+
+  // Reload just ONE group's wall (after posting), keeping the rest untouched.
+  async function reloadGroupPosts(groupId) {
+    const g = state.groups.find((x) => x.id === groupId);
+    if (g) g.posts = await fetchGroupPosts(groupId);
+    render();
+  }
+
+  // Reload proposed exercises after propose/vote/approve/reject/delete.
+  async function reloadExercises() {
+    const exPending = await fetchPendingExercises();
+    const exHistory = isAdmin() ? await fetchExerciseHistory() : [];
+    state.proposed = [...exPending, ...exHistory];
+    for (const e of state.proposed) e.lessonTitle = lessonBySlug(e.lessonSlug)?.title || e.lessonSlug;
+    state.myApprovedEx = await fetchMyApprovedExerciseCount();
+    render();
+  }
+
   // Reload conversations after sending/reading a message.
   async function reloadConversations() {
     state.conversations = await fetchConversations(isAdmin());
@@ -3351,10 +3387,24 @@ export function renderCommunity(basePath = "") {
       const wallPosts = await fetchFeed({ surface: "wall" });
       state.posts = [...forumPosts, ...wallPosts];
       state.members = await fetchMembers(); // real leaderboard directory (points desc)
+      await loadKudos(); // real claps/pokes — members are registered above, so surrogate→uuid resolves
       // Today's REAL daily challenge + whether I've already answered it.
       state.challenge = await fetchTodayChallenge();
       state.challengeSolve = state.challenge ? await fetchMyChallengeSolve(state.challenge.id) : null;
       if (isAdmin()) state.adminChallenges = await listChallenges();
+      // Real proposed exercises: pending (everyone) + decided history (admin only).
+      const exPending = await fetchPendingExercises();
+      const exHistory = isAdmin() ? await fetchExerciseHistory() : [];
+      state.proposed = [...exPending, ...exHistory];
+      for (const e of state.proposed) e.lessonTitle = lessonBySlug(e.lessonSlug)?.title || e.lessonSlug;
+      state.myApprovedEx = await fetchMyApprovedExerciseCount();
+      if (isLoggedIn()) state.events = await listEvents(); // RLS returns [] without event_access
+      // Real study groups + each group's wall (posts tagged with group_id).
+      state.groups = await listGroups();
+      await Promise.all(state.groups.map(async (g) => {
+        g.posts = await fetchGroupPosts(g.id);
+        g.color = groupColor(g.iconId);
+      }));
       state.conversations = await fetchConversations(isAdmin()); // real messages
       if (isAdmin()) {
         state.convLabels = await fetchConversationLabels();
@@ -3538,18 +3588,15 @@ export function renderCommunity(basePath = "") {
       state.notice = mentionMsg(badM);
       return;
     }
-    const g = newGroupTopic({
-      name: escapeHtml(name),
-      iconId: c.iconId,
-      creatorId: CURRENT_USER.id,
-      description: escapeHtml((c.text || "").trim()),
+    // Real group: create it (name/description stored RAW, escaped at render),
+    // then reload and jump straight into the new topic.
+    createGroup({ name, iconId: c.iconId, description: (c.text || "").trim() }).then((row) => {
+      if (row) state.openGroup = row.id;
+      reloadGroups();
     });
-    state.groups.unshift(g);
     state.composer = freshComposer();
     state.groupCreateOpen = false;
-    // Jump straight into the new group topic.
     state.section = "grupuri";
-    state.openGroup = g.id;
     history.replaceState(null, "", "#grupuri");
   }
 
@@ -3632,6 +3679,7 @@ export function renderCommunity(basePath = "") {
     }
 
     const id = Number(btn.dataset.id);
+    const rawId = btn.dataset.id; // string ids (exercises = Supabase UUIDs)
 
     switch (action) {
       case "go":
@@ -4124,21 +4172,23 @@ export function renderCommunity(basePath = "") {
         return render();
       case "open-group": {
         remember();
-        state.openGroup = id;
+        state.openGroup = rawId;
         state.addMemberOpen = false;
         state.openComments.clear();
         // Visiting clears this group's "nou" pulse.
         const seen = groupSeen();
-        seen[id] = Date.now();
+        seen[rawId] = Date.now();
         store.set("atelier_group_seen", seen);
         return render();
       }
       case "group-toggle": {
-        const g = findGroup(id);
+        const g = findGroup(rawId);
         if (g) {
           const i = g.memberIds.indexOf(CURRENT_USER.id);
-          if (i >= 0) g.memberIds.splice(i, 1);
+          const wasMember = i >= 0;
+          if (wasMember) g.memberIds.splice(i, 1);
           else g.memberIds.push(CURRENT_USER.id);
+          (wasMember ? leaveGroup(rawId) : joinGroup(rawId)); // persist (real)
         }
         return render();
       }
@@ -4148,16 +4198,23 @@ export function renderCommunity(basePath = "") {
       case "add-member": {
         const g = findGroup(state.openGroup);
         const uid = Number(btn.dataset.uid);
-        if (g && canAddMembers(g) && !g.memberIds.includes(uid)) g.memberIds.push(uid);
+        if (g && canAddMembers(g) && !g.memberIds.includes(uid)) {
+          g.memberIds.push(uid);
+          const uuid = uuidForSurrogate(uid);
+          if (uuid) addGroupMember(state.openGroup, uuid); // persist (RLS checks the rule)
+        }
         return render();
       }
       case "toggle-members-add": {
-        const g = findGroup(id);
-        if (g && (g.creatorId === CURRENT_USER.id || isAdmin())) g.allowMembersAdd = !g.allowMembersAdd;
+        const g = findGroup(rawId);
+        if (g && (g.creatorId === CURRENT_USER.id || isAdmin())) {
+          g.allowMembersAdd = !g.allowMembersAdd;
+          updateGroup(rawId, { allowMembersAdd: g.allowMembersAdd }); // persist
+        }
         return render();
       }
       case "group-post": {
-        const g = findGroup(id);
+        const g = findGroup(rawId);
         const box = mount.querySelector("#cx-group-post");
         const text = box?.value.trim();
         if (!g || !text) return;
@@ -4178,7 +4235,9 @@ export function renderCommunity(basePath = "") {
           return render();
         }
         state.groupWarn = null;
-        g.posts.unshift(newGroupPost(CURRENT_USER.id, escapeHtml(text)));
+        // Real group post (raw body; escaped at render). Reload this wall after.
+        postToGroup(rawId, { text }).then(() => reloadGroupPosts(rawId));
+        if (box) box.value = "";
         touchStreak(); // group activity counts too
         return render();
       }
@@ -4197,7 +4256,7 @@ export function renderCommunity(basePath = "") {
         return render();
       }
       case "group-save": {
-        const g = findGroup(id);
+        const g = findGroup(rawId);
         const name = mount.querySelector("#cx-editgroup-name")?.value.trim();
         const desc = mount.querySelector("#cx-editgroup-desc")?.value.trim();
         if (g && name) {
@@ -4207,30 +4266,30 @@ export function renderCommunity(basePath = "") {
             return render();
           }
           state.groupWarn = null;
-          g.name = escapeHtml(name);
-          g.description = escapeHtml(desc || "");
+          g.name = name; // raw; escaped at render
+          g.description = desc || "";
+          updateGroup(rawId, { name, description: desc || "", iconId: g.iconId }); // persist
         }
         state.editingGroup = false;
         return render();
       }
       case "group-del": {
-        const g = findGroup(id);
+        const g = findGroup(rawId);
         if (!g || !(g.creatorId === CURRENT_USER.id || isAdmin())) return;
         confirmDialog(`Grupul „${g.name}” va fi șters, cu tot cu postările lui.`, { title: "Ștergi grupul?", okLabel: "Șterge", danger: true }).then((ok) => {
           if (!ok) return;
-          removeGroup(id);
           state.openGroup = null;
           state.editingGroup = false;
           if (isAdmin()) logAdmin(`🗑 ai șters grupul „${g.name}”`);
-          render();
+          deleteGroup(rawId).then(reloadGroups); // real delete (cascades group posts)
         });
         return;
       }
 
       // ---- events ----
       case "event-go": {
-        const ev = state.events.find((x) => x.id === id);
-        if (ev) ev.going = !ev.going;
+        const ev = state.events.find((x) => x.id === rawId);
+        if (ev) { ev.going = !ev.going; rsvpEvent(rawId, ev.going); } // persist RSVP (real)
         return render();
       }
       case "admin-new-event":
@@ -4240,7 +4299,7 @@ export function renderCommunity(basePath = "") {
         return render();
       case "admin-edit-event":
         if (!isAdmin()) return;
-        state.editingEvent = id;
+        state.editingEvent = rawId;
         state.newEventOpen = false;
         return render();
       case "admin-event-cancel":
@@ -4251,41 +4310,45 @@ export function renderCommunity(basePath = "") {
         if (!isAdmin()) return;
         const title = mount.querySelector("#cx-ev-title")?.value.trim();
         if (!title) return;
-        state.events.push({
-          id: nextId(),
-          title: escapeHtml(title),
+        // Store RAW (escaped at render); the teacher creates it (RLS admin-only).
+        createEvent({
+          title,
           kind: mount.querySelector("#cx-ev-kind")?.value || "live",
-          when: escapeHtml(mount.querySelector("#cx-ev-when")?.value.trim() || "curând"),
-          host: escapeHtml(mount.querySelector("#cx-ev-host")?.value.trim() || "Atelierul"),
-          going: false,
-        });
+          whenText: mount.querySelector("#cx-ev-when")?.value.trim() || "curând",
+          host: mount.querySelector("#cx-ev-host")?.value.trim() || "Atelierul",
+        }).then(reloadEvents);
         state.newEventOpen = false;
         return render();
       }
       case "admin-save-event": {
         if (!isAdmin()) return;
-        const ev = state.events.find((x) => x.id === id);
         const title = mount.querySelector("#cx-ev-title")?.value.trim();
-        if (ev && title) {
-          ev.title = escapeHtml(title);
-          ev.kind = mount.querySelector("#cx-ev-kind")?.value || ev.kind;
-          ev.when = escapeHtml(mount.querySelector("#cx-ev-when")?.value.trim() || ev.when);
-          ev.host = escapeHtml(mount.querySelector("#cx-ev-host")?.value.trim() || ev.host);
+        if (title) {
+          updateEvent(rawId, {
+            title,
+            kind: mount.querySelector("#cx-ev-kind")?.value || "live",
+            whenText: mount.querySelector("#cx-ev-when")?.value.trim() || "",
+            host: mount.querySelector("#cx-ev-host")?.value.trim() || "",
+          }).then(reloadEvents);
         }
         state.editingEvent = null;
         return render();
       }
       case "admin-del-event": {
         if (!isAdmin()) return;
-        const i = state.events.findIndex((x) => x.id === id);
-        if (i >= 0) state.events.splice(i, 1);
+        deleteEvent(rawId).then(reloadEvents); // real delete
         return render();
       }
 
       // ---- admin ----
       case "grant-events": {
+        if (!isAdmin()) return;
         const uid = Number(btn.dataset.uid);
-        state.eventsGranted.has(uid) ? state.eventsGranted.delete(uid) : state.eventsGranted.add(uid);
+        const uuid = uuidForSurrogate(uid);
+        if (!uuid) return;
+        // Real event access: insert/delete an event_access row (admin-only, RLS).
+        if (state.eventAccessUuids.has(uuid)) { state.eventAccessUuids.delete(uuid); revokeEventAccess(uuid); }
+        else { state.eventAccessUuids.add(uuid); grantEventAccess(uuid); }
         return render();
       }
       case "admin-view":
@@ -4458,7 +4521,7 @@ export function renderCommunity(basePath = "") {
       // ---- admin: edit a proposal before approving it ----
       case "ex-admin-edit":
         if (!isAdmin()) return;
-        state.exEditId = id;
+        state.exEditId = rawId;
         state.exEditWarn = null;
         state.exComposer.open = false; // one exf-* form at a time
         // From the Moderare tab, jump to Exerciții where the editor lives.
@@ -4474,7 +4537,7 @@ export function renderCommunity(basePath = "") {
         return render();
       case "ex-admin-save": {
         if (!isAdmin()) return;
-        const ex = state.proposed.find((x) => x.id === id);
+        const ex = state.proposed.find((x) => x.id === rawId);
         if (!ex) return;
         const prompt = mount.querySelector("#exf-prompt")?.value.trim();
         if (!prompt) {
@@ -4486,9 +4549,10 @@ export function renderCommunity(basePath = "") {
           state.exEditWarn = form.error;
           return render();
         }
-        ex.prompt = escapeHtml(prompt);
+        ex.prompt = prompt; // stored RAW; escaped at render (no double-escape)
         ex.data = form.data;
         ex.editedByAdmin = true;
+        updateExercise(rawId, { prompt, data: form.data }); // persist (admin, real)
         state.exEditId = null;
         state.exEditWarn = null;
         showToast("✎ Propunere actualizată — o poți aproba acum", { kind: "success" });
@@ -4498,11 +4562,12 @@ export function renderCommunity(basePath = "") {
         state.exComposer.kind = btn.dataset.key;
         return render();
       case "ex-vote": {
-        const ex = state.proposed.find((x) => x.id === id);
+        const ex = state.proposed.find((x) => x.id === rawId);
         // Same rule as likes: never your own proposal.
         if (ex && ex.authorId !== CURRENT_USER.id) {
           ex.votedByMe = !ex.votedByMe;
           ex.votes += ex.votedByMe ? 1 : -1;
+          voteExercise(ex.id, ex.votedByMe); // persist (real)
         }
         return render();
       }
@@ -4510,42 +4575,19 @@ export function renderCommunity(basePath = "") {
       case "admin-reject-ex": {
         if (!isAdmin()) return;
         const approved = action === "admin-approve-ex";
-        const ex = decideExercise(id, approved ? "approved" : "rejected");
+        const ex = state.proposed.find((x) => x.id === rawId);
         if (ex) logAdmin(`${approved ? "✓ ai aprobat" : "✕ ai respins"} exercițiul lui ${ex.name}`);
-        // Approving a proposal rewards its author (a real contribution) —
-        // unless the author is the teacher himself (admin earns nothing).
-        if (ex && approved) {
-          const REWARD = 40;
-          if (ex.authorId === CURRENT_USER.id) {
-            if (!isAdmin()) {
-              awardPoints("Exercițiu aprobat — publicat la lecție", REWARD);
-              pointsFx(REWARD);
-              notifyReceived({
-                actorId: 0, kind: "award",
-                action: `ți-a aprobat exercițiul propus (+${REWARD} puncte)`,
-                snippet: String(ex.prompt).slice(0, 90),
-                context: `Publicat la «${ex.lessonTitle}»`,
-                goSection: "exercitii",
-              });
-            }
-          } else {
-            const u = userById(ex.authorId);
-            if (u) u.points += REWARD;
-            notifyUser(ex.authorId, { actorId: 0, kind: "award", action: "ți-a aprobat exercițiul propus", snippet: String(ex.prompt).slice(0, 90), context: `Publicat la «${ex.lessonTitle}»` });
-          }
-        }
-        return render();
+        // The SERVER approves + awards the author (approve_exercise RPC,
+        // cheat-safe via points_ledger). No client-side points.
+        (approved ? approveExercise(rawId) : rejectExercise(rawId)).then(reloadExercises);
+        return;
       }
       case "admin-del-ex": {
         if (!isAdmin()) return;
         confirmDialog("Propunerea de exercițiu va fi ștearsă definitiv.", { title: "Ștergi propunerea?", okLabel: "Șterge", danger: true }).then((ok) => {
           if (!ok) return;
-          const i = state.proposed.findIndex((x) => x.id === id);
-          if (i >= 0) {
-            state.proposed.splice(i, 1);
-            logAdmin("🗑 ai șters o propunere de exercițiu");
-          }
-          render();
+          logAdmin("🗑 ai șters o propunere de exercițiu");
+          deleteExercise(rawId).then(reloadExercises); // real delete
         });
         return;
       }
@@ -4569,20 +4611,14 @@ export function renderCommunity(basePath = "") {
           return render();
         }
         state.exWarn = null;
-        const fav = MY_PROFILE.favorites.find((f) => f.title === lesson);
-        const slug = fav ? fav.href.split("/").pop().replace(".html", "") : "";
-        state.proposed.unshift(
-          newExercise({
-            lessonSlug: slug,
-            lessonTitle: lesson,
-            authorId: CURRENT_USER.id,
-            kind: state.exComposer.kind,
-            prompt: escapeHtml(prompt),
-            data: form.data,
-          })
-        );
+        const slug = LESSONS.find((l) => l.title === lesson)?.slug || "";
+        if (!slug) { state.exWarn = "Alege o lecție validă din listă."; return render(); }
+        // Store the prompt RAW (escaped at render); status forced 'pending' by RLS.
+        proposeExercise({ lessonSlug: slug, kind: state.exComposer.kind, prompt, data: form.data })
+          .then(reloadExercises);
         state.exComposer.open = false;
         touchStreak(); // proposing counts as today's activity
+        showToast("✅ Propunere trimisă — profesorul o va verifica.", { kind: "success" });
         return render();
       }
 

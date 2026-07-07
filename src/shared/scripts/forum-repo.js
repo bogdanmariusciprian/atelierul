@@ -43,7 +43,7 @@ export function uuidForSurrogate(surrogateId) {
   return userUuidBySurr.get(surrogateId) || null;
 }
 
-function surrogateForAuthor(profile) {
+export function surrogateForAuthor(profile) {
   const myUuid = CURRENT_USER.authId;
   if (myUuid && profile.id === myUuid) return 0; // "me"
   const existing = userSurrByUuid.get(profile.id);
@@ -132,19 +132,48 @@ function mapCommentRow(row, childrenByParent, commentByUuid) {
   return obj;
 }
 
+/** Fill in ♥ likes + emoji reactions for a batch of mapped comments (shared by
+ *  the forum feed AND lesson comments, so both behave identically). */
+async function enrichCommentReactions(commentByUuid, myUuid) {
+  const commentIds = [...commentByUuid.keys()];
+  if (!commentIds.length) return;
+  const { data: cReacts } = await supabase
+    .from("comment_reactions")
+    .select("comment_id, user_id, emoji")
+    .in("comment_id", commentIds);
+  if (!cReacts) return;
+  for (const [uuid, c] of commentByUuid) {
+    const rows = cReacts.filter((r) => r.comment_id === uuid);
+    c.likes = rows.filter((r) => r.emoji === LIKE_EMOJI).length;
+    c.likedByMe = !!myUuid && rows.some((r) => r.emoji === LIKE_EMOJI && r.user_id === myUuid);
+    const reactions = {};
+    let myReaction = null;
+    for (const r of rows) {
+      if (r.emoji === LIKE_EMOJI) continue;
+      reactions[r.emoji] = (reactions[r.emoji] || 0) + 1;
+      if (myUuid && r.user_id === myUuid) myReaction = r.emoji;
+    }
+    c.reactions = reactions;
+    c.myReaction = myReaction;
+  }
+}
+
 /** Recent forum posts (newest first) WITH comments, likes, reactions and the
  *  current user's saved/liked state. RLS decides visibility. */
-export async function fetchFeed({ limit = 40, surface = "forum" } = {}) {
+export async function fetchFeed({ limit = 40, surface = "forum", groupId = null } = {}) {
   const myUuid = CURRENT_USER.authId;
 
-  const { data: postRows, error } = await supabase
+  let sel = supabase
     .from("posts")
     .select(
-      "id, author_id, body, type, background, audience, share_of, surface, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, author_id, body, type, background, audience, share_of, surface, group_id, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .eq("moderation_status", "visible")
-    .eq("surface", surface)
-    .is("share_of", null)
+    .is("share_of", null);
+  // A group's wall shows its own posts; the main forum / wall feeds must
+  // EXCLUDE group posts (group_id IS NULL).
+  sel = groupId ? sel.eq("group_id", groupId) : sel.eq("surface", surface).is("group_id", null);
+  const { data: postRows, error } = await sel
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
@@ -207,29 +236,7 @@ export async function fetchFeed({ limit = 40, surface = "forum" } = {}) {
   }
 
   // --- Comment likes (♥) + emoji reactions ---
-  const commentIds = [...commentByUuid.keys()];
-  if (commentIds.length) {
-    const { data: cReacts } = await supabase
-      .from("comment_reactions")
-      .select("comment_id, user_id, emoji")
-      .in("comment_id", commentIds);
-    if (cReacts) {
-      for (const [uuid, c] of commentByUuid) {
-        const rows = cReacts.filter((r) => r.comment_id === uuid);
-        c.likes = rows.filter((r) => r.emoji === LIKE_EMOJI).length;
-        c.likedByMe = !!myUuid && rows.some((r) => r.emoji === LIKE_EMOJI && r.user_id === myUuid);
-        const reactions = {};
-        let myReaction = null;
-        for (const r of rows) {
-          if (r.emoji === LIKE_EMOJI) continue;
-          reactions[r.emoji] = (reactions[r.emoji] || 0) + 1;
-          if (myUuid && r.user_id === myUuid) myReaction = r.emoji;
-        }
-        c.reactions = reactions;
-        c.myReaction = myReaction;
-      }
-    }
-  }
+  await enrichCommentReactions(commentByUuid, myUuid);
 
   // --- Saved posts (this user) ---
   if (myUuid) {
@@ -250,7 +257,7 @@ export async function fetchFeed({ limit = 40, surface = "forum" } = {}) {
 // Writes. All fire-and-forget from the hub (optimistic UI already updated).
 // supabase-js returns { error } instead of throwing, so no unhandled rejects.
 // ---------------------------------------------------------
-export async function createPost({ type, bg, audience, text, media, surface }) {
+export async function createPost({ type, bg, audience, text, media, surface, groupId = null }) {
   const { data, error } = await supabase
     .from("posts")
     .insert({
@@ -261,6 +268,7 @@ export async function createPost({ type, bg, audience, text, media, surface }) {
       audience: audience || "public",
       surface: surface === "wall" ? "wall" : "forum",
       media: media ?? null,
+      group_id: groupId,
     })
     .select("id")
     .single();
@@ -316,6 +324,48 @@ export async function createComment({ postSurrogate, parentSurrogate = null, tex
     console.warn("createComment:", error.message);
     return null;
   }
+  return data;
+}
+
+// ---------------------------------------------------------
+// LESSON comments — same `comments` table, keyed by lesson_slug instead of
+// post_id. Threaded, public-readable. Edit/delete/like reuse the comment
+// helpers below (they work off the comment surrogate, regardless of target).
+// ---------------------------------------------------------
+export async function fetchLessonComments(slug) {
+  const myUuid = CURRENT_USER.authId;
+  const { data: rows, error } = await supabase
+    .from("comments")
+    .select(
+      "id, lesson_slug, parent_id, body, edited_at, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+    )
+    .eq("lesson_slug", slug)
+    .eq("moderation_status", "visible")
+    .order("created_at", { ascending: true });
+  if (error) { console.warn("fetchLessonComments:", error.message); return []; }
+  const childrenByParent = new Map();
+  const top = [];
+  for (const r of rows || []) {
+    if (r.parent_id) {
+      if (!childrenByParent.has(r.parent_id)) childrenByParent.set(r.parent_id, []);
+      childrenByParent.get(r.parent_id).push(r);
+    } else top.push(r);
+  }
+  const commentByUuid = new Map();
+  const tree = top.map((r) => mapCommentRow(r, childrenByParent, commentByUuid));
+  await enrichCommentReactions(commentByUuid, myUuid);
+  return tree;
+}
+
+/** Post a lesson comment (top-level or a threaded reply). Returns { id }. */
+export async function addLessonComment({ lessonSlug, parentSurrogate = null, text }) {
+  const parentId = parentSurrogate ? commentUuidBySurr.get(parentSurrogate) : null;
+  const { data, error } = await supabase
+    .from("comments")
+    .insert({ lesson_slug: lessonSlug, parent_id: parentId, author_id: CURRENT_USER.authId, body: text })
+    .select("id")
+    .single();
+  if (error) { console.warn("addLessonComment:", error.message); return null; }
   return data;
 }
 
