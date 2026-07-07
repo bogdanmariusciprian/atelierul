@@ -2414,6 +2414,25 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
 /* Messages: category chips + always-visible template grid + sent tick */
 .cx-msgchips { display: flex; gap: 0.35rem; flex-wrap: wrap; margin: 0.5rem 0; }
 .cx-msggrid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+/* Reply suggestions (💡) + slot fill-in box + slotted template chips */
+.cx-msgsugg { margin-bottom: 0.6rem; padding: 0.5rem 0.6rem; border: 1px dashed var(--color-primary); border-radius: 12px; background: color-mix(in srgb, var(--color-primary) 6%, transparent); }
+.cx-msgsugg .cx-muted { margin: 0 0 0.35rem; font-weight: 700; }
+.cx-msgtpl--slot { border-style: dashed; border-color: var(--color-primary); }
+.cx-slotbox { margin-bottom: 0.6rem; padding: 0.6rem 0.7rem; border: 1px solid var(--color-primary); border-radius: 12px; background: var(--color-surface); }
+.cx-slotbox__t { margin: 0 0 0.5rem; font-weight: 600; }
+.cx-slotbox__row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.5rem; }
+.cx-slotpick { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.82rem; }
+.cx-slotpick select { min-width: 160px; }
+/* Admin inbox: conversation labels (Curent/Încheiat/Amânat/Evenimente) */
+.cx-msglabelbar { margin: 0.4rem 0; }
+.cx-convlabel { display: inline-block; padding: 0.05rem 0.4rem; margin-left: 0.25rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; color: #fff; background: var(--l, #64748b); }
+.cx-chat__labels { display: block; margin-top: 0.15rem; }
+.cx-labelset { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; padding: 0.4rem 0.2rem 0.6rem; }
+.cx-labelbtn { border: 1px solid var(--l, var(--color-border)); color: var(--l, var(--color-text)); background: transparent; border-radius: 999px; padding: 0.2rem 0.6rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+.cx-labelbtn:hover { background: color-mix(in srgb, var(--l, var(--color-primary)) 12%, transparent); }
+.cx-labelbtn.on { background: var(--l, var(--color-primary)); color: #fff; }
+.cx-labelbtn--clear { --l: var(--color-danger); }
+.cx-guestmail { padding: 0.6rem 0.7rem; border: 1px dashed var(--color-primary); border-radius: 12px; background: var(--color-surface); }
 .cx-msg__sent { font-size: 0.72rem; font-weight: 700; color: var(--color-success); }
 
 /* Exercise proposal preview (hub, simple rendition) */

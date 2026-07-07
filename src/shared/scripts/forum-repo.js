@@ -433,6 +433,190 @@ export async function removeFriend(userSurrogate) {
   );
 }
 
+// ---------------------------------------------------------
+// Messaging (real). Member↔member (templates), member→teacher (free text),
+// teacher→member (free text). Mapped into the hub's conversation shape.
+// ---------------------------------------------------------
+const MSG_PROFILE_SEL =
+  "sender:profiles!messages_sender_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role), " +
+  "recipient:profiles!messages_recipient_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role)";
+
+/** My conversations, grouped by partner, in the hub's shape:
+ *  [{ key, partnerId(surrogate), partnerName, teacher, guest, msgs[], unread }].
+ *  A message: { id, fromId(0=me), fromTeacher, text, createdAt, read, template }. */
+export async function fetchConversations(asAdmin = false) {
+  const me = CURRENT_USER.authId;
+  if (!me) return [];
+  const filter = asAdmin ? `to_admin.eq.true,sender_id.eq.${me}` : `sender_id.eq.${me},recipient_id.eq.${me}`;
+  const { data, error } = await supabase
+    .from("messages")
+    .select(`id, sender_id, recipient_id, to_admin, body, template_key, guest_name, guest_email, created_at, read_at, ${MSG_PROFILE_SEL}`)
+    .or(filter)
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.warn("fetchConversations:", error.message);
+    return [];
+  }
+  const map = new Map();
+  for (const m of data || []) {
+    const senderIsAdmin = m.sender?.role === "admin";
+    const iAmSender = m.sender_id === me;
+    let key, partnerId = null, partnerName = "Membru", teacher = false, guest = false, guestEmail = null;
+    if (asAdmin) {
+      const incoming = m.to_admin;
+      if (incoming && m.sender_id == null) {
+        // Guest contact — grouped by e-mail (or name), so the teacher can reply.
+        const gid = m.guest_email || m.guest_name || "vizitator";
+        key = `g:${gid}`;
+        partnerName = m.guest_name || "Vizitator";
+        guestEmail = m.guest_email || null;
+        guest = true;
+      } else {
+        const other = incoming ? m.sender : m.recipient;
+        partnerId = other ? surrogateForAuthor(other) : null;
+        key = `u${partnerId}`;
+        partnerName = other?.display_name || "Membru";
+      }
+    } else if (m.to_admin || senderIsAdmin) {
+      key = "t"; partnerName = "Profesorul"; teacher = true;
+    } else {
+      const other = iAmSender ? m.recipient : m.sender;
+      partnerId = other ? surrogateForAuthor(other) : null;
+      key = `u${partnerId}`;
+      partnerName = other?.display_name || "Membru";
+    }
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, { key, partnerId, partnerName, teacher, guest, guestEmail, msgs: [], unread: 0 });
+    const conv = map.get(key);
+    const read = !!m.read_at;
+    const mine = asAdmin ? senderIsAdmin : iAmSender;
+    conv.msgs.push({
+      id: m.id,
+      fromId: mine ? 0 : (partnerId ?? 0),
+      fromTeacher: senderIsAdmin,
+      text: m.body,
+      createdAt: new Date(m.created_at).getTime(),
+      read,
+      template: !!m.template_key,
+    });
+    if (!mine && !read) conv.unread++;
+  }
+  return [...map.values()].sort(
+    (a, b) => (b.msgs[b.msgs.length - 1]?.createdAt || 0) - (a.msgs[a.msgs.length - 1]?.createdAt || 0)
+  );
+}
+
+/** Member → member: a template message (server requires template_key). */
+export async function sendTemplateMsg(recipientSurrogate, body, templateKey) {
+  const to = uuidForSurrogate(recipientSurrogate);
+  if (!to || !CURRENT_USER.authId) return null;
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ sender_id: CURRENT_USER.authId, recipient_id: to, to_admin: false, body, template_key: templateKey || "tpl" })
+    .select("id").single();
+  if (error) { console.warn("sendTemplateMsg:", error.message); return null; }
+  return data;
+}
+
+/** Member → teacher: free text. */
+export async function sendTeacherMsg(body) {
+  if (!CURRENT_USER.authId) return null;
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ sender_id: CURRENT_USER.authId, recipient_id: null, to_admin: true, body })
+    .select("id").single();
+  if (error) { console.warn("sendTeacherMsg:", error.message); return null; }
+  return data;
+}
+
+/** Guest (signed-out) → teacher: a contact message with an e-mail for the
+ *  reply. Goes through a public SECURITY DEFINER RPC (anon can't insert). */
+export async function contactTeacher(name, email, body) {
+  const { error } = await supabase.rpc("contact_teacher", {
+    p_name: name || null,
+    p_email: email || null,
+    p_body: body,
+  });
+  if (error) {
+    console.warn("contactTeacher:", error.message);
+    return false;
+  }
+  return true;
+}
+
+/** Teacher → member: free text (admin only). */
+export async function sendTeacherReply(recipientSurrogate, body) {
+  const to = uuidForSurrogate(recipientSurrogate);
+  if (!to || !CURRENT_USER.authId) return null;
+  const { error } = await supabase
+    .from("messages")
+    .insert({ sender_id: CURRENT_USER.authId, recipient_id: to, to_admin: false, body });
+  if (error) console.warn("sendTeacherReply:", error.message);
+}
+
+// ---- Notifications (real; generated server-side by triggers, 0016) ----
+/** The current user's notifications, newest first. */
+export async function fetchNotifications(limit = 30) {
+  const me = CURRENT_USER.authId;
+  if (!me) return [];
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id, type, payload, read_at, created_at")
+    .eq("user_id", me)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) { console.warn("fetchNotifications:", error.message); return []; }
+  return data || [];
+}
+
+/** Mark specific notifications (by id) as read. */
+export async function markNotificationsRead(ids) {
+  if (!ids || !ids.length || !CURRENT_USER.authId) return;
+  await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
+}
+
+// ---- Teacher's inbox labels (admin) + event-access (auto "Evenimente") ----
+/** All conversation labels, keyed by member UUID → 'curent'|'incheiat'|'amanat'. */
+export async function fetchConversationLabels() {
+  const { data, error } = await supabase.from("conversation_labels").select("user_id, label");
+  if (error) { console.warn("fetchConversationLabels:", error.message); return {}; }
+  const out = {};
+  for (const r of data || []) out[r.user_id] = r.label;
+  return out;
+}
+
+/** Admin: set (or clear, when label is falsy) a member conversation's label. */
+export async function setConversationLabel(memberSurrogate, label) {
+  const uuid = uuidForSurrogate(memberSurrogate);
+  if (!uuid) return;
+  if (!label) {
+    await supabase.from("conversation_labels").delete().eq("user_id", uuid);
+  } else {
+    await supabase.from("conversation_labels").upsert({ user_id: uuid, label, updated_at: new Date().toISOString() });
+  }
+}
+
+/** Set of member UUIDs that have Events access (drives the auto "Evenimente"
+ *  label). Admin sees every row (RLS: own or admin). */
+export async function fetchEventAccessUsers() {
+  const { data, error } = await supabase.from("event_access").select("user_id");
+  if (error) { console.warn("fetchEventAccessUsers:", error.message); return new Set(); }
+  return new Set((data || []).map((r) => r.user_id));
+}
+
+/** Mark the incoming (not-mine) messages of ONE conversation as read. */
+export async function markConversationReadReal(conv, asAdmin) {
+  if (!conv || !CURRENT_USER.authId) return;
+  const ids = conv.msgs
+    .filter((m) => {
+      const mine = asAdmin ? m.fromTeacher : m.fromId === 0 && !m.fromTeacher;
+      return !mine && !m.read;
+    })
+    .map((m) => m.id);
+  if (!ids.length) return;
+  await supabase.from("messages").update({ read_at: new Date().toISOString() }).in("id", ids);
+}
+
 /** The current user's own profile (settings) row, or null.
  *  Via the get_my_profile() RPC: since migration 0009 locks the sensitive
  *  columns (names, school, town, class, passions, challenges) out of the

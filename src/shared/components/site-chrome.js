@@ -22,9 +22,9 @@ import { LESSON_DOMAINS } from "../scripts/domains.js";
 import { initUserMenu } from "../scripts/user-menu.js";
 import { openModerationItems } from "../scripts/moderation.js";
 import { pendingExercises, pendingForLesson } from "../scripts/exercises-data.js";
-import { notifTotal, trayRequests, trayMessages, trayActivity, consumeTray, relTime } from "../scripts/notif.js";
+import { notifTotal, notifRows, consumeTray, relTime, loadNotifications } from "../scripts/notif.js";
 import { isLoggedIn, signOut } from "../scripts/session.js";
-import { sendMessage } from "../scripts/messages.js";
+import { contactTeacher, sendTeacherMsg } from "../scripts/forum-repo.js";
 import { MY_PROFILE, userById } from "../scripts/community-data.js";
 import { findProfanity } from "../scripts/moderation.js";
 import { showToast } from "../scripts/toast.js";
@@ -191,8 +191,11 @@ function initContactFloat(basePath) {
       <p class="contact-float__title">Scrie-i profesorului</p>
       <p class="contact-float__sub">${isLoggedIn()
         ? "Mesajul tău ajunge doar la profesor. Răspunsul îl găsești în „Mesaje”."
-        : "Nu ai nevoie de cont — profesorul îți poate răspunde dacă lași un nume."}</p>
-      ${isLoggedIn() ? "" : `<input class="cx-input" id="contact-name" placeholder="Numele tău (opțional)" />`}
+        : "Nu ai nevoie de cont — lasă un e-mail și profesorul îți răspunde acolo."}</p>
+      ${isLoggedIn() ? "" : `
+        <input class="cx-input" id="contact-name" placeholder="Numele tău (opțional)" />
+        <input class="cx-input" id="contact-email" type="email" inputmode="email" placeholder="E-mailul tău (ca să-ți răspundă)" />
+        <p class="contact-float__hint cx-muted">Folosim e-mailul doar ca să-ți răspundem.</p>`}
       <textarea class="cx-input" id="contact-text" rows="3" placeholder="Scrie aici, cu cuvintele tale…"></textarea>
       <p class="contact-float__warn" id="contact-warn" hidden></p>
       <button type="button" class="btn btn--primary btn--sm" id="contact-send">Trimite</button>
@@ -226,13 +229,18 @@ function initContactFloat(basePath) {
             warn.hidden = false;
             return;
           }
-          const guestName = el.querySelector("#contact-name")?.value.trim();
-          sendMessage({
-            fromId: isLoggedIn() ? CURRENT_USER.id : null,
-            fromName: isLoggedIn() ? CURRENT_USER.name : guestName ? `Vizitator (${guestName})` : "Vizitator",
-            toAdmin: true,
-            text,
-          });
+          if (isLoggedIn()) {
+            sendTeacherMsg(text); // REAL: member → teacher (Supabase)
+          } else {
+            const name = el.querySelector("#contact-name")?.value.trim();
+            const email = el.querySelector("#contact-email")?.value.trim();
+            if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+              warn.textContent = "⚠️ Lasă un e-mail valid ca să-ți putem răspunde.";
+              warn.hidden = false;
+              return;
+            }
+            contactTeacher(name, email, text); // REAL: guest → teacher (public RPC)
+          }
           el.innerHTML = build(false);
           showToast("✉️ Mesaj trimis profesorului — mulțumim!", { kind: "success" });
         }
@@ -594,6 +602,7 @@ function renderHeader(basePath) {
 
   initNavUser(mount.querySelector(".nav-user-slot"), basePath);
   initNotifCenter(basePath);
+  loadNotifications(); // fill the bell from REAL notifications (fires atelier:notifs)
 
   const header = mount.querySelector(".site-header");
 
@@ -734,37 +743,32 @@ function initNotifCenter(basePath) {
   // the badge, so the number and the rows always match. Everything shown
   // disappears once the tray was viewed (consumeTray on close).
   const panelHtml = () => {
-    const rows = [];
-    for (const id of trayRequests()) {
-      const u = userById(id);
-      rows.push(row({
-        kind: "friend",
-        title: `<b>${u.name}</b> vrea să-ți fie prieten(ă)`,
-        text: "Acceptă sau refuză din profilul tău",
-        href: `${HUB}#profil`,
-        unread: true,
-      }));
-    }
-    for (const m of trayMessages()) {
-      rows.push(row({
-        kind: "message",
-        title: `<b>${m.fromName}</b> ți-a scris`,
-        text: `„${m.text.length > 90 ? m.text.slice(0, 90) + "…" : m.text}”`,
-        time: relTime(m.createdAt),
-        href: `${HUB}#mesaje`,
-        unread: true,
-      }));
-    }
-    for (const a of trayActivity()) {
-      rows.push(row({
-        kind: a.kind,
-        title: `<b>${a.name}</b> ${a.action}`,
-        text: a.snippet ? `„${a.snippet}”` : "",
-        time: a.time,
-        href: `${HUB}#activitate`,
-        unread: true,
-      }));
-    }
+    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const titleFor = (n) => {
+      const name = esc((n.payload || {}).actor_name || "Cineva");
+      switch (n.type) {
+        case "friend":
+          return (n.payload || {}).kind === "accepted"
+            ? `<b>${name}</b> ți-a acceptat cererea de prietenie`
+            : `<b>${name}</b> vrea să-ți fie prieten(ă)`;
+        case "message": return `<b>${name}</b> ți-a scris`;
+        case "like": return `<b>${name}</b> ți-a apreciat o postare`;
+        case "comment": return `<b>${name}</b> a comentat la postarea ta`;
+        default: return `<b>${name}</b>`;
+      }
+    };
+    const hrefFor = (n) =>
+      n.type === "message" ? `${HUB}#mesaje` : n.type === "friend" ? `${HUB}#profil` : `${HUB}#forum`;
+    const rows = notifRows().map((n) =>
+      row({
+        kind: n.type,
+        title: titleFor(n),
+        text: (n.payload || {}).snippet ? `„${esc(n.payload.snippet)}”` : "",
+        time: relTime(new Date(n.created_at).getTime()),
+        href: hrefFor(n),
+        unread: !n.read_at,
+      })
+    );
     return `
       <div class="notif" role="dialog" aria-label="Noutățile tale">
         <div class="notif__head">

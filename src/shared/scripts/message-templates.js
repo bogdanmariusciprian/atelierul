@@ -684,4 +684,109 @@ export const TEMPLATE_CATALOGUE = [
       ["Fiecare nivel e o poveste. Ăsta e capitolul meu preferat.", 9],
     ],
   },
+
+  // ---------------------------------------------------------
+  // SLOT-BASED categories — the {opera}/{lectie}/{zi} placeholder is filled
+  // from a FIXED list (SLOTS below), never free text. This is what makes
+  // conversations correlate ("Mă poți ajuta la {opera}?" → "Da, verifică
+  // comentariul meu la {lectie}.") while staying 100% safe.
+  // ---------------------------------------------------------
+  {
+    cat: "🆘 Cer ajutor",
+    items: [
+      "Mă poți ajuta la {opera}?",
+      "Am o nelămurire la {opera}. Mă ajuți?",
+      "Cum ai abordat tu {opera}?",
+      "Facem împreună un plan la {opera}?",
+      "Ce idei principale ai găsit la {opera}?",
+      "Îmi dai un exemplu bun pentru {opera}?",
+      ["Îmi explici și mie partea grea de la {opera}?", 2],
+      ["Am rămas blocat(ă) la {opera}. Vreo idee?", 2],
+      ["Cum începi un eseu la {opera}?", 3],
+      ["Tu cum ai memorat citatele de la {opera}?", 4],
+      ["Îmi trimiți planul tău de idei la {opera}?", 5],
+      ["Facem schimb de notițe la {opera}?", 6],
+    ],
+  },
+  {
+    cat: "🤝 Ofer ajutor",
+    items: [
+      "Da, verifică comentariul meu la {opera}.",
+      "Sigur! Hai să exersăm {opera} {zi}.",
+      "Te ajut cu drag la {opera}.",
+      "Uite ce-am scris eu la {opera} — poate te ajută.",
+      "Îți explic eu ideea principală de la {opera}.",
+      "Am notițe bune la {opera}, ți le arăt {zi}.",
+      ["Hai să facem un plan de eseu la {opera} împreună.", 2],
+      ["Îți dau un exemplu clar pentru {opera}.", 3],
+      ["Ne vedem în grupul de studiu {zi} și rezolvăm {opera}.", 4],
+      ["Îți trimit citatele mele preferate de la {opera}.", 5],
+      ["Facem un rezumat la {opera} pe rând?", 6],
+    ],
+  },
+  {
+    cat: "📆 Coordonăm studiul",
+    items: [
+      "Hai să învățăm {opera} {zi}.",
+      "Ne vedem în grupul de studiu {zi}?",
+      "Repetăm împreună la {opera} {zi}?",
+      "Facem provocarea zilei {zi}?",
+      "Pe {zi} ai timp de o sesiune de studiu?",
+      ["Setăm ca obiectiv {opera} până {zi}?", 2],
+      ["Maraton de recapitulare {zi} — te bagi?", 4],
+      ["Împărțim: eu iau {opera}, tu altă operă, apoi ne povestim {zi}?", 5],
+    ],
+  },
+  {
+    cat: "🎯 Provocare reciprocă",
+    items: [
+      "Te provoc la un test rapid despre {opera}!",
+      "Care ia nota mai mare la {opera}? 😄",
+      "Pariem cine termină primul recapitularea la {opera}?",
+      ["Provocare: 5 citate din {opera} până {zi}. Poți?", 3],
+      ["Hai să vedem cine face mai repede provocarea zilei {zi}.", 4],
+    ],
+  },
 ];
+
+// ---------------------------------------------------------
+// SLOTS — the ONLY values a placeholder can take (fixed lists, no free text).
+// {opera} = a studied literary work; {zi} = a day/time phrase.
+// ---------------------------------------------------------
+export const SLOTS = {
+  opera: [
+    "Testament", "Luceafărul", "Moromeții", "Enigma Otiliei", "Baltagul",
+    "Ion", "Plumb", "O scrisoare pierdută", "Amintiri din copilărie",
+    "Povestea lui Harap-Alb", "Fefeleaga", "Riga Crypto și lapona Enigel",
+    "Iona", "Eu nu strivesc corola de minuni a lumii", "În grădina Ghetsimani",
+    "textul narativ", "textul liric", "textul argumentativ", "textul descriptiv",
+  ],
+  zi: [
+    "azi", "diseară", "mâine", "în weekend", "luni", "marți", "miercuri",
+    "joi", "vineri", "săptămâna asta", "săptămâna viitoare",
+  ],
+};
+
+// ---------------------------------------------------------
+// INTENT of each category (for the "sugestii de răspuns"). Categories not
+// listed are "general". Keyed by the exact `cat` label above.
+// ---------------------------------------------------------
+export const CATEGORY_INTENT = {
+  "👋 Salutări": "greet",
+  "📚 Studiu împreună": "coordinate",
+  "🆘 Cer ajutor": "askHelp",
+  "🤝 Ofer ajutor": "offerHelp",
+  "📆 Coordonăm studiul": "coordinate",
+  "🎯 Provocare reciprocă": "challenge",
+};
+
+// Given the intent of the LAST received message, which intents make good
+// replies — drives the suggested templates shown on top when you reply.
+export const REPLY_INTENTS = {
+  greet: ["greet", "coordinate"],
+  askHelp: ["offerHelp", "coordinate", "encourage"],
+  offerHelp: ["thanks", "coordinate"],
+  coordinate: ["coordinate", "thanks"],
+  challenge: ["challenge", "coordinate"],
+  general: ["greet", "coordinate", "offerHelp"],
+};

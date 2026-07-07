@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
@@ -61,7 +61,7 @@ import { exerciseFormFields, readExerciseForm, exerciseEditFormHtml } from "../.
 import { touchStreak, getStreakInfo } from "../../shared/scripts/streak.js";
 import { store } from "../../shared/scripts/store.js";
 import { getNotes, addNote, updateNote, deleteNote } from "../../shared/scripts/notebook.js";
-import { MESSAGE_TEMPLATES, sendMessage, unreadMessages, conversationsFor, markConversationRead, searchTemplates, templateStats } from "../../shared/scripts/messages.js";
+import { MESSAGE_TEMPLATES, searchTemplates, templateStats, suggestReplies, intentOfTemplate, slotsIn, slotOptions, fillTemplate } from "../../shared/scripts/messages.js";
 import { mascotSvg } from "../../shared/scripts/mascot.js";
 import { MAX_LEVEL, xpSkin, levelInfo, setPreview, xpBarMarkup, applyBar } from "../../shared/scripts/xp-bar.js";
 import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
@@ -265,8 +265,15 @@ export function renderCommunity(basePath = "") {
     msgQuery: "", // template search
     msgParts: [], // templates chained into the message being composed
     msgWarn: null,
+    conversations: [], // REAL conversations (Supabase) — loaded in loadFeed
+    msgSlot: null, // a slotted template being filled ({opera}/{zi} pick)
+    convLabels: {}, // admin inbox: member UUID → 'curent'|'incheiat'|'amanat'
+    eventAccessUuids: new Set(), // members with Events access (auto "Evenimente")
+    msgLabelFilter: "all", // admin inbox filter
   };
   const MSG_MAX_PARTS = 5;
+  // Unread message count, derived from the REAL conversations.
+  const unreadMsgCount = () => state.conversations.reduce((n, c) => n + (c.unread || 0), 0);
   // Deep links into a specific admin tab: #admin/moderare, #admin/utilizatori…
   // (used by the floating admin quick-panel, from any page of the site).
   const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification" };
@@ -695,8 +702,8 @@ export function renderCommunity(basePath = "") {
           ? `<span class="cx-side__badge" title="Cereri de prietenie în așteptare">${friendReqs}</span>`
           : id === "grupuri" && groupNews
             ? `<span class="cx-side__badge" title="Grupuri cu activitate nouă">${groupNews}</span>`
-            : id === "mesaje" && !guest && unreadMessages(isAdmin())
-              ? `<span class="cx-side__badge" title="Mesaje necitite">${unreadMessages(isAdmin())}</span>`
+            : id === "mesaje" && !guest && unreadMsgCount()
+              ? `<span class="cx-side__badge" title="Mesaje necitite">${unreadMsgCount()}</span>`
               : id === "admin" && attention
                 ? `<span class="cx-side__badge" title="Necesită atenție">${attention}</span>`
                 : "";
@@ -1520,11 +1527,49 @@ export function renderCommunity(basePath = "") {
   // in the compose strip, so ONE message can chain several templates.
   // Templates above your LEVEL show locked (🔒) — levelling up literally
   // gives you more to say.
+  // The slot-fill box — shown when a {opera}/{zi} template is being completed.
+  function slotPickerHtml() {
+    const text = state.msgSlot;
+    if (!text) return "";
+    const label = (s) => (s === "opera" ? "operă / lecție" : s === "zi" ? "când" : s);
+    const preview = escapeHtml(text.replace(/\{\w+\}/g, "___"));
+    const pickers = slotsIn(text)
+      .map((s) => `<label class="cx-slotpick"><span class="cx-muted">${label(s)}</span>
+          <select class="cx-input" id="cx-slot-${s}">${slotOptions(s).map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("")}</select>
+        </label>`)
+      .join("");
+    return `<div class="cx-slotbox">
+        <p class="cx-slotbox__t">Completează: „${preview}"</p>
+        <div class="cx-slotbox__row">${pickers}</div>
+        <div class="cx-excompose__actions">
+          <button type="button" class="btn-mini" data-action="msg-slot-add">Adaugă la mesaj</button>
+          <button type="button" class="btn-mini btn-mini--ghost" data-action="msg-slot-cancel">Renunță</button>
+        </div>
+      </div>`;
+  }
+
   function templatePicker() {
     const level = levelInfo(MY_PROFILE.points).level;
     const stats = templateStats(level);
     const q = state.msgQuery.trim();
     const catIdx = state.msgCat;
+    // A template button. Slotted templates show the blank as „…" and open the
+    // slot picker on click; locked ones nudge to level up.
+    const tplBtn = (i) =>
+      i.lvl > level
+        ? `<button type="button" class="cx-msgtpl cx-msgtpl--locked" data-action="msg-locked" data-lvl="${i.lvl}" title="Se deblochează la nivelul ${i.lvl}">🔒 ${escapeHtml(i.t.replace(/\{(\w+)\}/g, "…"))}<span class="cx-msgtpl__lvl">niv. ${i.lvl}</span></button>`
+        : `<button type="button" class="cx-msgtpl${/\{\w+\}/.test(i.t) ? " cx-msgtpl--slot" : ""}" data-action="msg-pick" data-text="${escapeHtml(i.t)}">${escapeHtml(i.t.replace(/\{(\w+)\}/g, "…"))}</button>`;
+
+    // 💡 Reply suggestions — templates that fit the last INCOMING message.
+    const openConv = state.conversations.find((c) => c.key === state.msgOpen);
+    const lastIncoming = openConv
+      ? [...openConv.msgs].reverse().find((m) => !(m.fromId === 0 && !m.fromTeacher))
+      : null;
+    const suggs = lastIncoming && !q ? suggestReplies(intentOfTemplate(lastIncoming.text), level, 6) : [];
+    const suggBox = suggs.length
+      ? `<div class="cx-msgsugg"><p class="cx-muted">💡 Răspunsuri potrivite:</p><div class="cx-msggrid">${suggs.map(tplBtn).join("")}</div></div>`
+      : "";
+
     const chips = [`<button type="button" class="cx-fchip${catIdx === -1 && !q ? " on" : ""}" data-action="msg-cat" data-i="-1">✨ Toate</button>`]
       .concat(MESSAGE_TEMPLATES.map(
         (c, i) => `<button type="button" class="cx-fchip${i === catIdx && !q ? " on" : ""}" data-action="msg-cat" data-i="${i}">${c.cat}</button>`
@@ -1535,8 +1580,6 @@ export function renderCommunity(basePath = "") {
       items = searchTemplates(q);
       if (!items.length) items = null;
     } else if (catIdx === -1) {
-      // A taste of everything: 2 unlocked + 1 LOCKED per category — the
-      // locks must be visible up front, they're the reason to level up.
       items = MESSAGE_TEMPLATES.flatMap((c) => [
         ...c.items.filter((i) => i.lvl <= level).slice(0, 2),
         ...c.items.filter((i) => i.lvl > level).slice(0, 1),
@@ -1544,12 +1587,8 @@ export function renderCommunity(basePath = "") {
     } else {
       items = MESSAGE_TEMPLATES[Math.min(catIdx, MESSAGE_TEMPLATES.length - 1)].items;
     }
-    const tpl = (i) =>
-      i.lvl > level
-        ? `<button type="button" class="cx-msgtpl cx-msgtpl--locked" data-action="msg-locked" data-lvl="${i.lvl}" title="Se deblochează la nivelul ${i.lvl}">🔒 ${escapeHtml(i.t)}<span class="cx-msgtpl__lvl">niv. ${i.lvl}</span></button>`
-        : `<button type="button" class="cx-msgtpl" data-action="msg-pick" data-text="${escapeHtml(i.t)}">${escapeHtml(i.t)}</button>`;
     const grid = items
-      ? `<div class="cx-msggrid">${items.map(tpl).join("")}</div>`
+      ? `<div class="cx-msggrid">${items.map(tplBtn).join("")}</div>`
       : `<p class="cx-muted">Niciun șablon nu se potrivește căutării. Încearcă alt cuvânt.</p>`;
     const statsLine = `<p class="cx-msgstats">🧩 <b>${stats.unlocked}</b> din <b>${stats.total}</b> șabloane deblocate${stats.nextLvl ? ` · următoarele vin la <b>nivelul ${stats.nextLvl}</b>` : " · le ai pe toate! 🎉"}</p>`;
     const strip = state.msgParts.length
@@ -1563,21 +1602,59 @@ export function renderCommunity(basePath = "") {
          </div>`
       : `<p class="cx-muted cx-compose__hint">Apasă pe șabloane ca să-ți compui mesajul — poți înlănțui până la ${MSG_MAX_PARTS}.</p>`;
     return `
-      <input class="cx-input cx-msgsearch" id="cx-msg-search" type="search" placeholder="🔍 Caută un șablon… (ex: „felicitări”, „test”, „ajutor”)" value="${escapeHtml(q)}" />
+      ${suggBox}
+      ${slotPickerHtml()}
+      <input class="cx-input cx-msgsearch" id="cx-msg-search" type="search" placeholder="🔍 Caută un șablon…" value="${escapeHtml(q)}" />
       ${statsLine}
       <div class="cx-msgchips">${chips}</div>
       ${grid}
       ${strip}`;
   }
 
+  // Teacher's inbox labels. "Evenimente" is auto (derived from event access);
+  // the other three are set manually per member conversation.
+  const CONV_LABELS = [
+    { id: "curent", label: "Curent", color: "#2563eb" },
+    { id: "incheiat", label: "Încheiat", color: "#16a34a" },
+    { id: "amanat", label: "Amânat", color: "#f59e0b" },
+  ];
+  const convLabelId = (conv) =>
+    conv.partnerId != null ? state.convLabels[uuidForSurrogate(conv.partnerId)] || null : null;
+  const convHasEvents = (conv) =>
+    conv.partnerId != null && state.eventAccessUuids.has(uuidForSurrogate(conv.partnerId));
+  const convLabelChips = (conv) => {
+    const m = CONV_LABELS.find((l) => l.id === convLabelId(conv));
+    return `${m ? `<span class="cx-convlabel" style="--l:${m.color}">${m.label}</span>` : ""}${convHasEvents(conv) ? `<span class="cx-convlabel" style="--l:#7c3aed">🎟️</span>` : ""}`;
+  };
+  function adminLabelBar() {
+    const count = (id) =>
+      id === "all" ? state.conversations.length
+        : id === "evenimente" ? state.conversations.filter(convHasEvents).length
+          : state.conversations.filter((c) => convLabelId(c) === id).length;
+    const chip = (id, label) =>
+      `<button type="button" class="cx-fchip${state.msgLabelFilter === id ? " on" : ""}" data-action="msg-label-filter" data-id="${id}">${label} <span class="cx-muted">${count(id)}</span></button>`;
+    return `<div class="cx-histfilter cx-msglabelbar">${chip("all", "Toate")}${CONV_LABELS.map((l) => chip(l.id, l.label)).join("")}${chip("evenimente", "🎟️ Evenimente")}</div>`;
+  }
+  function convLabelSetter(conv) {
+    if (conv.partnerId == null) return "";
+    const cur = convLabelId(conv);
+    const btn = (l) => `<button type="button" class="cx-labelbtn${cur === l.id ? " on" : ""}" style="--l:${l.color}" data-action="msg-label" data-uid="${conv.partnerId}" data-label="${l.id}">${l.label}</button>`;
+    return `<div class="cx-labelset"><span class="cx-muted">Etichetă:</span> ${CONV_LABELS.map(btn).join("")}${cur ? `<button type="button" class="cx-labelbtn cx-labelbtn--clear" data-action="msg-label" data-uid="${conv.partnerId}" data-label="">✕</button>` : ""}${convHasEvents(conv) ? ` <span class="cx-convlabel" style="--l:#7c3aed">🎟️ Evenimente (auto)</span>` : ""}</div>`;
+  }
+
   function sectionMessages() {
     const asAdmin = isAdmin();
-    const convs = conversationsFor(asAdmin);
+    const convs = state.conversations; // REAL conversations (Supabase)
+    const shownConvs = asAdmin && state.msgLabelFilter !== "all"
+      ? convs.filter((c) => (state.msgLabelFilter === "evenimente" ? convHasEvents(c) : convLabelId(c) === state.msgLabelFilter))
+      : convs;
     const open = convs.find((c) => c.key === state.msgOpen) || null;
 
-    // --- left rail: conversations + "new message" ---
+    // --- left rail: conversations + "new message" (real members) ---
     const partnersInConvs = new Set(convs.map((c) => c.partnerId));
-    const newOpts = COMMUNITY_USERS.filter((u) => !partnersInConvs.has(u.id))
+    const newOpts = state.members
+      .map((id) => userById(id))
+      .filter((u) => u && u.id !== CURRENT_USER.id && !partnersInConvs.has(u.id))
       .map((u) => `<option value="u${u.id}">${escapeHtml(u.name)}</option>`)
       .join("");
     const newBox = `
@@ -1591,7 +1668,8 @@ export function renderCommunity(basePath = "") {
     const rail = convs.length || newOpts
       ? `<aside class="cx-chat__list">
           ${newBox}
-          ${convs
+          ${asAdmin ? adminLabelBar() : ""}
+          ${shownConvs
             .map((c) => {
               const last = c.msgs[c.msgs.length - 1];
               const av = c.teacher
@@ -1604,6 +1682,7 @@ export function renderCommunity(basePath = "") {
                 <span class="cx-chat__meta">
                   <b class="cx-chat__name">${escapeHtml(c.partnerName)}${c.guest ? ` <span class="cx-tag">vizitator</span>` : ""}</b>
                   <span class="cx-chat__snippet">${escapeHtml(last.text.split("\n")[0].slice(0, 42))}${last.text.length > 42 ? "…" : ""}</span>
+                  ${asAdmin ? `<span class="cx-chat__labels">${convLabelChips(c)}</span>` : ""}
                 </span>
                 <span class="cx-chat__side">
                   <span class="cx-chat__time">${relTime(Math.max(0, Date.now() - last.createdAt))}</span>
@@ -1636,20 +1715,31 @@ export function renderCommunity(basePath = "") {
       // Composer: free text toward/from the teacher, safe templates
       // between members. (Server-side this will be enforced by RLS too.)
       const freeText = asAdmin || open.teacher;
-      const composer = freeText
+      // A GUEST conversation can't be answered in-app (no account) — the
+      // teacher replies by e-mail. Show the address instead of a composer.
+      const composer = open.guest
         ? `<div class="cx-chat__composer">
-             <textarea class="cx-input" id="cx-msg-free" rows="2" placeholder="${asAdmin ? "Răspunsul tău (text liber — ești profesorul)…" : "Scrie-i profesorului cu cuvintele tale…"}"></textarea>
-             ${state.msgWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.msgWarn)}</p>` : ""}
-             <div class="cx-excompose__actions">
-               <button type="button" class="btn btn--primary btn--sm" data-action="msg-free-send">Trimite ✉️</button>
-             </div>
+             ${open.guestEmail
+               ? `<p class="cx-guestmail">✉️ Răspunde-i pe e-mail: <a href="mailto:${escapeHtml(open.guestEmail)}"><b>${escapeHtml(open.guestEmail)}</b></a></p>`
+               : `<p class="cx-muted">Vizitatorul nu a lăsat un e-mail — nu-i poți răspunde direct.</p>`}
            </div>`
-        : `<div class="cx-chat__composer">
-             <p class="cx-muted">Ca totul să rămână prietenos, mesajele dintre colegi se compun din șabloane. Cuvintele tale ajung doar la profesor.</p>
-             ${templatePicker()}
-           </div>`;
+        : freeText
+          ? `<div class="cx-chat__composer">
+               <textarea class="cx-input" id="cx-msg-free" rows="2" placeholder="${asAdmin ? "Răspunsul tău (text liber — ești profesorul)…" : "Scrie-i profesorului cu cuvintele tale…"}"></textarea>
+               ${state.msgWarn ? `<p class="cx-warn" role="alert">⚠️ ${escapeHtml(state.msgWarn)}</p>` : ""}
+               <div class="cx-excompose__actions">
+                 <button type="button" class="btn btn--primary btn--sm" data-action="msg-free-send">Trimite ✉️</button>
+               </div>
+             </div>`
+          : `<div class="cx-chat__composer">
+               <p class="cx-muted">Ca totul să rămână prietenos, mesajele dintre colegi se compun din șabloane. Cuvintele tale ajung doar la profesor.</p>
+               ${templatePicker()}
+             </div>`;
+      // Admin: label the member conversation right under the header.
+      const labelSetter = asAdmin && open.partnerId != null ? convLabelSetter(open) : "";
       pane = `<div class="cx-chat__pane">
           <p class="cx-chat__head">${who}</p>
+          ${labelSetter}
           <div class="cx-chat__scroll" id="cx-chat-scroll">${bubbles}</div>
           ${composer}
         </div>`;
@@ -2728,7 +2818,7 @@ export function renderCommunity(basePath = "") {
           <span class="cx-pulse__stat"><b>${postsToday}</b> postări noi</span>
           <span class="cx-pulse__stat"><b>${proposalsToday}</b> exerciții propuse</span>
           <span class="cx-pulse__stat"><b>${openModerationItems().length}</b> de moderat</span>
-          <span class="cx-pulse__stat"><b>${unreadMessages(true)}</b> mesaje necitite</span>
+          <span class="cx-pulse__stat"><b>${unreadMsgCount()}</b> mesaje necitite</span>
         </div>
         ${log.length
           ? `<p class="cx-muted cx-pulse__logtitle">Ultimele tale acțiuni:</p>
@@ -3110,6 +3200,14 @@ export function renderCommunity(basePath = "") {
     render();
   }
 
+  // Reload conversations after sending/reading a message.
+  async function reloadConversations() {
+    state.conversations = await fetchConversations(isAdmin());
+    render();
+    const sc = mount.querySelector("#cx-chat-scroll");
+    if (sc) sc.scrollTop = sc.scrollHeight;
+  }
+
   // Load the REAL forum feed once (on first paint), then re-render.
   async function loadFeed() {
     try {
@@ -3121,6 +3219,11 @@ export function renderCommunity(basePath = "") {
       state.challenge = await fetchTodayChallenge();
       state.challengeSolve = state.challenge ? await fetchMyChallengeSolve(state.challenge.id) : null;
       if (isAdmin()) state.adminChallenges = await listChallenges();
+      state.conversations = await fetchConversations(isAdmin()); // real messages
+      if (isAdmin()) {
+        state.convLabels = await fetchConversationLabels();
+        state.eventAccessUuids = await fetchEventAccessUsers();
+      }
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
       MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
       const fr = await fetchMyFriends(); // real friend graph
@@ -4334,9 +4437,15 @@ export function renderCommunity(basePath = "") {
         const key = btn.dataset.key;
         state.msgOpen = key;
         state.msgParts = [];
+        state.msgSlot = null;
         state.msgWarn = null;
-        markConversationRead(key, isAdmin());
-        window.dispatchEvent(new CustomEvent("atelier:notifs")); // badges follow
+        const conv = state.conversations.find((c) => c.key === key);
+        if (conv && conv.unread) {
+          markConversationReadReal(conv, isAdmin()); // REAL: persist read
+          conv.unread = 0;
+          conv.msgs.forEach((m) => (m.read = true));
+          window.dispatchEvent(new CustomEvent("atelier:notifs")); // badges follow
+        }
         return render();
       }
       case "msg-cat":
@@ -4352,9 +4461,24 @@ export function renderCommunity(basePath = "") {
           showToast(`Maxim ${MSG_MAX_PARTS} șabloane într-un mesaj`, { kind: "warn" });
           return;
         }
-        state.msgParts.push(btn.dataset.text);
+        const text = btn.dataset.text;
+        // A slotted template ("…{opera}…") → pick the blank from a list first.
+        if (slotsIn(text).length) { state.msgSlot = text; return render(); }
+        state.msgParts.push(text);
         return render();
       }
+      case "msg-slot-add": {
+        const text = state.msgSlot;
+        if (!text) return;
+        const values = {};
+        for (const s of slotsIn(text)) values[s] = mount.querySelector(`#cx-slot-${s}`)?.value || "";
+        if (state.msgParts.length < MSG_MAX_PARTS) state.msgParts.push(fillTemplate(text, values));
+        state.msgSlot = null;
+        return render();
+      }
+      case "msg-slot-cancel":
+        state.msgSlot = null;
+        return render();
       case "msg-part-del":
         state.msgParts.splice(Number(btn.dataset.i), 1);
         return render();
@@ -4362,28 +4486,16 @@ export function renderCommunity(basePath = "") {
         state.msgParts = [];
         return render();
       case "msg-send": {
-        // Member → member: a chain of validated templates, ONE message.
+        // Member → member: chained templates, ONE message. REAL (Supabase);
+        // the server also requires a template_key (migration 0013).
         const conv = state.msgOpen;
         const toId = conv?.startsWith("u") ? Number(conv.slice(1)) : NaN;
         const target = userById(toId);
         if (!target || !state.msgParts.length) return;
-        // Defense in depth: every part must be UNLOCKED at my level too.
-        const myLevel = levelInfo(MY_PROFILE.points).level;
-        const locked = MESSAGE_TEMPLATES.flatMap((c) => c.items)
-          .some((i) => i.lvl > myLevel && state.msgParts.includes(i.t));
-        if (locked) {
-          showToast("🔒 Un șablon din mesaj nu e încă deblocat la nivelul tău.", { kind: "warn" });
-          return;
-        }
-        const sent = sendMessage({
-          fromId: CURRENT_USER.id,
-          fromName: CURRENT_USER.name,
-          toId,
-          parts: [...state.msgParts],
-        });
-        if (!sent) return; // a part failed validation — nothing leaves
+        const body = state.msgParts.join("\n");
+        sendTemplateMsg(toId, body, "tpl").then(reloadConversations);
         state.msgParts = [];
-        showToast(`✉️ Trimis lui ${target.name.split(" ")[0]}`, { kind: "success" });
+        showToast(`✉️ Trimis lui ${(target.name || "").split(" ")[0]}`, { kind: "success" });
         touchStreak();
         return render();
       }
@@ -4400,25 +4512,35 @@ export function renderCommunity(basePath = "") {
         state.msgWarn = null;
         const conv = state.msgOpen;
         if (isAdmin()) {
-          const open = conversationsFor(true).find((c) => c.key === conv);
-          if (!open) return;
-          sendMessage({
-            fromId: 0,
-            fromName: "Profesorul",
-            toId: open.guest ? null : open.partnerId,
-            guestName: open.guest ? open.partnerName : null,
-            fromTeacher: true,
-            text,
-          });
+          const open = state.conversations.find((c) => c.key === conv);
+          if (!open || open.partnerId == null) return; // (guest replies: 4c)
+          sendTeacherReply(open.partnerId, text).then(reloadConversations); // REAL
           showToast("✉️ Răspuns trimis", { kind: "success" });
         } else {
           if (conv !== "t") return; // members' free text goes ONLY to the teacher
-          sendMessage({ fromId: CURRENT_USER.id, fromName: CURRENT_USER.name, toAdmin: true, text });
+          sendTeacherMsg(text).then(reloadConversations); // REAL
           showToast("✉️ Mesaj trimis profesorului", { kind: "success" });
           touchStreak();
         }
         return render();
       }
+
+      // ---- admin inbox: conversation labels ----
+      case "msg-label": {
+        if (!isAdmin()) return;
+        const uid = Number(btn.dataset.uid);
+        const label = btn.dataset.label || null;
+        const uuid = uuidForSurrogate(uid);
+        if (uuid) {
+          if (label) state.convLabels[uuid] = label;
+          else delete state.convLabels[uuid];
+        }
+        setConversationLabel(uid, label); // REAL
+        return render();
+      }
+      case "msg-label-filter":
+        state.msgLabelFilter = btn.dataset.id;
+        return render();
 
       // ---- notebook / status ----
       case "add-note": {
