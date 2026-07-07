@@ -500,13 +500,25 @@ function initSmoothPageScroll() {
     requestAnimationFrame(animate);
   }
 
+  // Defer to ANY self-scrolling region under the cursor (messenger, hub chat,
+  // notifications, lightbox, future overlays) so we never steal their wheel.
+  // Generic — walks the ancestry looking for a real overflow — so there's no
+  // allowlist to keep in sync every time a new scrollable panel is added.
+  const selfScrolls = (node) => {
+    for (let n = node; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+      if (n.nodeType !== 1) continue;
+      const oy = getComputedStyle(n).overflowY;
+      if ((oy === "auto" || oy === "scroll") && n.scrollHeight - n.clientHeight > 1) return true;
+    }
+    return false;
+  };
+
   window.addEventListener(
     "wheel",
     (e) => {
       if (e.ctrlKey) return; // pinch-zoom
-      // Let self-scrolling regions (lesson panel, notification list,
-      // any overlay) handle their own wheel — never steal their scroll.
-      if (e.target.closest && e.target.closest(".domain-panel__viewport, .notif, .cx-lightbox, .xp-pop")) return;
+      // Never steal the wheel from a region that scrolls on its own.
+      if (e.target instanceof Element && selfScrolls(e.target)) return;
 
       const max = document.documentElement.scrollHeight - window.innerHeight;
       if (max <= 0) return;
