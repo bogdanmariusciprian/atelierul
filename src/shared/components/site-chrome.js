@@ -52,27 +52,42 @@ const NAV_LINKS = [
 ];
 
 export function renderChrome(basePath = "") {
-  seedIdentityFromCache(); // paint the RIGHT avatar instantly — no flash
-  initTheme(); // palette + light/dark BEFORE anything paints brand colors
-  injectSvgFilters();
-  initSmoothPageScroll();
-  initPointsFx(); // cursor "points earned" flourish, available site-wide
-  initXpBar(basePath); // permanent level/XP bar (+ user identity) for members
-  initAdminFrame(); // pulsing page border while in the admin role
-  initAdminQuickPanel(basePath); // floating 🛡️ toolbox on EVERY page (admin)
-  initMessenger(basePath); // floating 💬 Messenger (members/teacher) + guest contact form
-  initGuestOneTap(); // Google One Tap card for signed-out visitors (site-wide)
-  startPresence(); // heartbeat → last_seen (green/red presence dots)
-  initUserMenu(); // right-click on any user name → copy/open/copy-link
-  renderHeader(basePath);
-  renderPageBreadcrumbs(basePath); // "Acasă › Lecții › …" on deep pages
-  renderFooter(basePath);
+  // Every step is ISOLATED: a throw in one widget must NEVER take down the rest
+  // of the chrome (header, nav, footer, logout). The label is logged so a
+  // failing widget is obvious in the console instead of silently blanking the
+  // page. The essential chrome (header/breadcrumbs/footer/user-menu) renders
+  // FIRST, so navigation + logout are always available even if a later floating
+  // widget fails.
+  const safe = (fn, label) => {
+    try {
+      fn();
+    } catch (e) {
+      console.error(`[chrome] "${label}" failed:`, e);
+    }
+  };
+
+  safe(seedIdentityFromCache, "seedIdentity"); // paint the RIGHT avatar instantly
+  safe(initTheme, "theme"); // palette + light/dark BEFORE anything paints brand colors
+  safe(injectSvgFilters, "svgFilters");
+  // --- Essential chrome first (must always render) ---
+  safe(() => renderHeader(basePath), "header");
+  safe(() => renderPageBreadcrumbs(basePath), "breadcrumbs");
+  safe(() => renderFooter(basePath), "footer");
+  safe(initUserMenu, "userMenu"); // right-click on any user name → copy/open
+  // --- Visual flourishes + floating widgets (isolated) ---
+  safe(initSmoothPageScroll, "smoothScroll");
+  safe(initPointsFx, "pointsFx"); // cursor "points earned" flourish
+  safe(() => initXpBar(basePath), "xpBar"); // permanent level/XP bar + identity
+  safe(initAdminFrame, "adminFrame"); // pulsing page border in the admin role
+  safe(() => initAdminQuickPanel(basePath), "adminQuickPanel"); // floating 🛡️ toolbox (admin)
+  safe(() => initMessenger(basePath), "messenger"); // floating 💬 Messenger + guest contact
+  safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
+  safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
   if (!window.__identityCacheOn) {
     window.__identityCacheOn = true;
-    // Re-cache whenever identity changes (login, profile save, hydrate).
     window.addEventListener("atelier:role", cacheIdentity);
   }
-  hydrateMemberIdentity(); // member's real avatar/identity, on EVERY page
+  safe(hydrateMemberIdentity, "hydrateIdentity"); // member's real avatar/identity
 }
 
 // Identity cache (localStorage) so the correct avatar/name paints INSTANTLY on

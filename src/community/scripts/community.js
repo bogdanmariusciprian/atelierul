@@ -3475,15 +3475,32 @@ export function renderCommunity(basePath = "") {
       if (f && document.activeElement !== f) f.focus();
       return;
     }
+    // Fault isolation: a throw in ONE piece (a section, the sidebar…) must not
+    // blank the whole hub — the sidebar carries navigation + logout. Each piece
+    // is guarded; failures log which one broke and show an inline notice.
+    const guard = (fn, label, fallback = "") => {
+      try {
+        return fn();
+      } catch (e) {
+        console.error(`[community] ${label} failed:`, e);
+        return fallback;
+      }
+    };
+    const sectionHtml = guard(
+      () => (SECTION_RENDER[state.section] || sectionForum)(),
+      `section "${state.section}"`,
+      `<div class="cx-emptybox"><h2>Această secțiune n-a putut fi afișată.</h2>
+       <p class="cx-muted">Reîncarcă pagina; dacă problema persistă, anunță profesorul.</p></div>`
+    );
     mount.innerHTML = `
       <div class="cx-shell">
-        ${sidebar()}
+        ${guard(sidebar, "sidebar", `<aside class="cx-side"><a class="cx-side__join" href="${basePath}">← Înapoi la site</a></aside>`)}
         <div class="cx-main">
-          ${crumbs()}
-          ${(SECTION_RENDER[state.section] || sectionForum)()}
+          ${guard(crumbs, "crumbs")}
+          ${sectionHtml}
         </div>
       </div>
-      ${lightboxHtml()}`;
+      ${guard(lightboxHtml, "lightbox")}`;
 
     // The gamification simulator's local preview mirrors the current sim.
     if (state.section === "admin" && state.adminTab === "gamification") {
