@@ -489,6 +489,7 @@ function renderPageBreadcrumbs(basePath) {
 function initAdminFrame() {
   if (window.__adminFrameOn) return;
   window.__adminFrameOn = true;
+  let pending = 0; // cached pending-exercise count (Supabase, refreshed async)
 
   const apply = () => {
     const on = isAdmin();
@@ -505,13 +506,21 @@ function initAdminFrame() {
     // CALM by default (thin, static); the full panic-room pulse fires only
     // while something actually awaits the teacher.
     if (on && frame) {
-      const alert = openModerationItems().length + pendingExercises().length > 0;
+      const alert = openModerationItems().length + pending > 0;
       frame.classList.toggle("admin-frame--alert", alert);
     }
   };
 
+  // Real pending-exercise count → then re-evaluate the alert pulse.
+  const refresh = async () => {
+    if (!isAdmin()) return;
+    try { pending = await fetchPendingCount(); } catch { pending = 0; }
+    apply();
+  };
+
   apply();
-  window.addEventListener("atelier:role", apply);
+  refresh();
+  window.addEventListener("atelier:role", () => { apply(); refresh(); });
   // Re-evaluate the alert state when the tab regains focus (cheap refresh).
   window.addEventListener("focus", apply);
 }
