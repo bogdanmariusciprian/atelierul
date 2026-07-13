@@ -5,7 +5,7 @@
 //   • FAQ accordion — native <details>, styled
 // Mock data, but the ranking is computed against the real user list.
 // =========================================================
-import { COMMUNITY_USERS, initials, avatarColor, slugForUser } from "../../shared/scripts/community-data.js";
+import { COMMUNITY_USERS, slugForUser } from "../../shared/scripts/community-data.js";
 import { avatarForUser } from "../../shared/scripts/avatars.js";
 
 const PTS_PER_LESSON = 70;

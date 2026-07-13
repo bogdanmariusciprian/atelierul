@@ -22,7 +22,7 @@ import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.
 import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
-import { MY_PROFILE, COMMUNITY_USERS, topUsers, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints, trendOf } from "../../shared/scripts/community-data.js";
+import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke, loadKudos } from "../../shared/scripts/kudos-repo.js";
 import {
   findProfanity, FILTER_MESSAGE, MODERATION_QUEUE, queueHeldPost,
@@ -36,7 +36,9 @@ import {
   grantEventAccess, revokeEventAccess,
 } from "../../shared/scripts/events-repo.js";
 import {
-  listGroups, fetchGroupPosts, postToGroup, createGroup, joinGroup,
+  // aliased: a LOCAL function createGroup() (the composer handler) already
+  // exists below — without the alias it would shadow this import and recurse.
+  listGroups, fetchGroupPosts, postToGroup, createGroup as createGroupRow, joinGroup,
   leaveGroup, addGroupMember, updateGroup, deleteGroup,
 } from "../../shared/scripts/groups-repo.js";
 import {
@@ -44,7 +46,7 @@ import {
   listChallenges, createChallenge, updateChallenge, deleteChallenge,
 } from "../../shared/scripts/challenges-repo.js";
 import {
-  FORUM_POSTS, myWallPosts, POST_TYPES, postType,
+  POST_TYPES, postType,
   POST_BACKGROUNDS, postBackground, topPost, nextId, relTime,
 } from "../../shared/scripts/forum-data.js";
 import {
@@ -3607,7 +3609,7 @@ export function renderCommunity(basePath = "") {
     }
     // Real group: create it (name/description stored RAW, escaped at render),
     // then reload and jump straight into the new topic.
-    createGroup({ name, iconId: c.iconId, description: (c.text || "").trim() }).then((row) => {
+    createGroupRow({ name, iconId: c.iconId, description: (c.text || "").trim() }).then((row) => {
       if (row) state.openGroup = row.id;
       reloadGroups();
     });

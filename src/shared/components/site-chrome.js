@@ -25,7 +25,7 @@ import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exerci
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications } from "../scripts/notif.js";
 import { isLoggedIn, signOut } from "../scripts/session.js";
 import { contactTeacher, sendTeacherMsg } from "../scripts/forum-repo.js";
-import { MY_PROFILE, userById } from "../scripts/community-data.js";
+import { MY_PROFILE } from "../scripts/community-data.js";
 import { findProfanity } from "../scripts/moderation.js";
 import { showToast } from "../scripts/toast.js";
 import { CURRENT_USER } from "../scripts/session.js";

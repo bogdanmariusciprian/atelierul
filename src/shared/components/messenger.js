@@ -7,7 +7,7 @@
 // Reuses the same real data layer as the hub (forum-repo) + the safe template
 // catalogue (messages.js), so both surfaces stay in sync.
 // =========================================================
-import { CURRENT_USER, isLoggedIn, isAdmin } from "../scripts/session.js";
+import { isLoggedIn, isAdmin } from "../scripts/session.js";
 import { MY_PROFILE, userById } from "../scripts/community-data.js";
 import {
   fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply,

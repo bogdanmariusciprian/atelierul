@@ -11,7 +11,7 @@
 // The teacher isn't in the game → proposing/solving earns him nothing.
 // =========================================================
 import { supabase } from "./supabase-client.js";
-import { CURRENT_USER, isAdmin } from "./session.js";
+import { CURRENT_USER } from "./session.js";
 import { surrogateForAuthor } from "./forum-repo.js";
 
 // Exercise kinds mirror the lesson engine (data-type): choice, fill, match.

@@ -7,7 +7,7 @@
 // plays on click), a type (with its own icon) and a chosen background
 // tint. Comments reuse the shared threaded-comments engine (thread.js).
 // =========================================================
-import { COMMUNITY_USERS, userById, initials, avatarColor } from "./community-data.js";
+import { userById, initials, avatarColor } from "./community-data.js";
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
