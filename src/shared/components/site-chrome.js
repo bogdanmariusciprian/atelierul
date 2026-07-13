@@ -24,10 +24,7 @@ import { openModerationItems } from "../scripts/moderation.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications } from "../scripts/notif.js";
 import { isLoggedIn, signOut } from "../scripts/session.js";
-import { contactTeacher, sendTeacherMsg } from "../scripts/forum-repo.js";
 import { MY_PROFILE } from "../scripts/community-data.js";
-import { findProfanity } from "../scripts/moderation.js";
-import { showToast } from "../scripts/toast.js";
 import { CURRENT_USER } from "../scripts/session.js";
 import { supabase } from "../scripts/supabase-client.js";
 import { startPresence } from "../scripts/presence.js";
@@ -187,92 +184,6 @@ function initGuestOneTap() {
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_IN" && session?.user) window.location.reload();
   });
-}
-
-/**
- * Floating ✉️ "Scrie profesorului" — bottom-right, on EVERY page, for
- * members AND guests (the admin has his 🛡️ toolbox there instead). The
- * only free-text channel students have — and it still passes the
- * profanity filter. Guest messages carry an optional name.
- */
-function initContactFloat(basePath) {
-  if (window.__contactFloatOn) return;
-  window.__contactFloatOn = true;
-
-  let el = null;
-
-  const build = (open) => `
-    <button type="button" class="contact-float__fab" title="Scrie-i profesorului" aria-expanded="${open}">✉️</button>
-    <div class="contact-float__panel" ${open ? "" : "hidden"}>
-      <p class="contact-float__title">Scrie-i profesorului</p>
-      <p class="contact-float__sub">${isLoggedIn()
-        ? "Mesajul tău ajunge doar la profesor. Răspunsul îl găsești în „Mesaje”."
-        : "Nu ai nevoie de cont — lasă un e-mail și profesorul îți răspunde acolo."}</p>
-      ${isLoggedIn() ? "" : `
-        <input class="cx-input" id="contact-name" placeholder="Numele tău (opțional)" />
-        <input class="cx-input" id="contact-email" type="email" inputmode="email" placeholder="E-mailul tău (ca să-ți răspundă)" />
-        <p class="contact-float__hint cx-muted">Folosim e-mailul doar ca să-ți răspundem.</p>`}
-      <textarea class="cx-input" id="contact-text" rows="3" placeholder="Scrie aici, cu cuvintele tale…"></textarea>
-      <p class="contact-float__warn" id="contact-warn" hidden></p>
-      <button type="button" class="btn btn--primary btn--sm" id="contact-send">Trimite</button>
-    </div>`;
-
-  const apply = () => {
-    if (isAdmin()) {
-      el?.remove();
-      el = null;
-      return;
-    }
-    if (!el) {
-      el = document.createElement("div");
-      el.className = "contact-float";
-      document.body.appendChild(el);
-
-      el.addEventListener("click", (e) => {
-        if (e.target.closest(".contact-float__fab")) {
-          e.stopPropagation();
-          const isOpen = !el.querySelector(".contact-float__panel").hidden;
-          el.innerHTML = build(!isOpen);
-          return;
-        }
-        if (e.target.id === "contact-send") {
-          e.stopPropagation();
-          const text = el.querySelector("#contact-text")?.value.trim();
-          const warn = el.querySelector("#contact-warn");
-          if (!text) return;
-          if (findProfanity(text).length) {
-            warn.textContent = "⚠️ Mesajul conține limbaj nepotrivit — reformulează, te rog.";
-            warn.hidden = false;
-            return;
-          }
-          if (isLoggedIn()) {
-            sendTeacherMsg(text); // REAL: member → teacher (Supabase)
-          } else {
-            const name = el.querySelector("#contact-name")?.value.trim();
-            const email = el.querySelector("#contact-email")?.value.trim();
-            if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-              warn.textContent = "⚠️ Lasă un e-mail valid ca să-ți putem răspunde.";
-              warn.hidden = false;
-              return;
-            }
-            contactTeacher(name, email, text); // REAL: guest → teacher (public RPC)
-          }
-          el.innerHTML = build(false);
-          showToast("✉️ Mesaj trimis profesorului — mulțumim!", { kind: "success" });
-        }
-      });
-      document.addEventListener("click", (e) => {
-        if (el && !el.contains(e.target)) {
-          const p = el.querySelector(".contact-float__panel");
-          if (p && !p.hidden) el.innerHTML = build(false);
-        }
-      });
-    }
-    el.innerHTML = build(false);
-  };
-
-  apply();
-  window.addEventListener("atelier:role", apply);
 }
 
 // The "log out" glyph used by the header logout button (a door + arrow).
@@ -706,7 +617,6 @@ function renderHeader(basePath) {
  */
 function initNavUser(slot, basePath) {
   if (!slot) return;
-  const HUB = `${basePath}comunitate/`;
 
   // The logout icon — same on every page for anyone signed in.
   const logoutBtn = `<button type="button" class="nav-logout" id="nav-logout" title="Ieși din cont" aria-label="Ieși din cont">${LOGOUT_ICON}</button>`;
