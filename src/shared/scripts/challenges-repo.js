@@ -19,18 +19,24 @@ function mapRow(row) {
     id: row.id,
     prompt: row.prompt || "",
     options: Array.isArray(data.options) ? data.options : [],
-    correct: Number.isFinite(Number(row.correct)) ? Number(row.correct) : 0,
+    // The ANSWER is hidden from the browser (0024: the `correct` column is
+    // revoked). It's null for a pupil until they answer — then it arrives from
+    // solve_challenge / get_challenge_answer. The teacher gets it via the
+    // admin RPC below.
+    correct: row.correct != null && row.correct !== "" ? Number(row.correct) : null,
     explanation: data.explanation || "",
     reward: row.reward ?? 15,
     date: row.active_date || null,
   };
 }
 
-/** Today's scheduled challenge, or null if the teacher hasn't set one. */
+/** Today's scheduled challenge, or null if the teacher hasn't set one.
+ *  NOTE: deliberately does NOT select `correct` — the answer never reaches the
+ *  browser before the pupil has used their one attempt. */
 export async function fetchTodayChallenge() {
   const { data, error } = await supabase
     .from("challenges")
-    .select("id, active_date, prompt, data, correct, reward")
+    .select("id, active_date, prompt, data, reward")
     .eq("active_date", todayISO())
     .order("created_at", { ascending: false })
     .limit(1);
@@ -39,6 +45,18 @@ export async function fetchTodayChallenge() {
     return null;
   }
   return mapRow((data || [])[0]);
+}
+
+/** The correct index — only AFTER you've answered (or if you're the teacher).
+ *  Returns null when you're not allowed to see it yet. */
+export async function fetchChallengeAnswer(challengeId) {
+  if (!challengeId) return null;
+  const { data, error } = await supabase.rpc("get_challenge_answer", { p_challenge: challengeId });
+  if (error) {
+    console.warn("fetchChallengeAnswer:", error.message);
+    return null;
+  }
+  return data == null ? null : Number(data);
 }
 
 /** Whether the current user already answered a challenge (+ what they chose). */
@@ -70,11 +88,10 @@ export async function solveChallenge(challengeId, choice) {
 // ---------------------------------------------------------
 // Admin scheduling (writes gated by RLS → admin only).
 // ---------------------------------------------------------
+/** The teacher's scheduling list — WITH the answers. Goes through an
+ *  admin-only RPC because the `correct` column is revoked from direct SELECT. */
 export async function listChallenges() {
-  const { data, error } = await supabase
-    .from("challenges")
-    .select("id, active_date, prompt, data, correct, reward")
-    .order("active_date", { ascending: true, nullsFirst: false });
+  const { data, error } = await supabase.rpc("list_challenges_admin");
   if (error) {
     console.warn("listChallenges:", error.message);
     return [];

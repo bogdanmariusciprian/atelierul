@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -42,7 +42,7 @@ import {
   leaveGroup, addGroupMember, updateGroup, deleteGroup,
 } from "../../shared/scripts/groups-repo.js";
 import {
-  fetchTodayChallenge, fetchMyChallengeSolve, solveChallenge,
+  fetchTodayChallenge, fetchMyChallengeSolve, solveChallenge, fetchChallengeAnswer,
   listChallenges, createChallenge, updateChallenge, deleteChallenge,
 } from "../../shared/scripts/challenges-repo.js";
 import {
@@ -55,9 +55,9 @@ import {
   updateExercise, deleteExercise, fetchMyApprovedExerciseCount,
 } from "../../shared/scripts/exercises-repo.js";
 import {
-  ACTIVITY_RECEIVED, ACTIVITY_GIVEN, ACTIVITY_KINDS,
-  unreadActivityCount, markActivityRead, recordGiven, notifyReceived, notifyUser,
-} from "../../shared/scripts/activity-data.js";
+  ACTIVITY_KINDS, receivedActivity, fetchGivenActivity, fetchMyContributionCounts,
+  fetchMyLessonSlugs, unreadActivityCount, markActivityRead, notifyMention,
+} from "../../shared/scripts/activity-repo.js";
 import { AVATAR_GIFS, CHAMPION_GIF, CHAMPION_UNLOCK_LEVEL, avatarForUser } from "../../shared/scripts/avatars.js";
 import {
   renderThread, handleThreadClick, countComments, makeUserComment, escapeHtml,
@@ -139,6 +139,9 @@ const ALL_SECTIONS = [...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id)), "a
 // Member-only sections: the ADMIN (teacher) has no wall, points or badges —
 // gamification belongs to students. (The "Logat" demo role previews those.)
 const ADMIN_HIDDEN_SECTIONS = new Set(["pagina-mea", "puncte", "insigne"]);
+// Every lesson in the "morfologie" domain — the "all of morphology" badge is
+// earned only when ALL of them are really completed (lesson_progress).
+const MORFOLOGIE_SLUGS = LESSONS.filter((l) => l.domain === "morfologie").map((l) => l.slug);
 
 // What a GUEST may open: the public forum (read-only), the leaderboard,
 // the daily challenge (a real taste, no points) and public profiles.
@@ -221,6 +224,10 @@ export function renderCommunity(basePath = "") {
     exComposer: { open: false, lesson: MY_PROFILE.favorites[0]?.title || "", kind: "choice" },
     thread: { openReplyId: null, openReactId: null, openEditId: null, warnId: null, warnMsg: null },
     activityTab: "primite",
+    given: [], // "Oferite" — derived from my REAL posts/comments/likes/kudos
+    myCounts: { posts: 0, comments: 0, likes: 0, given: 0 }, // real counts (badges)
+    myLessons: new Set(), // lesson slugs I actually completed (lesson_progress)
+    challengeAnswer: null, // revealed only after you answer (or to the teacher)
     exTab: "pending", // exercises section: "pending" | "history" (admin)
     exEditId: null, // proposal being edited by the admin (checked & polished)
     exEditWarn: null,
@@ -379,32 +386,22 @@ export function renderCommunity(basePath = "") {
   // Profanity gate for one text field: returns the offending words.
   const moderate = (text) => findProfanity(text || "");
 
-  // Award/withdraw points when admin marks a reply correct. Mine go through
-  // awardPoints so the "Puncte" history stays in sync with the total.
+  // The teacher marks a reply correct → the SERVER flips the flag AND awards
+  // (or takes back) the author's points via mark_comment_correct (cheat-safe,
+  // idempotent, persisted). Only the admin can mark; his OWN replies earn
+  // nothing (he isn't in the game).
   function awardCorrect(c, nowCorrect) {
-    if (c.authorId === CURRENT_USER.id) {
-      // The teacher never earns points — marking his own reply "correct"
-      // (an admin-only action) is purely informational.
-      if (isAdmin()) return;
-      awardPoints(
-        nowCorrect ? "Răspuns marcat corect de profesor" : "Retragere: răspuns corect",
-        nowCorrect ? CORRECT_REWARD : -CORRECT_REWARD
-      );
-      if (nowCorrect) {
-        pointsFx(CORRECT_REWARD); // celebrate at the cursor
-        notifyReceived({
-          actorId: 0, kind: "award",
-          action: `ți-a marcat răspunsul drept CORECT (+${CORRECT_REWARD} puncte)`,
-          snippet: String(c.text).slice(0, 90),
-          context: "Răspuns corect ✓",
-        });
-      }
-    } else {
-      const u = userById(c.authorId);
-      if (u) u.points += nowCorrect ? CORRECT_REWARD : -CORRECT_REWARD;
-      // Supabase later: this lands in the student's own notifications.
-      if (nowCorrect) notifyUser(c.authorId, { actorId: 0, kind: "award", action: "ți-a marcat răspunsul drept corect", snippet: String(c.text).slice(0, 90), context: "Răspuns corect ✓" });
-    }
+    if (!isAdmin()) return;
+    markCommentCorrect(c.id, nowCorrect); // REAL: persisted + points on the server
+    const mine = c.authorId === CURRENT_USER.id; // the teacher's own reply
+    showToast(
+      mine
+        ? nowCorrect ? "✓ Marcat corect (răspunsul tău — fără puncte)" : "Marcaj retras"
+        : nowCorrect
+          ? `✓ Marcat corect — ${c.name} primește +${CORRECT_REWARD} puncte`
+          : `Marcaj retras — ${CORRECT_REWARD} puncte retrase de la ${c.name}`,
+      { kind: nowCorrect ? "success" : "info" }
+    );
   }
 
   // Tiny audit trail: the admin's last actions, so "Prezentare" can show
@@ -652,16 +649,12 @@ export function renderCommunity(basePath = "") {
   const mentionMsg = (bad) =>
     `Nu-l poți menționa pe @${bad[0].user.name}: ${bad[0].reason}.`;
 
-  // A published text with @mentions notifies the mentioned friends (mock:
-  // only the current user's inbox exists — Supabase makes this real).
+  // A published text with @mentions sends each mentioned friend a REAL
+  // notification (notify_mention RPC — the server forces the actor to be you
+  // and enforces the friends-only rule).
   function notifyMentions(text, context) {
     for (const u of mentionsIn(text)) {
-      notifyUser(u.id, {
-        actorId: 0, kind: "mention",
-        action: "te-a menționat",
-        snippet: String(text).slice(0, 90),
-        context,
-      });
+      notifyMention(u.id, String(text).slice(0, 90), context);
     }
   }
 
@@ -1263,9 +1256,10 @@ export function renderCommunity(basePath = "") {
         .filter((g) => g.memberIds.includes(CURRENT_USER.id) || isAdmin())
         .flatMap((g) => g.posts.filter((p) => p.followed)),
     ];
+    const received = receivedActivity(); // REAL notifications (shared with the 🔔 tray)
     const tabs = [
-      { id: "primite", label: "Primite", count: ACTIVITY_RECEIVED.length },
-      { id: "oferite", label: "Oferite", count: ACTIVITY_GIVEN.length },
+      { id: "primite", label: "Primite", count: received.length },
+      { id: "oferite", label: "Oferite", count: state.given.length },
       { id: "urmarite", label: "Urmărite", count: followedPosts.length },
     ];
     const tabBar = `<div class="cx-tabs">${tabs
@@ -1284,7 +1278,7 @@ export function renderCommunity(basePath = "") {
 
     let body = "";
     if (state.activityTab === "primite" || state.activityTab === "oferite") {
-      const list = state.activityTab === "primite" ? ACTIVITY_RECEIVED : ACTIVITY_GIVEN;
+      const list = state.activityTab === "primite" ? received : state.given;
       body = list
         .map((a) => {
           // Resolvable rows link to the post (or hub section) behind them.
@@ -1300,12 +1294,12 @@ export function renderCommunity(basePath = "") {
           const k = ACTIVITY_KINDS[a.kind] || ACTIVITY_KINDS.comment;
           return `<div class="cx-actrow cx-actrow--${a.kind}${a.read ? "" : " is-unread"}${link ? " cx-actrow--link" : ""}"${link ? ` data-action="${link.action}" data-id="${link.id}" role="link" tabindex="0"` : ""}>
             <span class="cx-actrow__avatar">
-              ${avatarLink(a.authorId)}
+              ${a.authorId != null ? avatarLink(a.authorId) : `<span class="cx-av" style="--a:#94a3b8">🎓</span>`}
               ${actIcon(a.kind)}
             </span>
             <div class="cx-actrow__body">
               <span class="cx-actrow__kind" style="--k:${k.color}">${k.label}${a.read ? "" : ' · <b>nou</b>'}</span>
-              <p class="cx-actrow__what"><b>${a.authorId === CURRENT_USER.id ? "Tu" : userNameLink(a.authorId, a.name)}</b> ${escapeHtml(a.action)} <span class="cx-muted">· ${a.time}</span></p>
+              <p class="cx-actrow__what"><b>${a.authorId === CURRENT_USER.id ? "Tu" : a.authorId != null ? userNameLink(a.authorId, a.name) : escapeHtml(a.name)}</b> ${escapeHtml(a.action)} <span class="cx-muted">· ${a.time}</span></p>
               <p class="cx-actrow__snip">„${escapeHtml(a.snippet)}”</p>
               <span class="cx-actrow__ctx">${escapeHtml(a.context)}</span>
             </div>
@@ -2313,11 +2307,19 @@ export function renderCommunity(basePath = "") {
     const pending = state.challengePending;
     const myChoice = solve ? solve.choice : null;
     const wasCorrect = solve ? solve.correct : false;
+    // The ANSWER is not in the browser (0024). It arrives only once you've used
+    // your attempt (from solve_challenge) — or straight away for the teacher.
+    const answer = state.challengeAnswer;
     const opts = c
       ? c.options
           .map((o, i) => {
             let cls = "cx-ch__opt";
-            if (answered) cls += i === c.correct ? " is-correct" : i === myChoice ? " is-wrong" : " is-dim";
+            if (answered)
+              cls += answer != null && i === answer
+                ? " is-correct"
+                : i === myChoice
+                  ? " is-wrong"
+                  : " is-dim";
             return `<button type="button" class="${cls}" data-action="challenge" data-i="${i}" ${answered || pending ? "disabled" : ""}>${escapeHtml(o)}</button>`;
           })
           .join("")
@@ -3236,13 +3238,16 @@ export function renderCommunity(basePath = "") {
   // Earned states are DERIVED from real data (they used to be static flags,
   // so "Streak 7 zile" showed as earned while the actual streak was 2).
   function badgeEarned(b) {
+    // My rank in the REAL leaderboard (state.members is points-desc).
+    const myRank = state.members.indexOf(CURRENT_USER.id); // -1 when unknown
     switch (b.id) {
-      case 1: return ACTIVITY_GIVEN.length > 0; // first comment
+      case 1: return state.myCounts.comments > 0; // first comment (real)
       case 2: return MY_PROFILE.streak >= 7;
-      case 3: return MY_PROFILE.lessons >= 10;
-      case 4: return ACTIVITY_GIVEN.length >= 50;
-      case 5: return COMMUNITY_USERS.filter((u) => u.points > MY_PROFILE.points).length + 1 <= 10;
-      case 6: return false; // all morphology lessons — needs lesson progress (backend)
+      case 3: return state.myLessons.size >= 10; // real lesson_progress
+      case 4: return state.myCounts.given >= 50; // real contributions
+      case 5: return myRank >= 0 && myRank < 10; // real top-10
+      case 6: // every morphology lesson actually completed
+        return MORFOLOGIE_SLUGS.length > 0 && MORFOLOGIE_SLUGS.every((s) => state.myLessons.has(s));
       case 7: return state.myApprovedEx > 0;
       case 8: return challengesSolved() >= 30;
       default: return false;
@@ -3338,7 +3343,16 @@ export function renderCommunity(basePath = "") {
     if (isAdmin()) state.adminChallenges = await listChallenges();
     state.challenge = await fetchTodayChallenge();
     state.challengeSolve = state.challenge ? await fetchMyChallengeSolve(state.challenge.id) : null;
+    state.challengeAnswer = await revealAnswerIfAllowed();
     render();
+  }
+
+  // The answer is fetched ONLY when you may see it: the teacher always, a pupil
+  // only after they've used their one attempt (enforced by get_challenge_answer).
+  async function revealAnswerIfAllowed() {
+    if (!state.challenge || !isLoggedIn()) return null;
+    if (!isAdmin() && !state.challengeSolve) return null; // no peeking
+    return await fetchChallengeAnswer(state.challenge.id);
   }
 
   // Reload events after RSVP or an admin create/edit/delete.
@@ -3393,6 +3407,7 @@ export function renderCommunity(basePath = "") {
       // Today's REAL daily challenge + whether I've already answered it.
       state.challenge = await fetchTodayChallenge();
       state.challengeSolve = state.challenge ? await fetchMyChallengeSolve(state.challenge.id) : null;
+      state.challengeAnswer = await revealAnswerIfAllowed(); // only if allowed
       if (isAdmin()) state.adminChallenges = await listChallenges();
       // Real proposed exercises: pending (everyone) + decided history (admin only).
       const exPending = await fetchPendingExercises();
@@ -3400,6 +3415,13 @@ export function renderCommunity(basePath = "") {
       state.proposed = [...exPending, ...exHistory];
       for (const e of state.proposed) e.lessonTitle = lessonBySlug(e.lessonSlug)?.title || e.lessonSlug;
       state.myApprovedEx = await fetchMyApprovedExerciseCount();
+      // "Activitatea mea": OFERITE derived from what I really did + real counts
+      // for the badges. (PRIMITE comes from the shared notification cache.)
+      if (isLoggedIn()) {
+        state.given = await fetchGivenActivity();
+        state.myCounts = await fetchMyContributionCounts();
+        state.myLessons = await fetchMyLessonSlugs(); // real progress → badges
+      }
       if (isLoggedIn()) state.events = await listEvents(); // RLS returns [] without event_access
       // Real study groups + each group's wall (posts tagged with group_id).
       state.groups = await listGroups();
@@ -3661,15 +3683,7 @@ export function renderCommunity(basePath = "") {
             });
             touchStreak(); // replying counts as today's activity
             notifyMentions(text, "Într-un răspuns");
-            if (post.authorId !== CURRENT_USER.id || parent.authorId !== CURRENT_USER.id) {
-              recordGiven({
-                kind: "reply",
-                action: `ai răspuns lui ${parent.name}`,
-                snippet: text.slice(0, 90),
-                context: `${postType(post.type).label} · „${String(post.text).replace(/<[^>]*>/g, "").slice(0, 50)}…”`,
-                postId: post.id,
-              });
-            }
+            // ("Oferite" is derived from your real comments — nothing to log.)
           },
           rerender: render,
         });
@@ -3987,16 +4001,7 @@ export function renderCommunity(basePath = "") {
         });
         notifyMentions(text, "Într-un comentariu");
         touchStreak(); // commenting counts as today's activity
-        // Commenting on someone ELSE's post is real "given" activity.
-        if (p.authorId !== CURRENT_USER.id) {
-          recordGiven({
-            kind: "comment",
-            action: `ai comentat la postarea lui ${p.name}`,
-            snippet: text.slice(0, 90),
-            context: `${postType(p.type).label} · „${String(p.text).replace(/<[^>]*>/g, "").slice(0, 50)}…”`,
-            postId: p.id,
-          });
-        }
+        // ("Oferite" is derived from your real comments — nothing to log.)
         return render();
       }
       case "post-report": {
@@ -4131,12 +4136,6 @@ export function renderCommunity(basePath = "") {
         const u = userById(uid);
         if (u && givePoke(uid)) {
           showToast(`👉 Poke trimis lui ${u.name.split(" ")[0]} — știe acum că te apropii!`, { kind: "success" });
-          recordGiven({
-            kind: "poke",
-            action: `i-ai dat un poke lui ${u.name}`,
-            snippet: "Te ajung din urmă! 👀",
-            context: "Clasament",
-          });
         }
         return render();
       }
@@ -4160,19 +4159,28 @@ export function renderCommunity(basePath = "") {
       case "challenge": {
         if (!state.challenge || state.challengeSolve || state.challengePending) return;
         const choice = Number(btn.dataset.i);
-        // Guests & the teacher get a LOCAL "taste"/preview — no points, no
-        // server write (guests have no account; the teacher isn't in the game).
-        if (!isLoggedIn() || isAdmin()) {
-          state.challengeSolve = { choice, correct: choice === state.challenge.correct };
+        // A GUEST no longer gets a local verdict — the answer isn't in the page
+        // any more. That's honest AND the best moment to invite them in.
+        if (!isLoggedIn()) {
+          showToast("Conectează-te ca să afli dacă e corect — și să primești puncte 🔑");
+          return;
+        }
+        // The teacher previews locally (he already holds the answer) — no
+        // points, no server write: he isn't in the game.
+        if (isAdmin()) {
+          const ans = state.challengeAnswer;
+          state.challengeSolve = { choice, correct: ans != null && choice === ans };
           return render();
         }
-        // Members: solve_challenge decides correctness + awards points ONCE.
+        // Members: solve_challenge decides correctness + awards points ONCE,
+        // and returns the answer so we can reveal it.
         state.challengePending = true;
         render();
         solveChallenge(state.challenge.id, choice).then((res) => {
           state.challengePending = false;
           if (!res || res.error) return render();
           state.challengeSolve = { choice, correct: !!res.correct };
+          if (res.answer != null) state.challengeAnswer = Number(res.answer); // reveal now
           touchStreak(); // showing up for the challenge keeps the flame
           if (res.correct && res.awarded) {
             awardPoints("Provocarea zilei rezolvată", res.awarded); // sync total + history

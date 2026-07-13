@@ -7,16 +7,16 @@
 // =========================================================
 import {
   fetchLessonComments, addLessonComment, toggleCommentLike, toggleCommentReaction,
-  updateComment, deleteComment, mapComment,
+  updateComment, deleteComment, mapComment, markCommentCorrect,
 } from "../../shared/scripts/forum-repo.js";
 import { nextId } from "../../shared/scripts/forum-data.js";
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { MY_PROFILE, userById, slugForUser, awardPoints } from "../../shared/scripts/community-data.js";
+import { MY_PROFILE, slugForUser } from "../../shared/scripts/community-data.js";
 import { findProfanity, queueBlockedComment, queueReport } from "../../shared/scripts/moderation.js";
 import { initMentions, invalidMentions, linkifyMentions } from "../../shared/scripts/mentions.js";
 import { touchStreak } from "../../shared/scripts/streak.js";
 import { showToast } from "../../shared/scripts/toast.js";
-import { notifyReceived, notifyUser } from "../../shared/scripts/activity-data.js";
+import { notifyMention } from "../../shared/scripts/activity-repo.js";
 import { mentionsIn } from "../../shared/scripts/mentions.js";
 import {
   renderThread,
@@ -25,7 +25,6 @@ import {
   makeUserComment,
   CORRECT_REWARD,
 } from "../../shared/scripts/thread.js";
-import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { avatarForUser } from "../../shared/scripts/avatars.js";
 import { userMeta } from "../../shared/scripts/badges.js";
 import { currentLessonSlug } from "../../shared/scripts/lessons-index.js";
@@ -51,36 +50,29 @@ export function initLessonComments(basePath = "") {
     composerWarn: null, // profanity notice under the main comment box
   };
 
-  // Admin marks a reply correct → its author earns points. Mine go through
-  // awardPoints so the "Puncte" history stays in sync with the total.
+  // The teacher marks a reply correct → the SERVER flips the flag AND awards
+  // (or takes back) the author's points via mark_comment_correct (cheat-safe,
+  // idempotent, persisted). His OWN replies earn nothing (not in the game).
   function award(c, nowCorrect) {
-    if (c.authorId === CURRENT_USER.id) {
-      // The teacher never earns points (marking is admin-only anyway).
-      if (isAdmin()) return;
-      awardPoints(
-        nowCorrect ? "Răspuns marcat corect de profesor" : "Retragere: răspuns corect",
-        nowCorrect ? CORRECT_REWARD : -CORRECT_REWARD
-      );
-      if (nowCorrect) {
-        pointsFx(CORRECT_REWARD);
-        notifyReceived({
-          actorId: 0, kind: "award",
-          action: `ți-a marcat răspunsul drept CORECT (+${CORRECT_REWARD} puncte)`,
-          snippet: String(c.text).slice(0, 90),
-          context: `La lecția „${slug}”`,
-        });
-      }
-    } else {
-      const u = userById(c.authorId);
-      if (u) u.points += nowCorrect ? CORRECT_REWARD : -CORRECT_REWARD;
-      if (nowCorrect) notifyUser(c.authorId, { actorId: 0, kind: "award", action: "ți-a marcat răspunsul drept corect", snippet: String(c.text).slice(0, 90), context: `La lecția „${slug}”` });
-    }
+    if (!isAdmin()) return;
+    markCommentCorrect(c.id, nowCorrect); // REAL: persisted + points on the server
+    const mine = c.authorId === CURRENT_USER.id;
+    showToast(
+      mine
+        ? nowCorrect ? "✓ Marcat corect (răspunsul tău — fără puncte)" : "Marcaj retras"
+        : nowCorrect
+          ? `✓ Marcat corect — ${c.name} primește +${CORRECT_REWARD} puncte`
+          : `Marcaj retras — ${CORRECT_REWARD} puncte retrase de la ${c.name}`,
+      { kind: nowCorrect ? "success" : "info" }
+    );
   }
 
-  // A published comment/reply with @mentions notifies the mentioned friends.
+  // A published comment/reply with @mentions sends each mentioned friend a REAL
+  // notification (notify_mention RPC — the server forces the actor to be you
+  // and enforces the friends-only rule).
   const notifyMentions = (text) => {
     for (const u of mentionsIn(text)) {
-      notifyUser(u.id, { actorId: 0, kind: "mention", action: "te-a menționat", snippet: String(text).slice(0, 90), context: `Comentariu la lecția „${slug}”` });
+      notifyMention(u.id, String(text).slice(0, 90), `Comentariu la lecția „${slug}”`);
     }
   };
 

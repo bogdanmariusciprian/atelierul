@@ -43,6 +43,15 @@ export function uuidForSurrogate(surrogateId) {
   return userUuidBySurr.get(surrogateId) || null;
 }
 
+/** Surrogate id for a profile UUID, if that user is already in the registry
+ *  (registered when the feed / member list loaded). 0 = me, null = unknown.
+ *  Used to turn a notification's `actor` uuid into a clickable profile. */
+export function surrogateByUuid(uuid) {
+  if (!uuid) return null;
+  if (uuid === CURRENT_USER.authId) return 0;
+  return userSurrByUuid.get(uuid) ?? null;
+}
+
 export function surrogateForAuthor(profile) {
   const myUuid = CURRENT_USER.authId;
   if (myUuid && profile.id === myUuid) return 0; // "me"
@@ -126,6 +135,7 @@ function mapCommentRow(row, childrenByParent, commentByUuid) {
     reactions: {},
     myReaction: null,
     edited: !!row.edited_at,
+    correct: !!row.correct, // teacher marked it as the right answer (persisted)
     replies: kids,
   };
   commentByUuid.set(row.id, obj);
@@ -196,7 +206,7 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
   const { data: commentRows, error: cErr } = await supabase
     .from("comments")
     .select(
-      "id, post_id, parent_id, body, edited_at, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, post_id, parent_id, body, edited_at, correct, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .in("post_id", postIds)
     .eq("moderation_status", "visible")
@@ -337,7 +347,7 @@ export async function fetchLessonComments(slug) {
   const { data: rows, error } = await supabase
     .from("comments")
     .select(
-      "id, lesson_slug, parent_id, body, edited_at, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, lesson_slug, parent_id, body, edited_at, correct, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .eq("lesson_slug", slug)
     .eq("moderation_status", "visible")
@@ -366,6 +376,21 @@ export async function addLessonComment({ lessonSlug, parentSurrogate = null, tex
     .select("id")
     .single();
   if (error) { console.warn("addLessonComment:", error.message); return null; }
+  return data;
+}
+
+/** Teacher: mark a comment (forum reply OR lesson comment) as the CORRECT
+ *  answer. The SERVER flips the flag and awards/takes back the reward for the
+ *  author via points_ledger (cheat-safe, idempotent). Works on any comment,
+ *  since it's keyed by the comment surrogate. Returns { correct, awarded }. */
+export async function markCommentCorrect(commentSurrogate, on) {
+  const cid = commentUuidBySurr.get(commentSurrogate);
+  if (!cid) return null;
+  const { data, error } = await supabase.rpc("mark_comment_correct", { p_comment: cid, p_on: !!on });
+  if (error) {
+    console.warn("markCommentCorrect:", error.message);
+    return null;
+  }
   return data;
 }
 
