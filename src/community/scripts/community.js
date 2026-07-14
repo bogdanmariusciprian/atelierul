@@ -66,7 +66,7 @@ import {
 import { pointsFx, burstAt } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { initMentions, invalidMentions, linkifyMentions, mentionsIn } from "../../shared/scripts/mentions.js";
-import { exerciseFormFields, readExerciseForm, exerciseEditFormHtml } from "../../shared/scripts/exercise-form.js";
+import { exerciseFormFields, readExerciseForm, exerciseEditFormHtml, exercisePreviewHtml } from "../../shared/scripts/exercise-form.js";
 import { touchStreak, getStreakInfo } from "../../shared/scripts/streak.js";
 import { store } from "../../shared/scripts/store.js";
 import { getNotes, addNote, updateNote, deleteNote } from "../../shared/scripts/notebook.js";
@@ -1406,7 +1406,9 @@ export function renderCommunity(basePath = "") {
                   <b>${e.votes}</b>
                 </div>
                 <div class="cx-ex__body">
-                  <p class="cx-ex__prompt">${escapeHtml(e.prompt)}</p>
+                  <div class="exprev-wrap is-pending" aria-disabled="true">
+                    ${exercisePreviewHtml(e, { showAnswer: isAdmin() || e.authorId === CURRENT_USER.id })}
+                  </div>
                   <div class="cx-ex__meta">
                     <span class="cx-tag cx-tag--${e.kind}">${k.label}</span>
                     <span class="cx-tag cx-tag--wait">în așteptare</span>
@@ -2805,7 +2807,9 @@ export function renderCommunity(basePath = "") {
             return `<tr>
                 <td class="cx-histt__n">${i + 1}</td>
                 <td>${userNameLink(e.authorId, e.name)}</td>
-                <td class="cx-histt__prompt"><span class="cx-tag cx-tag--${e.kind}">${k.label}</span> ${escapeHtml(e.prompt)}<div class="cx-histt__lesson">${lessonLink(e)}</div></td>
+                <td class="cx-histt__prompt"><span class="cx-tag cx-tag--${e.kind}">${k.label}</span>
+                  <div class="exprev-wrap exprev-wrap--compact">${exercisePreviewHtml(e, { showAnswer: true })}</div>
+                  <div class="cx-histt__lesson">${lessonLink(e)}</div></td>
                 <td title="decis ${e.decidedTime || ""}">${date}</td>
                 <td class="cx-histt__status"><span class="cx-dot cx-dot--${ok ? "ok" : "no"}" title="${ok ? "aprobat" : "respins"}"></span></td>
                 <td class="cx-histt__act"><button type="button" class="post__adminbtn post__adminbtn--del" data-action="admin-del-ex" data-id="${e.id}" title="Șterge din istoric">🗑</button></td>
@@ -2929,7 +2933,9 @@ export function renderCommunity(basePath = "") {
           <span class="cx-moditem__ic">🧩</span>
           <div class="cx-moditem__body">
             <p class="cx-moditem__head"><b>Propunere de exercițiu</b> <span class="cx-muted">· ${userNameLink(e.authorId, e.name)} · ▲ ${e.votes} voturi</span></p>
-            <p class="cx-moditem__text">„${escapeHtml(e.prompt)}”</p>
+            <div class="exprev-wrap exprev-wrap--compact">
+              ${exercisePreviewHtml(e, { showAnswer: true })}
+            </div>
             <p class="cx-moditem__meta">${lessonLink(e)}</p>
           </div>
           <span class="cx-moditem__act">

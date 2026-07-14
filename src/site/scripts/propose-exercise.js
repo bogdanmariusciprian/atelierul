@@ -19,7 +19,7 @@ import { findProfanity, queueBlockedComment } from "../../shared/scripts/moderat
 import { userById, slugForUser } from "../../shared/scripts/community-data.js";
 import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
-import { exerciseFormFields, readExerciseForm, exerciseSolverHtml, exerciseEditFormHtml } from "../../shared/scripts/exercise-form.js";
+import { exerciseFormFields, readExerciseForm, exerciseSolverHtml, exerciseEditFormHtml, exercisePreviewHtml } from "../../shared/scripts/exercise-form.js";
 import { initExercisesIn } from "./lesson-engine.js";
 import { touchStreak } from "../../shared/scripts/streak.js";
 import { currentLessonSlug } from "../../shared/scripts/lessons-index.js";
@@ -92,9 +92,15 @@ export function initProposeExercise(basePath = "") {
     }
 
     // A PUBLISHED exercise with structured data is fully SOLVABLE — the same
-    // engine as the lesson's own exercises. Pending (or old) proposals stay text.
-    const solver = published_ ? exerciseSolverHtml(e) : null;
-    const body = solver || `<p class="propose__prompt">${escapeHtml(e.prompt)}</p>`;
+    // engine as the lesson's own exercises.
+    // A PENDING one is shown in its FINAL form too (options, blank, pairs) but
+    // INERT and greyed out, so you can actually judge/vote on what it will be.
+    // The answer is revealed only to the teacher and to the proposal's author.
+    const body = published_
+      ? exerciseSolverHtml(e) || `<p class="propose__prompt">${escapeHtml(e.prompt)}</p>`
+      : `<div class="exprev-wrap is-pending" aria-disabled="true">
+           ${exercisePreviewHtml(e, { showAnswer: isAdmin() || e.authorId === CURRENT_USER.id })}
+         </div>`;
     const verified = e.verified
       ? `<span class="cx-tag" title="Verificată și ajustată de profesor">✎ verificată</span>`
       : "";

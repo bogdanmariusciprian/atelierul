@@ -90,6 +90,66 @@ export function readExerciseForm(root, kind) {
 }
 
 // ---------------------------------------------------------
+// PREVIEW markup — the exercise in its FINAL form, but INERT (not solvable).
+// A proposal used to show only its bare prompt, so a fill-in-the-blank read as
+// "Ei ______ (a veni) mâine." — impossible to judge or vote on. Now you see
+// exactly what the exercise WILL be: the options, the blank, the pairs.
+//
+// `showAnswer` reveals the right answer. Give it ONLY to the teacher and to the
+// proposal's own author — never to other pupils, or an exercise would already
+// be spoiled by the time it gets approved and becomes worth points.
+// ---------------------------------------------------------
+export function exercisePreviewHtml(e, { showAnswer = false } = {}) {
+  const prompt = `<p class="exprev__prompt">${escapeHtml(e.prompt)}</p>`;
+  const d = e.data;
+  if (!d) {
+    return `<div class="exprev">${prompt}
+      <p class="exprev__none">(propunere veche — fără variante de răspuns)</p></div>`;
+  }
+
+  if (e.kind === "choice") {
+    const opts = (d.options || [])
+      .map((o, i) => {
+        const ok = showAnswer && i === d.correct;
+        return `<span class="exprev__opt${ok ? " is-correct" : ""}">${ok ? "✔ " : ""}${escapeHtml(o)}</span>`;
+      })
+      .join("");
+    return `<div class="exprev">${prompt}<div class="exprev__opts">${opts}</div></div>`;
+  }
+
+  if (e.kind === "fill") {
+    const answers = String(d.answer || "").split("|").filter(Boolean);
+    const reveal = showAnswer && answers.length
+      ? `<p class="exprev__ans">Răspuns acceptat: <b>${escapeHtml(answers.join(" / "))}</b></p>`
+      : "";
+    return `<div class="exprev">${prompt}
+      <p><span class="exprev__blank">completează…</span></p>${reveal}</div>`;
+  }
+
+  if (e.kind === "match") {
+    // With the answer, `data` still holds {pairs} (the pairing IS the answer).
+    // Without it, the server already redacted it down to {left, right} (0025) —
+    // so we simply show the two columns and never know which goes with which.
+    const pairs = d.pairs || [];
+    if (showAnswer && pairs.length) {
+      const rows = pairs
+        .map(([l, r]) => `<span class="exprev__opt">${escapeHtml(l)} <b>→</b> ${escapeHtml(r)}</span>`)
+        .join("");
+      return `<div class="exprev">${prompt}<div class="exprev__opts">${rows}</div></div>`;
+    }
+    const left = d.left || pairs.map(([l]) => l);
+    const right = d.right || [...pairs.map(([, r]) => r)].sort((a, b) => (a > b ? 1 : -1));
+    return `<div class="exprev">${prompt}
+      <div class="exprev__cols">
+        <div class="exprev__col">${left.map((l) => `<span class="exprev__opt">${escapeHtml(l)}</span>`).join("")}</div>
+        <div class="exprev__col">${right.map((r) => `<span class="exprev__opt">${escapeHtml(r)}</span>`).join("")}</div>
+      </div></div>`;
+  }
+
+  return `<div class="exprev">${prompt}</div>`;
+}
+
+// ---------------------------------------------------------
 // Solver markup — the EXACT structure the lesson engine understands
 // (.exercise[data-type] + .option/.blank/.match__select), so approved
 // community exercises behave identically to the hand-written ones.

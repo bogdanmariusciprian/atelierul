@@ -24,9 +24,6 @@ export function exerciseKind(key) {
   return EXERCISE_KINDS.find((k) => k.key === key) || EXERCISE_KINDS[0];
 }
 
-const PROFILE_SEL =
-  "author:profiles!exercises_author_id_fkey(id, display_name, avatar_color, avatar, points, status_line, last_seen_at, role)";
-
 const relTime = (ts) => {
   const s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
   if (s < 60) return "acum";
@@ -90,12 +87,22 @@ async function mySolves(ids) {
   return out;
 }
 
-async function query(filterFn) {
-  let q = supabase.from("exercises").select(`id, lesson_slug, kind, prompt, data, status, verified, decided_at, created_at, ${PROFILE_SEL}`);
-  q = filterFn(q);
-  const { data, error } = await q;
-  if (error) { console.warn("exercises query:", error.message); return []; }
-  const rows = data || [];
+/** ALL reads go through exercises_visible (0025), never straight off the table:
+ *  the SERVER decides what you may see AND strips the answer out of `data` for
+ *  a pending proposal that isn't yours. Filtering/sorting happens here, on the
+ *  already-redacted rows. */
+async function query({ lesson = null, statuses = null, sort = "created" } = {}) {
+  const { data, error } = await supabase.rpc("exercises_visible", { p_lesson: lesson });
+  if (error) { console.warn("exercises_visible:", error.message); return []; }
+  let rows = data || [];
+  if (statuses) rows = rows.filter((r) => statuses.includes(r.status));
+  rows.sort((a, b) =>
+    sort === "decided"
+      ? new Date(b.decided_at || 0) - new Date(a.decided_at || 0)
+      : sort === "oldest"
+        ? new Date(a.created_at) - new Date(b.created_at)
+        : new Date(b.created_at) - new Date(a.created_at)
+  );
   const { counts = new Map(), mine = new Set() } = await withVotes(rows);
   const solves = await mySolves(rows.map((r) => r.id));
   return rows.map((r) => mapRow(r, { myVote: mine.has(r.id), voteCount: counts.get(r.id) || 0, mySolve: solves.get(r.id) }));
@@ -103,22 +110,23 @@ async function query(filterFn) {
 
 /** Pending proposals across all lessons — the admin queue + community voting. */
 export function fetchPendingExercises() {
-  return query((q) => q.eq("status", "pending").order("created_at", { ascending: false }));
+  return query({ statuses: ["pending"] });
 }
 
 /** Decided proposals (approved/rejected) — the admin's history, newest first. */
 export function fetchExerciseHistory() {
-  return query((q) => q.in("status", ["approved", "rejected"]).order("decided_at", { ascending: false, nullsFirst: false }));
+  return query({ statuses: ["approved", "rejected"], sort: "decided" });
 }
 
 /** Approved (published) exercises for one lesson — SOLVABLE by pupils. */
 export function fetchApprovedForLesson(slug) {
-  return query((q) => q.eq("lesson_slug", slug).eq("status", "approved").order("created_at", { ascending: true }));
+  return query({ lesson: slug, statuses: ["approved"], sort: "oldest" });
 }
 
-/** Pending proposals for one lesson — shown for community voting. */
+/** Pending proposals for one lesson — everyone sees them now (to vote), but the
+ *  answer is redacted server-side unless it's yours (or you're the teacher). */
 export function fetchPendingForLesson(slug) {
-  return query((q) => q.eq("lesson_slug", slug).eq("status", "pending").order("created_at", { ascending: false }));
+  return query({ lesson: slug, statuses: ["pending"] });
 }
 
 /** Propose an exercise (status is forced to 'pending' by RLS). */

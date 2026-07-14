@@ -535,6 +535,46 @@
 .msgr-fabbadge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: var(--color-danger); color: #fff; font-size: 0.7rem; line-height: 18px; font-weight: 700; }
 .msgr-panel { width: 340px; max-width: calc(100vw - 32px); height: 460px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.35); overflow: hidden; }
 .msgr-panel[hidden] { display: none; } /* class display:flex would otherwise override the hidden attr */
+
+/* =========================================================
+   EXERCISE PREVIEW — a proposed exercise shown in its FINAL form (options,
+   blank, pairs) but INERT. Used on the lesson page, in the hub's proposal
+   list, in the moderation queue and in the history table (one renderer, four
+   places — DRY). `.is-pending` greys it out: you can read and judge it, but it
+   isn't solvable until the teacher approves it.
+   ========================================================= */
+.exprev { display: flex; flex-direction: column; gap: 0.5rem; }
+.exprev__prompt { margin: 0; font-weight: 600; line-height: 1.45; }
+.exprev__opts { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.exprev__cols { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+.exprev__col { display: flex; flex-direction: column; gap: 0.4rem; }
+.exprev__opt {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.3rem 0.6rem; border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  font-size: 0.88rem;
+}
+.exprev__opt.is-correct {
+  border-color: var(--color-success, #16a34a);
+  background: color-mix(in srgb, var(--color-success, #16a34a) 14%, var(--color-surface));
+  font-weight: 600;
+}
+.exprev__blank {
+  display: inline-block; min-width: 9ch; padding: 0.2rem 0.6rem;
+  border-bottom: 2px dashed var(--color-border);
+  color: var(--color-text-muted); font-style: italic;
+}
+.exprev__ans { margin: 0; font-size: 0.86rem; color: var(--color-text-muted); }
+.exprev__none { margin: 0; font-size: 0.86rem; color: var(--color-text-muted); font-style: italic; }
+
+/* PENDING: readable, but visibly "not live yet" — and never interactive. */
+.exprev-wrap.is-pending { opacity: 0.62; filter: saturate(0.55); }
+.exprev-wrap.is-pending .exprev__opt { border-style: dashed; }
+.exprev-wrap { pointer-events: none; user-select: none; } /* preview is inert everywhere */
+.exprev-wrap--compact .exprev { gap: 0.35rem; }
+.exprev-wrap--compact .exprev__prompt { font-weight: 500; font-size: 0.92rem; }
+.exprev-wrap--compact .exprev__opt { padding: 0.15rem 0.45rem; font-size: 0.8rem; }
 .msgr-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--color-border); font-size: 0.95rem; background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
 .msgr-back { border: none; background: transparent; font-size: 1.4rem; line-height: 1; cursor: pointer; color: var(--color-text-muted); }
 .msgr-list { overflow-y: auto; flex: 1; }
