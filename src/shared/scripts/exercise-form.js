@@ -118,12 +118,27 @@ export function exercisePreviewHtml(e, { showAnswer = false } = {}) {
   }
 
   if (e.kind === "fill") {
-    const answers = String(d.answer || "").split("|").filter(Boolean);
-    const reveal = showAnswer && answers.length
-      ? `<p class="exprev__ans">Răspuns acceptat: <b>${escapeHtml(answers.join(" / "))}</b></p>`
+    // The blank lives INSIDE the sentence ("Ei ______ (a veni) mâine."), so the
+    // answer has to go exactly there — a chip floating underneath read as
+    // gibberish. We show EVERY accepted form (including the no-diacritics
+    // variants), because that's what the teacher must judge.
+    const answers = String(d.answer || "")
+      .split("|")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const slot = showAnswer && answers.length
+      ? `<span class="exprev__blank exprev__blank--filled">${escapeHtml(answers.join(" / "))}</span>`
+      : `<span class="exprev__blank">completează…</span>`;
+
+    const escaped = escapeHtml(e.prompt);
+    const BLANK = /_{2,}/g; // the "______" the author typed
+    const sentence = BLANK.test(escaped)
+      ? escaped.replace(/_{2,}/g, slot)
+      : `${escaped} ${slot}`; // no marker → put the slot after the sentence
+    const note = showAnswer && answers.length > 1
+      ? `<p class="exprev__ans">${answers.length} forme acceptate</p>`
       : "";
-    return `<div class="exprev">${prompt}
-      <p><span class="exprev__blank">completează…</span></p>${reveal}</div>`;
+    return `<div class="exprev"><p class="exprev__prompt">${sentence}</p>${note}</div>`;
   }
 
   if (e.kind === "match") {

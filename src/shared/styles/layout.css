@@ -560,10 +560,19 @@
   background: color-mix(in srgb, var(--color-success, #16a34a) 14%, var(--color-surface));
   font-weight: 600;
 }
+/* The blank sits INLINE, inside the sentence, exactly where the author typed
+   "______" — so the exercise reads as a sentence, not a prompt + a stray chip. */
 .exprev__blank {
-  display: inline-block; min-width: 9ch; padding: 0.2rem 0.6rem;
+  display: inline-block; min-width: 8ch; padding: 0.05rem 0.5rem; margin: 0 0.15rem;
   border-bottom: 2px dashed var(--color-border);
   color: var(--color-text-muted); font-style: italic;
+}
+/* Revealed (teacher / author): the accepted form(s), shown in place. */
+.exprev__blank--filled {
+  border-bottom: 2px solid var(--color-success, #16a34a);
+  background: color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent);
+  border-radius: 4px;
+  color: var(--color-text); font-style: normal; font-weight: 600;
 }
 .exprev__ans { margin: 0; font-size: 0.86rem; color: var(--color-text-muted); }
 .exprev__none { margin: 0; font-size: 0.86rem; color: var(--color-text-muted); font-style: italic; }

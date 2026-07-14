@@ -1325,19 +1325,13 @@ export function renderCommunity(basePath = "") {
   function exPreviewHtml() {
     const prompt = mount.querySelector("#cx-ex-prompt")?.value.trim() || "(enunțul tău)";
     const form = readExerciseForm(mount, state.exComposer.kind);
-    let body = `<p class="cx-warn">⚠️ ${escapeHtml(form.error || "Completează câmpurile ca să vezi previzualizarea.")}</p>`;
-    if (form.ok && form.data) {
-      const d = form.data;
-      if (state.exComposer.kind === "choice")
-        body = `<div class="cx-expreview__opts">${d.options.map((o, i) => `<span class="cx-expreview__opt${i === d.correct ? " ok" : ""}">${i === d.correct ? "✔ " : ""}${escapeHtml(o)}</span>`).join("")}</div>`;
-      else if (state.exComposer.kind === "fill")
-        body = `<p class="cx-muted">Răspunsuri acceptate: <b>${escapeHtml(d.answer.split("|").join(" / "))}</b></p>`;
-      else
-        body = `<div class="cx-expreview__opts">${d.pairs.map(([l, r]) => `<span class="cx-expreview__opt">${escapeHtml(l)} → ${escapeHtml(r)}</span>`).join("")}</div>`;
-    }
+    // The SAME renderer as everywhere else, so the preview is exactly what your
+    // proposal will look like. Your own answer is shown (it's yours).
+    const body = form.ok && form.data
+      ? exercisePreviewHtml({ prompt, kind: state.exComposer.kind, data: form.data }, { showAnswer: true })
+      : `<p class="cx-warn">⚠️ ${escapeHtml(form.error || "Completează câmpurile ca să vezi previzualizarea.")}</p>`;
     return `<div class="cx-expreview">
         <p class="cx-expreview__label">Așa va arăta:</p>
-        <p class="cx-expreview__prompt">${escapeHtml(prompt)}</p>
         ${body}
       </div>`;
   }
