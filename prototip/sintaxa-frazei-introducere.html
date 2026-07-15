@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  ATELIERUL DE ROMÂNĂ · Lecție interactivă „Sintaxa frazei – Introducere"
+  ============================================================================
+
+  CE ESTE
+  Lecție interactivă, de sine stătătoare, care predă metoda de analiză a frazei:
+  câte PREDICATE, atâtea propoziții (numărăm predicate, nu cuvinte). Cititorul ia
+  o frază-model și o descâlcește pas cu pas, văzând cum apar, pe rând, marcajele:
+  sublinieri (predicate), cercuri (subordonatoare), pătrate (coordonatoare),
+  tăieri (relații false) și bare (granițe de propoziție).
+
+  INTEGRARE ÎN SITE
+  · Un SINGUR fișier, fără dependențe externe: fără framework, fără pas de build,
+    fără CDN. Tot CSS-ul e în <style>, tot JS-ul în <script>-ul de la final.
+    Poate fi folosit ca pagină separată SAU conținutul din <body> + <style> +
+    <script> poate fi lipit într-un șablon existent.
+  · TEMĂ: toate culorile de bază sunt în :root (--violet, --blue, --amber, ...).
+    Le schimbi o singură dată acolo și se propagă în toată lecția.
+  · Conținutul e în română; identificatorii din cod sunt în engleză (convenție).
+  · Semn de pauză în text: folosim EN DASH „–" (nu EM DASH „—").
+  · Accesibilitate: navigare cu tastele ← / → prin pași; formele pur decorative
+    au aria-hidden; butonul „+" e focusabil (role=button, tabindex=0).
+
+  STRUCTURA (5 secțiuni, în <body>)
+  1. Definiție      – silogism: 2 premise → concluzie (DE CE numărăm predicate).
+  2. Pașii de lucru – componenta interactivă (walkthrough), 8 pași animați.
+  3. Notația        – cercuri vs pătrate; butonul „+" adaugă cuvinte noi.
+  4. Dificultăți    – 4 capcane: par relații, dar NU se numără.
+  5. Strategii      – 7 unelte, fiecare cu un exemplu (tooltip + pastilă).
+
+  IDEI DE ANIMAȚIE (și ce evită fiecare)
+  · Ordinea „pe rând" vine din variabile CSS pe fiecare element: --d (subliniere),
+    --m (marcaj/cerc/pătrat), --b (bară), --c (tăiere). Sunt folosite în
+    transition-delay / animation-delay: calc(var(--x) * 0.7s + ...).
+    EVITĂ un JS cu zeci de setTimeout (fragil, greu de ținut sincron).
+  · min-width pornește de la 0 (NU „auto"): tranziția auto→lungime nu se animează,
+    deci fără 0 spațierea ar sări brusc. EVITĂ saltul de spațiere la încercuire.
+  · Cercul/pătratul e un INEL overlay (::before), nu o cutie care schimbă display;
+    cuvântul rămâne pe linia de bază. EVITĂ textul „plutitor" și sublinierea
+    ajunsă la alt nivel.
+  · Bucățile de subliniere sunt inline-block cu white-space:pre, ca linia să iasă
+    la EXACT același nivel la toate predicatele. EVITĂ sublinieri „în trepte".
+  · La revenirea la un pas deja parcurs se pune clasa .no-anim → animațiile NU se
+    reiau. EVITĂ re-rularea obositoare a efectelor la fiecare revenire.
+  · „Înainte" se blochează cât rulează animația pasului nou (vezi waitForStepAnim,
+    care așteaptă cu getAnimations). EVITĂ sărirea peste pași înainte de final.
+  ============================================================================
+-->
+<html lang="ro">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sintaxa frazei · Introducere</title>
+<style>
+  /* ─────────────────────────────────────────────────────────────────────────
+     TEMĂ CENTRALĂ: schimbi culorile o singură dată aici, în :root, și se
+     propagă în toată lecția (butoane, cercuri, pătrate, tăieri, etichete...).
+     --grad = degradeul de brand; --r/--shadow = raza colțurilor și umbra comună.
+     ───────────────────────────────────────────────────────────────────────── */
+  :root{
+    --ink:#1c2033; --muted:#6b7280; --bg:#f5f6fb; --card:#ffffff; --line:#e7e8f0;
+    --violet:#7c3aed; --blue:#2563eb; --amber:#e8890c; --mint:#10b981; --gold:#eab308; --rose:#e11d68;
+    --grad:linear-gradient(135deg,#7c3aed,#2563eb);
+    --shadow:0 18px 40px -22px rgba(30,33,60,.35); --r:18px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif; line-height:1.6; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px; margin:0 auto; padding:clamp(16px,4vw,40px)}
+  /* Walkthrough-ul are voie să fie mai lat decât restul, ca fraza + cercurile să încapă lejer */
+  .walk{width:min(1240px, calc(100vw - 32px)); position:relative; left:50%; transform:translateX(-50%)}
+  h2{font-size:clamp(1.25rem,3.4vw,1.7rem); margin:0 0 .3rem; letter-spacing:-.01em}
+  section{margin:clamp(34px,7vw,64px) 0}
+  .kicker{display:inline-flex; align-items:center; gap:.5rem; font-weight:700; font-size:.72rem;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--violet)}
+  /* eticheta de secțiune – pastilă cu număr, mai vie și ușor de urmărit (înlocuiește „1 · ...") */
+  .seclabel{display:inline-flex; align-items:center; gap:.55rem; font-weight:800; font-size:.82rem; color:var(--violet);
+    background:#f1ecff; padding:.3rem .95rem .3rem .32rem; border-radius:999px; margin-bottom:.5rem; user-select:none}
+  .seclabel .kn{display:grid; place-items:center; width:1.6rem; height:1.6rem; border-radius:50%; flex:none;
+    background:var(--grad); color:#fff; font-size:.84rem; box-shadow:0 5px 13px -4px rgba(124,58,237,.75)}
+  .seclabel .kn small{opacity:.7; font-size:.62em; font-weight:700}
+  .seclabel.s2{background:#e6f0ff; color:#1d4ed8}  .seclabel.s2 .kn{background:linear-gradient(135deg,#3b82f6,#2563eb); box-shadow:0 5px 13px -4px rgba(37,99,235,.7)}
+  .seclabel.s3{background:#fdf1da; color:#b45309}  .seclabel.s3 .kn{background:linear-gradient(135deg,#f59e0b,#d97706); box-shadow:0 5px 13px -4px rgba(217,119,6,.6)}
+  .seclabel.s4{background:#ffe4ec; color:#be123c}  .seclabel.s4 .kn{background:linear-gradient(135deg,#fb7185,#e11d48); box-shadow:0 5px 13px -4px rgba(225,29,72,.6)}
+  .seclabel.s5{background:#d8f7e8; color:#047857}  .seclabel.s5 .kn{background:linear-gradient(135deg,#10b981,#059669); box-shadow:0 5px 13px -4px rgba(5,150,105,.6)}
+  .sub{color:var(--muted); margin:.2rem 0 1.4rem}
+
+  /* HERO */
+  .hero{background:var(--grad); color:#fff; border-radius:26px; padding:clamp(26px,6vw,52px);
+    box-shadow:var(--shadow); position:relative; overflow:hidden}
+  .hero::after{content:""; position:absolute; inset:auto -60px -120px auto; width:280px; height:280px;
+    background:radial-gradient(circle,rgba(255,255,255,.22),transparent 70%)}
+  .hero .kicker{color:#e9d5ff}
+  .hero h1{font-size:clamp(2rem,7vw,3.4rem); margin:.4rem 0 .5rem; letter-spacing:-.02em; line-height:1.05}
+  .hero p{margin:0; font-size:clamp(1rem,2.6vw,1.22rem); color:#eef2ff; max-width:52ch}
+  .hero .chips{display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1.3rem}
+  .hero .chip{background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.28); padding:.32rem .8rem;
+    border-radius:999px; font-size:.82rem; font-weight:600}
+
+  /* DEFINIȚIE – silogism: două premise → concluzie (compact, text normal, substituție color-coded) */
+  .defsyl{max-width:760px; margin:8px auto 0}
+  .ds-row{display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:stretch}
+  .ds-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:13px 16px;
+    transition:transform .2s ease, box-shadow .2s ease}
+  .ds-card:hover{transform:translateY(-2px); box-shadow:0 14px 30px -22px rgba(124,58,237,.5)}
+  .ds-lab{font-size:.68rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--violet)}
+  .ds-card p{margin:.28rem 0 0; font-size:1rem; line-height:1.5}
+  .ds-q{font-style:italic; color:var(--rose); font-weight:600; font-size:.9rem}
+  .ds-join{align-self:center; text-align:center; max-width:5rem; font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#8b5cf6}
+  .ds-down{text-align:center; margin:11px 0; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#059669}
+  .ds-down::before, .ds-down::after{content:"↓"; margin:0 .5em; color:#10b981; font-size:1.05em}
+  .ds-final{background:linear-gradient(135deg,#faf5ff,#eef6ff); border:1.5px solid #c7ebda; box-shadow:0 14px 30px -22px rgba(16,185,129,.5)}
+  .ds-final .ds-lab{color:#059669}
+  .ds-final p{font-size:1.1rem; font-weight:700}
+  .k-prop, .k-pred{font-weight:800; padding:.05em .4em; border-radius:7px; white-space:nowrap}
+  .k-prop{color:#5b21b6; background:#efe7ff}
+  .k-pred{color:#7a4a05; background:#fdeccb}
+  .predpill{display:inline-block; box-shadow:inset 0 -0.35em 0 -0.05em #fde3bf; font-weight:700}
+  @media(max-width:640px){ .ds-row{grid-template-columns:1fr} .ds-join{max-width:none; padding:3px 0} }
+
+  /* WALKTHROUGH */
+  .walk{background:var(--card); border:1px solid var(--line); border-radius:24px; padding:clamp(16px,3.6vw,26px); box-shadow:var(--shadow)}
+  .walk-grid{display:grid; grid-template-columns:250px 1fr; gap:22px; align-items:start}
+
+  /* steps list (side) */
+  .steps{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; position:sticky; top:14px}
+  .steps li{display:grid; grid-template-columns:1.7rem 1fr; gap:10px; align-items:center; padding:.5rem .6rem;
+    border-radius:12px; cursor:pointer; color:var(--muted); font-size:.9rem; font-weight:600; transition:.18s; border:1px solid transparent}
+  .steps li .n{width:1.7rem; height:1.7rem; border-radius:8px; display:grid; place-items:center; font-weight:800;
+    font-size:.82rem; background:#eef0f7; color:var(--muted); flex:none; transition:.18s}
+  .steps li:hover{background:#f6f5ff}
+  .steps li.done{color:var(--ink)}
+  .steps li.done .n{background:#e9fbf3; color:var(--mint)}
+  .steps li.on{background:#f3ebff; border-color:#e3d6ff; color:var(--ink)}
+  .steps li.on .n{background:var(--grad); color:#fff}
+  /* pași încă neatinși – indisponibili până ajungi la ei */
+  .steps li.locked{opacity:.5; cursor:not-allowed}
+  .steps li.locked:hover{background:transparent}
+  .steps li.locked .n{background:#eef0f7; color:transparent; font-size:0}
+  .steps li.locked .n::before{content:"🔒"; font-size:.78rem}
+  .steps li.locked .txt{color:var(--muted)}
+
+  .walk-main{min-width:0}
+  /* the sentence stage – roomy, uncluttered */
+  /* fraza – bandă proprie, lată cât tot panelul, auto-micșorată să încapă pe un rând (fără scroll) */
+  .stage{font-size:1.15rem; line-height:3; text-align:center; padding:56px 12px 30px;
+    white-space:nowrap; overflow:visible; border-bottom:1px solid var(--line); margin-bottom:12px}
+  /* în timpul măsurării (auto-fit), oprim animațiile ca să nu clipească marcajele */
+  .stage.measuring, .stage.measuring *, .stage.measuring *::before, .stage.measuring *::after,
+  .stage.no-anim, .stage.no-anim *, .stage.no-anim *::before, .stage.no-anim *::after,
+  .walk.no-anim .cnt, .walk.no-anim .formula, .walk.no-anim .node{animation:none!important; transition:none!important}
+  .tok{position:relative; display:inline-block; margin:0 .55em}
+  @media(max-width:760px){ .stage{padding-top:50px} }
+  /* min-width:0 de BAZĂ (nu „auto"): doar așa se animează lin lățirea cuvântului când apare cercul/pătratul.
+     Cu „auto", tranziția auto→lungime nu pornește și spațierea ar sări brusc. */
+  .tok .w{position:relative; display:inline-block; min-width:0; padding:.05em .12em; transition:color .3s ease, border-color .3s ease, opacity .3s ease, min-width .45s ease}
+  /* 1) predicate underline – linie normală, subțire, aproape de text, trasată pe rând */
+  .tok.pred .w{line-height:1.5; padding:0 .12em}   /* fără padding vertical, ca linia continuă și cea pe bucăți să fie la ACELAȘI nivel */
+  /* toate bucățile = inline-block (nu inline), ca `::after`-ul sublinierii să se raporteze la ACEEAȘI
+     margine (cutia de line-height), deci linia iese la EXACT același nivel la toate predicatele */
+  .tok.pred .ul, .tok.pred .cl{position:relative; display:inline-block; vertical-align:baseline; white-space:pre}
+  .tok.pred .ul::after{content:""; position:absolute; z-index:1; left:0; right:0; bottom:-3px; height:2px; background:var(--amber);
+    border-radius:2px; transform:scaleX(0); transform-origin:left; transition:transform .55s ease}
+  .stage.s-pred .tok.pred .ul::after{transform:scaleX(1); transition-delay:calc(var(--d,0) * .7s)}
+  /* predicate CONTINUE (fără clitic intercalat): O SINGURĂ linie sub TOT predicatul (nu pe bucăți),
+     ca „Să știi / să fac / să vând / trebuie / vreau" să aibă subliniere neîntreruptă, sub cercul „să". */
+  .tok.pred:not(.pred-caps) .ul::after{display:none}
+  .tok.pred:not(.pred-caps) .w::after{content:""; position:absolute; z-index:1; left:0; right:0; bottom:-3px; height:2px;
+    background:var(--amber); border-radius:2px; transform:scaleX(0); transform-origin:left; transition:transform .55s ease}
+  .stage.s-pred .tok.pred:not(.pred-caps) .w::after{transform:scaleX(1); transition-delay:calc(var(--d,0) * .7s)}
+  /* predicat cu clitic cu cratimă („nu-mi place"): liniuțe verticale la CAPETELE sublinierii –
+     puse pe începutul lui „nu-" și pe sfârșitul lui „ place", ca să se întâlnească în colț cu
+     linia orizontală (aceeași margine `bottom`, la capătul exact al fiecărei .ul) */
+  .tok.pred-caps .ul:first-child:not(.pcirc)::after{left:-5px}    /* sublinierea iese puțin în afara cuvântului... */
+  .tok.pred-caps .ul:last-child::after{right:-5px}
+  .tok.pred-caps .ul:first-child:not(.pcirc)::before,
+  .tok.pred-caps .ul:last-child::before{content:""; position:absolute; bottom:-3px; width:2px; height:.9em;
+    background:var(--amber); transform:scaleY(0); transform-origin:bottom; transition:transform .35s ease}
+  .tok.pred-caps .ul:first-child:not(.pcirc)::before{left:-5px}   /* ...iar verticala stă la acel capăt, la distanță laterală de cuvânt */
+  .tok.pred-caps .ul:last-child::before{right:-5px}
+  .stage.s-pred .tok.pred-caps .ul:first-child:not(.pcirc)::before,
+  .stage.s-pred .tok.pred-caps .ul:last-child::before{transform:scaleY(1); transition-delay:calc(var(--d,0) * .7s + .2s)}
+  /* „să...spui": „să" e cerc (::before = inel), deci capătul vertical din stânga e un element <i class=capL> */
+  .tok.pred-caps .ul.pcirc:first-child::after{left:-4px}   /* linia lui „să" iese puțin spre capătul din stânga */
+  .tok.pred-caps .pcirc .capL{position:absolute; left:-4px; bottom:-3px; width:2px; height:.9em; background:var(--amber);
+    border-radius:1px; transform:scaleY(0); transform-origin:bottom; transition:transform .35s ease}
+  .stage.s-pred .tok.pred-caps .pcirc .capL{transform:scaleY(1); transition-delay:calc(var(--d,0) * .7s + .2s)}
+  /* predicatele rămân la culoarea default (negru), fără bold, fără maro */
+  /* 3) cerc (subordonator) & pătrat (coordonator) – CUVÂNTUL există deja; se animează DOAR inelul */
+  /* cutia rămâne inline-block (fără schimbare de display → min-width se tranziționează LIN),
+     inelul e overlay ::before (ca la „să"); textul rămâne pe linia de bază */
+  .tok.circle .w, .tok.square .w{line-height:1.5; text-align:center}
+  .stage.s-marks .tok.circle .w{min-width:1.9em; color:var(--violet); transition:min-width .45s ease calc(var(--m,0) * .7s + .5s), color .3s ease calc(var(--m,0) * .7s + .9s)}
+  .stage.s-marks .tok.square .w{min-width:1.75em; color:var(--blue); transition:min-width .45s ease calc(var(--m,0) * .7s + .5s), color .3s ease calc(var(--m,0) * .7s + .9s)}
+  .stage.s-marks .tok.circle .w::before, .stage.s-marks .tok.square .w::before{
+    content:""; position:absolute; z-index:2; top:-.16em; bottom:-.28em; left:-.06em; right:-.06em; border:2.5px solid currentColor; transition:border-color .3s ease;
+    animation:ringIn .55s ease backwards; animation-delay:calc(var(--m,0) * .7s + .5s)}
+  .stage.s-marks .tok.circle .w::before{border-radius:50%}
+  .stage.s-marks .tok.square .w::before{border-radius:5px}
+  @keyframes ringIn{0%{opacity:0; transform:scale(.3)} 60%{transform:scale(1.12)} 100%{opacity:1; transform:scale(1)}}
+  /* cerc pe o BUCATĂ de predicat („Să", „să"): e ȘI încercuit, ȘI subliniat. Cutia .pcirc devine
+     cerc, iar sublinierea (.ul::after) rămâne jos → linia trece pe SUB cerc (cercul stă pe linie). */
+  .tok.pred .pcirc{position:relative; display:inline-block; vertical-align:baseline; min-width:0; padding:0 .12em; transition:color .3s ease, min-width .45s ease}
+  /* abia la pasul 3: se lărgește la mărimea cercului, se centrează și devine MOV DUPĂ ce apare inelul */
+  .stage.s-marks .tok.pred .pcirc{min-width:1.75em; text-align:center; color:var(--violet); transition:min-width .45s ease calc(var(--m,0) * .7s + .5s), color .3s ease calc(var(--m,0) * .7s + .9s)}
+  .stage.s-marks .tok.pred .pcirc::before{content:""; position:absolute; z-index:2; top:-.16em; bottom:-.26em; left:-.05em; right:-.05em;
+    border:2.5px solid currentColor; border-radius:50%; transition:border-color .3s ease, opacity .3s ease;
+    animation:ringIn .55s ease backwards; animation-delay:calc(var(--m,0) * .7s + .5s)}
+  /* tăierea pe „Să": estompăm doar INELUL (relația respinsă) + trasăm linia oblică (un <i>, ca să nu
+     se bată cu inelul ::before și sublinierea ::after); predicatul „Să știi" rămâne subliniat normal */
+  /* fără estompare: inelul lui „Să" rămâne mov normal; doar diagonala roșie marchează tăierea */
+  .stage.s-cut .tok.pred .pcut i{position:absolute; z-index:3; left:50%; top:50%; width:2px; height:3.5em; background:var(--rose);
+    border-radius:2px; transform:translate(-50%,-50%) rotate(-45deg); transform-origin:center;
+    animation:cutDraw .45s ease backwards; animation-delay:calc(var(--c,0) * .7s + .6s)}
+  /* 4) tăiere – diagonală curată la 45°, stânga-sus -> dreapta-jos ("\") */
+  /* fără estompare: pătratul „și" rămâne albastru normal; doar diagonala roșie marchează tăierea */
+  .stage.s-cut .tok.cut .w::after{content:""; position:absolute; z-index:3; left:50%; top:50%; width:2px; background:var(--rose);
+    border-radius:2px; transform:translate(-50%,-50%) rotate(-45deg); transform-origin:center;
+    animation:cutDraw .45s ease backwards; animation-delay:calc(var(--c,0) * .7s + .6s)}
+  @keyframes cutDraw{from{transform:translate(-50%,-50%) rotate(-45deg) scaleY(0)} to{transform:translate(-50%,-50%) rotate(-45deg) scaleY(1)}}
+  .stage.s-cut .tok.cut-ext .w::after{height:3.5em}   /* exterior: depășește marca */
+  .stage.s-cut .tok.cut-int .w::after{height:1.05em}  /* interior: rămâne înăuntru */
+  /* 5) bare – oblice ca un slash "/", alungite în sus; numărul într-un chip centrat, clar deasupra vârfului */
+  /* bara pornește cu lățime 0 și CREȘTE lin (nu mai apare instant), ca spațierea dintre cuvinte să fie lină */
+  .bar{position:relative; display:inline-block; width:0; vertical-align:middle; transition:width .55s ease}
+  .bar i{position:absolute; left:50%; top:-1.95em; height:3.3em; width:2px; background:var(--ink); border-radius:2px;
+    transform:translateX(-50%) rotate(22deg); transform-origin:center; opacity:0; transition:opacity .4s ease}
+  /* învelișul stă la font-size-ul frazei, ca poziția (în em) să NU fie micșorată de chip;
+     chip-ul mic (font-size:.6em) doar poartă textul. Altfel numărul cădea peste bară. */
+  .bar .labwrap{position:absolute; top:-3em; left:calc(50% - .5em); transform:translateX(-50%); display:none; transition:left .3s ease}
+  .bar .lab{display:inline-block; font-size:.6em; font-weight:800; line-height:1.15;
+    white-space:nowrap; color:var(--ink); background:#fff; padding:.15em .5em; border-radius:7px;
+    box-shadow:0 2px 8px -3px rgba(30,33,60,.4), 0 0 0 1.5px var(--line)}
+  /* felul (PP/PS): pornește cu max-width:0 (clipat, fără spațiu) și se LĂȚEȘTE pe rând → chip-ul crește unul câte unul */
+  .bar .type{color:var(--violet); padding-left:.15em; display:inline-block; max-width:0; overflow:hidden; opacity:0; white-space:nowrap; transition:max-width .4s ease, opacity .3s ease}
+  .stage.s-bars .bar{width:1.5em; transition-delay:calc(var(--b,0) * .7s)}
+  .stage.s-bars .bar i{opacity:1; transition-delay:calc(var(--b,0) * .7s)}
+  .stage.s-num  .bar .labwrap{display:block; animation:numPop .4s cubic-bezier(.34,1.5,.6,1) backwards; animation-delay:calc(var(--b,0) * .7s)}
+  .stage.s-type .bar .labwrap{left:calc(50% - 1.1em); transition-delay:calc(var(--b,0) * .7s + .5s)}   /* chip mai lat → mai la stânga, pe rând (sincron cu felul) */
+  .stage.s-type .bar .type{max-width:3em; opacity:1; transition-delay:calc(var(--b,0) * .7s + .5s)}
+  /* 6) clipesc sublinierile + barele */
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.12}}
+  .stage.s-check .tok.pred .ul::after,
+  .stage.s-check .tok.pred:not(.pred-caps) .w::after{animation:blink .8s ease-in-out 3}
+  .stage.s-check .bar i{animation:blink .8s ease-in-out 3}
+  @keyframes pop{from{opacity:0; transform:translateY(4px) scale(.85)}to{opacity:1; transform:none}}
+  @keyframes numPop{from{opacity:0; transform:translateX(-50%) translateY(-7px) scale(.5)} to{opacity:1; transform:translateX(-50%) translateY(0) scale(1)}}
+
+  /* explanation + counters */
+  .explain{margin-top:8px; background:#fbfaff; border:1px solid var(--line); border-radius:16px; padding:16px 18px; min-height:5.2em}
+  .explain h3{margin:.1rem 0 .3rem; font-size:1.05rem; display:flex; gap:.5rem; align-items:center}
+  .explain h3 .tag{background:var(--grad); color:#fff; width:1.7rem; height:1.7rem; border-radius:8px; display:grid; place-items:center; font-size:.85rem; font-weight:800}
+  .explain p{margin:0; color:#414659}
+  /* forme reale (cerc/pătrat) în textul pasului 3, nu caractere */
+  .lg-c,.lg-s{display:inline-block; width:1.05em; height:1.05em; vertical-align:-.18em; margin-right:.15em}
+  .lg-c{border:2.5px solid var(--violet); border-radius:50%}
+  .lg-s{border:2.5px solid var(--blue); border-radius:4px}
+  .counters{display:flex; gap:14px; flex-wrap:wrap; margin-top:14px; justify-content:center; align-items:center}
+  .cnt{border:1.5px solid var(--line); border-radius:12px; padding:.5rem .9rem; text-align:center; min-width:104px; display:none; background:#fff; position:relative}
+  .cnt.on{display:block; animation:pop .3s ease both}
+  .cnt .n{font-size:1.5rem; font-weight:800; line-height:1}
+  .cnt .t{font-size:.66rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted)}
+  .cnt.pred.on{border-color:var(--amber)} .cnt.pred .n{color:var(--amber)}
+  .cnt.rel.on{border-color:var(--violet)} .cnt.rel .n{color:var(--violet)}
+  .cnt.prop.on{border-color:var(--mint); animation-delay:.7s} .cnt.prop .n{color:var(--mint)}
+  .cnt .hint{font-size:.6rem; color:var(--muted); font-weight:700; margin-top:2px}
+  /* la pasul calculului, cardul „Elem. relație" pulsează ca să sublinieze rezultatul */
+  /* cardul 3 (elem. relație): apare și se mărește la 1,2x, ca accent pe rezultat */
+  @keyframes relZoom{0%{opacity:0; transform:translateY(4px) scale(.85)} 55%{opacity:1; transform:scale(1)} 100%{opacity:1; transform:scale(1.2)}}
+  .cnt.rel.pulse{animation:relZoom .8s ease 1.4s both; transform:scale(1.2); margin:0 .55em}   /* static + margine, ca la revenire să rămână mărit și gap-urile egale */
+  .formula{text-align:center; margin-top:12px; font-weight:800; font-size:1.12rem; color:var(--ink); display:none}
+  .formula.on{display:block; animation:pop .3s ease 2.6s both}
+
+  .ctrls{display:flex; align-items:center; gap:12px; margin-top:14px; justify-content:space-between; flex-wrap:wrap}
+  .btn{border:0; cursor:pointer; font:inherit; font-weight:700; border-radius:12px; padding:.6rem 1.15rem;
+    background:var(--grad); color:#fff; box-shadow:0 10px 22px -12px rgba(124,58,237,.8); transition:.15s}
+  .btn:hover{transform:translateY(-1px)} .btn:disabled{opacity:.4; cursor:not-allowed; transform:none; box-shadow:none}
+  .btn.waiting{cursor:progress}   /* pas nou: „Înainte" e blocat cât rulează animația */
+  .btn.ghost{background:#eef0f7; color:var(--ink); box-shadow:none}
+  .progress{font-size:.82rem; font-weight:700; color:var(--muted)}
+
+  /* schema */
+  .schema{margin-top:18px; display:none; justify-content:center; padding:14px; border-top:1px dashed var(--line)}
+  .walk.reveal-schema .schema{display:flex; animation:pop .4s ease both}
+  /* nodurile schemei apar pe rând, de sus în jos */
+  .walk.reveal-schema .node{animation:nodeIn .42s ease backwards}
+  .walk.reveal-schema .node:nth-child(1){animation-delay:.12s} .walk.reveal-schema .node:nth-child(2){animation-delay:.22s}
+  .walk.reveal-schema .node:nth-child(3){animation-delay:.32s} .walk.reveal-schema .node:nth-child(4){animation-delay:.42s}
+  .walk.reveal-schema .node:nth-child(5){animation-delay:.52s} .walk.reveal-schema .node:nth-child(6){animation-delay:.62s}
+  .walk.reveal-schema .node:nth-child(7){animation-delay:.72s}
+  @keyframes nodeIn{from{opacity:0; transform:translateX(-10px)} to{opacity:1; transform:none}}
+  .chain{display:flex; flex-direction:column; align-items:flex-start; gap:0}
+  .node{position:relative; display:flex; align-items:center; gap:12px; padding:5px 0}
+  .node .num{width:2.3rem; height:2.3rem; border-radius:50%; display:grid; place-items:center; font-weight:800;
+    border:2.5px solid var(--blue); color:var(--blue); background:#fff; z-index:1}
+  .node.pp .num{border-color:var(--gold); color:#92600a; background:#fef3c7}
+  .node .tag{font-size:.8rem; font-weight:800; color:var(--muted)}
+  .node:not(:last-child)::after{content:""; position:absolute; left:1.15rem; top:2.3rem; height:1.05rem; width:2.5px; background:var(--line)}
+
+  /* LEGEND */
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:20px 22px;
+    transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease}
+  .card:hover{transform:translateY(-3px); box-shadow:var(--shadow); border-color:#e0d5ff}
+  .card:hover .mark{transform:scale(1.12)}
+  .mark{transition:transform .22s ease}
+  .legend h3{margin:.1rem 0 .7rem; display:flex; align-items:center; justify-content:center; gap:.5rem; font-size:1.05rem}
+  .mark{display:inline-grid; place-items:center; width:2rem; height:2rem; font-weight:800; flex:none}
+  .mark.c{border:2.5px solid var(--violet); border-radius:50%; color:var(--violet)}
+  .mark.s{border:2.5px solid var(--blue); border-radius:5px; color:var(--blue)}
+  .words{display:flex; flex-wrap:wrap; gap:8px; margin-top:2px}
+  .word{padding:.34rem .85rem; border-radius:999px; font-weight:600; font-size:.92rem}
+  .legend .c-card .word{background:#f3ebff; color:#5b21b6; border-radius:999px}
+  .legend .s-card .word{background:#e5efff; color:#1e40af; border-radius:7px}
+  /* delimitator estompat între titlu și pastile (se stinge spre capete) */
+  .legend .cdiv{height:1px; margin:2px 2px 13px; background:linear-gradient(90deg, transparent, #d8cef2, transparent)}
+  .legend .s-card .cdiv{background:linear-gradient(90deg, transparent, #cadcf6, transparent)}
+  /* pastila „+": aceeași formă/fundal, dar contur punctat = buton de adăugare */
+  .legend .word.add{display:inline-flex; align-items:center; justify-content:center; min-width:2.1rem; padding:.26rem .7rem; border:2px dotted currentColor; font-size:1.1rem; line-height:1; cursor:pointer; opacity:.7; user-select:none; transition:opacity .2s ease, transform .2s ease, background .2s ease}
+  .legend .word.add:hover, .legend .word.add:focus-visible{opacity:1; transform:scale(1.06); outline:none}
+  /* input inline: arată ca o pastilă, moștenește forma/fundalul cardului */
+  .legend .word-input{border:none; box-shadow:0 0 0 1.6px currentColor inset; font-family:inherit; font-weight:600; font-size:.92rem; width:7em; max-width:60vw}
+  .legend .word-input:focus{outline:none}
+
+  /* TRAPS */
+  .trap{display:flex; gap:14px; align-items:center; padding:16px 18px; border-radius:16px; background:#fff5f6; border:1px solid #fbd5da;
+    transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease}
+  .trap:hover{transform:translateY(-3px); box-shadow:0 18px 36px -22px rgba(225,29,104,.55); border-color:#f6aec2; background:#fff}
+  .tshape{transition:transform .22s ease}
+  .trap:hover .tshape{transform:scale(1.1) rotate(-4deg)}
+  /* forme pt. capcane: cerc/pătrat × tăiere INTERIOARĂ (scurtă, rămâne înăuntru) / EXTERIOARĂ (depășește) */
+  .tshape{position:relative; flex:none; width:1.7em; height:1.7em; border:2.5px solid var(--violet)}
+  .tshape.ci{border-radius:50%}
+  .tshape.sq{border-color:var(--blue); border-radius:5px}
+  .tshape::after{content:""; position:absolute; left:50%; top:50%; width:2px; background:var(--rose); border-radius:2px; transform:translate(-50%,-50%) rotate(-45deg)}
+  .tshape.ci.int::after{height:1.68em}   /* interior cerc: atinge marginile (≈ diametrul) */
+  .tshape.sq.int::after{height:2.15em}   /* interior pătrat: atinge colțul ROTUNJIT (diagonala e scurtată de border-radius) */
+  .tshape.ci.ext::after{height:2.6em}    /* exterior: depășește marca */
+  .tshape.sq.ext::after{height:3.3em}
+  .tnote{display:block; margin-top:5px; color:#414659; font-size:.95rem; line-height:1.55}
+  .tnote i{color:#2a2f45}
+  .nuance{font-weight:700; color:var(--rose)}
+  .trap-head{display:flex; align-items:baseline; gap:.5em; flex-wrap:wrap}
+  .trap-head b{color:var(--ink)}
+  .tflag{display:inline-block; background:#ffe1ea; color:#c11458; font-size:.66rem; font-weight:800; padding:.18em .6em;
+    border-radius:999px; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap}
+  .trap+.trap{margin-top:12px}
+  .trap .ic{font-size:1.4rem; flex:none}
+  .trap b{color:var(--rose)}
+  .trap code{background:#fff; border:1px solid #fbd5da; padding:.05em .45em; border-radius:6px; font-weight:700; color:var(--rose)}
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     STRATEGII – fiecare card are un exemplu ascuns (.strat-tip).
+     Comportament (starea „văzut" se ține din JS prin clasa .revealed):
+       1) prima oară: hover pe CARD  ⇒ după 2s apare tooltipul DEASUPRA cardului;
+       2) când tooltipul DISPARE prima dată ⇒ apare pastila mică, estompată, din colț;
+       3) apoi: hover pe PASTILĂ ⇒ ACELAȘI tooltip, dar INSTANT.
+     DE CE gătim regula pe „:not(.revealed)": dacă lăsam și cardul să deschidă
+     tooltipul după ce apărea pastila, regula părintelui (.strat:hover, delay 2s)
+     „prindea" tranziția (aceeași țintă, opacity:1) și pastila nu mai era instant.
+     Așa, după apariția pastilei singurul declanșator rămâne pastila = instant.
+     Culoarea --pill e setată pe .strat (din emoji-ul cardului) și o moștenesc
+     ȘI pastila, ȘI fundalul tooltipului, ca să fie asortate.
+     ───────────────────────────────────────────────────────────────────────── */
+  .strats{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .strat{position:relative; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; display:flex; gap:12px; align-items:center; transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease}
+  .strat:hover{border-color:#d9c9ff; box-shadow:0 18px 36px -20px rgba(124,58,237,.55); transform:translateY(-3px); z-index:20}
+  .strat .k{width:2.2rem; height:2.2rem; border-radius:10px; background:#eef2ff; font-size:1.15rem; display:grid; place-items:center; flex:none; transition:transform .2s ease, background .2s ease}
+  .strat:hover .k{transform:scale(1.12) rotate(-3deg); background:#e6ddff}
+  .strat b{display:block} .strat span{color:var(--muted); font-size:.92rem}
+  /* hover: după 2s exemplul apare ca tooltip DEASUPRA cardului; la ieșire se micșorează instant spre colțul din dreapta-sus */
+  .strat-tip{position:absolute; bottom:calc(100% + 12px); left:0; right:0; z-index:9;
+    background:var(--pill, #ece7fb); color:#332b63;
+    padding:13px 18px; border-radius:14px; font-size:.92rem; line-height:1.6; font-style:italic;
+    box-shadow:0 22px 44px -20px rgba(60,50,90,.5), 0 0 0 1px rgba(0,0,0,.06);
+    opacity:0; visibility:hidden; transform:translate(-10px,36px) scale(.1); transform-origin:bottom right;
+    transition:opacity .3s ease, transform .38s cubic-bezier(.4,0,.2,1), visibility .38s; pointer-events:none}
+  /* prima dată: doar cât NU e încă „revealed", cardul deschide tooltipul după 2s */
+  .strat:not(.revealed):hover .strat-tip{opacity:1; visibility:visible; transform:none; transition-delay:2s}
+  /* pastilă mică, estompată; apare DOAR după prima DISPARIȚIE a tooltipului (clasa .revealed vine din JS). Nuanța = --pill, preluată de la simbolul cardului */
+  .strat-pill{position:absolute; top:9px; right:9px; z-index:10; width:15px; height:15px; border-radius:50%;
+    background:var(--pill, #d8cef2); border:1px solid rgba(0,0,0,.06);
+    cursor:help; user-select:none; box-shadow:0 2px 5px -2px rgba(0,0,0,.25);
+    opacity:0; visibility:hidden; pointer-events:none; transform:scale(.4);
+    transition:opacity .25s ease, transform .3s cubic-bezier(.34,1.5,.5,1), visibility .25s, filter .2s ease}
+  .strat.revealed .strat-pill{opacity:1; visibility:visible; pointer-events:auto; transform:scale(1)}
+  .strat.revealed .strat-pill:hover{transform:scale(1.25); filter:saturate(1.5) brightness(.96)}
+  /* hover pe pastilă = același tooltip, dar instantaneu (fără delay-ul de 2s) */
+  .strat.revealed .strat-pill:hover + .strat-tip{opacity:1; visibility:visible; transform:none; transition-delay:0s; transition-duration:.12s}
+  .strat-tip::before{content:""; position:absolute; bottom:-6px; right:30px; width:13px; height:13px; background:var(--pill, #ece7fb); border-radius:3px; transform:rotate(45deg)}
+  .strat-tip::after{content:"\201D"; position:absolute; top:2px; right:13px; font-size:2.3rem; font-style:normal; color:rgba(51,43,99,.16); line-height:1; font-family:Georgia,serif}
+
+  .foot{text-align:center; color:var(--muted); font-size:.85rem; margin-top:40px; padding-top:20px; border-top:1px solid var(--line)}
+
+  @media(max-width:760px){
+    .walk-grid{grid-template-columns:1fr}
+    .steps{position:static; flex-direction:row; overflow:auto; gap:6px; padding-bottom:4px}
+    .steps li{grid-template-columns:1.7rem; justify-items:center; min-width:2.6rem; padding:.4rem}
+    .steps li .txt{display:none}
+  }
+  @media(max-width:640px){ .defrow{grid-template-columns:1fr; text-align:center} .two,.strats{grid-template-columns:1fr} .stage{line-height:3.9} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <span class="kicker">Sintaxa frazei · Lecția 1</span>
+    <h1>Introducere</h1>
+    <p>Cum descâlcești orice frază, pas cu pas – cu predicate, cercuri, pătrate și bare.</p>
+    <div class="chips">
+      <span class="chip">● cerc = subordonator</span>
+      <span class="chip">▢ pătrat = coordonator</span>
+      <span class="chip">/ bară = graniță de propoziție</span>
+    </div>
+  </header>
+
+  <!-- 1. DEFINIȚIE (sumă -> concluzie) -->
+  <section>
+    <span class="seclabel"><span class="kn">1</span>Definiție</span>
+    <h2>Ce este o frază?</h2>
+    <div class="defsyl">
+      <div class="ds-row">
+        <div class="ds-card">
+          <span class="ds-lab">Pornim de la</span>
+          <p>Fraza este un enunț alcătuit din <span class="k-prop">două sau mai multe propoziții</span>.</p>
+          <p class="ds-q">…dar ce este o propoziție?</p>
+        </div>
+        <div class="ds-join">așa că lămurim</div>
+        <div class="ds-card">
+          <span class="ds-lab">Definim propoziția</span>
+          <p>Propoziția este un enunț cu <span class="k-pred">un singur predicat</span>.</p>
+        </div>
+      </div>
+      <div class="ds-down">acum e clar</div>
+      <div class="ds-card ds-final">
+        <span class="ds-lab">Concluzie</span>
+        <p>Fraza este un enunț alcătuit din <span class="k-pred">două sau mai multe predicate</span>.</p>
+      </div>
+    </div>
+    <p class="sub" style="margin-top:14px">De aceea, ca să afli câte propoziții are o frază, nu numeri cuvintele – numeri
+      <span class="predpill">predicatele</span>. Câte predicate, atâtea propoziții.</p>
+  </section>
+
+  <!-- 2. WALKTHROUGH -->
+  <section>
+    <span class="seclabel s2"><span class="kn">2</span>Pașii de lucru – pe viu</span>
+    <h2>Rezolvăm o frază, pas cu pas</h2>
+    <p class="sub">Aceeași frază, de la enunț la schemă. Apasă <b>Înainte</b> (sau &larr;/&rarr;) și urmărește cum apar marcajele.</p>
+
+    <!-- #stage (fraza) și #stepsList (lista de pași) sunt GOALE în HTML: le populează JS-ul din SEQ și STEPS.
+         #schema (schema PP/PS de jos) apare abia la ultimul pas, prin clasa .reveal-schema pusă pe #walk. -->
+    <div class="walk" id="walk">
+      <div class="stage" id="stage"></div>
+      <div class="walk-grid">
+        <ol class="steps" id="stepsList"></ol>
+
+        <div class="walk-main">
+          <div class="explain">
+            <h3><span class="tag" id="stepNum">1</span> <span id="stepTitle"></span></h3>
+            <p id="stepDesc"></p>
+            <div class="counters">
+              <div class="cnt pred" id="cPred"><div class="n">7</div><div class="t">Predicate</div></div>
+              <div class="cnt prop" id="cProp"><div class="n">7</div><div class="t">Propoziții</div></div>
+              <div class="cnt rel" id="cRel"><div class="n">6</div><div class="t">Elem. relație</div><div class="hint">= predicate − 1</div></div>
+            </div>
+            <div class="formula" id="formula">7 predicate = 7 propoziții = 6 elemente de relație</div>
+          </div>
+
+          <div class="ctrls">
+            <button class="btn ghost" id="prev">‹ Înapoi</button>
+            <span class="progress" id="progress">Pasul 1 / 8</span>
+            <button class="btn" id="next">Înainte ›</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="schema" id="schema">
+        <div class="chain">
+          <div class="node pp"><span class="num">1</span><span class="tag">PP · principală</span></div>
+          <div class="node"><span class="num">2</span><span class="tag">PS · are cerc</span></div>
+          <div class="node"><span class="num">3</span><span class="tag">PS · are cerc</span></div>
+          <div class="node"><span class="num">4</span><span class="tag">PS · are cerc</span></div>
+          <div class="node"><span class="num">5</span><span class="tag">PS · are cerc</span></div>
+          <div class="node"><span class="num">6</span><span class="tag">PS · are cerc</span></div>
+          <div class="node"><span class="num">7</span><span class="tag">PS · are cerc</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NOTAȚIA -->
+  <section class="legend">
+    <span class="seclabel s3"><span class="kn">3</span>Notația</span>
+    <h2>Cercuri și pătrate</h2>
+    <p class="sub">Elementele de relație se împart în două. Le înveți o dată, le folosești mereu.</p>
+    <div class="two">
+      <div class="card c-card">
+        <h3><span class="mark c"></span> Cercuri <span style="color:var(--muted);font-weight:600;font-size:.85rem">· subordonatoare</span></h3>
+        <div class="cdiv"></div>
+        <div class="words">
+          <span class="word">care</span><span class="word">ce</span><span class="word">când</span><span class="word">unde</span>
+          <span class="word">cum</span><span class="word">cine</span><span class="word">că</span><span class="word">să</span>
+          <span class="word">dacă</span><span class="word">încât</span><span class="word">pentru că</span><span class="word">ca să</span>
+          <span class="word add" role="button" tabindex="0" aria-label="Adaugă un cuvânt">+</span>
+        </div>
+      </div>
+      <div class="card s-card">
+        <h3><span class="mark s"></span> Pătrate <span style="color:var(--muted);font-weight:600;font-size:.85rem">· coordonatoare</span></h3>
+        <div class="cdiv"></div>
+        <div class="words">
+          <span class="word">și</span><span class="word">iar</span><span class="word">sau</span><span class="word">dar</span>
+          <span class="word add" role="button" tabindex="0" aria-label="Adaugă un cuvânt">+</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. DIFICULTĂȚI -->
+  <section>
+    <span class="seclabel s4"><span class="kn">4</span>Dificultăți</span>
+    <h2>Capcanele – nu orice element de relație contează</h2>
+    <p class="sub">Uneori un cuvânt arată ca element de relație, dar nu e: îl încercuiești/încadrezi, apoi îl tai. Tăierea se face pe <b style="color:var(--ink)">interiorul</b> sau pe <b style="color:var(--ink)">exteriorul</b> marcajului, după calitatea lui – iar toate cazurile de mai jos <b style="color:var(--rose)">nu se numără</b> la pasul 2.</p>
+    <div class="trap">
+      <span class="tshape ci int" aria-hidden="true"></span>
+      <div>
+        <div class="trap-head"><b>„să" care marchează un ordin</b><span class="tflag">nu se numără</span></div>
+        <div class="tnote">Este tot conjuncție, dar <span class="nuance">fără rol de relație</span> în frază.</div>
+      </div>
+    </div>
+    <div class="trap">
+      <span class="tshape ci ext" aria-hidden="true"></span>
+      <div>
+        <div class="trap-head"><b><code>cum</code> / <code>ce</code> / <code>unde</code> / <code>când</code> / <code>care</code> / <code>cât</code> care introduc întrebări</b><span class="tflag">nu se numără</span></div>
+        <div class="tnote">Nu sunt conjuncții, ci pronume sau adverbe <span class="nuance">interogative</span>.</div>
+      </div>
+    </div>
+    <div class="trap">
+      <span class="tshape sq int" aria-hidden="true"></span>
+      <div>
+        <div class="trap-head"><b>Pătratele care leagă două cercuri</b><span class="tflag">nu se numără</span></div>
+        <div class="tnote"><i>„Mi-a spus <b>că</b> pleacă <b>și</b> <b>că</b> nu se întoarce."</i><br>
+          Cele două „<b>că</b>" (cercuri) sunt relațiile; „<b>și</b>" doar le leagă.</div>
+      </div>
+    </div>
+    <div class="trap">
+      <span class="tshape sq ext" aria-hidden="true"></span>
+      <div>
+        <div class="trap-head"><b>Pătratele fără rol la nivel de frază</b><span class="tflag">nu se numără</span></div>
+        <div class="tnote">Leagă doar părți în aceeași propoziție: <i>„Am cumpărat un caiet <b>și</b> un marker."</i> (două complemente directe).<br>
+          Ori își pierde statutul de conjuncție – <b>substantiv</b>: <i>„Am un <b>dar</b> pentru tine."</i> (dar = cadou); <b>adverb de întărire</b>: <i>„Clientul a venit <b>și</b> azi."</i></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. STRATEGII -->
+  <section>
+    <span class="seclabel s5"><span class="kn">5</span>Strategii de lucru</span>
+    <h2>Când fraza e grea, ai unelte</h2>
+    <!-- Fiecare card: style="--pill:#..." pe .strat = nuanța (luată din culoarea emoji-ului),
+         folosită ȘI de pastila din colț, ȘI de fundalul tooltipului (.strat-tip).
+         „Refacerea topicii" n-are exemplu, deci n-are .strat-tip → nu capătă pastilă. -->
+    <div class="strats">
+      <div class="strat" style="--pill:#eddcae"><span class="k">💡</span><div><b>Resemantizare</b><span>schimbăm sensul unor cuvinte</span></div><span class="strat-pill" aria-hidden="true"></span><div class="strat-tip">Ce vreau eu de la tine? Un lucru vreau: să știi ce fel de om sunt eu.</div></div>
+      <div class="strat" style="--pill:#edcfb2"><span class="k">📖</span><div><b>Sinonimizare</b><span>înlocuim cuvinte cu altele mai potrivite, ca să înțelegem</span></div><span class="strat-pill" aria-hidden="true"></span><div class="strat-tip">Află dumneata că nu-mi place să-mi spui diverse!</div></div>
+      <div class="strat"><span class="k">🔀</span><div><b>Refacerea topicii</b><span>rearanjăm ordinea cuvintelor</span></div></div>
+      <div class="strat" style="--pill:#cfd6e2"><span class="k">🗣️</span><div><b>Starea și intenția vorbitorului</b><span>găsirea contextului</span></div><span class="strat-pill" aria-hidden="true"></span><div class="strat-tip">Mă simt deranjat că îmi dai tu ordine, eu sunt un om independent, știu ce să fac, știu să mă descurc și chiar mă supăr dacă vei continua să-mi spui ce să fac!</div></div>
+      <div class="strat" style="--pill:#e6c3c9"><span class="k">🪗</span><div><b>Contragere și expansiune</b><span>strângem sau desfășurăm ideea</span></div><span class="strat-pill" aria-hidden="true"></span><div class="strat-tip">Să știi plăcerea mea. · Nu-mi place intervenția ta. · Să-mi spui tu păreri. …</div></div>
+      <div class="strat" style="--pill:#ddcf9a"><span class="k">🔑</span><div><b>Păstrarea elementelor esențiale</b><span>reținem ce ține enunțul în picioare</span></div><span class="strat-pill" aria-hidden="true"></span><div class="strat-tip">Să știi că nu-mi place [ceva, nu mai contează exact ce].</div></div>
+      <div class="strat" style="--pill:#c4d6ec"><span class="k">🔍</span><div><b>Găsirea de contexte similare</b><span>ne sprijinim pe situații cunoscute</span></div><span class="strat-pill" aria-hidden="true"></span><div class="strat-tip">Tu știi despre mine că nu-mi place. · Mama știe că nu-mi place.</div></div>
+    </div>
+  </section>
+
+  <p class="foot">Atelierul de română · prototip lecție „Sintaxa frazei – Introducere"</p>
+</div>
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════════════
+     JS · trei module INDEPENDENTE, fără biblioteci (doar DOM + Web Animations):
+       A) WALKTHROUGH (secț. 2): construiește fraza din SEQ, listează pașii din
+          STEPS, animează fiecare pas O SINGURĂ dată și blochează „Înainte" până
+          se termină ultima animație a pasului.  → SEQ, STEPS, render, go,
+          waitForStepAnim, fitStage.
+       B) NOTAȚIA (secț. 3): butonul „+" adaugă pastile-cuvânt inline.
+       C) STRATEGII (secț. 5): la prima DISPARIȚIE a tooltipului, cardul devine
+          „revealed" și apare pastila din colț (care redeschide tooltipul instant).
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  // ── A) WALKTHROUGH ──────────────────────────────────────────────────────
+  // SEQ = secvența frazei-model, în ordine. Fiecare element e un „token":
+  //   pred:true                → predicat (se subliniază);   parts:[...] = predicat
+  //                              spart în bucăți (ex. „Să"+„ știi"), ca o bucată să
+  //                              poată fi ȘI cerc, ȘI subliniată.
+  //   mark:"circle"|"square"   → element de relație (cerc = subordonator, pătrat =
+  //                              coordonator);   rel:true = relație VALIDĂ (se numără).
+  //   cut:"ext"|"int"          → tăiere pe exterior / interior (relație FALSĂ).
+  //   bar:true, prop, type     → bară (graniță de propoziție) + nr. propoziției + fel.
+  const SEQ = [
+    {pred:true, parts:[{t:"Să", ul:1, circle:1, cut:"ext"}, {t:" știi", ul:1}]},   // „Să știi" – subliniat cu tot cu „Să"; „Să" e cerc + tăiat
+    {bar:true, prop:1, type:"PP"},
+    {t:"că", mark:"circle", rel:true},
+    {pred:true, caps:true, parts:[{t:"nu-", ul:1}, {t:"mi", cl:1}, {t:" place", ul:1}]},   // neschimbat
+    {bar:true, prop:2, type:"PS"},
+    {pred:true, caps:true, parts:[{t:"să", ul:1, circle:1}, {t:" îmi", cl:1}, {t:" spui", ul:1}]},   // „să...spui" ca la „nu-mi place"; „îmi" = clitic
+    {t:"tu"},
+    {bar:true, prop:3, type:"PS"},
+    {t:"ce", mark:"circle", rel:true},
+    {t:"trebuie", pred:true},
+    {bar:true, prop:4, type:"PS"},
+    {pred:true, parts:[{t:"să", ul:1, circle:1}, {t:" fac", ul:1}]},   // „să fac" – cu tot cu „să"
+    {bar:true, prop:5, type:"PS"},
+    {t:"când", mark:"circle", rel:true},
+    {t:"vreau", pred:true},
+    {bar:true, prop:6, type:"PS"},
+    {pred:true, parts:[{t:"să", ul:1, circle:1}, {t:" vând", ul:1}]},   // „să vând" – cu tot cu „să"
+    {t:"cărți"},
+    {t:"și", mark:"square", cut:"ext"},
+    {t:"caiete."},
+    {bar:true, prop:7, type:"PS"},
+  ];
+
+  const STEPS = [
+    {cls:"s-pred",  t:"Subliniem predicatele",
+     d:"Fiecare predicat = o propoziție. Aici sunt <b>7</b>: știi, place, spui, trebuie, fac, vreau, vând."},
+    {cls:"s-math",  t:"Facem calculul matematic",
+     d:"7 predicate → <b>7 propoziții</b>. Iar rezultatul calculului e numărul de <b>elemente de relație</b>: 7 − 1 = <b>6</b>. Acum știm câte relații să căutăm."},
+    {cls:"s-marks", t:"Încercuim / încadrăm elementele de relație",
+     d:"<span class='lg-c'></span> <b>cerc</b> = subordonator (că, să, ce, când…)<br><span class='lg-s'></span> <b>pătrat</b> = coordonator (și)."},
+    {cls:"s-cut",   t:"Verificăm calitatea cercurilor și pătratelor",
+     d:"Tăiem (de la stânga-sus spre dreapta-jos) ce nu e relație – aici, tăiere <b>pe exterior</b>: „Să” (ordin) și „și” (leagă părți). Rămân fix <b>6</b> – cât ne-a dat calculul. ✓"},
+    {cls:"s-bars",  t:"Punem bare",
+     d:"O bară oblică (ca un slash) la fiecare cerc/pătrat care <b>nu</b> are tăietură pe exterior – plus una la final. Deocamdată fără numere."},
+    {cls:"s-check", t:"Între două bare, o singură linie",
+     d:"Clipesc sublinierile și barele: verificăm că între fiecare pereche de bare există fix un predicat (o linie). Totul e curat."},
+    {cls:"s-num",   t:"Numărăm predicatele la bară",
+     d:"Numerotăm barele – dar doar pe cele care au un predicat înaintea lor. Ies <b>7</b>. Deci <b>7 = 7 = 6</b>."},
+    {cls:"s-type",  t:"Precizăm felul propozițiilor",
+     d:"Lângă fiecare număr trecem, în paranteză, felul: prima e <b>(PP)</b>, restul <b>(PS)</b>. Regula: orice propoziție care are cerc este <b>PS</b>."},
+  ];
+
+  // build sentence
+  const stage = document.getElementById("stage");
+  let html = "", pIdx = 0, mIdx = 0, bIdx = 0, cIdx = 0;
+  for(const it of SEQ){
+    if(it.bar){
+      html += `<span class="bar" style="--b:${bIdx++}"><i></i><span class="labwrap"><span class="lab"><span class="num">${it.prop}</span><span class="type">(${it.type})</span></span></span></span>`;
+      continue;
+    }
+    let c="tok", vars="";
+    if(it.pred){ c+=" pred"; vars+=`--d:${pIdx++};`; }   /* ordinea, pt. subliniere pe rând */
+    if(it.caps) c+=" pred-caps";   /* predicat cu clitic → liniuțe verticale la capetele sublinierii */
+    if(it.mark==="circle"){ c+=" circle"; vars+=`--m:${mIdx++};`; }   /* ordinea, pt. apariția pe rând */
+    else if(it.mark==="square"){ c+=" square"; vars+=`--m:${mIdx++};`; }
+    if(it.cut){ c+=" cut cut-"+it.cut; vars+=`--c:${cIdx++};`; }   /* ordinea tăierilor, pt. estompare pe rând */
+    let inner;
+    if(it.parts){
+      inner = it.parts.map((p, pi) => {
+        let pc = p.ul ? "ul" : "cl", pv = "", extra = "";
+        if(p.circle){ pc += " pcirc"; pv += `--m:${mIdx++};`; }   /* cerc pe o BUCATĂ de predicat (ex. „Să", „să") */
+        if(p.cut){ pc += " pcut pcut-"+p.cut; pv += `--c:${cIdx++};`; extra += "<i></i>"; }
+        if(it.caps && p.circle && pi===0) extra += "<i class='capL'></i>";   /* capătul vertical din stânga (inelul ocupă ::before) */
+        return `<span class="${pc}"${pv?` style="${pv}"`:""}>${extra}${p.t}</span>`;
+      }).join("");
+    }
+    else if(it.pred) inner = `<span class="ul">${it.t}</span>`;   /* subliniem doar verbul */
+    else inner = it.t;
+    const style = vars ? ` style="${vars}"` : "";
+    html += `<span class="${c}"${style}><span class="w">${inner}</span></span>`;
+  }
+  stage.innerHTML = html;
+
+  // build steps list
+  const listEl = document.getElementById("stepsList");
+  STEPS.forEach((s,k)=>{
+    const li=document.createElement("li");
+    li.innerHTML = `<span class="n">${k+1}</span><span class="txt">${s.t}</span>`;
+    li.onclick=()=>{ if(k <= maxReached + 1) go(k); };   /* doar pașii deblocați sunt clicabili */
+    listEl.appendChild(li);
+  });
+
+  const E = id => document.getElementById(id);
+  let i = -1;          // -1 = starea inițială: fraza fără niciun marcaj
+  let maxReached = -1; // cel mai avansat pas atins – pentru deblocarea progresivă a pașilor
+  let stepLocked = false; // cât rulează animația unui pas nou, nu lăsăm avansarea la următorul
+  let animToken = 0;      // invalidează o așteptare de animație veche dacă utilizatorul navighează între timp
+  function render(animate){
+    const started = i >= 0;
+    // animăm DOAR la prima vizită a unui pas; la revenire/reparcurgere = instant (fără animație)
+    stage.className = "stage" + (animate ? "" : " no-anim") + (started ? " " + STEPS.slice(0,i+1).map(s=>s.cls).join(" ") : "");
+    if(started){
+      const s = STEPS[i];
+      E("stepNum").textContent = i+1;
+      E("stepTitle").textContent = s.t;
+      E("stepDesc").innerHTML = s.d;
+      E("progress").textContent = `Pasul ${i+1} / ${STEPS.length}`;
+    } else {
+      E("stepNum").textContent = "0";
+      E("stepTitle").textContent = "Fraza de analizat";
+      E("stepDesc").innerHTML = "Aceasta e fraza pe care o rezolvăm. Apasă <b>Începe</b> și o luăm pas cu pas.";
+      E("progress").textContent = "Start";
+    }
+    // counters
+    E("cPred").classList.toggle("on", i>=1);   // cele 3 carduri apar toate la pasul 2 (calculul), în cascadă
+    E("cProp").classList.toggle("on", i>=1);
+    E("cRel").classList.toggle("on", i>=1);
+    E("formula").classList.toggle("on", i>=1);
+    E("cRel").classList.toggle("pulse", i===1);   // pulsează la pasul calculului
+    E("walk").classList.toggle("reveal-schema", i>=7);
+    E("walk").classList.toggle("no-anim", !animate);   // la revenire, cardurile/schema nu se re-animează
+    // steps list state – done / on / locked (încă neatins)
+    [...listEl.children].forEach((li,k)=>{
+      li.classList.toggle("on", k===i);
+      li.classList.toggle("done", k<i);
+      li.classList.toggle("locked", k > maxReached+1);
+    });
+    E("prev").disabled = i<0;
+    E("next").disabled = i===STEPS.length-1;
+    E("next").textContent = i<0 ? "Începe ›" : (i===STEPS.length-1 ? "Gata ✓" : "Înainte ›");
+  }
+  function go(n){
+    n = Math.max(-1, Math.min(STEPS.length-1, n));
+    if(stepLocked && n > i) return;          // cât rulează animația pasului curent, nu avansăm
+    const isNew = n > maxReached;
+    if(isNew) maxReached = n;
+    i = n;
+    animToken++;                             // orice navigare încheie o așteptare anterioară
+    stepLocked = false;
+    E("next").classList.remove("waiting");
+    render(isNew);
+    if(isNew) waitForStepAnim();             // pas nou: blocăm „Înainte" până se termină ultima animație
+  }
+  // Așteaptă terminarea TUTUROR animațiilor/tranzițiilor pasului nou, apoi redeblochează avansarea.
+  // Folosim getAnimations() ca să NU codăm dur durata fiecărui pas (ar fi fragil dacă schimbăm delay-urile);
+  // așteptăm exact cât rulează. animToken invalidează o așteptare veche dacă utilizatorul navighează între timp.
+  function waitForStepAnim(){
+    const token = animToken, nextBtn = E("next"), walk = E("walk");
+    stepLocked = true;
+    nextBtn.disabled = true;
+    nextBtn.classList.add("waiting");
+    const unlock = ()=>{
+      if(token !== animToken) return;        // o navigare mai nouă a preluat controlul
+      stepLocked = false;
+      nextBtn.classList.remove("waiting");
+      nextBtn.disabled = (i === STEPS.length-1);
+    };
+    if(!walk.getAnimations){ unlock(); return; }   // browser fără Web Animations API: fără blocare
+    requestAnimationFrame(()=>{
+      if(token !== animToken) return;
+      const anims = walk.getAnimations({subtree:true}).filter(a=>{
+        const eff = a.effect, tgt = eff && eff.target;
+        if(tgt && tgt.closest && tgt.closest("button")) return false;   // ignorăm hover-ul butoanelor
+        const t = eff && eff.getComputedTiming ? eff.getComputedTiming() : {};
+        return t.iterations !== Infinity && a.playState !== "finished";
+      });
+      if(!anims.length){ unlock(); return; }
+      Promise.all(anims.map(a=>a.finished.catch(()=>{}))).then(unlock);
+    });
+  }
+  // Micșorează fontul frazei cât să încapă pe un rând, măsurând starea CEA MAI
+  // lată (cu toate marcajele + bare), ca să nu apară scroll și să nu sară fontul.
+  function fitStage(){
+    stage.style.fontSize = "";
+    const prev = stage.className;
+    stage.className = "stage measuring " + STEPS.map(s=>s.cls).join(" ");
+    const need = stage.scrollWidth, avail = stage.clientWidth - 6;
+    const base = parseFloat(getComputedStyle(stage).fontSize);
+    stage.className = prev;
+    if(need > avail) stage.style.fontSize = Math.max(10, base * avail / need) + "px";
+  }
+  E("next").onclick=()=>go(i+1);
+  E("prev").onclick=()=>go(i-1);
+  document.addEventListener("keydown",e=>{ if(e.key==="ArrowRight")go(i+1); if(e.key==="ArrowLeft")go(i-1); });
+  window.addEventListener("resize", fitStage);
+  window.addEventListener("load", fitStage);
+  fitStage();
+  render(false);
+
+  // NOTAȚIA: butonul „+" deschide un câmp inline; Enter adaugă pastila și redeschide câmpul pentru încă una, Esc/gol închide.
+  document.querySelectorAll(".legend .words").forEach(box=>{
+    const addBtn = box.querySelector(".add");
+    if(!addBtn) return;
+    const openInput = ()=>{
+      if(box.querySelector(".word-input")) return;            // deja deschis
+      const inp = document.createElement("input");
+      inp.className = "word word-input";
+      inp.maxLength = 24;
+      inp.setAttribute("aria-label", "Cuvânt nou");
+      box.insertBefore(inp, addBtn);
+      inp.focus();
+      const commit = save=>{
+        if(!inp.isConnected) return;
+        const v = inp.value.trim();
+        if(save && v){
+          const w = document.createElement("span");
+          w.className = "word";
+          w.textContent = v;
+          box.insertBefore(w, addBtn);
+        }
+        inp.remove();
+      };
+      inp.addEventListener("keydown", e=>{
+        if(e.key === "Enter"){ e.preventDefault(); const again = !!inp.value.trim(); commit(true); if(again) openInput(); }
+        else if(e.key === "Escape"){ e.preventDefault(); commit(false); }
+      });
+      inp.addEventListener("blur", ()=>commit(true));
+    };
+    addBtn.addEventListener("click", openInput);
+    addBtn.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openInput(); } });
+  });
+
+  // STRATEGII: prima dată tooltipul apare după 2s de hover (din CSS). După ce s-a afișat complet și apoi
+  // a DISPĂRUT prima oară, marcăm cardul „revealed" → apare pastila estompată din colț, care de-atunci
+  // redeschide tooltipul instant.
+  document.querySelectorAll(".strat").forEach(card=>{
+    const tip = card.querySelector(".strat-tip");
+    if(!tip) return;
+    let shown = false;   // tooltipul a fost afișat complet cel puțin o dată
+    tip.addEventListener("transitionend", e=>{
+      if(e.propertyName !== "opacity") return;
+      if(parseFloat(getComputedStyle(tip).opacity) > 0.5) shown = true;   // s-a afișat complet
+      else if(shown) card.classList.add("revealed");                      // prima dispariție după afișare → apare pastila
+    });
+  });
+</script>
+</body>
+</html>
