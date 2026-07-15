@@ -622,48 +622,6 @@
 .msgr-guestmail { padding: 0.7rem; }
 .msgr-warn { color: var(--color-danger); font-size: 0.78rem; margin: 0; }
 
-.contact-float {
-  position: fixed;
-  right: 22px;
-  bottom: 26px;
-  z-index: 2147482100;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.5rem;
-}
-.contact-float__fab {
-  width: 3.1rem;
-  height: 3.1rem;
-  border-radius: 50%;
-  border: none;
-  font-size: 1.25rem;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: linear-gradient(135deg, #7c3aed, #db2777);
-  box-shadow: 0 12px 28px -10px rgba(124, 58, 237, 0.7);
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.contact-float__fab:hover { transform: scale(1.07); box-shadow: 0 16px 34px -10px rgba(124, 58, 237, 0.85); }
-.contact-float__panel {
-  order: -1;
-  width: 18rem;
-  padding: 0.8rem;
-  border-radius: 14px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  box-shadow: 0 22px 50px -20px rgba(0, 0, 0, 0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-.contact-float__panel[hidden] { display: none; }
-.contact-float__title { margin: 0; font-weight: 800; }
-.contact-float__sub { margin: 0; font-size: 0.8rem; color: var(--color-text-muted); }
-.contact-float__warn { margin: 0; font-size: 0.8rem; color: var(--color-danger, #dc2626); }
-
 /* Small honest note under the mock login button. */
 .login-note {
   margin-top: 0.8rem;
@@ -671,83 +629,6 @@
   color: var(--color-text-muted);
   max-width: 42ch;
 }
-
-/* =========================================================
-   Demo role switcher 🎭 (site-chrome.js) — discreet, bottom-left.
-   Preview-only affordance; remove before production.
-   ========================================================= */
-.role-switch {
-  position: fixed;
-  left: 18px;
-  bottom: 22px;
-  z-index: 2147482100;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.role-switch__row { display: flex; align-items: center; gap: 0.45rem; }
-.role-switch__fab {
-  width: 2.7rem;
-  height: 2.7rem;
-  border-radius: 50%;
-  border: 2px solid var(--color-primary);
-  background: var(--color-bg);
-  font-size: 1.2rem;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  box-shadow: 0 10px 24px -10px rgba(124, 58, 237, 0.55);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.role-switch__fab:hover { transform: scale(1.08); box-shadow: 0 14px 30px -10px rgba(124, 58, 237, 0.7); }
-/* The current role, always readable next to the mask. */
-.role-switch__now {
-  padding: 0.18rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  font-size: 0.74rem;
-  font-weight: 800;
-  color: var(--color-primary);
-  box-shadow: var(--shadow-sm);
-  pointer-events: none;
-}
-.role-switch__panel {
-  order: -1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.45rem;
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  box-shadow: 0 16px 36px -16px rgba(0, 0, 0, 0.35);
-}
-.role-switch__panel[hidden] { display: none; }
-.role-switch__title {
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  padding: 0 0.4rem 0.15rem;
-}
-.role-switch__opt {
-  border: none;
-  background: transparent;
-  text-align: left;
-  padding: 0.3rem 0.6rem;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.role-switch__opt:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); }
-.role-switch__opt.on { background: var(--color-primary); color: #fff; }
 
 /* =========================================================
    Account slot in the header — CTA (guest) or identity chip (member/admin)
@@ -1007,10 +888,6 @@ body.is-logged .nav-guest-only { display: none; }
     white-space: nowrap;
   }
   .page-crumbs__inner::-webkit-scrollbar { display: none; }
-
-  /* Floating controls: keep them clear of each other and of the thumb. */
-  .contact-float { right: 0.6rem; bottom: 0.9rem; }
-  .role-switch { left: 0.6rem; bottom: 0.9rem; }
 }
 
 /* Touch devices (no hover anywhere): hover-revealed details are simply
