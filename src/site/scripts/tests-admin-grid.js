@@ -159,7 +159,7 @@ function columnHasSemi(field) {
   return vals.length > 0 && vals.every((v) => stripRich(v).replace(/\s+$/, "").endsWith(";"));
 }
 function semiColBtn(field) {
-  return `<button type="button" class="tg-semicol${columnHasSemi(field) ? " on" : ""}" data-semicol="${field}" title="Adaugă „;" la finalul variantelor (intrări vizibile)">;</button>`;
+  return `<button type="button" class="tg-semicol${columnHasSemi(field) ? " on" : ""}" data-semicol="${field}" title="Adaugă ; la finalul variantelor (intrări vizibile)">;</button>`;
 }
 async function bulkSemi(field) {
   const on = !columnHasSemi(field);
@@ -170,7 +170,7 @@ async function bulkSemi(field) {
     const next = setTrailingSemi(cur, on);
     if (next != null && next !== cur) targets.push([it, next]);
   }
-  if (!targets.length) { showToast(on ? "Toate au deja „;"." : "Nimic de scos."); return; }
+  if (!targets.length) { showToast(on ? "Toate au deja ; la final." : "Nimic de scos."); return; }
   const save = root.querySelector("#tg-save");
   let done = 0, failed = 0;
   const CHUNK = 12;
@@ -183,7 +183,7 @@ async function bulkSemi(field) {
     if (save) { save.textContent = `Se salvează… ${done}/${targets.length}`; save.className = "tg-savestate is-saving"; }
   }
   showSaved(failed === 0);
-  showToast(`„;" ${on ? "adăugat la" : "scos de la"} ${done} variante` + (failed ? ` (${failed} eșuate)` : ""));
+  showToast(`Am ${on ? "adăugat ; la" : "scos ; de la"} ${done} variante` + (failed ? ` (${failed} eșuate)` : ""));
   render();
 }
 
