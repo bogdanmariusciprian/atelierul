@@ -135,6 +135,58 @@ async function bulkBold(field) {
   render();
 }
 
+// ---------- add „;" at the end of a variant column (visible rows) ----------
+function lastTextNode(content) {
+  const w = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+  let last = null, n;
+  while ((n = w.nextNode())) last = n;
+  return last;
+}
+function setTrailingSemi(html, on) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = String(html);
+  const node = lastTextNode(tpl.content);
+  if (!node) return null;
+  const trimmed = node.nodeValue.replace(/\s+$/, "");
+  const has = trimmed.endsWith(";");
+  if (on && !has) node.nodeValue = trimmed + ";";
+  else if (!on && has) node.nodeValue = trimmed.replace(/;+$/, "");
+  else return null;                       // no change needed
+  return sanitizeRich(tpl.innerHTML);
+}
+function columnHasSemi(field) {
+  const vals = filtered().map((it) => fieldVal(it, field)).filter((v) => v && stripRich(v));
+  return vals.length > 0 && vals.every((v) => stripRich(v).replace(/\s+$/, "").endsWith(";"));
+}
+function semiColBtn(field) {
+  return `<button type="button" class="tg-semicol${columnHasSemi(field) ? " on" : ""}" data-semicol="${field}" title="Adaugă „;" la finalul variantelor (intrări vizibile)">;</button>`;
+}
+async function bulkSemi(field) {
+  const on = !columnHasSemi(field);
+  const targets = [];
+  for (const it of filtered()) {                 // ONLY the visible rows
+    const cur = fieldVal(it, field);
+    if (!cur || !stripRich(cur)) continue;
+    const next = setTrailingSemi(cur, on);
+    if (next != null && next !== cur) targets.push([it, next]);
+  }
+  if (!targets.length) { showToast(on ? "Toate au deja „;"." : "Nimic de scos."); return; }
+  const save = root.querySelector("#tg-save");
+  let done = 0, failed = 0;
+  const CHUNK = 12;
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    // eslint-disable-next-line no-await-in-loop
+    await Promise.all(targets.slice(i, i + CHUNK).map(async ([it, next]) => {
+      const ok = await updateTestItem(it.id, { [field]: next });
+      if (ok) { applyLocal(it, field, next); done++; } else failed++;
+    }));
+    if (save) { save.textContent = `Se salvează… ${done}/${targets.length}`; save.className = "tg-savestate is-saving"; }
+  }
+  showSaved(failed === 0);
+  showToast(`„;" ${on ? "adăugat la" : "scos de la"} ${done} variante` + (failed ? ` (${failed} eșuate)` : ""));
+  render();
+}
+
 // ---------- find & replace (visible rows only) ----------
 // Replaces inside TEXT NODES only, so <b>/<u>/<i> formatting is never touched.
 function replaceInHtml(html, find, repl, whole, cs) {
@@ -257,7 +309,7 @@ function tableHtml(rows) {
           <th class="tg-fix tg-c2">Sesiune</th>
           <th class="tg-fix tg-c3">Nr.</th>
           <th>Enunț ${boldColBtn("question")}</th>
-          <th>A</th><th>B</th><th>C</th><th>D</th>
+          <th>A ${semiColBtn("option_a")}</th><th>B ${semiColBtn("option_b")}</th><th>C ${semiColBtn("option_c")}</th><th>D</th>
           <th title="Răspunsul din grila oficială (istoric)">Corect (ist.)</th>
           <th title="Răspunsul pe gramatica 2026">Corect 2026</th>
           <th>Observații</th>
@@ -393,6 +445,8 @@ function wireEvents() {
     if (zb) return zoom(zb.dataset.zoom);
     const bc = e.target.closest("[data-boldcol]");
     if (bc) return bulkBold(bc.dataset.boldcol);
+    const sc = e.target.closest("[data-semicol]");
+    if (sc) return bulkSemi(sc.dataset.semicol);
     const fr = e.target.closest("[data-action=find-replace]");
     if (fr) return findReplace();
     const tog = e.target.closest("[data-toggle]");

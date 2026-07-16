@@ -354,6 +354,14 @@
 }
 .tg-boldcol:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .tg-boldcol.on { background: var(--color-text); color: #fff; border-color: var(--color-text); }
+/* „adaugă ;" button in A/B/C headers */
+.tg-semicol {
+  font: inherit; font-weight: 900; font-size: 0.8rem; cursor: pointer;
+  margin-left: 0.25rem; padding: 0 0.4rem; border-radius: 5px; line-height: 1.5;
+  border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
+}
+.tg-semicol:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.tg-semicol.on { background: var(--color-text); color: #fff; border-color: var(--color-text); }
 
 /* freeze first three columns (An / Sesiune / Nr.) */
 .tg-fix { position: sticky; z-index: 3; }
