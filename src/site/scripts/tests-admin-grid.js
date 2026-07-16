@@ -32,6 +32,7 @@ const state = {
   years: [], year: null,
   items: [], loading: false,
   session: "", status: "all", onlyFlagged: false, onlyNo2026: false, search: "",
+  zoom: 1,
 };
 
 export async function initTestAdminGrid(mountEl) {
@@ -105,6 +106,12 @@ function render() {
         <button type="button" class="tg-fmt" data-fmt="bold"><b>B</b></button>
         <button type="button" class="tg-fmt" data-fmt="underline"><u>U</u></button>
         <button type="button" class="tg-fmt" data-fmt="italic"><i>I</i></button>
+      </span>
+      <span class="tg-zoom">
+        <button type="button" class="tg-zbtn" data-zoom="out" title="Micșorează">−</button>
+        <span class="tg-zval">${Math.round(state.zoom * 100)}%</span>
+        <button type="button" class="tg-zbtn" data-zoom="in" title="Mărește">+</button>
+        <button type="button" class="tg-zbtn" data-zoom="fit" title="Potrivește pe lățime (toate coloanele)">Fit</button>
       </span>
       <span class="tg-savestate" id="tg-save"></span>
       <span class="tg-count">${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} publicați</span>
@@ -189,6 +196,26 @@ function flash(el) {
   setTimeout(() => el.classList.remove("tg-saved"), 800);
 }
 
+// ---------- zoom (Excel-like) — the CSS var persists on `root` across renders ----------
+function applyZoom() {
+  root.style.setProperty("--tg-zoom", state.zoom);
+  const lbl = root.querySelector(".tg-zval");
+  if (lbl) lbl.textContent = Math.round(state.zoom * 100) + "%";
+}
+function computeFit() {
+  const sc = root.querySelector(".tg-scroll");
+  if (!sc) return state.zoom;
+  root.style.setProperty("--tg-zoom", "1"); // measure the natural width first
+  const z = Math.max(0.3, Math.min(1, (sc.clientWidth - 2) / sc.scrollWidth));
+  return +z.toFixed(3);
+}
+function zoom(dir) {
+  if (dir === "in") state.zoom = Math.min(1.6, +(state.zoom + 0.1).toFixed(2));
+  else if (dir === "out") state.zoom = Math.max(0.4, +(state.zoom - 0.1).toFixed(2));
+  else if (dir === "fit") state.zoom = computeFit();
+  applyZoom();
+}
+
 // ---------- events (delegated on root) ----------
 function wireEvents() {
   root.addEventListener("focusin", (e) => {
@@ -225,6 +252,8 @@ function wireEvents() {
   });
 
   root.addEventListener("click", (e) => {
+    const zb = e.target.closest(".tg-zbtn");
+    if (zb) return zoom(zb.dataset.zoom);
     const chip = e.target.closest("[data-filter]");
     if (chip) { state[chip.dataset.filter] = chip.dataset.val; return render(); }
     const tog = e.target.closest("[data-toggle]");
