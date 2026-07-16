@@ -333,7 +333,7 @@
 .tg-table th, .tg-table td { border-bottom: 1px solid var(--color-border); border-right: 1px solid var(--color-border); padding: 5px 8px; vertical-align: middle; background: var(--color-bg); }
 
 /* freeze header row */
-.tg-table thead th { position: sticky; top: 0; z-index: 2; background: var(--color-surface); font-weight: 800; white-space: nowrap; text-align: left; }
+.tg-table thead th { position: sticky; top: 0; z-index: 2; background: var(--color-surface); font-weight: 800; white-space: nowrap; text-align: center; }
 
 /* freeze first three columns (An / Sesiune / Nr.) */
 .tg-fix { position: sticky; z-index: 3; }

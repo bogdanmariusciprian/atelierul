@@ -47,6 +47,14 @@ const state = {
   answered: {}, // { [itemId]: { chosen, correct, correctAnswer, historical, observation } }
 };
 
+// Leaving the admin grid: drop its full-screen look AND unlock the page scroll
+// (the grid locks <html>/<body> overflow while it's open).
+function leaveAdminMode() {
+  document.body.classList.remove("tg-mode");
+  document.documentElement.style.overflow = "";
+  document.body.style.overflow = "";
+}
+
 export function initTestsHub(mountEl) {
   root = mountEl;
   adminMode = isAdmin();
@@ -74,7 +82,7 @@ function route() {
 
 // ---------- category grid ----------
 function renderHub() {
-  document.body.classList.remove("tg-mode"); // leave the admin full-screen editor look
+  leaveAdminMode();
   state.exam = null;
   root.className = "tests-grid";
   root.innerHTML = CATEGORIES.map((c) => `
@@ -88,7 +96,7 @@ function renderHub() {
 
 // ---------- one exam (pupil practice) ----------
 async function openExam(exam) {
-  document.body.classList.remove("tg-mode"); // pupil view is not the admin editor
+  leaveAdminMode();
   state.exam = exam;
   state.answered = {};
   root.className = "tests-exam";

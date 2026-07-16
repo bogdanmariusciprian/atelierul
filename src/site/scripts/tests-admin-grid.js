@@ -4,19 +4,22 @@
 // A spreadsheet-style editor over `test_items` (loaded per year via the
 // admin_test_items RPC, which returns the answers + unverified rows):
 //   • fills the browser (width + height); sticky header + sticky first columns
-//     (An/Sesiune/Nr); the active row highlighted with a gradient;
-//   • filters: year, session, published/unpublished, flagged, missing-2026, search;
+//     (An/Sesiune/Nr); the active row highlighted with a gradient; zoom +/−/Fit.
+//   • filters: year, session, „ascunde verificații", „fără 2026", free-text search.
 //   • EVERY cell is editable and SAVES to Supabase automatically (on blur / on
 //     click — there is no submit button):
 //       - Enunț / A–D / Observații = rich text (bold / underline / italic);
 //       - An / Sesiune / Nr. = plain text;
 //       - „Corect (ist.)" and „Corect 2026" = click one of A/B/C/D;
-//       - „Publicat" (visible to pupils) and „★" (private teacher marker) = toggle.
-//   A live "✓ Salvat" indicator confirms every write. Writes are RLS-gated to
-//   the teacher; nothing here is shown to pupils.
+//       - „Verificat" = toggle (verified → visible to pupils).
+//   A live "✓ Salvat" indicator confirms every write. Writes are RLS-gated.
+//
+// Scroll: the PAGE scroll is locked in this mode and the grid scrolls on its own
+// (overscroll-behavior: contain + a JS-measured height), so scrolling the table
+// never jolts the page.
 // =========================================================
 import {
-  adminFetchTestItems, fetchTestYears, updateTestItem, setTestVerified, setTestFlagged,
+  adminFetchTestItems, fetchTestYears, updateTestItem, setTestVerified,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich, stripRich, execBold, execUnderline, execItalic } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -31,13 +34,14 @@ const state = {
   exam: "admitere-drept",
   years: [], year: null,
   items: [], loading: false,
-  session: "", status: "all", onlyFlagged: false, onlyNo2026: false, search: "",
+  session: "", hideVerified: false, onlyNo2026: false, search: "",
   zoom: 1,
 };
 
 export async function initTestAdminGrid(mountEl) {
   root = mountEl;
-  document.body.classList.add("tg-mode"); // full-screen editor look
+  lockPageScroll(true);                 // Excel-like full screen: no page scroll
+  document.body.classList.add("tg-mode");
   if (!wired) { wireEvents(); wired = true; }
   root.className = "tg-wrap";
   state.loading = true;
@@ -47,6 +51,14 @@ export async function initTestAdminGrid(mountEl) {
     state.year = state.years.length ? state.years[state.years.length - 1].year : null;
   }
   await load();
+}
+
+// Locking BOTH <html> and <body> is what actually stops the page from moving
+// (the scroller can be either). tests-hub.js restores it when you leave.
+function lockPageScroll(on) {
+  const v = on ? "hidden" : "";
+  document.documentElement.style.overflow = v;
+  document.body.style.overflow = v;
 }
 
 async function load() {
@@ -61,9 +73,7 @@ function filtered() {
   const q = state.search.trim().toLowerCase();
   return state.items.filter((it) => {
     if (state.session && it.session !== state.session) return false;
-    if (state.status === "pub" && !it.verified) return false;
-    if (state.status === "draft" && it.verified) return false;
-    if (state.onlyFlagged && !it.flagged) return false;
+    if (state.hideVerified && it.verified) return false;
     if (state.onlyNo2026 && it.correct2026) return false;
     if (q) {
       const hay = [it.question, it.options.A, it.options.B, it.options.C, it.options.D, it.observation]
@@ -83,8 +93,6 @@ function render() {
     `<option value="${y.year}"${y.year === state.year ? " selected" : ""}>${y.year} (${y.n})</option>`).join("");
   const sesSel = `<option value="">toate sesiunile</option>` +
     sessions.map((s) => `<option value="${esc(s)}"${s === state.session ? " selected" : ""}>${esc(s)}</option>`).join("");
-  const chip = (key, val, label) =>
-    `<button type="button" class="tg-chip${state[key] === val ? " on" : ""}" data-filter="${key}" data-val="${val}">${label}</button>`;
   const toggleChip = (key, label) =>
     `<button type="button" class="tg-chip${state[key] ? " on" : ""}" data-toggle="${key}">${label}</button>`;
 
@@ -98,8 +106,8 @@ function render() {
       <label class="tg-f">An <select id="tg-year">${yearsSel}</select></label>
       <label class="tg-f">Sesiune <select id="tg-ses">${sesSel}</select></label>
       <span class="tg-chips">
-        ${chip("status", "all", "Toate")}${chip("status", "pub", "Publicate")}${chip("status", "draft", "Nepublicate")}
-        ${toggleChip("onlyFlagged", "★ marcate")}${toggleChip("onlyNo2026", "fără 2026")}
+        ${toggleChip("hideVerified", "Ascunde verificații")}
+        ${toggleChip("onlyNo2026", "fără 2026")}
       </span>
       <input id="tg-search" class="tg-search" type="search" placeholder="Caută în text…" value="${esc(state.search)}" />
       <span class="tg-fmt-group" title="Selectează text într-o celulă, apoi:">
@@ -114,7 +122,7 @@ function render() {
         <button type="button" class="tg-zbtn" data-zoom="fit" title="Potrivește pe lățime (toate coloanele)">Fit</button>
       </span>
       <span class="tg-savestate" id="tg-save"></span>
-      <span class="tg-count">${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} publicați</span>
+      <span class="tg-count">${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați</span>
     </div>
 
     <div class="tg-scroll">
@@ -122,7 +130,8 @@ function render() {
         ? `<div class="tg-empty">Se încarcă…</div>`
         : (!rows.length ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : tableHtml(rows))}
     </div>
-    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D, ✓/★. Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). „★" = marcaj privat (doar pentru tine, ex. „de revăzut"; nu-l văd elevii).</p>`;
+    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D și pe „Verificat". Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). „Verificat" = itemul devine vizibil elevilor.</p>`;
+  requestAnimationFrame(fitHeight);
 }
 
 function tableHtml(rows) {
@@ -138,8 +147,7 @@ function tableHtml(rows) {
           <th title="Răspunsul din grila oficială (istoric)">Corect (ist.)</th>
           <th title="Răspunsul pe gramatica 2026">Corect 2026</th>
           <th>Observații</th>
-          <th title="Vizibil elevilor">Publicat</th>
-          <th title="Marcaj privat (de revăzut)">★</th>
+          <th title="Verificat → vizibil elevilor">Verificat</th>
         </tr>
       </thead>
       <tbody>${rows.map(rowHtml).join("")}</tbody>
@@ -160,7 +168,7 @@ function rowHtml(it) {
   const plain = (field, val, cls) =>
     `<td class="tg-fix ${cls} tg-edit" contenteditable="true" data-id="${rid}" data-field="${field}">${esc(val ?? "")}</td>`;
   return `
-    <tr class="tg-row${it.verified ? " is-pub" : ""}${it.flagged ? " is-flag" : ""}" data-id="${rid}">
+    <tr class="tg-row${it.verified ? " is-pub" : ""}" data-id="${rid}">
       ${plain("year", it.year, "tg-c1")}
       ${plain("session", it.session, "tg-c2")}
       ${plain("item_no", it.itemNo, "tg-c3")}
@@ -172,9 +180,16 @@ function rowHtml(it) {
       ${letters("correct", rid, it.correct)}
       ${letters("correct_2026", rid, it.correct2026)}
       ${rich("observation", it.observation)}
-      <td class="tg-tg"><button type="button" class="tg-pub${it.verified ? " on" : ""}" data-action="pub" data-id="${rid}" title="${it.verified ? "Publicat — vizibil elevilor" : "Nepublicat"}">${it.verified ? "✓" : "○"}</button></td>
-      <td class="tg-tg"><button type="button" class="tg-flag${it.flagged ? " on" : ""}" data-action="flag" data-id="${rid}" title="Marcaj privat">${it.flagged ? "★" : "☆"}</button></td>
+      <td class="tg-tg"><button type="button" class="tg-pub${it.verified ? " on" : ""}" data-action="pub" data-id="${rid}" title="${it.verified ? "Verificat — vizibil elevilor" : "Neverificat"}">${it.verified ? "✓" : "○"}</button></td>
     </tr>`;
+}
+
+// ---------- viewport-fit height (kills page/table scroll conflict) ----------
+function fitHeight() {
+  const sc = root && root.querySelector(".tg-scroll");
+  if (!sc) return;
+  const top = sc.getBoundingClientRect().top;
+  sc.style.height = Math.max(180, window.innerHeight - top - 8) + "px";
 }
 
 // ---------- save-state indicator ----------
@@ -196,7 +211,7 @@ function flash(el) {
   setTimeout(() => el.classList.remove("tg-saved"), 800);
 }
 
-// ---------- zoom (Excel-like) — the CSS var persists on `root` across renders ----------
+// ---------- zoom — the CSS var persists on `root` across renders ----------
 function applyZoom() {
   root.style.setProperty("--tg-zoom", state.zoom);
   const lbl = root.querySelector(".tg-zval");
@@ -205,7 +220,7 @@ function applyZoom() {
 function computeFit() {
   const sc = root.querySelector(".tg-scroll");
   if (!sc) return state.zoom;
-  root.style.setProperty("--tg-zoom", "1"); // measure the natural width first
+  root.style.setProperty("--tg-zoom", "1");
   const z = Math.max(0.3, Math.min(1, (sc.clientWidth - 2) / sc.scrollWidth));
   return +z.toFixed(3);
 }
@@ -218,6 +233,8 @@ function zoom(dir) {
 
 // ---------- events (delegated on root) ----------
 function wireEvents() {
+  window.addEventListener("resize", fitHeight);
+
   root.addEventListener("focusin", (e) => {
     const tr = e.target.closest(".tg-row");
     root.querySelectorAll(".tg-row.is-active").forEach((r) => r !== tr && r.classList.remove("is-active"));
@@ -254,8 +271,6 @@ function wireEvents() {
   root.addEventListener("click", (e) => {
     const zb = e.target.closest(".tg-zbtn");
     if (zb) return zoom(zb.dataset.zoom);
-    const chip = e.target.closest("[data-filter]");
-    if (chip) { state[chip.dataset.filter] = chip.dataset.val; return render(); }
     const tog = e.target.closest("[data-toggle]");
     if (tog) { state[tog.dataset.toggle] = !state[tog.dataset.toggle]; return render(); }
 
@@ -271,8 +286,6 @@ function wireEvents() {
 
     const pub = e.target.closest("[data-action=pub]");
     if (pub) return togglePub(pub);
-    const flag = e.target.closest("[data-action=flag]");
-    if (flag) return toggleFlag(flag);
   });
 
   // Enter commits the cell (blur) instead of adding newlines.
@@ -316,19 +329,17 @@ async function savePlain(cell) {
   if (!ok) {
     showSaved(false);
     showToast("Nu am putut salva (poate un An/Sesiune/Nr deja folosit).");
-    cell.textContent = curr ?? ""; // revert
+    cell.textContent = curr ?? "";
     return;
   }
   if (field === "year") it.year = val; else if (field === "item_no") it.itemNo = val; else it.session = val;
   showSaved(true); flash(cell);
 }
 
-// click a letter in a Corect / Corect 2026 cell
 function saveLetter(td, k) {
   const it = byId(td.dataset.id); if (!it) return;
   const field = td.dataset.field;
-  // 2026 is optional → clicking the active one clears it; historical is required.
-  const val = (field === "correct_2026" && it.correct2026 === k) ? null : k;
+  const val = (field === "correct_2026" && it.correct2026 === k) ? null : k; // 2026 optional; historical required
   saveLetterValue(td, val);
 }
 async function saveLetterValue(td, val) {
@@ -348,30 +359,18 @@ async function togglePub(btn) {
   const next = !it.verified;
   showSaving();
   const ok = await setTestVerified(it.id, next);
-  if (!ok) { showSaved(false); showToast("Nu am putut publica."); return; }
+  if (!ok) { showSaved(false); showToast("Nu am putut verifica."); return; }
   it.verified = next;
   btn.classList.toggle("on", next); btn.textContent = next ? "✓" : "○";
   btn.closest(".tg-row").classList.toggle("is-pub", next);
   showSaved(true);
-  showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
-}
-
-async function toggleFlag(btn) {
-  const it = byId(btn.dataset.id); if (!it) return;
-  const next = !it.flagged;
-  showSaving();
-  const ok = await setTestFlagged(it.id, next);
-  if (!ok) { showSaved(false); showToast("Nu am putut marca."); return; }
-  it.flagged = next;
-  btn.classList.toggle("on", next); btn.textContent = next ? "★" : "☆";
-  btn.closest(".tg-row").classList.toggle("is-flag", next);
-  showSaved(true);
+  showToast(next ? "Verificat — vizibil elevilor." : "Retras de la elevi.");
 }
 
 function renderBodyOnly() {
   const rows = filtered();
   const count = root.querySelector(".tg-count");
-  if (count) count.textContent = `${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} publicați`;
+  if (count) count.textContent = `${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați`;
   const scroll = root.querySelector(".tg-scroll");
   if (!scroll) return;
   if (!rows.length) { scroll.innerHTML = `<div class="tg-empty">Niciun item pentru filtrele curente.</div>`; return; }
