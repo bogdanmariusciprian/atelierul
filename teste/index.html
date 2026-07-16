@@ -20,8 +20,8 @@
     <section class="page-hero">
       <h1>Teste</h1>
       <p class="page-hero__lead">
-        Modele de test pentru examene și admitere — cu bareme și rezolvări.
-        Alege categoria potrivită. (Conținutul se adaugă în curând.)
+        Modele de test pentru examene și admitere. Alege o categorie —
+        „Admitere Drept" e disponibilă, cu itemi de-a lungul anilor (2002–2026).
       </p>
     </section>
 
@@ -33,35 +33,15 @@
   <div id="footer"></div>
 
   <script type="module">
+    // Chrome (header/footer) + the Teste hub. The category grid and the live
+    // "Admitere Drept" item practice live in tests-hub.js (single source, DRY).
     import { renderChrome } from "../src/shared/components/site-chrome.js";
-
-    // Test categories. Add a `tests: [...]` list per category later; for now
-    // each shows an "în curând" pill. Content is Romanian; identifiers English.
-    const TEST_CATEGORIES = [
-      { slug: "clasa-6", icon: "📘", color: "#0ea5e9",
-        title: "Clasa a 6-a", desc: "Evaluarea Națională la clasa a VI-a — limbă și comunicare." },
-      { slug: "clasa-8", icon: "📗", color: "#16a34a",
-        title: "Clasa a 8-a", desc: "Evaluarea Națională — limba și literatura română." },
-      { slug: "clasa-12", icon: "🎓", color: "#7c3aed",
-        title: "Clasa a 12-a", desc: "Bacalaureat — proba de limba și literatura română." },
-      { slug: "admitere-politie", icon: "🛡️", color: "#1d4ed8",
-        title: "Admitere Poliție", desc: "Subiecte de limba română pentru admiterea la Academia de Poliție." },
-      { slug: "admitere-drept", icon: "⚖️", color: "#b45309",
-        title: "Admitere Drept", desc: "Gramatică și redactare pentru admiterea la Facultatea de Drept." },
-    ];
+    import { initTestsHub } from "../src/site/scripts/tests-hub.js";
 
     renderChrome("../");
 
     const mount = document.getElementById("tests-hub");
-    if (mount) {
-      mount.innerHTML = TEST_CATEGORIES.map((c) => `
-        <a class="test-card" id="${c.slug}" href="#${c.slug}" style="--card-color: ${c.color}">
-          <span class="test-card__icon" aria-hidden="true">${c.icon}</span>
-          <h2 class="test-card__title">${c.title}</h2>
-          <p class="test-card__desc">${c.desc}</p>
-          <span class="test-card__soon">în curând</span>
-        </a>`).join("");
-    }
+    if (mount) initTestsHub(mount);
   </script>
 </body>
 </html>
