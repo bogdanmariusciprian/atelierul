@@ -369,14 +369,26 @@
 .tg-same:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 .tg-tg { text-align: center; }
-.tg-verify, .tg-publish {
-  width: 1.7rem; height: 1.7rem; border-radius: 50%; cursor: pointer; font-size: 0.9rem; line-height: 1;
+/* Verificat — a borderless dotted ring; the green tick appears only when on */
+.tg-verify {
+  width: 1.9rem; height: 1.9rem; padding: 0; border: none; background: none; cursor: pointer;
+  display: inline-grid; place-items: center;
+}
+.tg-verify svg { width: 1.55rem; height: 1.55rem; display: block; }
+.tg-verify .tg-dots { stroke: #9aa0a6; }
+.tg-verify .tg-tick { stroke: #158a3a; opacity: 0; transition: opacity 0.15s ease; }
+.tg-verify.on .tg-tick { opacity: 1; }
+.tg-verify:hover .tg-dots { stroke: var(--color-primary); }
+
+/* Publicat — a bordered circle with the upload glyph; blue when live */
+.tg-publish {
+  width: 1.7rem; height: 1.7rem; border-radius: 50%; cursor: pointer;
   display: inline-grid; place-items: center;
   border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
 }
 .tg-publish svg { width: 0.95rem; height: 0.95rem; display: block; }
-.tg-verify.on { background: #16a34a; color: #fff; border-color: #16a34a; }   /* verificat = verde ✓ */
-.tg-publish.on { background: #2563eb; color: #fff; border-color: #2563eb; }  /* publicat = albastru, iconul upload alb */
+.tg-publish:hover { border-color: var(--color-primary); }
+.tg-publish.on { background: #2563eb; color: #fff; border-color: #2563eb; }
 
 /* plain editable cells (An / Sesiune / Nr.) */
 .tg-edit { cursor: text; }

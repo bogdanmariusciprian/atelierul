@@ -29,6 +29,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 const LETTERS = ["A", "B", "C", "D"];
 // „Publicat" icon — a clean upload glyph (arrow out of a tray), tinted via currentColor.
 const UPLOAD_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`;
+// „Verificat" icon — a dotted ring with a green tick that appears only when on.
+const VERIFY_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="tg-dots" cx="12" cy="12" r="8.5" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="0.2 3.15"/><path class="tg-tick" d="M6.4 12.4 L10.4 16.6 L18.4 6.8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 let root = null;
 let wired = false;
@@ -183,7 +185,7 @@ function rowHtml(it) {
       ${letters("correct", rid, it.correct)}
       ${letters("correct_2026", rid, it.correct2026)}
       ${rich("observation", it.observation)}
-      <td class="tg-tg"><button type="button" class="tg-verify${it.verified ? " on" : ""}" data-action="verify" data-id="${rid}" title="${it.verified ? "Verificat" : "Neverificat"}">${it.verified ? "✓" : "○"}</button></td>
+      <td class="tg-tg"><button type="button" class="tg-verify${it.verified ? " on" : ""}" data-action="verify" data-id="${rid}" title="${it.verified ? "Verificat" : "Neverificat"}">${VERIFY_SVG}</button></td>
       <td class="tg-tg"><button type="button" class="tg-publish${it.published ? " on" : ""}" data-action="publish" data-id="${rid}" title="${it.published ? "Publicat — vizibil elevilor" : "Nepublicat"}">${UPLOAD_SVG}</button></td>
     </tr>`;
 }
@@ -367,7 +369,7 @@ async function toggleVerified(btn) {
   const ok = await setTestVerified(it.id, next);
   if (!ok) { showSaved(false); showToast("Nu am putut salva."); return; }
   it.verified = next;
-  btn.classList.toggle("on", next); btn.textContent = next ? "✓" : "○";
+  btn.classList.toggle("on", next); // the green tick shows/hides via the .on class
   showSaved(true);
 }
 
