@@ -281,3 +281,95 @@
   cursor: pointer; user-select: none;
 }
 .ti-obs-save:hover { border-color: var(--color-primary); }
+
+/* pupil: "pe gramatica veche era X" note under the verdict */
+.ti-hist-note {
+  margin-bottom: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+/* =========================================================
+   Admitere Drept — ADMIN editor grid (Excel-like). Teacher only.
+   ========================================================= */
+.tg-wrap { margin-block: var(--space-md); }
+
+.tg-bar { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-sm); }
+.tg-back { text-decoration: none; font-weight: 700; color: var(--color-text-muted); user-select: none; }
+.tg-back:hover { color: var(--color-primary); }
+.tg-title { margin: 0; font-size: 1.25rem; }
+.tg-title .tg-sub { color: var(--color-text-muted); font-weight: 600; font-size: 0.9rem; }
+
+/* toolbar: filters + format + count */
+.tg-toolbar {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.5rem 0.7rem; margin-bottom: 0.5rem;
+  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
+}
+.tg-f { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 700; color: var(--color-text-muted); user-select: none; }
+.tg-f select { font: inherit; padding: 0.25rem 0.5rem; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); }
+.tg-chips { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+.tg-chip {
+  font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; user-select: none;
+  padding: 0.25rem 0.6rem; border-radius: 999px;
+  border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
+}
+.tg-chip.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.tg-search { font: inherit; padding: 0.3rem 0.6rem; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); min-width: 12rem; flex: 1 1 10rem; }
+.tg-fmt-group { display: inline-flex; gap: 0.25rem; }
+.tg-fmt {
+  width: 1.9rem; height: 1.9rem; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-size: 0.95rem;
+}
+.tg-fmt:hover { border-color: var(--color-primary); }
+.tg-count { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: var(--color-text-muted); }
+
+.tg-hint { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--color-text-muted); }
+.tg-empty { padding: var(--space-lg); text-align: center; color: var(--color-text-muted); }
+
+/* the scroll viewport (sticky header + sticky first columns live inside it) */
+.tg-scroll { overflow: auto; max-height: 72vh; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }
+.tg-table { border-collapse: separate; border-spacing: 0; font-size: 0.84rem; width: max-content; min-width: 100%; }
+.tg-table th, .tg-table td { border-bottom: 1px solid var(--color-border); border-right: 1px solid var(--color-border); padding: 5px 8px; vertical-align: top; background: var(--color-bg); }
+
+/* freeze header row */
+.tg-table thead th { position: sticky; top: 0; z-index: 2; background: var(--color-surface); font-weight: 800; white-space: nowrap; text-align: left; }
+
+/* freeze first three columns (An / Sesiune / Nr.) */
+.tg-fix { position: sticky; z-index: 3; }
+.tg-table thead th.tg-fix { z-index: 4; }           /* top-left corner above both */
+.tg-c1 { left: 0;     min-width: 52px;  width: 52px;  text-align: center; font-weight: 700; }
+.tg-c2 { left: 52px;  min-width: 118px; width: 118px; }
+.tg-c3 { left: 170px; min-width: 46px;  width: 46px;  text-align: center; box-shadow: 2px 0 0 var(--color-border); }
+
+/* rows: hover + active (gradient) + state accents */
+.tg-row:hover td { background: #faf9ff; }
+.tg-row.is-active td { background: linear-gradient(90deg, #f1ecff, #eaf2ff); }
+.tg-row.is-active .tg-c1 { box-shadow: inset 3px 0 0 var(--color-primary); }
+.tg-row.is-pub .tg-c3 { box-shadow: 2px 0 0 var(--color-border), inset 0 0 0 999px transparent; }
+
+/* editable cells */
+.tg-rich { min-width: 190px; max-width: 360px; line-height: 1.45; cursor: text; }
+.tg-rich:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; background: #fffef7; }
+.tg-rich:empty::before { content: "—"; color: #c9c9d6; }
+.tg-saved { animation: tgSaved 0.7s ease; }
+@keyframes tgSaved { 0% { background: #dcfce7; } 100% { background: var(--color-bg); } }
+
+.tg-hist { text-align: center; font-weight: 800; color: #3730a3; white-space: nowrap; }
+.tg-2026 { white-space: nowrap; }
+.tg-sel { font: inherit; padding: 0.15rem 0.3rem; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); }
+.tg-same { font: inherit; font-size: 0.72rem; font-weight: 700; margin-left: 0.25rem; padding: 0.15rem 0.4rem; border-radius: 6px; border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-muted); cursor: pointer; }
+.tg-same:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.tg-tg { text-align: center; }
+.tg-pub, .tg-flag {
+  width: 1.7rem; height: 1.7rem; border-radius: 50%; cursor: pointer; font-size: 0.9rem; line-height: 1;
+  border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
+}
+.tg-pub.on { background: #16a34a; color: #fff; border-color: #16a34a; }
+.tg-flag.on { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+
+@media (max-width: 760px) {
+  .tg-c2 { min-width: 90px; width: 90px; }
+  .tg-c3 { left: 142px; }
+}

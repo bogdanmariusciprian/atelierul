@@ -29,6 +29,8 @@ function mapRow(r) {
     verified: !!r.verified,
     // present ONLY for the admin fetch (admin_test_items); null for the public one.
     correct: r.correct || null,
+    correct2026: r.correct_2026 || null,
+    flagged: !!r.flagged,
   };
 }
 
@@ -66,6 +68,8 @@ export async function checkTestItem(id, answer) {
   return {
     correct: !!data.correct,
     correctAnswer: data.correct_answer,
+    // set only when the 2026 answer differs from the historical one
+    historical: data.historical || null,
     observation: data.observation || "",
   };
 }
@@ -92,11 +96,22 @@ export async function setTestVerified(id, on) {
   return true;
 }
 
+/** Toggle the teacher's private marker (own tracking; not shown to pupils). */
+export async function setTestFlagged(id, on) {
+  const { error } = await supabase.from("test_items").update({ flagged: !!on }).eq("id", id);
+  if (error) {
+    console.warn("setTestFlagged:", error.message);
+    return false;
+  }
+  return true;
+}
+
 /** Edit an item (observation is the common case; others allowed for fixes). */
 export async function updateTestItem(id, patch) {
   const allowed = {};
   for (const k of ["question", "option_a", "option_b", "option_c", "option_d",
-                   "correct", "observation", "verified", "year", "session", "item_no"]) {
+                   "correct", "correct_2026", "observation", "verified", "flagged",
+                   "year", "session", "item_no"]) {
     if (k in patch) allowed[k] = patch[k];
   }
   const { error } = await supabase.from("test_items").update(allowed).eq("id", id);

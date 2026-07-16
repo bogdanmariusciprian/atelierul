@@ -1,22 +1,22 @@
 // =========================================================
-// Teste — hub of categories + the "Admitere Drept" item practice.
+// Teste — category hub + the "Admitere Drept" practice (PUPIL view).
 //
-//   • The category grid (Clasa a 6-a … Admitere Drept). Only "Admitere Drept"
-//     is live for now; the rest show "în curând".
-//   • Opening #admitere-drept loads REAL items from Supabase (test-repo.js):
-//       - a PUPIL/GUEST sees only VERIFIED items, one per card. They pick an
-//         option → the SERVER says right/wrong, reveals the correct letter and
-//         the observation (the answer never sits in the page source).
-//       - the ADMIN (teacher) sees ALL items (incl. unverified + the answer),
-//         can PUBLISH (verify) an item and edit its observation inline.
-//   • Filtered by year (the item's label). Content Romanian, identifiers English.
+//   • The category grid (only "Admitere Drept" is live; the rest show "în curând").
+//   • Opening #admitere-drept:
+//       - PUPIL / GUEST: only VERIFIED items, one per card. Pick an option → the
+//         SERVER decides, reveals the EFFECTIVE correct letter (2026 answer when
+//         set, else historical) + the observation, and — when the 2026 answer
+//         differs from the historical one — a "pe gramatica veche" note. The
+//         answer never sits in the page source.
+//       - ADMIN (teacher): handed off to the Excel-like editor (tests-admin-grid.js).
+//   • Item text may carry small formatting (bold/underline) → rendered SAFELY.
+//   Content Romanian, identifiers English.
 // =========================================================
-import {
-  fetchTestItems, fetchTestYears, checkTestItem,
-  adminFetchTestItems, setTestVerified, updateTestItem,
-} from "../../shared/scripts/test-repo.js";
+import { fetchTestItems, fetchTestYears, checkTestItem } from "../../shared/scripts/test-repo.js";
+import { initTestAdminGrid } from "./tests-admin-grid.js";
 import { isAdmin } from "../../shared/scripts/session.js";
 import { showToast } from "../../shared/scripts/toast.js";
+import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 
 const CATEGORIES = [
   { slug: "clasa-6", icon: "📘", color: "#0ea5e9", live: false,
@@ -37,24 +37,24 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 let root = null;
+let adminMode = false;
 const state = {
-  admin: false,
   exam: null,
   year: null,
   years: [],
   items: [],
   loading: false,
-  answered: {}, // { [itemId]: { chosen, correct, correctAnswer, observation } }
+  answered: {}, // { [itemId]: { chosen, correct, correctAnswer, historical, observation } }
 };
 
 export function initTestsHub(mountEl) {
   root = mountEl;
-  state.admin = isAdmin();
+  adminMode = isAdmin();
   window.addEventListener("hashchange", route);
-  // If the session settles / the teacher signs in after first paint, re-render.
+  // If the session settles / the teacher signs in after first paint, re-route.
   window.addEventListener("atelier:role", () => {
     const a = isAdmin();
-    if (a !== state.admin) { state.admin = a; if (state.exam) loadItems(); }
+    if (a !== adminMode) { adminMode = a; route(); }
   });
   root.addEventListener("click", onClick);
   root.addEventListener("change", onChange);
@@ -64,8 +64,12 @@ export function initTestsHub(mountEl) {
 function route() {
   const slug = (location.hash || "").replace(/^#/, "");
   const cat = CAT_BY_SLUG[slug];
-  if (cat && cat.live) openExam(cat.slug);
-  else renderHub();
+  if (cat && cat.live) {
+    if (adminMode) initTestAdminGrid(root);   // teacher → the Excel-like editor
+    else openExam(cat.slug);                   // pupil → the practice cards
+  } else {
+    renderHub();
+  }
 }
 
 // ---------- category grid ----------
@@ -81,7 +85,7 @@ function renderHub() {
     </a>`).join("");
 }
 
-// ---------- one exam (items) ----------
+// ---------- one exam (pupil practice) ----------
 async function openExam(exam) {
   state.exam = exam;
   state.answered = {};
@@ -99,9 +103,7 @@ async function loadItems() {
   if (!state.exam) return;
   state.loading = true;
   renderExam();
-  state.items = state.admin
-    ? await adminFetchTestItems(state.exam, state.year)
-    : await fetchTestItems({ exam: state.exam, year: state.year });
+  state.items = await fetchTestItems({ exam: state.exam, year: state.year }); // verified only (RLS)
   state.loading = false;
   renderExam();
 }
@@ -116,17 +118,11 @@ function renderExam() {
        </label>`
     : "";
 
-  const adminHint = state.admin
-    ? `<p class="ti-adminhint">Ești în modul profesor: vezi și itemii nepublicați și răspunsul corect. Apasă <b>Publică</b> ca să-i faci vizibili elevilor.</p>`
-    : "";
-
   let body;
   if (state.loading) {
     body = `<div class="ti-empty">Se încarcă itemii…</div>`;
   } else if (!state.items.length) {
-    body = `<div class="ti-empty">${state.admin
-      ? "Niciun item pentru anul selectat."
-      : "Încă nu sunt itemi publicați pentru anul selectat. Revino în curând."}</div>`;
+    body = `<div class="ti-empty">Încă nu sunt itemi publicați pentru anul selectat. Revino în curând.</div>`;
   } else {
     body = `<div class="ti-list">${state.items.map(renderCard).join("")}</div>`;
   }
@@ -137,7 +133,6 @@ function renderExam() {
       <h2 class="ti-title"><span aria-hidden="true">${cat.icon || "⚖️"}</span> ${esc(cat.title || "Admitere Drept")}</h2>
       ${yearSel}
     </div>
-    ${adminHint}
     ${body}`;
 
   // re-apply any answers already given (survives re-render)
@@ -150,44 +145,22 @@ function renderExam() {
 function renderCard(it) {
   const opts = OPTS
     .filter((k) => it.options[k] != null && it.options[k] !== "")
-    .map((k) => {
-      // Admin sees the correct option highlighted directly (and can't "answer").
-      const isAns = state.admin && it.correct === k;
-      return `
-      <button type="button" class="ti-opt${isAns ? " opt-correct" : ""}" data-k="${k}"${state.admin ? " disabled" : ""}>
+    .map((k) => `
+      <button type="button" class="ti-opt" data-k="${k}">
         <span class="ti-opt__k">${k}</span>
-        <span class="ti-opt__t">${esc(it.options[k])}</span>
-      </button>`;
-    }).join("");
-
-  // Admin sees the answer + publish toggle + editable observation.
-  const adminTools = state.admin ? `
-    <div class="ti-admin">
-      <span class="ti-answer">Răspuns corect: <b>${esc(it.correct || "?")}</b></span>
-      <button type="button" class="ti-pub${it.verified ? " is-on" : ""}" data-action="verify" data-id="${it.id}">
-        ${it.verified ? "✓ Publicat" : "Publică"}
-      </button>
-      <label class="ti-obsedit">Observații (ce văd elevii după răspuns)
-        <textarea class="ti-obs-input" data-id="${it.id}" rows="2" placeholder="Scrie o explicație…">${esc(it.observation)}</textarea>
-        <button type="button" class="ti-obs-save" data-action="save-obs" data-id="${it.id}">Salvează</button>
-      </label>
-    </div>` : "";
-
-  const cls = ["ti-card"];
-  if (state.admin && !it.verified) cls.push("is-unverified");
+        <span class="ti-opt__t">${sanitizeRich(it.options[k])}</span>
+      </button>`).join("");
 
   return `
-    <article class="${cls.join(" ")}" data-id="${it.id}">
+    <article class="ti-card" data-id="${it.id}">
       <header class="ti-card__head">
         <span class="ti-chip ti-year">${it.year ?? "—"}</span>
         ${it.session ? `<span class="ti-ses">${esc(it.session)}</span>` : ""}
         <span class="ti-no">Item ${it.itemNo ?? "—"}</span>
-        ${it.verified ? `<span class="ti-verified" title="Verificat">✓ verificat</span>` : (state.admin ? `<span class="ti-draft">nepublicat</span>` : "")}
       </header>
-      <p class="ti-q">${it.question ? esc(it.question) : "<em>(enunț indisponibil)</em>"}</p>
+      <p class="ti-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
       <div class="ti-opts">${opts || `<span class="ti-empty">(variante indisponibile)</span>`}</div>
       <div class="ti-feedback" hidden></div>
-      ${adminTools}
     </article>`;
 }
 
@@ -197,22 +170,16 @@ function onChange(e) {
   if (sel) { state.year = Number(sel.value); loadItems(); }
 }
 
-async function onClick(e) {
+function onClick(e) {
   const opt = e.target.closest(".ti-opt");
-  if (opt) return submitAnswer(opt);
-
-  const verify = e.target.closest("[data-action=verify]");
-  if (verify) return toggleVerify(verify);
-
-  const saveObs = e.target.closest("[data-action=save-obs]");
-  if (saveObs) return saveObservation(saveObs);
+  if (opt) submitAnswer(opt);
 }
 
-// PUPIL: pick an option → server decides + reveals the answer.
+// PUPIL: pick an option → the server decides + reveals the answer.
 async function submitAnswer(btn) {
   const card = btn.closest(".ti-card");
   const id = card?.dataset.id;
-  if (!id || state.answered[id] || state.admin) return; // one shot; admin doesn't answer
+  if (!id || state.answered[id]) return; // one shot per item
   const k = btn.dataset.k;
   card.classList.add("is-checking");
   const res = await checkTestItem(id, k);
@@ -232,46 +199,15 @@ function paintAnswer(card, data) {
     if (k === data.chosen && !data.correct) b.classList.add("opt-wrong");
   });
   const fb = card.querySelector(".ti-feedback");
-  if (fb) {
-    fb.hidden = false;
-    fb.innerHTML = `
-      <div class="ti-verdict ${data.correct ? "ok" : "no"}">
-        ${data.correct ? "✓ Răspuns corect" : `✗ Greșit — corect era <b>${esc(data.correctAnswer)}</b>`}
-      </div>
-      ${data.observation ? `<div class="ti-obs"><span class="ti-obs__lab">Observație</span>${esc(data.observation)}</div>` : ""}`;
-  }
-}
-
-// ADMIN: publish / unpublish an item.
-async function toggleVerify(btn) {
-  const id = btn.dataset.id;
-  const it = state.items.find((x) => x.id === id);
-  if (!it) return;
-  const next = !it.verified;
-  btn.disabled = true;
-  const ok = await setTestVerified(id, next);
-  btn.disabled = false;
-  if (!ok) { showToast("Nu am putut publica itemul."); return; }
-  it.verified = next;
-  const card = btn.closest(".ti-card");
-  card.classList.toggle("is-unverified", !next);
-  btn.classList.toggle("is-on", next);
-  btn.textContent = next ? "✓ Publicat" : "Publică";
-  const tag = card.querySelector(".ti-verified, .ti-draft");
-  if (tag) { tag.className = next ? "ti-verified" : "ti-draft"; tag.textContent = next ? "✓ verificat" : "nepublicat"; }
-  showToast(next ? "Item publicat — vizibil elevilor." : "Item retras.");
-}
-
-// ADMIN: save the observation shown to pupils after they answer.
-async function saveObservation(btn) {
-  const id = btn.dataset.id;
-  const ta = root.querySelector(`.ti-obs-input[data-id="${id}"]`);
-  if (!ta) return;
-  btn.disabled = true;
-  const ok = await updateTestItem(id, { observation: ta.value.trim() || null });
-  btn.disabled = false;
-  if (!ok) { showToast("Nu am putut salva observația."); return; }
-  const it = state.items.find((x) => x.id === id);
-  if (it) it.observation = ta.value.trim();
-  showToast("Observație salvată.");
+  if (!fb) return;
+  fb.hidden = false;
+  const histNote = data.historical
+    ? `<div class="ti-hist-note">Pe gramatica veche, răspunsul era <b>${esc(data.historical)}</b>.</div>`
+    : "";
+  fb.innerHTML = `
+    <div class="ti-verdict ${data.correct ? "ok" : "no"}">
+      ${data.correct ? "✓ Răspuns corect" : `✗ Greșit — corect era <b>${esc(data.correctAnswer)}</b>`}
+    </div>
+    ${histNote}
+    ${data.observation ? `<div class="ti-obs"><span class="ti-obs__lab">Observație</span>${sanitizeRich(data.observation)}</div>` : ""}`;
 }
