@@ -460,6 +460,10 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 @media (max-width: 700px) {
   /* desktop mode locks the page scroll; on a phone we scroll the page normally */
   body.tg-mode { overflow: auto; }
+  /* hide the site menu (Acasă / Despre / …) while working in the editor, to free
+     up the whole screen. It comes back the moment you leave via „‹" (tg-mode off). */
+  body.tg-mode .site-header { display: none !important; }
+  body.tg-mode #header { height: 0 !important; }
 
   .tgm { display: flex; flex-direction: column; gap: 0.55rem; padding-bottom: 4.8rem; }
 
@@ -507,22 +511,22 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   .tgm-lab small { text-transform: none; letter-spacing: 0; font-weight: 600; }
 
   /* editable rich cells → full-width boxes, comfy for a stylus */
-  .tgm-card .tg-rich { min-width: 0; max-width: none; width: 100%; font-size: 1rem; line-height: 1.55; padding: 0.55rem 0.65rem; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface); }
+  .tgm-card .tg-rich { min-width: 0; max-width: none; width: 100%; font-size: 0.88rem; line-height: 1.5; padding: 0.45rem 0.55rem; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); }
   .tgm-card .tg-rich:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; background: #fffef7; }
   .tgm-card .tg-rich:empty::before { content: "—"; color: #c9c9d6; }
   .tgm-q { font-weight: 600; text-align: justify; }
 
   .tgm-opt { display: flex; align-items: flex-start; gap: 0.55rem; }
-  .tgm-optk { flex: none; width: 2.1rem; height: 2.1rem; margin-top: 0.1rem; display: grid; place-items: center; border-radius: 50%; font-weight: 800; background: var(--color-surface); border: 1.5px solid var(--color-border); }
-  .tgm-optt { flex: 1 1 auto; }
+  .tgm-optk { flex: none; width: 1.65rem; height: 1.65rem; margin-top: 0.05rem; display: grid; place-items: center; border-radius: 50%; font-weight: 800; font-size: 0.8rem; background: var(--color-surface); border: 1.5px solid var(--color-border); }
+  .tgm-optt { flex: 1 1 auto; font-size: 0.82rem; }
 
   .tgm-ans-wrap { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 0.7rem; }
   .tgm-ans-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
   .tgm-ans-lab { flex: 1 1 100%; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-muted); }
   .tgm-ans { white-space: normal; }
-  /* BIG tappable answer letters */
-  .tgm-ans .tg-letter { width: 2.8rem; height: 2.8rem; margin: 0; border-radius: 13px; font-size: 1.1rem; }
-  .tgm-ans .tg-same { height: 2.8rem; padding: 0 0.7rem; font-size: 0.85rem; }
+  /* tappable answer letters — compact, but still fine for a stylus */
+  .tgm-ans .tg-letter { width: 2.15rem; height: 2.15rem; margin: 0; border-radius: 9px; font-size: 0.9rem; }
+  .tgm-ans .tg-same { height: 2.15rem; padding: 0 0.55rem; font-size: 0.76rem; }
 
   /* fixed bottom action bar: ‹ Înapoi · B U I · Înainte › */
   .tgm-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.7rem; background: var(--color-bg); border-top: 1px solid var(--color-border); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06); }
