@@ -19,7 +19,7 @@
 // never jolts the page.
 // =========================================================
 import {
-  adminFetchTestItems, fetchTestYears, updateTestItem, setTestVerified,
+  adminFetchTestItems, fetchTestYears, updateTestItem, setTestVerified, setTestPublished,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich, stripRich, execBold, execUnderline, execItalic } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -130,7 +130,7 @@ function render() {
         ? `<div class="tg-empty">Se încarcă…</div>`
         : (!rows.length ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : tableHtml(rows))}
     </div>
-    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D și pe „Verificat". Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). „Verificat" = itemul devine vizibil elevilor.</p>`;
+    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D, Verificat sau Publicat. Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). <b>Verificat</b> ✓ = l-ai controlat tu (intern); <b>Publicat</b> 📢 = e vizibil elevilor.</p>`;
   requestAnimationFrame(fitHeight);
 }
 
@@ -147,7 +147,8 @@ function tableHtml(rows) {
           <th title="Răspunsul din grila oficială (istoric)">Corect (ist.)</th>
           <th title="Răspunsul pe gramatica 2026">Corect 2026</th>
           <th>Observații</th>
-          <th title="Verificat → vizibil elevilor">Verificat</th>
+          <th title="Verificat de profesor (control intern)">Verificat</th>
+          <th title="Publicat → vizibil elevilor">Publicat</th>
         </tr>
       </thead>
       <tbody>${rows.map(rowHtml).join("")}</tbody>
@@ -168,7 +169,7 @@ function rowHtml(it) {
   const plain = (field, val, cls) =>
     `<td class="tg-fix ${cls} tg-edit" contenteditable="true" data-id="${rid}" data-field="${field}">${esc(val ?? "")}</td>`;
   return `
-    <tr class="tg-row${it.verified ? " is-pub" : ""}" data-id="${rid}">
+    <tr class="tg-row${it.published ? " is-pub" : ""}" data-id="${rid}">
       ${plain("year", it.year, "tg-c1")}
       ${plain("session", it.session, "tg-c2")}
       ${plain("item_no", it.itemNo, "tg-c3")}
@@ -180,7 +181,8 @@ function rowHtml(it) {
       ${letters("correct", rid, it.correct)}
       ${letters("correct_2026", rid, it.correct2026)}
       ${rich("observation", it.observation)}
-      <td class="tg-tg"><button type="button" class="tg-pub${it.verified ? " on" : ""}" data-action="pub" data-id="${rid}" title="${it.verified ? "Verificat — vizibil elevilor" : "Neverificat"}">${it.verified ? "✓" : "○"}</button></td>
+      <td class="tg-tg"><button type="button" class="tg-verify${it.verified ? " on" : ""}" data-action="verify" data-id="${rid}" title="${it.verified ? "Verificat" : "Neverificat"}">${it.verified ? "✓" : "○"}</button></td>
+      <td class="tg-tg"><button type="button" class="tg-publish${it.published ? " on" : ""}" data-action="publish" data-id="${rid}" title="${it.published ? "Publicat — vizibil elevilor" : "Nepublicat"}">${it.published ? "📢" : "○"}</button></td>
     </tr>`;
 }
 
@@ -284,8 +286,10 @@ function wireEvents() {
       return;
     }
 
-    const pub = e.target.closest("[data-action=pub]");
-    if (pub) return togglePub(pub);
+    const verify = e.target.closest("[data-action=verify]");
+    if (verify) return toggleVerified(verify);
+    const publish = e.target.closest("[data-action=publish]");
+    if (publish) return togglePublished(publish);
   });
 
   // Enter commits the cell (blur) instead of adding newlines.
@@ -354,17 +358,28 @@ async function saveLetterValue(td, val) {
   showSaved(true); flash(td);
 }
 
-async function togglePub(btn) {
+async function toggleVerified(btn) {
   const it = byId(btn.dataset.id); if (!it) return;
   const next = !it.verified;
   showSaving();
   const ok = await setTestVerified(it.id, next);
-  if (!ok) { showSaved(false); showToast("Nu am putut verifica."); return; }
+  if (!ok) { showSaved(false); showToast("Nu am putut salva."); return; }
   it.verified = next;
   btn.classList.toggle("on", next); btn.textContent = next ? "✓" : "○";
-  btn.closest(".tg-row").classList.toggle("is-pub", next);
   showSaved(true);
-  showToast(next ? "Verificat — vizibil elevilor." : "Retras de la elevi.");
+}
+
+async function togglePublished(btn) {
+  const it = byId(btn.dataset.id); if (!it) return;
+  const next = !it.published;
+  showSaving();
+  const ok = await setTestPublished(it.id, next);
+  if (!ok) { showSaved(false); showToast("Nu am putut publica."); return; }
+  it.published = next;
+  btn.classList.toggle("on", next); btn.textContent = next ? "📢" : "○";
+  btn.closest(".tg-row").classList.toggle("is-pub", next); // row "live" = published
+  showSaved(true);
+  showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
 }
 
 function renderBodyOnly() {

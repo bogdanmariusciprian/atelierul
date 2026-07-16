@@ -26,10 +26,11 @@ function mapRow(r) {
     question: r.question || "",
     options: { A: r.option_a, B: r.option_b, C: r.option_c, D: r.option_d },
     observation: r.observation || "",
-    verified: !!r.verified,
-    // present ONLY for the admin fetch (admin_test_items); null for the public one.
+    // answers present ONLY for the admin fetch (admin_test_items); null for the public one.
     correct: r.correct || null,
     correct2026: r.correct_2026 || null,
+    verified: !!r.verified,   // teacher QA marker
+    published: !!r.published, // visible to pupils
     flagged: !!r.flagged,
   };
 }
@@ -96,6 +97,16 @@ export async function setTestVerified(id, on) {
   return true;
 }
 
+/** Publish / unpublish — controls whether pupils can see the item. */
+export async function setTestPublished(id, on) {
+  const { error } = await supabase.from("test_items").update({ published: !!on }).eq("id", id);
+  if (error) {
+    console.warn("setTestPublished:", error.message);
+    return false;
+  }
+  return true;
+}
+
 /** Toggle the teacher's private marker (own tracking; not shown to pupils). */
 export async function setTestFlagged(id, on) {
   const { error } = await supabase.from("test_items").update({ flagged: !!on }).eq("id", id);
@@ -110,7 +121,7 @@ export async function setTestFlagged(id, on) {
 export async function updateTestItem(id, patch) {
   const allowed = {};
   for (const k of ["question", "option_a", "option_b", "option_c", "option_d",
-                   "correct", "correct_2026", "observation", "verified", "flagged",
+                   "correct", "correct_2026", "observation", "verified", "published", "flagged",
                    "year", "session", "item_no"]) {
     if (k in patch) allowed[k] = patch[k];
   }

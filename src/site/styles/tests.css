@@ -369,12 +369,12 @@
 .tg-same:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 .tg-tg { text-align: center; }
-.tg-pub, .tg-flag {
+.tg-verify, .tg-publish {
   width: 1.7rem; height: 1.7rem; border-radius: 50%; cursor: pointer; font-size: 0.9rem; line-height: 1;
   border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
 }
-.tg-pub.on { background: #16a34a; color: #fff; border-color: #16a34a; }
-.tg-flag.on { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+.tg-verify.on { background: #16a34a; color: #fff; border-color: #16a34a; }   /* verificat = verde ✓ */
+.tg-publish.on { background: #2563eb; border-color: #2563eb; }               /* publicat = albastru 📢 */
 
 /* plain editable cells (An / Sesiune / Nr.) */
 .tg-edit { cursor: text; }
