@@ -468,11 +468,16 @@ function wireEvents() {
     if (publish) return togglePublished(publish);
   });
 
-  // Enter commits the cell (blur) instead of adding newlines.
+  // Enter: in a TEXT cell = a new text line (<br>, saved to Supabase, shown to pupils);
+  // in a plain An/Sesiune/Nr cell = commit (blur). Shift+Enter always adds a line.
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && (e.target.closest(".tg-rich") || e.target.closest(".tg-edit"))) {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    if (e.target.closest(".tg-edit")) { e.preventDefault(); e.target.blur(); return; }
+    if (e.target.closest(".tg-rich")) {
       e.preventDefault();
-      e.target.blur();
+      try {
+        if (!document.execCommand("insertLineBreak")) document.execCommand("insertHTML", false, "<br>");
+      } catch { document.execCommand("insertHTML", false, "<br>"); }
     }
   });
 }
