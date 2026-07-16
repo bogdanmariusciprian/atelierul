@@ -27,6 +27,9 @@ import { showToast } from "../../shared/scripts/toast.js";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const LETTERS = ["A", "B", "C", "D"];
+// Phone layout kicks in at ≤700px (e.g. Samsung S24 portrait). Above that the
+// desktop Excel grid is used, completely unchanged.
+const isMobile = () => window.matchMedia("(max-width: 700px)").matches;
 // „Publicat" icon — a clean upload glyph (arrow out of a tray), tinted via currentColor.
 const UPLOAD_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`;
 // „Verificat" icon — a dotted ring with a green tick that appears only when on.
@@ -39,13 +42,13 @@ const state = {
   years: [], year: null,
   items: [], loading: false,
   session: "", hideVerified: false, onlyNo2026: false, search: "",
-  zoom: 1,
+  zoom: 1, mIndex: 0,
   find: "", repl: "", frWhole: true, frCase: true,
 };
 
 export async function initTestAdminGrid(mountEl) {
   root = mountEl;
-  lockPageScroll(true);                 // Excel-like full screen: no page scroll
+  if (!isMobile()) lockPageScroll(true); // desktop: Excel-like full screen (no page scroll). Phone scrolls normally.
   document.body.classList.add("tg-mode");
   if (!wired) { wireEvents(); wired = true; }
   root.className = "tg-wrap";
@@ -242,6 +245,7 @@ async function findReplace() {
 
 // ---------- render ----------
 function render() {
+  if (isMobile()) return renderMobile();   // phone layout — a completely separate DOM
   const sessions = [...new Set(state.items.map((i) => i.session).filter(Boolean))].sort();
   const rows = filtered();
 
@@ -417,14 +421,14 @@ function wireEvents() {
   });
 
   root.addEventListener("change", (e) => {
-    if (e.target.id === "tg-year") { state.year = Number(e.target.value); state.session = ""; return load(); }
-    if (e.target.id === "tg-ses") { state.session = e.target.value; return render(); }
+    if (e.target.id === "tg-year") { state.year = Number(e.target.value); state.session = ""; state.mIndex = 0; return load(); }
+    if (e.target.id === "tg-ses") { state.session = e.target.value; state.mIndex = 0; return render(); }
     if (e.target.id === "tg-fr-whole") { state.frWhole = e.target.checked; return; }
     if (e.target.id === "tg-fr-cs") { state.frCase = e.target.checked; return; }
   });
 
   root.addEventListener("input", (e) => {
-    if (e.target.id === "tg-search") { state.search = e.target.value; renderBodyOnly(); }
+    if (e.target.id === "tg-search") { state.search = e.target.value; state.mIndex = 0; renderBodyOnly(); }
     else if (e.target.id === "tg-find") state.find = e.target.value;
     else if (e.target.id === "tg-repl") state.repl = e.target.value;
   });
@@ -441,6 +445,8 @@ function wireEvents() {
   });
 
   root.addEventListener("click", (e) => {
+    const nav = e.target.closest("[data-nav]");   // phone: ‹ / › previous-next item
+    if (nav) return mGo(nav.dataset.nav === "next" ? 1 : -1);
     const zb = e.target.closest(".tg-zbtn");
     if (zb) return zoom(zb.dataset.zoom);
     const bc = e.target.closest("[data-boldcol]");
@@ -450,7 +456,7 @@ function wireEvents() {
     const fr = e.target.closest("[data-action=find-replace]");
     if (fr) return findReplace();
     const tog = e.target.closest("[data-toggle]");
-    if (tog) { state[tog.dataset.toggle] = !state[tog.dataset.toggle]; return render(); }
+    if (tog) { state[tog.dataset.toggle] = !state[tog.dataset.toggle]; state.mIndex = 0; return render(); }
 
     const letter = e.target.closest(".tg-letter");
     if (letter) return saveLetter(letter.closest(".tg-ans"), letter.dataset.k);
@@ -458,7 +464,9 @@ function wireEvents() {
     const same = e.target.closest(".tg-same");
     if (same) {
       const it = byId(same.dataset.id);
-      if (it && it.correct) saveLetterValue(same.closest("td").parentElement.querySelector('.tg-ans[data-field="correct_2026"]'), it.correct);
+      // Find the 2026 answer cell for THIS item — works on the desktop row and the phone card alike.
+      const td2026 = root.querySelector(`.tg-ans[data-field="correct_2026"][data-id="${same.dataset.id}"]`);
+      if (it && it.correct && td2026) saveLetterValue(td2026, it.correct);
       return;
     }
 
@@ -480,6 +488,24 @@ function wireEvents() {
       } catch { document.execCommand("insertHTML", false, "<br>"); }
     }
   });
+
+  // Phone: a horizontal swipe = previous / next item (ignored while editing text
+  // so the caret / text selection keeps working).
+  let sx = 0, sy = 0, st = 0;
+  root.addEventListener("touchstart", (e) => {
+    if (!isMobile()) return;
+    const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; st = Date.now();
+  }, { passive: true });
+  root.addEventListener("touchend", (e) => {
+    if (!isMobile()) return;
+    const ae = document.activeElement;
+    if (ae && ae.isContentEditable) return;                 // don't hijack an edit
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Date.now() - st > 600) return;                      // too slow to be a swipe
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6) return; // must be clearly horizontal
+    mGo(dx < 0 ? 1 : -1);
+  }, { passive: true });
 }
 
 // ---------- saves ----------
@@ -548,8 +574,11 @@ async function toggleVerified(btn) {
   it.verified = next;
   btn.classList.toggle("on", next); // the green tick shows/hides via the .on class
   showSaved(true);
-  // With „Ascunde verificații" on, the row you just verified fades out after 1s.
-  if (next && state.hideVerified) scheduleHide(btn.closest(".tg-row"), it);
+  // With „Ascunde verificații" on, the item you just verified drops out.
+  if (next && state.hideVerified) {
+    if (isMobile()) renderMobile();                 // phone: re-filter → auto-advances to the next item
+    else scheduleHide(btn.closest(".tg-row"), it);  // desktop: fade the row out after 1s
+  }
 }
 
 function scheduleHide(row, it) {
@@ -574,12 +603,14 @@ async function togglePublished(btn) {
   if (!ok) { showSaved(false); showToast("Nu am putut publica."); return; }
   it.published = next;
   btn.classList.toggle("on", next); // the upload icon stays; color signals the state
-  btn.closest(".tg-row").classList.toggle("is-pub", next); // row "live" = published
+  const pubRow = btn.closest(".tg-row"); // desktop only — the phone card has no table row
+  if (pubRow) pubRow.classList.toggle("is-pub", next); // row "live" = published
   showSaved(true);
   showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
 }
 
 function renderBodyOnly() {
+  if (isMobile()) return mUpdateBody();    // phone: refresh only card + progress, keep the search focused
   const rows = filtered();
   const count = root.querySelector(".tg-count");
   if (count) count.textContent = `${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați`;
@@ -598,4 +629,132 @@ function applyLocal(it, field, val) {
   else if (field === "option_b") it.options.B = val;
   else if (field === "option_c") it.options.C = val;
   else if (field === "option_d") it.options.D = val;
+}
+
+// =========================================================
+// PHONE layout (≤700px) — a completely separate render path. One item fills the
+// screen as a big, stylus-friendly card; swipe or ‹ › moves between items.
+// It reuses the SAME state and the SAME save handlers as the desktop grid (same
+// .tg-rich / .tg-edit / .tg-ans / [data-action] hooks), so text edits, answers,
+// verify and publish persist to Supabase in exactly the same way. The desktop
+// table is never built on phones — and its markup/CSS is never touched.
+// =========================================================
+function mClamp(rows) {
+  const n = (rows || filtered()).length;
+  state.mIndex = n ? Math.max(0, Math.min(state.mIndex, n - 1)) : 0;
+}
+
+function mGo(delta) {
+  const rows = filtered();
+  if (!rows.length) return;
+  const ae = document.activeElement;
+  if (ae && ae.blur) ae.blur();                 // commit any open edit before moving on
+  state.mIndex = Math.max(0, Math.min(state.mIndex + delta, rows.length - 1));
+  renderMobile();
+  window.scrollTo(0, 0);                         // show the new card from the top
+}
+
+function mLetters(field, id, current) {
+  return `<div class="tg-ans tgm-ans${field === "correct" ? " tg-ans--hist" : ""}" data-field="${field}" data-id="${id}">
+    ${LETTERS.map((k) => `<button type="button" class="tg-letter${current === k ? " on" : ""}" data-k="${k}">${k}</button>`).join("")}
+    ${field === "correct_2026" ? `<button type="button" class="tg-same" data-id="${id}" title="Pune la 2026 același răspuns ca cel istoric">= ist.</button>` : ""}
+  </div>`;
+}
+
+function mCardHtml(it) {
+  const rid = it.id;
+  const rich = (field, val, extra = "") =>
+    `<div class="tg-rich${extra}" contenteditable="true" data-id="${rid}" data-field="${field}">${sanitizeRich(val)}</div>`;
+  const optRow = (k, field, val) =>
+    `<div class="tgm-opt"><span class="tgm-optk">${k}</span>${rich(field, val, " tgm-optt")}</div>`;
+  return `
+    <div class="tgm-card" data-id="${rid}">
+      <div class="tgm-head">
+        <span class="tgm-year-chip">${esc(it.year ?? "")}</span>
+        <span class="tgm-meta">
+          <span class="tgm-ed tg-edit" contenteditable="true" data-id="${rid}" data-field="session" data-ph="sesiune">${esc(it.session || "")}</span>
+          <span class="tgm-sep">·</span>nr
+          <span class="tgm-ed tgm-ed--no tg-edit" contenteditable="true" data-id="${rid}" data-field="item_no">${esc(it.itemNo ?? "")}</span>
+        </span>
+        <span class="tgm-spacer"></span>
+        <button type="button" class="tgm-verify${it.verified ? " on" : ""}" data-action="verify" data-id="${rid}" aria-label="${it.verified ? "Verificat" : "Marchează verificat"}">${VERIFY_SVG}</button>
+        <button type="button" class="tgm-publish${it.published ? " on" : ""}" data-action="publish" data-id="${rid}" aria-label="${it.published ? "Publicat — vizibil elevilor" : "Publică"}">${UPLOAD_SVG}</button>
+      </div>
+
+      <div class="tgm-lab">enunț</div>
+      ${rich("question", it.question, " tgm-q")}
+
+      <div class="tgm-lab">variante</div>
+      ${optRow("A", "option_a", it.options.A)}
+      ${optRow("B", "option_b", it.options.B)}
+      ${optRow("C", "option_c", it.options.C)}
+      ${optRow("D", "option_d", it.options.D)}
+
+      <div class="tgm-ans-wrap">
+        <div class="tgm-ans-row"><span class="tgm-ans-lab">corect istoric</span>${mLetters("correct", rid, it.correct)}</div>
+        <div class="tgm-ans-row"><span class="tgm-ans-lab">corect 2026</span>${mLetters("correct_2026", rid, it.correct2026)}</div>
+      </div>
+
+      <div class="tgm-lab">observații <small>(le vede elevul)</small></div>
+      ${rich("observation", it.observation, " tgm-obs")}
+    </div>`;
+}
+
+function mBars() {
+  const yearsSel = state.years.map((y) =>
+    `<option value="${y.year}"${y.year === state.year ? " selected" : ""}>${y.year} (${y.n})</option>`).join("");
+  return `
+    <div class="tgm-top">
+      <a class="tg-back" href="#" aria-label="Toate testele">‹</a>
+      <select id="tg-year" class="tgm-year" aria-label="An">${yearsSel}</select>
+      <input id="tg-search" class="tgm-search" type="search" placeholder="Caută…" value="${esc(state.search)}" />
+      <button type="button" class="tg-chip tgm-chip${state.hideVerified ? " on" : ""}" data-toggle="hideVerified" title="Ascunde itemii verificați">✓ ascunde</button>
+    </div>`;
+}
+
+function mProgHtml(rows) {
+  const vCount = state.items.filter((i) => i.verified).length;
+  return `${rows.length ? state.mIndex + 1 : 0} / ${rows.length}<small> · ${vCount} verif.</small>`;
+}
+
+function renderMobile() {
+  const rows = filtered();
+  mClamp(rows);
+  const it = rows[state.mIndex];
+  root.innerHTML = `
+    <div class="tgm">
+      ${mBars()}
+      <div class="tgm-prog">
+        <button type="button" class="tgm-navbtn" data-nav="prev" aria-label="Precedentul">‹</button>
+        <span class="tgm-progtxt">${mProgHtml(rows)}</span>
+        <span class="tg-savestate tgm-save" id="tg-save"></span>
+        <button type="button" class="tgm-navbtn" data-nav="next" aria-label="Următorul">›</button>
+      </div>
+      ${state.loading
+        ? `<div class="tg-empty">Se încarcă…</div>`
+        : (!it ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : mCardHtml(it))}
+      <div class="tgm-nav">
+        <button type="button" class="tgm-navbig" data-nav="prev">‹ Înapoi</button>
+        <span class="tgm-fmt" title="Selectează text, apoi formatează:">
+          <button type="button" class="tg-fmt" data-fmt="bold"><b>B</b></button>
+          <button type="button" class="tg-fmt" data-fmt="underline"><u>U</u></button>
+          <button type="button" class="tg-fmt" data-fmt="italic"><i>I</i></button>
+        </span>
+        <button type="button" class="tgm-navbig" data-nav="next">Înainte ›</button>
+      </div>
+    </div>`;
+}
+
+// Refresh only the card + progress (used while typing in search, to keep focus).
+function mUpdateBody() {
+  const rows = filtered();
+  mClamp(rows);
+  const it = rows[state.mIndex];
+  const prog = root.querySelector(".tgm-progtxt");
+  if (prog) prog.innerHTML = mProgHtml(rows);
+  const cur = root.querySelector(".tgm-card, .tgm .tg-empty");
+  if (!cur) return;
+  cur.outerHTML = state.loading
+    ? `<div class="tg-empty">Se încarcă…</div>`
+    : (!it ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : mCardHtml(it));
 }

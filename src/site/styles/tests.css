@@ -451,3 +451,83 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   .tg-c2 { min-width: 90px; width: 90px; }
   .tg-c3 { left: 142px; }
 }
+
+/* =========================================================
+   PHONE layout (≤700px) for the ADMIN editor. A separate, stylus-friendly card
+   view: one item per screen, swipe or ‹ › to move. EVERYTHING is inside this
+   media query, so the desktop grid (>700px) stays byte-for-byte unchanged.
+   ========================================================= */
+@media (max-width: 700px) {
+  /* desktop mode locks the page scroll; on a phone we scroll the page normally */
+  body.tg-mode { overflow: auto; }
+
+  .tgm { display: flex; flex-direction: column; gap: 0.55rem; padding-bottom: 4.8rem; }
+
+  /* top bar: back · year · search · hide-verified */
+  .tgm-top { display: flex; align-items: center; gap: 0.4rem; padding: 0.1rem 0; }
+  .tgm-top .tg-back { font-size: 1.6rem; line-height: 1; padding: 0 0.25rem; color: var(--color-text-muted); text-decoration: none; }
+  .tgm-year { font: inherit; padding: 0.45rem 0.4rem; border-radius: 9px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
+  .tgm-search { flex: 1 1 auto; min-width: 0; font: inherit; padding: 0.5rem 0.6rem; border-radius: 9px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
+  .tgm-chip { flex: none; font-size: 0.78rem; }
+
+  /* progress row: ‹  N / total · verif.  [saved]  › */
+  .tgm-prog { display: flex; align-items: center; gap: 0.5rem; }
+  .tgm-progtxt { flex: 1 1 auto; font-weight: 800; font-size: 1rem; color: var(--color-text); }
+  .tgm-progtxt small { font-weight: 700; font-size: 0.78rem; color: var(--color-text-muted); }
+  .tgm-save { flex: none; min-width: 0; font-size: 0.72rem; }
+  .tgm-navbtn { flex: none; width: 2.7rem; height: 2.7rem; border-radius: 50%; cursor: pointer; font-size: 1.5rem; font-weight: 800; line-height: 1; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
+  .tgm-navbtn:active { background: var(--color-primary); color: #fff; }
+
+  /* the item card */
+  .tgm-card { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: var(--shadow-sm); padding: 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
+
+  .tgm-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; }
+  .tgm-year-chip { flex: none; font-weight: 800; font-size: 0.82rem; padding: 0.18rem 0.6rem; border-radius: 999px; background: #efe7ff; color: #5b21b6; }
+  .tgm-meta { font-size: 0.85rem; color: var(--color-text-muted); display: inline-flex; align-items: center; gap: 0.3rem; }
+  .tgm-sep { opacity: 0.5; }
+  .tgm-spacer { flex: 1 1 auto; }
+  .tgm-ed { min-width: 1.1rem; border-bottom: 1px dashed var(--color-border); padding: 0 0.15rem; color: var(--color-text); }
+  .tgm-ed--no { min-width: 1.6rem; text-align: center; font-weight: 700; }
+  .tgm-ed:focus { outline: none; border-bottom-color: var(--color-primary); background: #fffef7; }
+  .tgm-ed:empty::before { content: attr(data-ph); color: #b9b9c6; }
+
+  /* big verify + publish toggles */
+  .tgm-verify { flex: none; width: 2.6rem; height: 2.6rem; padding: 0; border: none; background: none; cursor: pointer; display: inline-grid; place-items: center; border-radius: 50%; }
+  .tgm-verify svg { width: 2.05rem; height: 2.05rem; }
+  .tgm-verify .tg-dots { stroke: #9aa0a6; }
+  .tgm-verify .tg-tick { stroke: #158a3a; opacity: 0; transition: opacity 0.15s ease; }
+  .tgm-verify.on { background: #dcfce7; }
+  .tgm-verify.on .tg-dots { stroke: #22c55e; }
+  .tgm-verify.on .tg-tick { opacity: 1; }
+  .tgm-publish { flex: none; width: 2.5rem; height: 2.5rem; border-radius: 50%; cursor: pointer; display: inline-grid; place-items: center; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted); }
+  .tgm-publish svg { width: 1.25rem; height: 1.25rem; }
+  .tgm-publish.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+  .tgm-lab { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); margin-top: 0.55rem; }
+  .tgm-lab small { text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+  /* editable rich cells → full-width boxes, comfy for a stylus */
+  .tgm-card .tg-rich { min-width: 0; max-width: none; width: 100%; font-size: 1rem; line-height: 1.55; padding: 0.55rem 0.65rem; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface); }
+  .tgm-card .tg-rich:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; background: #fffef7; }
+  .tgm-card .tg-rich:empty::before { content: "—"; color: #c9c9d6; }
+  .tgm-q { font-weight: 600; text-align: justify; }
+
+  .tgm-opt { display: flex; align-items: flex-start; gap: 0.55rem; }
+  .tgm-optk { flex: none; width: 2.1rem; height: 2.1rem; margin-top: 0.1rem; display: grid; place-items: center; border-radius: 50%; font-weight: 800; background: var(--color-surface); border: 1.5px solid var(--color-border); }
+  .tgm-optt { flex: 1 1 auto; }
+
+  .tgm-ans-wrap { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 0.7rem; }
+  .tgm-ans-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+  .tgm-ans-lab { flex: 1 1 100%; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-muted); }
+  .tgm-ans { white-space: normal; }
+  /* BIG tappable answer letters */
+  .tgm-ans .tg-letter { width: 2.8rem; height: 2.8rem; margin: 0; border-radius: 13px; font-size: 1.1rem; }
+  .tgm-ans .tg-same { height: 2.8rem; padding: 0 0.7rem; font-size: 0.85rem; }
+
+  /* fixed bottom action bar: ‹ Înapoi · B U I · Înainte › */
+  .tgm-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.7rem; background: var(--color-bg); border-top: 1px solid var(--color-border); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06); }
+  .tgm-navbig { flex: 1 1 auto; padding: 0.75rem 0.5rem; border-radius: 12px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
+  .tgm-navbig:active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+  .tgm-fmt { display: inline-flex; gap: 0.3rem; flex: none; }
+  .tgm-fmt .tg-fmt { width: 2.6rem; height: 2.6rem; font-size: 1.1rem; }
+}
