@@ -40,6 +40,7 @@ const state = {
   items: [], loading: false,
   session: "", hideVerified: false, onlyNo2026: false, search: "",
   zoom: 1,
+  find: "", repl: "", frWhole: true, frCase: true,
 };
 
 export async function initTestAdminGrid(mountEl) {
@@ -134,6 +135,59 @@ async function bulkBold(field) {
   render();
 }
 
+// ---------- find & replace (visible rows only) ----------
+// Replaces inside TEXT NODES only, so <b>/<u>/<i> formatting is never touched.
+function replaceInHtml(html, find, repl, whole, cs) {
+  if (!find) return null;
+  const escd = find.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pat = whole ? `(?<![\\p{L}\\p{N}_])${escd}(?![\\p{L}\\p{N}_])` : escd;
+  let re;
+  try { re = new RegExp(pat, (cs ? "g" : "gi") + "u"); }
+  catch { re = new RegExp(escd, cs ? "g" : "gi"); } // fallback if lookbehind/unicode unsupported
+  const tpl = document.createElement("template");
+  tpl.innerHTML = String(html);
+  const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let changed = false;
+  nodes.forEach((n) => {
+    const nv = n.nodeValue.replace(re, () => repl);
+    if (nv !== n.nodeValue) { n.nodeValue = nv; changed = true; }
+  });
+  return changed ? sanitizeRich(tpl.innerHTML) : null;
+}
+
+async function findReplace() {
+  const find = state.find.trim();
+  if (!find) { showToast("Scrie textul căutat."); return; }
+  const repl = state.repl;
+  const fields = ["question", "option_a", "option_b", "option_c", "option_d", "observation"];
+  const targets = [];
+  for (const it of filtered()) {                 // ONLY the visible rows
+    for (const f of fields) {
+      const cur = fieldVal(it, f);
+      if (!cur) continue;
+      const next = replaceInHtml(cur, find, repl, state.frWhole, state.frCase);
+      if (next != null && next !== cur) targets.push([it, f, next]);
+    }
+  }
+  if (!targets.length) { showToast(`„${find}" nu apare în intrările vizibile.`); return; }
+  const save = root.querySelector("#tg-save");
+  let done = 0, failed = 0;
+  const CHUNK = 12;
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    // eslint-disable-next-line no-await-in-loop
+    await Promise.all(targets.slice(i, i + CHUNK).map(async ([it, f, next]) => {
+      const ok = await updateTestItem(it.id, { [f]: next });
+      if (ok) { applyLocal(it, f, next); done++; } else failed++;
+    }));
+    if (save) { save.textContent = `Se salvează… ${done}/${targets.length}`; save.className = "tg-savestate is-saving"; }
+  }
+  showSaved(failed === 0);
+  showToast(`Înlocuit în ${done} celule` + (failed ? ` (${failed} eșuate)` : ""));
+  render();
+}
+
 // ---------- render ----------
 function render() {
   const sessions = [...new Set(state.items.map((i) => i.session).filter(Boolean))].sort();
@@ -175,6 +229,16 @@ function render() {
       <span class="tg-count">${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați</span>
     </div>
 
+    <div class="tg-toolbar tg-fr-row">
+      <span class="tg-frlabel">Caută &amp; înlocuiește <b>(doar în intrările vizibile)</b>:</span>
+      <input id="tg-find" class="tg-frin" type="text" placeholder="caută" value="${esc(state.find)}" />
+      <span class="tg-fr-arrow">→</span>
+      <input id="tg-repl" class="tg-frin" type="text" placeholder="înlocuiește cu" value="${esc(state.repl)}" />
+      <label class="tg-frchk"><input type="checkbox" id="tg-fr-whole"${state.frWhole ? " checked" : ""} /> cuvânt întreg</label>
+      <label class="tg-frchk"><input type="checkbox" id="tg-fr-cs"${state.frCase ? " checked" : ""} /> Aa</label>
+      <button type="button" class="tg-frbtn" data-action="find-replace">Înlocuiește</button>
+    </div>
+
     <div class="tg-scroll">
       ${state.loading
         ? `<div class="tg-empty">Se încarcă…</div>`
@@ -193,10 +257,10 @@ function tableHtml(rows) {
           <th class="tg-fix tg-c2">Sesiune</th>
           <th class="tg-fix tg-c3">Nr.</th>
           <th>Enunț ${boldColBtn("question")}</th>
-          <th>A ${boldColBtn("option_a")}</th><th>B ${boldColBtn("option_b")}</th><th>C ${boldColBtn("option_c")}</th><th>D ${boldColBtn("option_d")}</th>
+          <th>A</th><th>B</th><th>C</th><th>D</th>
           <th title="Răspunsul din grila oficială (istoric)">Corect (ist.)</th>
           <th title="Răspunsul pe gramatica 2026">Corect 2026</th>
-          <th>Observații ${boldColBtn("observation")}</th>
+          <th>Observații</th>
           <th title="Verificat de profesor (control intern)">Verificat</th>
           <th title="Publicat → vizibil elevilor">Publicat</th>
         </tr>
@@ -303,10 +367,14 @@ function wireEvents() {
   root.addEventListener("change", (e) => {
     if (e.target.id === "tg-year") { state.year = Number(e.target.value); state.session = ""; return load(); }
     if (e.target.id === "tg-ses") { state.session = e.target.value; return render(); }
+    if (e.target.id === "tg-fr-whole") { state.frWhole = e.target.checked; return; }
+    if (e.target.id === "tg-fr-cs") { state.frCase = e.target.checked; return; }
   });
 
   root.addEventListener("input", (e) => {
     if (e.target.id === "tg-search") { state.search = e.target.value; renderBodyOnly(); }
+    else if (e.target.id === "tg-find") state.find = e.target.value;
+    else if (e.target.id === "tg-repl") state.repl = e.target.value;
   });
 
   // format buttons must NOT steal the caret from the focused cell
@@ -325,6 +393,8 @@ function wireEvents() {
     if (zb) return zoom(zb.dataset.zoom);
     const bc = e.target.closest("[data-boldcol]");
     if (bc) return bulkBold(bc.dataset.boldcol);
+    const fr = e.target.closest("[data-action=find-replace]");
+    if (fr) return findReplace();
     const tog = e.target.closest("[data-toggle]");
     if (tog) { state[tog.dataset.toggle] = !state[tog.dataset.toggle]; return render(); }
 
@@ -419,6 +489,22 @@ async function toggleVerified(btn) {
   it.verified = next;
   btn.classList.toggle("on", next); // the green tick shows/hides via the .on class
   showSaved(true);
+  // With „Ascunde verificații" on, the row you just verified fades out after 1s.
+  if (next && state.hideVerified) scheduleHide(btn.closest(".tg-row"), it);
+}
+
+function scheduleHide(row, it) {
+  if (!row) return;
+  setTimeout(() => {
+    if (!row.isConnected || !state.hideVerified || !it.verified) return; // still applies?
+    row.classList.add("tg-fading");
+    setTimeout(() => { if (row.isConnected) row.remove(); syncCount(); }, 350);
+  }, 1000);
+}
+
+function syncCount() {
+  const count = root.querySelector(".tg-count");
+  if (count) count.textContent = `${filtered().length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați`;
 }
 
 async function togglePublished(btn) {

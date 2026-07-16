@@ -324,6 +324,18 @@
 .tg-fmt:hover { border-color: var(--color-primary); }
 .tg-count { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: var(--color-text-muted); }
 
+/* find & replace row */
+.tg-fr-row { font-size: 0.82rem; }
+.tg-frlabel { color: var(--color-text-muted); }
+.tg-frin { font: inherit; padding: 0.25rem 0.5rem; border-radius: 7px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); min-width: 8.5rem; }
+.tg-fr-arrow { color: var(--color-text-muted); font-weight: 800; }
+.tg-frchk { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--color-text-muted); font-weight: 600; user-select: none; }
+.tg-frbtn { font: inherit; font-weight: 800; padding: 0.3rem 0.8rem; border-radius: 999px; border: 1px solid var(--color-primary); background: var(--color-primary); color: #fff; cursor: pointer; }
+.tg-frbtn:hover { filter: brightness(1.08); }
+
+/* row fading out when auto-hidden after verify */
+.tg-row.tg-fading { opacity: 0.12; transition: opacity 0.35s ease; }
+
 .tg-hint { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--color-text-muted); }
 .tg-empty { padding: var(--space-lg); text-align: center; color: var(--color-text-muted); }
 
