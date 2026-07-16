@@ -371,10 +371,12 @@
 .tg-tg { text-align: center; }
 .tg-verify, .tg-publish {
   width: 1.7rem; height: 1.7rem; border-radius: 50%; cursor: pointer; font-size: 0.9rem; line-height: 1;
+  display: inline-grid; place-items: center;
   border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
 }
+.tg-publish svg { width: 0.95rem; height: 0.95rem; display: block; }
 .tg-verify.on { background: #16a34a; color: #fff; border-color: #16a34a; }   /* verificat = verde ✓ */
-.tg-publish.on { background: #2563eb; border-color: #2563eb; }               /* publicat = albastru 📢 */
+.tg-publish.on { background: #2563eb; color: #fff; border-color: #2563eb; }  /* publicat = albastru, iconul upload alb */
 
 /* plain editable cells (An / Sesiune / Nr.) */
 .tg-edit { cursor: text; }

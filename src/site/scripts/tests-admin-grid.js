@@ -27,6 +27,8 @@ import { showToast } from "../../shared/scripts/toast.js";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const LETTERS = ["A", "B", "C", "D"];
+// „Publicat" icon — a clean upload glyph (arrow out of a tray), tinted via currentColor.
+const UPLOAD_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`;
 
 let root = null;
 let wired = false;
@@ -130,7 +132,7 @@ function render() {
         ? `<div class="tg-empty">Se încarcă…</div>`
         : (!rows.length ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : tableHtml(rows))}
     </div>
-    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D, Verificat sau Publicat. Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). <b>Verificat</b> ✓ = l-ai controlat tu (intern); <b>Publicat</b> 📢 = e vizibil elevilor.</p>`;
+    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D, Verificat sau Publicat. Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). <b>Verificat</b> ✓ = l-ai controlat tu (intern); <b>Publicat</b> 📤 = e vizibil elevilor.</p>`;
   requestAnimationFrame(fitHeight);
 }
 
@@ -182,7 +184,7 @@ function rowHtml(it) {
       ${letters("correct_2026", rid, it.correct2026)}
       ${rich("observation", it.observation)}
       <td class="tg-tg"><button type="button" class="tg-verify${it.verified ? " on" : ""}" data-action="verify" data-id="${rid}" title="${it.verified ? "Verificat" : "Neverificat"}">${it.verified ? "✓" : "○"}</button></td>
-      <td class="tg-tg"><button type="button" class="tg-publish${it.published ? " on" : ""}" data-action="publish" data-id="${rid}" title="${it.published ? "Publicat — vizibil elevilor" : "Nepublicat"}">${it.published ? "📢" : "○"}</button></td>
+      <td class="tg-tg"><button type="button" class="tg-publish${it.published ? " on" : ""}" data-action="publish" data-id="${rid}" title="${it.published ? "Publicat — vizibil elevilor" : "Nepublicat"}">${UPLOAD_SVG}</button></td>
     </tr>`;
 }
 
@@ -376,7 +378,7 @@ async function togglePublished(btn) {
   const ok = await setTestPublished(it.id, next);
   if (!ok) { showSaved(false); showToast("Nu am putut publica."); return; }
   it.published = next;
-  btn.classList.toggle("on", next); btn.textContent = next ? "📢" : "○";
+  btn.classList.toggle("on", next); // the upload icon stays; color signals the state
   btn.closest(".tg-row").classList.toggle("is-pub", next); // row "live" = published
   showSaved(true);
   showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
