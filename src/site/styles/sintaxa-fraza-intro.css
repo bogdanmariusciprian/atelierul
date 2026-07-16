@@ -1,0 +1,430 @@
+/* =========================================================
+   Lesson „Sintaxa frazei – Introducere” — page-specific styles.
+   Load AFTER shared/styles/main.css + site/styles/lesson.css; used only by
+   lectii/sintaxa-frazei/introducere/. Every class is prefixed `sf-` so nothing
+   collides with the global .btn/.card/.node/.hero.
+   THEME: the neutrals map onto the SITE tokens (variables.css) so the page
+   belongs to the site; the MARKER colors stay pedagogical and are declared
+   once below — violet = circle (subordinating), blue = square (coordinating,
+   = --lesson-color of the domain), amber = predicate underline, rose = cut.
+   Animation order comes from CSS variables set per element by the JS
+   (fraza-walkthrough.js): --d underline, --m ring, --b bar, --c cut.
+   ========================================================= */
+.lesson--sf {
+  /* neutrals from the site's design tokens */
+  --sf-ink: var(--color-text);
+  --sf-muted: var(--color-text-muted);
+  --sf-card: #fff;
+  --sf-line: var(--color-border);
+  --sf-shadow: var(--shadow-md);
+  --sf-r: 16px;
+  /* pedagogical markers (meaningful colors — keep them stable) */
+  --sf-violet: #7c3aed;
+  --sf-blue: var(--lesson-color, #2563eb);
+  --sf-amber: #e8890c;
+  --sf-mint: var(--color-primary);
+  --sf-gold: #eab308;
+  --sf-rose: #e11d68;
+  --sf-grad: var(--grad-brand);
+}
+
+/* Intro chips (cerc / pătrat / bară) under the lesson intro */
+.sf-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.sf-chip {
+  border: 1.5px solid var(--sf-line); background: var(--sf-card); color: var(--sf-muted);
+  padding: 0.32rem 0.8rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; user-select: none;
+}
+.sf-chip .sy-c { color: var(--sf-violet); }
+.sf-chip .sy-s { color: var(--sf-blue); }
+.sf-chip .sy-b { color: var(--sf-ink); }
+
+/* Section label — numbered pill, livelier than "1 · …" */
+.sf-seclabel {
+  display: inline-flex; align-items: center; gap: 0.55rem; font-weight: 800; font-size: 0.82rem; color: var(--sf-violet);
+  background: #f1ecff; padding: 0.3rem 0.95rem 0.3rem 0.32rem; border-radius: 999px; margin-bottom: 0.5rem; user-select: none;
+}
+.sf-seclabel .kn {
+  display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; flex: none;
+  background: var(--sf-grad); color: #fff; font-size: 0.84rem; box-shadow: 0 5px 13px -4px rgba(14, 169, 123, 0.7);
+}
+.sf-seclabel.s2 { background: #e6f0ff; color: #1d4ed8; }
+.sf-seclabel.s2 .kn { background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 5px 13px -4px rgba(37, 99, 235, 0.7); }
+.sf-seclabel.s3 { background: #fdf1da; color: #b45309; }
+.sf-seclabel.s3 .kn { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 5px 13px -4px rgba(217, 119, 6, 0.6); }
+.sf-seclabel.s4 { background: #ffe4ec; color: #be123c; }
+.sf-seclabel.s4 .kn { background: linear-gradient(135deg, #fb7185, #e11d48); box-shadow: 0 5px 13px -4px rgba(225, 29, 72, 0.6); }
+.sf-seclabel.s5 { background: #d8f7e8; color: #047857; }
+.sf-seclabel.s5 .kn { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 5px 13px -4px rgba(5, 150, 105, 0.6); }
+.sf-sub { color: var(--sf-muted); margin: 0.2rem 0 1.4rem; }
+
+/* ── 1. DEFINIȚIE — syllogism: two premises → conclusion ─────────────────── */
+.sf-defsyl { max-width: 760px; margin: 8px auto 0; }
+.sf-ds-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: stretch; }
+.sf-ds-card {
+  background: var(--sf-card); border: 1px solid var(--sf-line); border-radius: 14px; padding: 13px 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.sf-ds-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -22px rgba(124, 58, 237, 0.5); }
+.sf-ds-lab { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sf-violet); }
+.sf-ds-card p { margin: 0.28rem 0 0; font-size: 1rem; line-height: 1.5; }
+.sf-ds-q { font-style: italic; color: var(--sf-rose); font-weight: 600; font-size: 0.9rem; }
+.sf-ds-join { align-self: center; text-align: center; max-width: 5rem; font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #8b5cf6; }
+.sf-ds-down { text-align: center; margin: 11px 0; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #059669; }
+.sf-ds-down::before, .sf-ds-down::after { content: "↓"; margin: 0 0.5em; color: #10b981; font-size: 1.05em; }
+.sf-ds-final { background: linear-gradient(135deg, #faf5ff, #eef6ff); border: 1.5px solid #c7ebda; box-shadow: 0 14px 30px -22px rgba(16, 185, 129, 0.5); }
+.sf-ds-final .sf-ds-lab { color: #059669; }
+.sf-ds-final p { font-size: 1.1rem; font-weight: 700; }
+.sf-k-prop, .sf-k-pred { font-weight: 800; padding: 0.05em 0.4em; border-radius: 7px; white-space: nowrap; }
+.sf-k-prop { color: #5b21b6; background: #efe7ff; }
+.sf-k-pred { color: #7a4a05; background: #fdeccb; }
+.sf-predpill { display: inline-block; box-shadow: inset 0 -0.35em 0 -0.05em #fde3bf; font-weight: 700; }
+@media (max-width: 640px) {
+  .sf-ds-row { grid-template-columns: 1fr; }
+  .sf-ds-join { max-width: none; padding: 3px 0; }
+}
+
+/* ── 2. WALKTHROUGH ──────────────────────────────────────────────────────── */
+/* Wider than the lesson column, so the sentence + rings fit comfortably.
+   48px lateral slack ⇒ never wider than the viewport (scrollbar included). */
+.sf-walk {
+  width: min(1240px, calc(100vw - 48px)); position: relative; left: 50%; transform: translateX(-50%);
+  background: var(--sf-card); border: 1px solid var(--sf-line); border-radius: 24px;
+  padding: clamp(16px, 3.6vw, 26px); box-shadow: var(--sf-shadow);
+}
+.sf-walk-grid { display: grid; grid-template-columns: 250px 1fr; gap: 22px; align-items: start; }
+
+/* steps list (side) — sticky, clears the XP bar like every sticky panel */
+.sf-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; position: sticky; top: var(--sticky-top, 14px); }
+.sf-steps li {
+  display: grid; grid-template-columns: 1.7rem 1fr; gap: 10px; align-items: center; padding: 0.5rem 0.6rem;
+  border-radius: 12px; cursor: pointer; color: var(--sf-muted); font-size: 0.9rem; font-weight: 600;
+  transition: 0.18s; border: 1px solid transparent; user-select: none;
+}
+.sf-steps li .n {
+  width: 1.7rem; height: 1.7rem; border-radius: 8px; display: grid; place-items: center; font-weight: 800;
+  font-size: 0.82rem; background: #eef0f7; color: var(--sf-muted); flex: none; transition: 0.18s;
+}
+.sf-steps li:hover { background: #f6f5ff; }
+.sf-steps li.done { color: var(--sf-ink); }
+.sf-steps li.done .n { background: #e9fbf3; color: var(--sf-mint); }
+.sf-steps li.on { background: #f3ebff; border-color: #e3d6ff; color: var(--sf-ink); }
+.sf-steps li.on .n { background: var(--sf-grad); color: #fff; }
+/* steps not reached yet — unavailable until you get there */
+.sf-steps li.locked { opacity: 0.5; cursor: not-allowed; }
+.sf-steps li.locked:hover { background: transparent; }
+.sf-steps li.locked .n { background: #eef0f7; color: transparent; font-size: 0; }
+.sf-steps li.locked .n::before { content: "🔒"; font-size: 0.78rem; }
+.sf-steps li.locked .txt { color: var(--sf-muted); }
+
+.sf-walk-main { min-width: 0; }
+
+/* the sentence stage — its own band, auto-shrunk to fit ONE line (no scroll) */
+.sf-stage {
+  font-size: 1.15rem; line-height: 3; text-align: center; padding: 56px 12px 30px;
+  white-space: nowrap; overflow: visible; border-bottom: 1px solid var(--sf-line); margin-bottom: 12px;
+}
+/* while measuring (auto-fit) and on revisits, animations are OFF (no flicker) */
+.sf-stage.measuring, .sf-stage.measuring *, .sf-stage.measuring *::before, .sf-stage.measuring *::after,
+.sf-stage.no-anim, .sf-stage.no-anim *, .sf-stage.no-anim *::before, .sf-stage.no-anim *::after,
+.sf-walk.no-anim .sf-cnt, .sf-walk.no-anim .sf-formula, .sf-walk.no-anim .sf-node { animation: none !important; transition: none !important; }
+.sf-stage .tok { position: relative; display: inline-block; margin: 0 0.55em; }
+@media (max-width: 760px) { .sf-stage { padding-top: 50px; } }
+/* min-width:0 as the BASE (not "auto"): only then does the word's widening
+   animate smoothly when the ring appears — auto→length doesn't transition. */
+.sf-stage .tok .w { position: relative; display: inline-block; min-width: 0; padding: 0.05em 0.12em; transition: color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, min-width 0.45s ease; }
+
+/* 1) predicate underline — thin, close to the text, drawn one by one */
+.sf-stage .tok.pred .w { line-height: 1.5; padding: 0 0.12em; } /* no vertical padding, so the continuous and the pieced underline sit at the SAME level */
+/* every piece = inline-block (not inline), so the underline's ::after refers
+   to the SAME box edge — the line comes out at the exact same level everywhere */
+.sf-stage .tok.pred .ul, .sf-stage .tok.pred .cl { position: relative; display: inline-block; vertical-align: baseline; white-space: pre; }
+.sf-stage .tok.pred .ul::after {
+  content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: -3px; height: 2px; background: var(--sf-amber);
+  border-radius: 2px; transform: scaleX(0); transform-origin: left; transition: transform 0.55s ease;
+}
+.sf-stage.s-pred .tok.pred .ul::after { transform: scaleX(1); transition-delay: calc(var(--d, 0) * 0.7s); }
+/* CONTINUOUS predicates (no interposed clitic): ONE line under the WHOLE
+   predicate, so "Să știi / să fac / să vând / trebuie / vreau" get an
+   unbroken underline that passes under the "să" circle. */
+.sf-stage .tok.pred:not(.pred-caps) .ul::after { display: none; }
+.sf-stage .tok.pred:not(.pred-caps) .w::after {
+  content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: -3px; height: 2px;
+  background: var(--sf-amber); border-radius: 2px; transform: scaleX(0); transform-origin: left; transition: transform 0.55s ease;
+}
+.sf-stage.s-pred .tok.pred:not(.pred-caps) .w::after { transform: scaleX(1); transition-delay: calc(var(--d, 0) * 0.7s); }
+/* clitic predicate with hyphen („nu-mi place”): small vertical caps at the
+   underline's ENDS — on the start of "nu-" and the end of " place", meeting
+   the horizontal line in the corner (same bottom edge, at each .ul's end) */
+.sf-stage .tok.pred-caps .ul:first-child:not(.pcirc)::after { left: -5px; } /* the underline pokes slightly out of the word… */
+.sf-stage .tok.pred-caps .ul:last-child::after { right: -5px; }
+.sf-stage .tok.pred-caps .ul:first-child:not(.pcirc)::before,
+.sf-stage .tok.pred-caps .ul:last-child::before {
+  content: ""; position: absolute; bottom: -3px; width: 2px; height: 0.9em;
+  background: var(--sf-amber); transform: scaleY(0); transform-origin: bottom; transition: transform 0.35s ease;
+}
+.sf-stage .tok.pred-caps .ul:first-child:not(.pcirc)::before { left: -5px; } /* …and the vertical cap sits at that end */
+.sf-stage .tok.pred-caps .ul:last-child::before { right: -5px; }
+.sf-stage.s-pred .tok.pred-caps .ul:first-child:not(.pcirc)::before,
+.sf-stage.s-pred .tok.pred-caps .ul:last-child::before { transform: scaleY(1); transition-delay: calc(var(--d, 0) * 0.7s + 0.2s); }
+/* „să…spui”: „să” is a circle (::before = the ring), so the left cap is an <i class=capL> */
+.sf-stage .tok.pred-caps .ul.pcirc:first-child::after { left: -4px; }
+.sf-stage .tok.pred-caps .pcirc .capL {
+  position: absolute; left: -4px; bottom: -3px; width: 2px; height: 0.9em; background: var(--sf-amber);
+  border-radius: 1px; transform: scaleY(0); transform-origin: bottom; transition: transform 0.35s ease;
+}
+.sf-stage.s-pred .tok.pred-caps .pcirc .capL { transform: scaleY(1); transition-delay: calc(var(--d, 0) * 0.7s + 0.2s); }
+
+/* 3) circle (subordinating) & square (coordinating) — the WORD is already
+   there; only the RING animates. The box stays inline-block (no display
+   change → min-width transitions SMOOTHLY); the ring is a ::before overlay,
+   the text stays on the baseline. */
+.sf-stage .tok.circle .w, .sf-stage .tok.square .w { line-height: 1.5; text-align: center; }
+.sf-stage.s-marks .tok.circle .w { min-width: 1.9em; color: var(--sf-violet); transition: min-width 0.45s ease calc(var(--m, 0) * 0.7s + 0.5s), color 0.3s ease calc(var(--m, 0) * 0.7s + 0.9s); }
+.sf-stage.s-marks .tok.square .w { min-width: 1.75em; color: var(--sf-blue); transition: min-width 0.45s ease calc(var(--m, 0) * 0.7s + 0.5s), color 0.3s ease calc(var(--m, 0) * 0.7s + 0.9s); }
+.sf-stage.s-marks .tok.circle .w::before, .sf-stage.s-marks .tok.square .w::before {
+  content: ""; position: absolute; z-index: 2; top: -0.16em; bottom: -0.28em; left: -0.06em; right: -0.06em;
+  border: 2.5px solid currentColor; transition: border-color 0.3s ease;
+  animation: sfRingIn 0.55s ease backwards; animation-delay: calc(var(--m, 0) * 0.7s + 0.5s);
+}
+.sf-stage.s-marks .tok.circle .w::before { border-radius: 50%; }
+.sf-stage.s-marks .tok.square .w::before { border-radius: 5px; }
+@keyframes sfRingIn { 0% { opacity: 0; transform: scale(0.3); } 60% { transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+/* circle on a PIECE of a predicate („Să”, „să”): it's BOTH circled AND
+   underlined — the .pcirc box becomes the circle while the underline stays
+   below → the line passes UNDER the ring (the ring sits on the line). */
+.sf-stage .tok.pred .pcirc { position: relative; display: inline-block; vertical-align: baseline; min-width: 0; padding: 0 0.12em; transition: color 0.3s ease, min-width 0.45s ease; }
+/* only at step 3: widens to ring size, centers, turns violet AFTER the ring lands */
+.sf-stage.s-marks .tok.pred .pcirc { min-width: 1.75em; text-align: center; color: var(--sf-violet); transition: min-width 0.45s ease calc(var(--m, 0) * 0.7s + 0.5s), color 0.3s ease calc(var(--m, 0) * 0.7s + 0.9s); }
+.sf-stage.s-marks .tok.pred .pcirc::before {
+  content: ""; position: absolute; z-index: 2; top: -0.16em; bottom: -0.26em; left: -0.05em; right: -0.05em;
+  border: 2.5px solid currentColor; border-radius: 50%; transition: border-color 0.3s ease, opacity 0.3s ease;
+  animation: sfRingIn 0.55s ease backwards; animation-delay: calc(var(--m, 0) * 0.7s + 0.5s);
+}
+/* the cut on „Să”: only the red diagonal marks the rejected relation (an <i>,
+   so it doesn't fight the ring ::before and the underline ::after) */
+.sf-stage.s-cut .tok.pred .pcut i {
+  position: absolute; z-index: 3; left: 50%; top: 50%; width: 2px; height: 3.5em; background: var(--sf-rose);
+  border-radius: 2px; transform: translate(-50%, -50%) rotate(-45deg); transform-origin: center;
+  animation: sfCutDraw 0.45s ease backwards; animation-delay: calc(var(--c, 0) * 0.7s + 0.6s);
+}
+/* 4) the cut — clean 45° diagonal, top-left → bottom-right ("\") */
+.sf-stage.s-cut .tok.cut .w::after {
+  content: ""; position: absolute; z-index: 3; left: 50%; top: 50%; width: 2px; background: var(--sf-rose);
+  border-radius: 2px; transform: translate(-50%, -50%) rotate(-45deg); transform-origin: center;
+  animation: sfCutDraw 0.45s ease backwards; animation-delay: calc(var(--c, 0) * 0.7s + 0.6s);
+}
+@keyframes sfCutDraw { from { transform: translate(-50%, -50%) rotate(-45deg) scaleY(0); } to { transform: translate(-50%, -50%) rotate(-45deg) scaleY(1); } }
+.sf-stage.s-cut .tok.cut-ext .w::after { height: 3.5em; }  /* outside: goes past the mark */
+.sf-stage.s-cut .tok.cut-int .w::after { height: 1.05em; } /* inside: stays within */
+
+/* 5) bars — slash-like, stretched upward; the number in a chip above the tip.
+   A bar starts at width 0 and GROWS (no instant pop), so word spacing is smooth. */
+.sf-stage .bar { position: relative; display: inline-block; width: 0; vertical-align: middle; transition: width 0.55s ease; }
+.sf-stage .bar i {
+  position: absolute; left: 50%; top: -1.95em; height: 3.3em; width: 2px; background: var(--sf-ink); border-radius: 2px;
+  transform: translateX(-50%) rotate(22deg); transform-origin: center; opacity: 0; transition: opacity 0.4s ease;
+}
+/* the wrapper stays at the sentence's font-size, so the em-position is NOT
+   shrunk by the chip; the small chip (font-size:.6em) only carries the text. */
+.sf-stage .bar .labwrap { position: absolute; top: -3em; left: calc(50% - 0.5em); transform: translateX(-50%); display: none; transition: left 0.3s ease; }
+.sf-stage .bar .lab {
+  display: inline-block; font-size: 0.6em; font-weight: 800; line-height: 1.15;
+  white-space: nowrap; color: var(--sf-ink); background: #fff; padding: 0.15em 0.5em; border-radius: 7px;
+  box-shadow: 0 2px 8px -3px rgba(30, 33, 60, 0.4), 0 0 0 1.5px var(--sf-line);
+}
+/* the kind (PP/PS): starts clipped at max-width 0 and WIDENS one by one */
+.sf-stage .bar .type { color: var(--sf-violet); padding-left: 0.15em; display: inline-block; max-width: 0; overflow: hidden; opacity: 0; white-space: nowrap; transition: max-width 0.4s ease, opacity 0.3s ease; }
+.sf-stage.s-bars .bar { width: 1.5em; transition-delay: calc(var(--b, 0) * 0.7s); }
+.sf-stage.s-bars .bar i { opacity: 1; transition-delay: calc(var(--b, 0) * 0.7s); }
+.sf-stage.s-num .bar .labwrap { display: block; animation: sfNumPop 0.4s cubic-bezier(0.34, 1.5, 0.6, 1) backwards; animation-delay: calc(var(--b, 0) * 0.7s); }
+.sf-stage.s-type .bar .labwrap { left: calc(50% - 1.1em); transition-delay: calc(var(--b, 0) * 0.7s + 0.5s); } /* wider chip → shifts left, in sync with the kind */
+.sf-stage.s-type .bar .type { max-width: 3em; opacity: 1; transition-delay: calc(var(--b, 0) * 0.7s + 0.5s); }
+/* 6) the underlines + bars blink for the check step */
+@keyframes sfBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.12; } }
+.sf-stage.s-check .tok.pred .ul::after,
+.sf-stage.s-check .tok.pred:not(.pred-caps) .w::after { animation: sfBlink 0.8s ease-in-out 3; }
+.sf-stage.s-check .bar i { animation: sfBlink 0.8s ease-in-out 3; }
+@keyframes sfPop { from { opacity: 0; transform: translateY(4px) scale(0.85); } to { opacity: 1; transform: none; } }
+@keyframes sfNumPop { from { opacity: 0; transform: translateX(-50%) translateY(-7px) scale(0.5); } to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
+
+/* explanation + counters */
+.sf-explain { margin-top: 8px; background: #fbfaff; border: 1px solid var(--sf-line); border-radius: 16px; padding: 16px 18px; min-height: 5.2em; }
+.sf-explain h3 { margin: 0.1rem 0 0.3rem; font-size: 1.05rem; display: flex; gap: 0.5rem; align-items: center; }
+.sf-explain h3 .tag { background: var(--sf-grad); color: #fff; width: 1.7rem; height: 1.7rem; border-radius: 8px; display: grid; place-items: center; font-size: 0.85rem; font-weight: 800; flex: none; }
+.sf-explain p { margin: 0; color: var(--sf-muted); }
+/* real shapes (circle/square) inside step 3's text, not characters */
+.sf-lg-c, .sf-lg-s { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -0.18em; margin-right: 0.15em; }
+.sf-lg-c { border: 2.5px solid var(--sf-violet); border-radius: 50%; }
+.sf-lg-s { border: 2.5px solid var(--sf-blue); border-radius: 4px; }
+.sf-counters { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; justify-content: center; align-items: center; }
+.sf-cnt { border: 1.5px solid var(--sf-line); border-radius: 12px; padding: 0.5rem 0.9rem; text-align: center; min-width: 104px; display: none; background: #fff; position: relative; }
+.sf-cnt.on { display: block; animation: sfPop 0.3s ease both; }
+.sf-cnt .n { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+.sf-cnt .t { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--sf-muted); }
+.sf-cnt.pred.on { border-color: var(--sf-amber); } .sf-cnt.pred .n { color: var(--sf-amber); }
+.sf-cnt.rel.on { border-color: var(--sf-violet); } .sf-cnt.rel .n { color: var(--sf-violet); }
+.sf-cnt.prop.on { border-color: var(--sf-mint); animation-delay: 0.7s; } .sf-cnt.prop .n { color: var(--sf-mint); }
+.sf-cnt .hint { font-size: 0.6rem; color: var(--sf-muted); font-weight: 700; margin-top: 2px; }
+/* on the math step, the "relation elements" card grows to 1.2× — the result */
+@keyframes sfRelZoom { 0% { opacity: 0; transform: translateY(4px) scale(0.85); } 55% { opacity: 1; transform: scale(1); } 100% { opacity: 1; transform: scale(1.2); } }
+.sf-cnt.rel.pulse { animation: sfRelZoom 0.8s ease 1.4s both; transform: scale(1.2); margin: 0 0.55em; } /* static + margin, so revisits keep the size and even gaps */
+.sf-formula { text-align: center; margin-top: 12px; font-weight: 800; font-size: 1.12rem; color: var(--sf-ink); display: none; }
+.sf-formula.on { display: block; animation: sfPop 0.3s ease 2.6s both; }
+
+/* controls — the buttons are the SITE's .btn; only the states are local */
+.sf-ctrls { display: flex; align-items: center; gap: 12px; margin-top: 14px; justify-content: space-between; flex-wrap: wrap; }
+.sf-ctrls .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+.sf-ctrls .btn.waiting { cursor: progress; } /* new step: „Înainte” is locked while it animates */
+.sf-progress { font-size: 0.82rem; font-weight: 700; color: var(--sf-muted); }
+
+/* schema — appears at the last step, nodes drop in top-down */
+.sf-schema { margin-top: 18px; display: none; justify-content: center; padding: 14px; border-top: 1px dashed var(--sf-line); }
+.sf-walk.reveal-schema .sf-schema { display: flex; animation: sfPop 0.4s ease both; }
+.sf-walk.reveal-schema .sf-node { animation: sfNodeIn 0.42s ease backwards; }
+.sf-walk.reveal-schema .sf-node:nth-child(1) { animation-delay: 0.12s; }
+.sf-walk.reveal-schema .sf-node:nth-child(2) { animation-delay: 0.22s; }
+.sf-walk.reveal-schema .sf-node:nth-child(3) { animation-delay: 0.32s; }
+.sf-walk.reveal-schema .sf-node:nth-child(4) { animation-delay: 0.42s; }
+.sf-walk.reveal-schema .sf-node:nth-child(5) { animation-delay: 0.52s; }
+.sf-walk.reveal-schema .sf-node:nth-child(6) { animation-delay: 0.62s; }
+.sf-walk.reveal-schema .sf-node:nth-child(7) { animation-delay: 0.72s; }
+@keyframes sfNodeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+.sf-chain { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.sf-node { position: relative; display: flex; align-items: center; gap: 12px; padding: 5px 0; }
+.sf-node .num {
+  width: 2.3rem; height: 2.3rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800;
+  border: 2.5px solid var(--sf-blue); color: var(--sf-blue); background: #fff; z-index: 1;
+}
+.sf-node.pp .num { border-color: var(--sf-gold); color: #92600a; background: #fef3c7; }
+.sf-node .tag { font-size: 0.8rem; font-weight: 800; color: var(--sf-muted); }
+.sf-node:not(:last-child)::after { content: ""; position: absolute; left: 1.15rem; top: 2.3rem; height: 1.05rem; width: 2.5px; background: var(--sf-line); }
+
+/* ── 3. NOTAȚIA — legend cards + live word pills ─────────────────────────── */
+.sf-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.sf-card {
+  background: var(--sf-card); border: 1px solid var(--sf-line); border-radius: var(--sf-r); padding: 20px 22px;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.sf-card:hover { transform: translateY(-3px); box-shadow: var(--sf-shadow); border-color: #e0d5ff; }
+.sf-card:hover .sf-mark { transform: scale(1.12); }
+.sf-legend h3 { margin: 0.1rem 0 0.7rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 1.05rem; }
+.sf-mark { display: inline-grid; place-items: center; width: 2rem; height: 2rem; font-weight: 800; flex: none; transition: transform 0.22s ease; }
+.sf-mark.c { border: 2.5px solid var(--sf-violet); border-radius: 50%; color: var(--sf-violet); }
+.sf-mark.s { border: 2.5px solid var(--sf-blue); border-radius: 5px; color: var(--sf-blue); }
+.sf-words { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.sf-word { display: inline-flex; align-items: center; gap: 0.3em; padding: 0.34rem 0.85rem; border-radius: 999px; font-weight: 600; font-size: 0.92rem; }
+.sf-card--c .sf-word { background: #f3ebff; color: #5b21b6; border-radius: 999px; }
+.sf-card--s .sf-word { background: #e5efff; color: #1e40af; border-radius: 7px; }
+/* faded divider between the title and the pills (fades toward the ends) */
+.sf-cdiv { height: 1px; margin: 2px 2px 13px; background: linear-gradient(90deg, transparent, #d8cef2, transparent); }
+.sf-card--s .sf-cdiv { background: linear-gradient(90deg, transparent, #cadcf6, transparent); }
+/* the "+" pill: same shape/background, dotted outline = add button */
+.sf-word--add {
+  justify-content: center; min-width: 2.1rem; padding: 0.26rem 0.7rem; border: 2px dotted currentColor;
+  font-size: 1.1rem; line-height: 1; cursor: pointer; opacity: 0.7; user-select: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+.sf-word--add:hover, .sf-word--add:focus-visible { opacity: 1; transform: scale(1.06); outline: none; }
+/* inline input: looks like a pill, inherits the card's shape/background */
+.sf-word-input { border: none; box-shadow: 0 0 0 1.6px currentColor inset; font-family: inherit; font-weight: 600; font-size: 0.92rem; width: 7em; max-width: 60vw; }
+.sf-word-input:focus { outline: none; }
+/* a PENDING word (visible to its author + the teacher): dashed, waiting */
+.sf-word--pending { border: 1.6px dashed currentColor; background: transparent !important; opacity: 0.8; }
+.sf-word__wait { font-size: 0.85em; }
+/* the teacher's inline decisions on a pill: tiny ✓ / ✕ */
+.sf-wbtn {
+  border: 0; cursor: pointer; font: inherit; font-size: 0.8em; font-weight: 800; line-height: 1;
+  border-radius: 7px; padding: 0.18em 0.45em; transition: transform 0.15s ease;
+}
+.sf-wbtn:hover { transform: scale(1.15); }
+.sf-wbtn--ok { color: #047857; background: #d8f7e8; }
+.sf-wbtn--no { color: #be123c; background: #ffe4ec; }
+
+/* ── 4. DIFICULTĂȚI — the traps ──────────────────────────────────────────── */
+.sf-trap {
+  display: flex; gap: 14px; align-items: center; padding: 16px 18px; border-radius: 16px;
+  background: #fff5f6; border: 1px solid #fbd5da;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+}
+.sf-trap:hover { transform: translateY(-3px); box-shadow: 0 18px 36px -22px rgba(225, 29, 104, 0.55); border-color: #f6aec2; background: #fff; }
+.sf-trap + .sf-trap { margin-top: 12px; }
+.sf-trap b { color: var(--sf-rose); }
+.sf-trap code { background: #fff; border: 1px solid #fbd5da; padding: 0.05em 0.45em; border-radius: 6px; font-weight: 700; color: var(--sf-rose); }
+.sf-trap:hover .sf-tshape { transform: scale(1.1) rotate(-4deg); }
+/* trap shapes: circle/square × INSIDE cut (short, stays within) / OUTSIDE cut */
+.sf-tshape { position: relative; flex: none; width: 1.7em; height: 1.7em; border: 2.5px solid var(--sf-violet); transition: transform 0.22s ease; }
+.sf-tshape.ci { border-radius: 50%; }
+.sf-tshape.sq { border-color: var(--sf-blue); border-radius: 5px; }
+.sf-tshape::after { content: ""; position: absolute; left: 50%; top: 50%; width: 2px; background: var(--sf-rose); border-radius: 2px; transform: translate(-50%, -50%) rotate(-45deg); }
+.sf-tshape.ci.int::after { height: 1.68em; } /* inside circle: touches the edges (≈ the diameter) */
+.sf-tshape.sq.int::after { height: 2.15em; } /* inside square: reaches the ROUNDED corner */
+.sf-tshape.ci.ext::after { height: 2.6em; }  /* outside: goes past the mark */
+.sf-tshape.sq.ext::after { height: 3.3em; }
+.sf-tnote { display: block; margin-top: 5px; color: var(--sf-muted); font-size: 0.95rem; line-height: 1.55; }
+.sf-tnote i { color: var(--sf-ink); }
+.sf-nuance { font-weight: 700; color: var(--sf-rose); }
+.sf-trap-head { display: flex; align-items: baseline; gap: 0.5em; flex-wrap: wrap; }
+.sf-trap-head b { color: var(--sf-ink); }
+.sf-tflag {
+  display: inline-block; background: #ffe1ea; color: #c11458; font-size: 0.66rem; font-weight: 800;
+  padding: 0.18em 0.6em; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+}
+
+/* ── 5. STRATEGII — each card hides an example (.sf-strat-tip).
+   Behaviour (the „seen” state comes from JS via .revealed):
+     1) first time: hover the CARD ⇒ after 2s the tooltip opens ABOVE it;
+     2) when the tooltip DISAPPEARS the first time ⇒ the small faded corner
+        pill appears; 3) then: hover the PILL ⇒ the SAME tooltip, INSTANTLY.
+   The rule is gated on ":not(.revealed)" so once the pill exists it is the
+   only trigger (otherwise the card's 2s-delay rule would capture the
+   transition and the pill would stop being instant). --pill is set per card
+   (from its emoji's hue) and colors BOTH the pill AND the tooltip. ───────── */
+.sf-strats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sf-strat {
+  position: relative; background: var(--sf-card); border: 1px solid var(--sf-line); border-radius: 14px;
+  padding: 14px 16px; display: flex; gap: 12px; align-items: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.sf-strat:hover { border-color: #d9c9ff; box-shadow: 0 18px 36px -20px rgba(124, 58, 237, 0.55); transform: translateY(-3px); z-index: 20; }
+.sf-strat .k { width: 2.2rem; height: 2.2rem; border-radius: 10px; background: #eef2ff; font-size: 1.15rem; display: grid; place-items: center; flex: none; transition: transform 0.2s ease, background 0.2s ease; }
+.sf-strat:hover .k { transform: scale(1.12) rotate(-3deg); background: #e6ddff; }
+.sf-strat b { display: block; }
+.sf-strat span { color: var(--sf-muted); font-size: 0.92rem; }
+/* hover: after 2s the example opens as a tooltip ABOVE the card; on leave it
+   shrinks instantly toward the top-right corner */
+.sf-strat-tip {
+  position: absolute; bottom: calc(100% + 12px); left: 0; right: 0; z-index: 9;
+  background: var(--pill, #ece7fb); color: #332b63;
+  padding: 13px 18px; border-radius: 14px; font-size: 0.92rem; line-height: 1.6; font-style: italic;
+  box-shadow: 0 22px 44px -20px rgba(60, 50, 90, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  opacity: 0; visibility: hidden; transform: translate(-10px, 36px) scale(0.1); transform-origin: bottom right;
+  transition: opacity 0.3s ease, transform 0.38s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.38s; pointer-events: none;
+}
+/* first time only: while NOT yet „revealed”, the card opens the tooltip after 2s */
+.sf-strat:not(.revealed):hover .sf-strat-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 2s; }
+/* the small faded pill; appears ONLY after the tooltip's first DISAPPEARANCE */
+.sf-strat-pill {
+  position: absolute; top: 9px; right: 9px; z-index: 10; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--pill, #d8cef2); border: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: help; user-select: none; box-shadow: 0 2px 5px -2px rgba(0, 0, 0, 0.25);
+  opacity: 0; visibility: hidden; pointer-events: none; transform: scale(0.4);
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.5, 0.5, 1), visibility 0.25s, filter 0.2s ease;
+}
+.sf-strat.revealed .sf-strat-pill { opacity: 1; visibility: visible; pointer-events: auto; transform: scale(1); }
+.sf-strat.revealed .sf-strat-pill:hover { transform: scale(1.25); filter: saturate(1.5) brightness(0.96); }
+/* hover on the pill = the same tooltip, instantly (no 2s delay) */
+.sf-strat.revealed .sf-strat-pill:hover + .sf-strat-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; transition-duration: 0.12s; }
+.sf-strat-tip::before { content: ""; position: absolute; bottom: -6px; right: 30px; width: 13px; height: 13px; background: var(--pill, #ece7fb); border-radius: 3px; transform: rotate(45deg); }
+.sf-strat-tip::after { content: "\201D"; position: absolute; top: 2px; right: 13px; font-size: 2.3rem; font-style: normal; color: rgba(51, 43, 99, 0.16); line-height: 1; font-family: Georgia, serif; }
+
+/* ── responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  .sf-walk-grid { grid-template-columns: 1fr; }
+  .sf-steps { position: static; flex-direction: row; overflow: auto; gap: 6px; padding-bottom: 4px; }
+  .sf-steps li { grid-template-columns: 1.7rem; justify-items: center; min-width: 2.6rem; padding: 0.4rem; }
+  .sf-steps li .txt { display: none; }
+}
+@media (max-width: 640px) {
+  .sf-two, .sf-strats { grid-template-columns: 1fr; }
+  .sf-stage { line-height: 3.9; }
+}

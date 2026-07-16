@@ -79,6 +79,14 @@ export const LESSONS = [
   { domain: "fonetica", title: "Corespondența sunet – literă" },
 
   // ---------- Sintaxa frazei ----------
+  {
+    domain: "sintaxa-frazei",
+    slug: "sintaxa-frazei-introducere",
+    title: "Introducere: metoda de analiză a frazei",
+    href: "lectii/sintaxa-frazei/introducere/",
+    summary: "Câte predicate, atâtea propoziții – descâlcim fraza pas cu pas, cu cercuri, pătrate și bare.",
+    ready: true,
+  },
   { domain: "sintaxa-frazei", title: "Propoziția și fraza" },
   { domain: "sintaxa-frazei", title: "Propoziția principală și propoziția secundară" },
   { domain: "sintaxa-frazei", title: "Coordonarea (copulativă, adversativă…)" },

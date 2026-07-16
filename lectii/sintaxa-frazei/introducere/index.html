@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Sintaxa frazei: introducere — Atelierul-LRO</title>
+  <meta name="description" content="Lecție interactivă: metoda de analiză a frazei – câte predicate, atâtea propoziții. Descâlcim o frază pas cu pas, cu cercuri, pătrate și bare." />
+  <meta property="og:title" content="Introducere: metoda de analiză a frazei" />
+  <meta property="og:description" content="Lecție interactivă de sintaxa frazei – rezolvăm o frază pas cu pas, pe viu." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="../../../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../../../src/site/styles/lesson.css" />
+  <link rel="stylesheet" href="../../../src/site/styles/sintaxa-fraza-intro.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <article class="lesson lesson--sf" data-lesson-slug="sintaxa-frazei-introducere" style="--lesson-color: #2563eb">
+      <p class="lesson__breadcrumb">
+        <a href="../../../">Acasă</a> ›
+        <a href="../../">Lecții</a> ›
+        <a href="../../#sintaxa-frazei">Sintaxa frazei</a>
+      </p>
+      <span class="lesson__tag">Sintaxa frazei</span>
+      <h1 class="lesson__title">Introducere: metoda de analiză a frazei</h1>
+      <p class="lesson__intro">
+        Cum descâlcești orice frază, pas cu pas – cu predicate, cercuri, pătrate
+        și bare. Câte predicate, atâtea propoziții.
+      </p>
+      <div class="sf-chips" aria-hidden="true">
+        <span class="sf-chip"><b class="sy-c">●</b> cerc = subordonator</span>
+        <span class="sf-chip"><b class="sy-s">▢</b> pătrat = coordonator</span>
+        <span class="sf-chip"><b class="sy-b">/</b> bară = graniță de propoziție</span>
+      </div>
+
+      <!-- OBIECTIVE -->
+      <section class="lesson-section">
+        <h2 class="lesson-section__title">Obiective</h2>
+        <ul class="objectives">
+          <li>Înțelegi de ce numărul de propoziții = numărul de predicate.</li>
+          <li>Aplici pașii metodei: subliniezi predicatele, faci calculul, încercuiești/încadrezi elementele de relație.</li>
+          <li>Deosebești cercurile (subordonatoare) de pătrate (coordonatoare) și recunoști relațiile false.</li>
+          <li>Desparți fraza în propoziții cu bare și precizezi felul lor (PP/PS).</li>
+        </ul>
+      </section>
+
+      <!-- 1. DEFINIȚIE (silogism: două premise → concluzie) -->
+      <section class="lesson-section">
+        <span class="sf-seclabel"><span class="kn">1</span>Definiție</span>
+        <h2 class="lesson-section__title">Ce este o frază?</h2>
+        <div class="sf-defsyl">
+          <div class="sf-ds-row">
+            <div class="sf-ds-card">
+              <span class="sf-ds-lab">Pornim de la</span>
+              <p>Fraza este un enunț alcătuit din <span class="sf-k-prop">două sau mai multe propoziții</span>.</p>
+              <p class="sf-ds-q">…dar ce este o propoziție?</p>
+            </div>
+            <div class="sf-ds-join">așa că lămurim</div>
+            <div class="sf-ds-card">
+              <span class="sf-ds-lab">Definim propoziția</span>
+              <p>Propoziția este un enunț cu <span class="sf-k-pred">un singur predicat</span>.</p>
+            </div>
+          </div>
+          <div class="sf-ds-down">acum e clar</div>
+          <div class="sf-ds-card sf-ds-final">
+            <span class="sf-ds-lab">Concluzie</span>
+            <p>Fraza este un enunț alcătuit din <span class="sf-k-pred">două sau mai multe predicate</span>.</p>
+          </div>
+        </div>
+        <p class="sf-sub" style="margin-top: 14px">De aceea, ca să afli câte propoziții are o frază, nu numeri cuvintele – numeri
+          <span class="sf-predpill">predicatele</span>. Câte predicate, atâtea propoziții.</p>
+      </section>
+
+      <!-- 2. PAȘII DE LUCRU (walkthrough interactiv) -->
+      <section class="lesson-section">
+        <span class="sf-seclabel s2"><span class="kn">2</span>Pașii de lucru – pe viu</span>
+        <h2 class="lesson-section__title">Rezolvăm o frază, pas cu pas</h2>
+        <p class="sf-sub">Aceeași frază, de la enunț la schemă. Apasă <b>Înainte</b> (sau &larr;/&rarr;) și urmărește cum apar marcajele.</p>
+
+        <!-- #sf-stage (fraza) și #sf-steps-list (pașii) sunt GOALE în HTML: le
+             populează fraza-walkthrough.js din SEQ și STEPS. Schema PP/PS de
+             jos apare abia la ultimul pas (clasa .reveal-schema pe #sf-walk). -->
+        <div class="sf-walk" id="sf-walk">
+          <div class="sf-stage" id="sf-stage"></div>
+          <div class="sf-walk-grid">
+            <ol class="sf-steps" id="sf-steps-list"></ol>
+
+            <div class="sf-walk-main">
+              <div class="sf-explain">
+                <h3><span class="tag" id="sf-step-num">1</span> <span id="sf-step-title"></span></h3>
+                <p id="sf-step-desc"></p>
+                <div class="sf-counters">
+                  <div class="sf-cnt pred" id="sf-c-pred"><div class="n">7</div><div class="t">Predicate</div></div>
+                  <div class="sf-cnt prop" id="sf-c-prop"><div class="n">7</div><div class="t">Propoziții</div></div>
+                  <div class="sf-cnt rel" id="sf-c-rel"><div class="n">6</div><div class="t">Elem. relație</div><div class="hint">= predicate − 1</div></div>
+                </div>
+                <div class="sf-formula" id="sf-formula">7 predicate = 7 propoziții = 6 elemente de relație</div>
+              </div>
+
+              <div class="sf-ctrls">
+                <button class="btn btn--ghost" id="sf-prev">‹ Înapoi</button>
+                <span class="sf-progress" id="sf-progress">Start</span>
+                <button class="btn btn--primary" id="sf-next">Începe ›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sf-schema">
+            <div class="sf-chain">
+              <div class="sf-node pp"><span class="num">1</span><span class="tag">PP · principală</span></div>
+              <div class="sf-node"><span class="num">2</span><span class="tag">PS · are cerc</span></div>
+              <div class="sf-node"><span class="num">3</span><span class="tag">PS · are cerc</span></div>
+              <div class="sf-node"><span class="num">4</span><span class="tag">PS · are cerc</span></div>
+              <div class="sf-node"><span class="num">5</span><span class="tag">PS · are cerc</span></div>
+              <div class="sf-node"><span class="num">6</span><span class="tag">PS · are cerc</span></div>
+              <div class="sf-node"><span class="num">7</span><span class="tag">PS · are cerc</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. NOTAȚIA (cuvintele de start sunt statice; „+” adaugă cuvinte VII:
+           membrul propune, profesorul aprobă chiar aici, apoi le vede oricine) -->
+      <section class="lesson-section sf-legend">
+        <span class="sf-seclabel s3"><span class="kn">3</span>Notația</span>
+        <h2 class="lesson-section__title">Cercuri și pătrate</h2>
+        <p class="sf-sub">Elementele de relație se împart în două. Le înveți o dată, le folosești mereu. Îți lipsește un cuvânt? Propune-l cu <b>+</b> – după aprobarea profesorului, îl vede toată lumea.</p>
+        <div class="sf-two">
+          <div class="sf-card sf-card--c">
+            <h3><span class="sf-mark c"></span> Cercuri <span style="color:var(--sf-muted);font-weight:600;font-size:.85rem">· subordonatoare</span></h3>
+            <div class="sf-cdiv"></div>
+            <div class="sf-words" data-kind="circle">
+              <span class="sf-word">care</span><span class="sf-word">ce</span><span class="sf-word">când</span><span class="sf-word">unde</span>
+              <span class="sf-word">cum</span><span class="sf-word">cine</span><span class="sf-word">că</span><span class="sf-word">să</span>
+              <span class="sf-word">dacă</span><span class="sf-word">încât</span><span class="sf-word">pentru că</span><span class="sf-word">ca să</span>
+              <span class="sf-word sf-word--add" role="button" tabindex="0" aria-label="Propune un cuvânt nou">+</span>
+            </div>
+          </div>
+          <div class="sf-card sf-card--s">
+            <h3><span class="sf-mark s"></span> Pătrate <span style="color:var(--sf-muted);font-weight:600;font-size:.85rem">· coordonatoare</span></h3>
+            <div class="sf-cdiv"></div>
+            <div class="sf-words" data-kind="square">
+              <span class="sf-word">și</span><span class="sf-word">iar</span><span class="sf-word">sau</span><span class="sf-word">dar</span>
+              <span class="sf-word sf-word--add" role="button" tabindex="0" aria-label="Propune un cuvânt nou">+</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. DIFICULTĂȚI -->
+      <section class="lesson-section">
+        <span class="sf-seclabel s4"><span class="kn">4</span>Dificultăți</span>
+        <h2 class="lesson-section__title">Capcanele – nu orice element de relație contează</h2>
+        <p class="sf-sub">Uneori un cuvânt arată ca element de relație, dar nu e: îl încercuiești/încadrezi, apoi îl tai. Tăierea se face pe <b style="color:var(--sf-ink)">interiorul</b> sau pe <b style="color:var(--sf-ink)">exteriorul</b> marcajului, după calitatea lui – iar toate cazurile de mai jos <b style="color:var(--sf-rose)">nu se numără</b> la pasul 2.</p>
+        <div class="sf-trap">
+          <span class="sf-tshape ci int" aria-hidden="true"></span>
+          <div>
+            <div class="sf-trap-head"><b>„să” care marchează un ordin</b><span class="sf-tflag">nu se numără</span></div>
+            <div class="sf-tnote">Este tot conjuncție, dar <span class="sf-nuance">fără rol de relație</span> în frază.</div>
+          </div>
+        </div>
+        <div class="sf-trap">
+          <span class="sf-tshape ci ext" aria-hidden="true"></span>
+          <div>
+            <div class="sf-trap-head"><b><code>cum</code> / <code>ce</code> / <code>unde</code> / <code>când</code> / <code>care</code> / <code>cât</code> care introduc întrebări</b><span class="sf-tflag">nu se numără</span></div>
+            <div class="sf-tnote">Nu sunt conjuncții, ci pronume sau adverbe <span class="sf-nuance">interogative</span>.</div>
+          </div>
+        </div>
+        <div class="sf-trap">
+          <span class="sf-tshape sq int" aria-hidden="true"></span>
+          <div>
+            <div class="sf-trap-head"><b>Pătratele care leagă două cercuri</b><span class="sf-tflag">nu se numără</span></div>
+            <div class="sf-tnote"><i>„Mi-a spus <b>că</b> pleacă <b>și</b> <b>că</b> nu se întoarce.”</i><br>
+              Cele două „<b>că</b>” (cercuri) sunt relațiile; „<b>și</b>” doar le leagă.</div>
+          </div>
+        </div>
+        <div class="sf-trap">
+          <span class="sf-tshape sq ext" aria-hidden="true"></span>
+          <div>
+            <div class="sf-trap-head"><b>Pătratele fără rol la nivel de frază</b><span class="sf-tflag">nu se numără</span></div>
+            <div class="sf-tnote">Leagă doar părți în aceeași propoziție: <i>„Am cumpărat un caiet <b>și</b> un marker.”</i> (două complemente directe).<br>
+              Ori își pierde statutul de conjuncție – <b>substantiv</b>: <i>„Am un <b>dar</b> pentru tine.”</i> (dar = cadou); <b>adverb de întărire</b>: <i>„Clientul a venit <b>și</b> azi.”</i></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. STRATEGII -->
+      <section class="lesson-section">
+        <span class="sf-seclabel s5"><span class="kn">5</span>Strategii de lucru</span>
+        <h2 class="lesson-section__title">Când fraza e grea, ai unelte</h2>
+        <!-- Fiecare card: style="--pill:#…" = nuanța (după emoji), folosită ȘI de
+             pastila din colț, ȘI de fundalul tooltipului (.sf-strat-tip).
+             „Refacerea topicii” n-are exemplu → nu capătă pastilă. -->
+        <div class="sf-strats">
+          <div class="sf-strat" style="--pill:#eddcae"><span class="k">💡</span><div><b>Resemantizare</b><span>schimbăm sensul unor cuvinte</span></div><span class="sf-strat-pill" aria-hidden="true"></span><div class="sf-strat-tip">Ce vreau eu de la tine? Un lucru vreau: să știi ce fel de om sunt eu.</div></div>
+          <div class="sf-strat" style="--pill:#edcfb2"><span class="k">📖</span><div><b>Sinonimizare</b><span>înlocuim cuvinte cu altele mai potrivite, ca să înțelegem</span></div><span class="sf-strat-pill" aria-hidden="true"></span><div class="sf-strat-tip">Află dumneata că nu-mi place să-mi spui diverse!</div></div>
+          <div class="sf-strat"><span class="k">🔀</span><div><b>Refacerea topicii</b><span>rearanjăm ordinea cuvintelor</span></div></div>
+          <div class="sf-strat" style="--pill:#cfd6e2"><span class="k">🗣️</span><div><b>Starea și intenția vorbitorului</b><span>găsirea contextului</span></div><span class="sf-strat-pill" aria-hidden="true"></span><div class="sf-strat-tip">Mă simt deranjat că îmi dai tu ordine, eu sunt un om independent, știu ce să fac, știu să mă descurc și chiar mă supăr dacă vei continua să-mi spui ce să fac!</div></div>
+          <div class="sf-strat" style="--pill:#e6c3c9"><span class="k">🪗</span><div><b>Contragere și expansiune</b><span>strângem sau desfășurăm ideea</span></div><span class="sf-strat-pill" aria-hidden="true"></span><div class="sf-strat-tip">Să știi plăcerea mea. · Nu-mi place intervenția ta. · Să-mi spui tu păreri. …</div></div>
+          <div class="sf-strat" style="--pill:#ddcf9a"><span class="k">🔑</span><div><b>Păstrarea elementelor esențiale</b><span>reținem ce ține enunțul în picioare</span></div><span class="sf-strat-pill" aria-hidden="true"></span><div class="sf-strat-tip">Să știi că nu-mi place [ceva, nu mai contează exact ce].</div></div>
+          <div class="sf-strat" style="--pill:#c4d6ec"><span class="k">🔍</span><div><b>Găsirea de contexte similare</b><span>ne sprijinim pe situații cunoscute</span></div><span class="sf-strat-pill" aria-hidden="true"></span><div class="sf-strat-tip">Tu știi despre mine că nu-mi place. · Mama știe că nu-mi place.</div></div>
+        </div>
+      </section>
+
+      <!-- RECAPITULARE -->
+      <section class="lesson-section">
+        <h2 class="lesson-section__title">Recapitulare</h2>
+        <ul class="objectives">
+          <li>Câte predicate, atâtea propoziții – numeri predicatele, nu cuvintele.</li>
+          <li>Elementele de relație = predicate − 1: cerc = subordonator, pătrat = coordonator.</li>
+          <li>Ce doar pare relație se taie (pe interior sau pe exterior) și nu se numără.</li>
+          <li>Barele despart propozițiile; prima e (PP), iar orice propoziție care are cerc e (PS).</li>
+        </ul>
+      </section>
+
+      <nav class="lesson-nav">
+        <a class="btn btn--ghost" href="../../#sintaxa-frazei">← Înapoi la lecții</a>
+        <a class="btn btn--primary" href="../../">Toate lecțiile</a>
+      </nav>
+    </article>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "../../../src/shared/components/site-chrome.js";
+    import { initFrazaIntro } from "../../../src/site/scripts/fraza-walkthrough.js";
+    import { initLessonExercises } from "../../../src/site/scripts/lesson-engine.js";
+    import { initLessonComments } from "../../../src/site/scripts/comments.js";
+    import { initProposeExercise } from "../../../src/site/scripts/propose-exercise.js";
+    import { initLessonProgress } from "../../../src/site/scripts/lesson-progress.js";
+    renderChrome("../../../");
+    initFrazaIntro();
+    initLessonExercises();
+    initLessonProgress("../../../");
+    initProposeExercise("../../../");
+    initLessonComments("../../../");
+  </script>
+</body>
+</html>
