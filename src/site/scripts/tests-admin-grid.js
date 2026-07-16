@@ -21,7 +21,7 @@
 import {
   adminFetchTestItems, fetchTestYears, updateTestItem, setTestVerified, setTestPublished,
 } from "../../shared/scripts/test-repo.js";
-import { sanitizeRich, stripRich, execBold, execUnderline, execItalic } from "../../shared/scripts/rich-text.js";
+import { sanitizeRich, stripRich, execBold, execUnderline, execItalic, formatState } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -441,8 +441,12 @@ function wireEvents() {
       if (fmt.dataset.fmt === "bold") execBold();
       else if (fmt.dataset.fmt === "underline") execUnderline();
       else execItalic();
+      updateFmtButtons();                 // reflect the new state on the B/U/I buttons
     }
   });
+
+  // Keep B/U/I lit to match the formatting under the caret/selection.
+  document.addEventListener("selectionchange", updateFmtButtons);
 
   root.addEventListener("click", (e) => {
     const nav = e.target.closest("[data-nav]");   // phone: ‹ / › previous-next item
@@ -479,6 +483,18 @@ function wireEvents() {
   // Enter: in a TEXT cell = a new text line (<br>, saved to Supabase, shown to pupils);
   // in a plain An/Sesiune/Nr cell = commit (blur). Shift+Enter always adds a line.
   root.addEventListener("keydown", (e) => {
+    // Ctrl/Cmd + B / U / I inside a text cell → route through OUR tag-mode
+    // formatters, so the output is <b>/<u>/<i> (not a <span style> the save
+    // would drop) and the toolbar buttons stay in sync — same as the buttons.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const k = e.key.toLowerCase();
+      if ((k === "b" || k === "u" || k === "i") && e.target.closest(".tg-rich")) {
+        e.preventDefault();
+        if (k === "b") execBold(); else if (k === "u") execUnderline(); else execItalic();
+        updateFmtButtons();
+        return;
+      }
+    }
     if (e.key !== "Enter" || e.shiftKey) return;
     if (e.target.closest(".tg-edit")) { e.preventDefault(); e.target.blur(); return; }
     if (e.target.closest(".tg-rich")) {
@@ -506,6 +522,20 @@ function wireEvents() {
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6) return; // must be clearly horizontal
     mGo(dx < 0 ? 1 : -1);
   }, { passive: true });
+}
+
+// Light up the B/U/I buttons to match the formatting at the caret/selection.
+function updateFmtButtons() {
+  if (!root) return;
+  const btns = root.querySelectorAll(".tg-fmt");
+  if (!btns.length) return;
+  const sel = document.getSelection();
+  let node = sel && sel.anchorNode;
+  if (node && node.nodeType === 3) node = node.parentElement;   // text node → its element
+  const inRich = node && node.closest && node.closest(".tg-rich");
+  if (!inRich) { btns.forEach((b) => b.classList.remove("on")); return; }
+  const st = formatState();
+  btns.forEach((b) => b.classList.toggle("on", !!st[b.dataset.fmt]));
 }
 
 // ---------- saves ----------
@@ -661,10 +691,16 @@ function mLetters(field, id, current) {
   </div>`;
 }
 
+// Fields where the phone keyboard should NOT auto-capitalise: notes + answer
+// options are lowercase fragments. Enunț keeps sentence-case (starts a sentence).
+const NO_AUTOCAP = new Set(["observation", "option_a", "option_b", "option_c", "option_d"]);
+
 function mCardHtml(it) {
   const rid = it.id;
-  const rich = (field, val, extra = "") =>
-    `<div class="tg-rich${extra}" contenteditable="true" data-id="${rid}" data-field="${field}">${sanitizeRich(val)}</div>`;
+  const rich = (field, val, extra = "") => {
+    const caps = NO_AUTOCAP.has(field) ? ' autocapitalize="none"' : "";
+    return `<div class="tg-rich${extra}" contenteditable="true"${caps} data-id="${rid}" data-field="${field}">${sanitizeRich(val)}</div>`;
+  };
   const optRow = (k, field, val) =>
     `<div class="tgm-opt"><span class="tgm-optk">${k}</span>${rich(field, val, " tgm-optt")}</div>`;
   return `

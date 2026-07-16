@@ -322,6 +322,8 @@
   border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-size: 0.95rem;
 }
 .tg-fmt:hover { border-color: var(--color-primary); }
+/* active/inactive state: lit when the caret/selection is bold / underline / italic */
+.tg-fmt.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 .tg-count { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: var(--color-text-muted); }
 
 /* find & replace row */

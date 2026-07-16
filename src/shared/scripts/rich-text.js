@@ -10,11 +10,31 @@
 // no onclick, no href — no XSS surface even though only the admin authors it).
 // =========================================================
 
-// Inline formatting tags we allow; everything else is unwrapped (kept as text).
-const ALLOWED = new Set(["b", "strong", "u", "i", "em", "mark"]);
-
 const escapeText = (s) =>
   String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+// Canonical inline formatting for an element, derived from BOTH its tag name and
+// its inline style. This is what makes formatting save reliably on phones: some
+// mobile browsers apply bold as <span style="font-weight:bold"> (or 700) rather
+// than <b>, even with styleWithCSS=false. Reading the style too, we normalise it
+// to <b>/<i>/<u> so it survives sanitization instead of being silently dropped.
+function fmtTagsFor(el) {
+  const tag = el.tagName.toLowerCase();
+  const s = el.style || {};
+  const fw = String(s.fontWeight || "").toLowerCase();
+  const bold = tag === "b" || tag === "strong" || fw === "bold" || fw === "bolder"
+    || (/^\d+$/.test(fw) && Number(fw) >= 600);
+  const fst = String(s.fontStyle || "").toLowerCase();
+  const italic = tag === "i" || tag === "em" || fst === "italic" || fst === "oblique";
+  const dec = String(s.textDecoration || s.textDecorationLine || "").toLowerCase();
+  const underline = tag === "u" || dec.includes("underline");
+  const tags = [];
+  if (bold) tags.push("b");
+  if (italic) tags.push("i");
+  if (underline) tags.push("u");
+  if (tag === "mark") tags.push("mark");
+  return tags;
+}
 
 function serialize(node) {
   let out = "";
@@ -24,8 +44,10 @@ function serialize(node) {
     } else if (n.nodeType === Node.ELEMENT_NODE) {
       const tag = n.tagName.toLowerCase();
       if (tag === "br") { out += "<br>"; return; }
-      const inner = serialize(n); // clean children regardless of this tag
-      out += ALLOWED.has(tag) ? `<${tag}>${inner}</${tag}>` : inner; // unwrap unknown tags
+      let inner = serialize(n); // clean children regardless of this tag
+      const tags = fmtTagsFor(n);
+      for (let i = tags.length - 1; i >= 0; i--) inner = `<${tags[i]}>${inner}</${tags[i]}>`;
+      out += inner; // unknown / unformatted tags are unwrapped, keeping their text
     }
     // comments / other node types are dropped
   });
@@ -54,14 +76,21 @@ export function isRichEmpty(html) {
 }
 
 // ---- editor commands (for a focused contenteditable) --------------------
-// Force tag-based output (<b>/<u>) instead of inline styles, so sanitizeRich
-// preserves the formatting.
-let tagModeSet = false;
+// Prefer tag-based output (<b>/<u>) over inline styles. We re-assert it before
+// every command because some browsers reset the flag; and even when a browser
+// ignores it and emits <span style>, sanitizeRich now normalises that back to
+// tags (see fmtTagsFor), so bold/italic/underline save reliably on phones too.
 function ensureTagMode() {
-  if (tagModeSet) return;
   try { document.execCommand("styleWithCSS", false, false); } catch { /* ignore */ }
-  tagModeSet = true;
 }
 export function execBold() { ensureTagMode(); document.execCommand("bold"); }
 export function execUnderline() { ensureTagMode(); document.execCommand("underline"); }
 export function execItalic() { ensureTagMode(); document.execCommand("italic"); }
+
+/** On/off state of the formatting at the caret/selection — so toolbar buttons
+ *  (B/U/I) can light up to match what's active. Guarded: queryCommandState can
+ *  throw when there's no live selection. */
+export function formatState() {
+  const q = (c) => { try { return document.queryCommandState(c); } catch { return false; } };
+  return { bold: q("bold"), underline: q("underline"), italic: q("italic") };
+}
