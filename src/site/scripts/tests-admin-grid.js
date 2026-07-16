@@ -88,6 +88,52 @@ function filtered() {
   });
 }
 
+// ---------- bold a whole column (current year) ----------
+function fieldVal(it, field) {
+  return field === "question" ? it.question
+    : field === "observation" ? it.observation
+    : field === "option_a" ? it.options.A
+    : field === "option_b" ? it.options.B
+    : field === "option_c" ? it.options.C
+    : it.options.D;
+}
+const isBoldWrapped = (v) => /^<b>[\s\S]*<\/b>$/.test(String(v).trim());
+function columnIsBold(field) {
+  const vals = state.items.map((it) => fieldVal(it, field)).filter((v) => v && stripRich(v));
+  return vals.length > 0 && vals.every(isBoldWrapped);
+}
+function boldColBtn(field) {
+  return `<button type="button" class="tg-boldcol${columnIsBold(field) ? " on" : ""}" data-boldcol="${field}" title="Bold pe toată coloana (anul curent)">B</button>`;
+}
+async function bulkBold(field) {
+  const on = !columnIsBold(field);
+  const targets = [];
+  for (const it of state.items) {
+    const cur = fieldVal(it, field);
+    if (!cur || !stripRich(cur)) continue;               // skip empty cells
+    const b = isBoldWrapped(cur);
+    let next = cur;
+    if (on && !b) next = "<b>" + cur + "</b>";
+    else if (!on && b) next = cur.trim().replace(/^<b>([\s\S]*)<\/b>$/, "$1");
+    if (next !== cur) targets.push([it, next]);
+  }
+  if (!targets.length) { showToast(on ? "Coloana e deja bold." : "Nimic de scos."); return; }
+  const save = root.querySelector("#tg-save");
+  let done = 0, failed = 0;
+  const CHUNK = 12;
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    // eslint-disable-next-line no-await-in-loop
+    await Promise.all(targets.slice(i, i + CHUNK).map(async ([it, next]) => {
+      const ok = await updateTestItem(it.id, { [field]: next });
+      if (ok) { applyLocal(it, field, next); done++; } else failed++;
+    }));
+    if (save) { save.textContent = `Se salvează… ${done}/${targets.length}`; save.className = "tg-savestate is-saving"; }
+  }
+  showSaved(failed === 0);
+  showToast(`${done} celule ${on ? "bolduite" : "fără bold"}` + (failed ? ` (${failed} eșuate)` : ""));
+  render();
+}
+
 // ---------- render ----------
 function render() {
   const sessions = [...new Set(state.items.map((i) => i.session).filter(Boolean))].sort();
@@ -146,11 +192,11 @@ function tableHtml(rows) {
           <th class="tg-fix tg-c1">An</th>
           <th class="tg-fix tg-c2">Sesiune</th>
           <th class="tg-fix tg-c3">Nr.</th>
-          <th>Enunț</th>
-          <th>A</th><th>B</th><th>C</th><th>D</th>
+          <th>Enunț ${boldColBtn("question")}</th>
+          <th>A ${boldColBtn("option_a")}</th><th>B ${boldColBtn("option_b")}</th><th>C ${boldColBtn("option_c")}</th><th>D ${boldColBtn("option_d")}</th>
           <th title="Răspunsul din grila oficială (istoric)">Corect (ist.)</th>
           <th title="Răspunsul pe gramatica 2026">Corect 2026</th>
-          <th>Observații</th>
+          <th>Observații ${boldColBtn("observation")}</th>
           <th title="Verificat de profesor (control intern)">Verificat</th>
           <th title="Publicat → vizibil elevilor">Publicat</th>
         </tr>
@@ -277,6 +323,8 @@ function wireEvents() {
   root.addEventListener("click", (e) => {
     const zb = e.target.closest(".tg-zbtn");
     if (zb) return zoom(zb.dataset.zoom);
+    const bc = e.target.closest("[data-boldcol]");
+    if (bc) return bulkBold(bc.dataset.boldcol);
     const tog = e.target.closest("[data-toggle]");
     if (tog) { state[tog.dataset.toggle] = !state[tog.dataset.toggle]; return render(); }
 
