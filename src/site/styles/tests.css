@@ -328,9 +328,9 @@
 .tg-empty { padding: var(--space-lg); text-align: center; color: var(--color-text-muted); }
 
 /* the scroll viewport (sticky header + sticky first columns live inside it) */
-.tg-scroll { overflow: auto; max-height: 72vh; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }
+.tg-scroll { overflow: auto; height: calc(100vh - 150px); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }
 .tg-table { border-collapse: separate; border-spacing: 0; font-size: 0.84rem; width: max-content; min-width: 100%; }
-.tg-table th, .tg-table td { border-bottom: 1px solid var(--color-border); border-right: 1px solid var(--color-border); padding: 5px 8px; vertical-align: top; background: var(--color-bg); }
+.tg-table th, .tg-table td { border-bottom: 1px solid var(--color-border); border-right: 1px solid var(--color-border); padding: 5px 8px; vertical-align: middle; background: var(--color-bg); }
 
 /* freeze header row */
 .tg-table thead th { position: sticky; top: 0; z-index: 2; background: var(--color-surface); font-weight: 800; white-space: nowrap; text-align: left; }
@@ -343,22 +343,29 @@
 .tg-c3 { left: 170px; min-width: 46px;  width: 46px;  text-align: center; box-shadow: 2px 0 0 var(--color-border); }
 
 /* rows: hover + active (gradient) + state accents */
-.tg-row:hover td { background: #faf9ff; }
-.tg-row.is-active td { background: linear-gradient(90deg, #f1ecff, #eaf2ff); }
-.tg-row.is-active .tg-c1 { box-shadow: inset 3px 0 0 var(--color-primary); }
+.tg-row:hover td { background: #f6f4ff; }
+.tg-row.is-active td { background: linear-gradient(90deg, #d9ccff, #c9dcff); }
+.tg-row.is-active .tg-c1 { box-shadow: inset 4px 0 0 var(--color-primary); }
 .tg-row.is-pub .tg-c3 { box-shadow: 2px 0 0 var(--color-border), inset 0 0 0 999px transparent; }
 
 /* editable cells */
 .tg-rich { min-width: 190px; max-width: 360px; line-height: 1.45; cursor: text; }
 .tg-rich:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; background: #fffef7; }
 .tg-rich:empty::before { content: "—"; color: #c9c9d6; }
-.tg-saved { animation: tgSaved 0.7s ease; }
-@keyframes tgSaved { 0% { background: #dcfce7; } 100% { background: var(--color-bg); } }
+.tg-saved { animation: tgSaved 0.8s ease; }
+@keyframes tgSaved { 0% { background: #bbf7d0; } 100% { background: var(--color-bg); } }
 
-.tg-hist { text-align: center; font-weight: 800; color: #3730a3; white-space: nowrap; }
-.tg-2026 { white-space: nowrap; }
-.tg-sel { font: inherit; padding: 0.15rem 0.3rem; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); }
-.tg-same { font: inherit; font-size: 0.72rem; font-weight: 700; margin-left: 0.25rem; padding: 0.15rem 0.4rem; border-radius: 6px; border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-muted); cursor: pointer; }
+/* clickable A/B/C/D answer cells (historical + 2026) */
+.tg-ans { white-space: nowrap; text-align: center; }
+.tg-letter {
+  width: 1.5rem; height: 1.5rem; margin: 1px; border-radius: 6px; cursor: pointer;
+  font: inherit; font-weight: 800; font-size: 0.8rem;
+  border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
+}
+.tg-letter:hover { border-color: var(--color-primary); }
+.tg-letter.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.tg-ans--hist .tg-letter.on { background: #3730a3; border-color: #3730a3; }
+.tg-same { font: inherit; font-size: 0.72rem; font-weight: 700; margin-left: 0.3rem; padding: 0.15rem 0.4rem; border-radius: 6px; border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-muted); cursor: pointer; }
 .tg-same:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 .tg-tg { text-align: center; }
@@ -368,6 +375,23 @@
 }
 .tg-pub.on { background: #16a34a; color: #fff; border-color: #16a34a; }
 .tg-flag.on { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+
+/* plain editable cells (An / Sesiune / Nr.) */
+.tg-edit { cursor: text; }
+.tg-edit:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; background: #fffef7; }
+
+/* Enunț: justified text */
+.tg-q-cell { text-align: justify; }
+
+/* live "saving / saved" indicator in the toolbar */
+.tg-savestate { font-size: 0.78rem; font-weight: 800; min-width: 5.5rem; }
+.tg-savestate.is-saving { color: var(--color-text-muted); }
+.tg-savestate.is-ok { color: #16a34a; }
+.tg-savestate.is-err { color: #dc2626; }
+
+/* full-screen editor mode: hide the page hero + let the grid fill the window */
+body.tg-mode .page-hero { display: none; }
+body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10px; }
 
 @media (max-width: 760px) {
   .tg-c2 { min-width: 90px; width: 90px; }

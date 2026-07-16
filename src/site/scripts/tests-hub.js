@@ -74,6 +74,7 @@ function route() {
 
 // ---------- category grid ----------
 function renderHub() {
+  document.body.classList.remove("tg-mode"); // leave the admin full-screen editor look
   state.exam = null;
   root.className = "tests-grid";
   root.innerHTML = CATEGORIES.map((c) => `
@@ -87,6 +88,7 @@ function renderHub() {
 
 // ---------- one exam (pupil practice) ----------
 async function openExam(exam) {
+  document.body.classList.remove("tg-mode"); // pupil view is not the admin editor
   state.exam = exam;
   state.answered = {};
   root.className = "tests-exam";

@@ -3,43 +3,40 @@
 //
 // A spreadsheet-style editor over `test_items` (loaded per year via the
 // admin_test_items RPC, which returns the answers + unverified rows):
-//   • rows × columns, sticky header + sticky first columns (An/Sesiune/Nr),
-//     the active row highlighted with a gradient;
-//   • filters: year, session, published/unpublished, flagged, missing-2026,
-//     free-text search;
-//   • inline editing that SAVES to Supabase on blur/change:
-//       - Enunț / A–D / Observații = rich text (bold/underline, via rich-text.js);
-//       - „Corect 2026" = A/B/C/D, with a „= ist." button (copy the historical one);
-//       - „Publicat" (verified → visible to pupils) and „Marcaj" (private) toggles.
-//   Writes are RLS-gated to the teacher; nothing here is shown to pupils.
+//   • fills the browser (width + height); sticky header + sticky first columns
+//     (An/Sesiune/Nr); the active row highlighted with a gradient;
+//   • filters: year, session, published/unpublished, flagged, missing-2026, search;
+//   • EVERY cell is editable and SAVES to Supabase automatically (on blur / on
+//     click — there is no submit button):
+//       - Enunț / A–D / Observații = rich text (bold / underline / italic);
+//       - An / Sesiune / Nr. = plain text;
+//       - „Corect (ist.)" and „Corect 2026" = click one of A/B/C/D;
+//       - „Publicat" (visible to pupils) and „★" (private teacher marker) = toggle.
+//   A live "✓ Salvat" indicator confirms every write. Writes are RLS-gated to
+//   the teacher; nothing here is shown to pupils.
 // =========================================================
 import {
   adminFetchTestItems, fetchTestYears, updateTestItem, setTestVerified, setTestFlagged,
 } from "../../shared/scripts/test-repo.js";
-import { sanitizeRich, stripRich, execBold, execUnderline } from "../../shared/scripts/rich-text.js";
+import { sanitizeRich, stripRich, execBold, execUnderline, execItalic } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const LETTERS = ["A", "B", "C", "D"];
 
 let root = null;
 let wired = false;
 const state = {
   exam: "admitere-drept",
-  years: [],
-  year: null,
-  items: [],
-  loading: false,
-  // filters
-  session: "",
-  status: "all",   // all | pub | draft
-  onlyFlagged: false,
-  onlyNo2026: false,
-  search: "",
+  years: [], year: null,
+  items: [], loading: false,
+  session: "", status: "all", onlyFlagged: false, onlyNo2026: false, search: "",
 };
 
 export async function initTestAdminGrid(mountEl) {
   root = mountEl;
+  document.body.classList.add("tg-mode"); // full-screen editor look
   if (!wired) { wireEvents(); wired = true; }
   root.className = "tg-wrap";
   state.loading = true;
@@ -52,14 +49,12 @@ export async function initTestAdminGrid(mountEl) {
 }
 
 async function load() {
-  state.loading = true;
-  render();
+  state.loading = true; render();
   state.items = await adminFetchTestItems(state.exam, state.year);
-  state.loading = false;
-  render();
+  state.loading = false; render();
 }
 
-function byId(id) { return state.items.find((x) => x.id === id); }
+const byId = (id) => state.items.find((x) => x.id === id);
 
 function filtered() {
   const q = state.search.trim().toLowerCase();
@@ -80,7 +75,6 @@ function filtered() {
 
 // ---------- render ----------
 function render() {
-  const cat = "⚖️ Admitere Drept";
   const sessions = [...new Set(state.items.map((i) => i.session).filter(Boolean))].sort();
   const rows = filtered();
 
@@ -88,7 +82,6 @@ function render() {
     `<option value="${y.year}"${y.year === state.year ? " selected" : ""}>${y.year} (${y.n})</option>`).join("");
   const sesSel = `<option value="">toate sesiunile</option>` +
     sessions.map((s) => `<option value="${esc(s)}"${s === state.session ? " selected" : ""}>${esc(s)}</option>`).join("");
-
   const chip = (key, val, label) =>
     `<button type="button" class="tg-chip${state[key] === val ? " on" : ""}" data-filter="${key}" data-val="${val}">${label}</button>`;
   const toggleChip = (key, label) =>
@@ -97,7 +90,7 @@ function render() {
   root.innerHTML = `
     <div class="tg-bar">
       <a class="tg-back" href="#">‹ Toate testele</a>
-      <h2 class="tg-title">${cat} <span class="tg-sub">— editor profesor</span></h2>
+      <h2 class="tg-title">⚖️ Admitere Drept <span class="tg-sub">— editor profesor</span></h2>
     </div>
 
     <div class="tg-toolbar">
@@ -105,25 +98,24 @@ function render() {
       <label class="tg-f">Sesiune <select id="tg-ses">${sesSel}</select></label>
       <span class="tg-chips">
         ${chip("status", "all", "Toate")}${chip("status", "pub", "Publicate")}${chip("status", "draft", "Nepublicate")}
-        ${toggleChip("onlyFlagged", "★ marcate")}
-        ${toggleChip("onlyNo2026", "fără 2026")}
+        ${toggleChip("onlyFlagged", "★ marcate")}${toggleChip("onlyNo2026", "fără 2026")}
       </span>
       <input id="tg-search" class="tg-search" type="search" placeholder="Caută în text…" value="${esc(state.search)}" />
       <span class="tg-fmt-group" title="Selectează text într-o celulă, apoi:">
         <button type="button" class="tg-fmt" data-fmt="bold"><b>B</b></button>
         <button type="button" class="tg-fmt" data-fmt="underline"><u>U</u></button>
+        <button type="button" class="tg-fmt" data-fmt="italic"><i>I</i></button>
       </span>
-      <span class="tg-count">${rows.length} / ${state.items.length} itemi · ${state.items.filter((i) => i.verified).length} publicați</span>
+      <span class="tg-savestate" id="tg-save"></span>
+      <span class="tg-count">${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} publicați</span>
     </div>
 
     <div class="tg-scroll">
       ${state.loading
         ? `<div class="tg-empty">Se încarcă…</div>`
-        : (!rows.length
-            ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>`
-            : tableHtml(rows))}
+        : (!rows.length ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : tableHtml(rows))}
     </div>
-    <p class="tg-hint">Editează direct în celule; se salvează singur când ieși din celulă. Formatare: selectează text, apoi <b>B</b>/<u>U</u> sau Ctrl+B / Ctrl+U. „= ist." pune la 2026 același răspuns ca cel istoric.</p>`;
+    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D, ✓/★. Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). „★" = marcaj privat (doar pentru tine, ex. „de revăzut"; nu-l văd elevii).</p>`;
 }
 
 function tableHtml(rows) {
@@ -140,38 +132,61 @@ function tableHtml(rows) {
           <th title="Răspunsul pe gramatica 2026">Corect 2026</th>
           <th>Observații</th>
           <th title="Vizibil elevilor">Publicat</th>
-          <th title="Marcaj privat">★</th>
+          <th title="Marcaj privat (de revăzut)">★</th>
         </tr>
       </thead>
       <tbody>${rows.map(rowHtml).join("")}</tbody>
     </table>`;
 }
 
+function letters(field, id, current) {
+  return `<td class="tg-ans${field === "correct" ? " tg-ans--hist" : ""}" data-field="${field}" data-id="${id}">
+    ${LETTERS.map((k) => `<button type="button" class="tg-letter${current === k ? " on" : ""}" data-k="${k}">${k}</button>`).join("")}
+    ${field === "correct_2026" ? `<button type="button" class="tg-same" data-id="${id}" title="Pune la 2026 același răspuns ca cel istoric">= ist.</button>` : ""}
+  </td>`;
+}
+
 function rowHtml(it) {
   const rid = it.id;
-  const rich = (field, val) =>
-    `<td class="tg-cell tg-rich" contenteditable="true" data-id="${rid}" data-field="${field}">${sanitizeRich(val)}</td>`;
-  const opts = ["", "A", "B", "C", "D"].map((v) =>
-    `<option value="${v}"${(it.correct2026 || "") === v ? " selected" : ""}>${v || "—"}</option>`).join("");
+  const rich = (field, val, extra = "") =>
+    `<td class="tg-cell tg-rich${extra}" contenteditable="true" data-id="${rid}" data-field="${field}">${sanitizeRich(val)}</td>`;
+  const plain = (field, val, cls) =>
+    `<td class="tg-fix ${cls} tg-edit" contenteditable="true" data-id="${rid}" data-field="${field}">${esc(val ?? "")}</td>`;
   return `
     <tr class="tg-row${it.verified ? " is-pub" : ""}${it.flagged ? " is-flag" : ""}" data-id="${rid}">
-      <td class="tg-fix tg-c1">${it.year ?? ""}</td>
-      <td class="tg-fix tg-c2">${esc(it.session)}</td>
-      <td class="tg-fix tg-c3">${it.itemNo ?? ""}</td>
-      ${rich("question", it.question)}
+      ${plain("year", it.year, "tg-c1")}
+      ${plain("session", it.session, "tg-c2")}
+      ${plain("item_no", it.itemNo, "tg-c3")}
+      ${rich("question", it.question, " tg-q-cell")}
       ${rich("option_a", it.options.A)}
       ${rich("option_b", it.options.B)}
       ${rich("option_c", it.options.C)}
       ${rich("option_d", it.options.D)}
-      <td class="tg-hist">${esc(it.correct || "?")}</td>
-      <td class="tg-2026">
-        <select class="tg-sel" data-id="${rid}" data-field="correct_2026" aria-label="Răspuns 2026">${opts}</select>
-        <button type="button" class="tg-same" data-id="${rid}" title="Pune același răspuns ca cel istoric (${esc(it.correct || "?")})">= ist.</button>
-      </td>
+      ${letters("correct", rid, it.correct)}
+      ${letters("correct_2026", rid, it.correct2026)}
       ${rich("observation", it.observation)}
       <td class="tg-tg"><button type="button" class="tg-pub${it.verified ? " on" : ""}" data-action="pub" data-id="${rid}" title="${it.verified ? "Publicat — vizibil elevilor" : "Nepublicat"}">${it.verified ? "✓" : "○"}</button></td>
       <td class="tg-tg"><button type="button" class="tg-flag${it.flagged ? " on" : ""}" data-action="flag" data-id="${rid}" title="Marcaj privat">${it.flagged ? "★" : "☆"}</button></td>
     </tr>`;
+}
+
+// ---------- save-state indicator ----------
+function showSaving() {
+  const el = root.querySelector("#tg-save");
+  if (el) { el.textContent = "Se salvează…"; el.className = "tg-savestate is-saving"; }
+}
+function showSaved(ok) {
+  const el = root.querySelector("#tg-save");
+  if (!el) return;
+  el.textContent = ok ? "✓ Salvat" : "✗ Eroare";
+  el.className = "tg-savestate " + (ok ? "is-ok" : "is-err");
+  clearTimeout(showSaved._t);
+  showSaved._t = setTimeout(() => { el.textContent = ""; el.className = "tg-savestate"; }, 1700);
+}
+function flash(el) {
+  if (!el) return;
+  el.classList.add("tg-saved");
+  setTimeout(() => el.classList.remove("tg-saved"), 800);
 }
 
 // ---------- events (delegated on root) ----------
@@ -182,115 +197,156 @@ function wireEvents() {
     if (tr) tr.classList.add("is-active");
   });
 
-  // save rich cells on blur
-  root.addEventListener("focusout", async (e) => {
-    const cell = e.target.closest(".tg-rich");
-    if (!cell) return;
-    const it = byId(cell.dataset.id);
-    if (!it) return;
-    const field = cell.dataset.field;
-    const clean = sanitizeRich(cell.innerHTML);
-    cell.innerHTML = clean; // normalise what we show to what we store
-    const current = { question: it.question, option_a: it.options.A, option_b: it.options.B,
-                      option_c: it.options.C, option_d: it.options.D, observation: it.observation }[field] || "";
-    if (clean === (current || "")) return; // unchanged
-    const ok = await updateTestItem(it.id, { [field]: clean || null });
-    if (!ok) { showToast("Nu am putut salva. Reîncearcă."); return; }
-    applyLocal(it, field, clean);
-    flash(cell);
+  root.addEventListener("focusout", (e) => {
+    const rich = e.target.closest(".tg-rich");
+    if (rich) return saveRich(rich);
+    const plainCell = e.target.closest(".tg-edit");
+    if (plainCell) return savePlain(plainCell);
   });
 
-  // selects (correct_2026)
-  root.addEventListener("change", async (e) => {
+  root.addEventListener("change", (e) => {
     if (e.target.id === "tg-year") { state.year = Number(e.target.value); state.session = ""; return load(); }
     if (e.target.id === "tg-ses") { state.session = e.target.value; return render(); }
-    const sel = e.target.closest(".tg-sel");
-    if (sel) {
-      const it = byId(sel.dataset.id);
-      if (!it) return;
-      const val = sel.value || null;
-      const ok = await updateTestItem(it.id, { correct_2026: val });
-      if (!ok) { showToast("Nu am putut salva răspunsul 2026."); return; }
-      it.correct2026 = val;
-      flash(sel.closest("td"));
-    }
   });
 
-  // search
   root.addEventListener("input", (e) => {
     if (e.target.id === "tg-search") { state.search = e.target.value; renderBodyOnly(); }
   });
 
-  // clicks: chips, toggles, "= ist.", format buttons, back
+  // format buttons must NOT steal the caret from the focused cell
   root.addEventListener("mousedown", (e) => {
-    // format buttons must NOT steal the caret from the focused cell
     const fmt = e.target.closest(".tg-fmt");
-    if (fmt) { e.preventDefault(); fmt.dataset.fmt === "bold" ? execBold() : execUnderline(); }
+    if (fmt) {
+      e.preventDefault();
+      if (fmt.dataset.fmt === "bold") execBold();
+      else if (fmt.dataset.fmt === "underline") execUnderline();
+      else execItalic();
+    }
   });
 
-  root.addEventListener("click", async (e) => {
+  root.addEventListener("click", (e) => {
     const chip = e.target.closest("[data-filter]");
     if (chip) { state[chip.dataset.filter] = chip.dataset.val; return render(); }
     const tog = e.target.closest("[data-toggle]");
     if (tog) { state[tog.dataset.toggle] = !state[tog.dataset.toggle]; return render(); }
 
+    const letter = e.target.closest(".tg-letter");
+    if (letter) return saveLetter(letter.closest(".tg-ans"), letter.dataset.k);
+
     const same = e.target.closest(".tg-same");
     if (same) {
       const it = byId(same.dataset.id);
-      if (!it || !it.correct) return;
-      const ok = await updateTestItem(it.id, { correct_2026: it.correct });
-      if (!ok) { showToast("Nu am putut copia răspunsul."); return; }
-      it.correct2026 = it.correct;
-      const sel = same.parentElement.querySelector(".tg-sel");
-      if (sel) sel.value = it.correct;
-      flash(same.closest("td"));
+      if (it && it.correct) saveLetterValue(same.closest("td").parentElement.querySelector('.tg-ans[data-field="correct_2026"]'), it.correct);
       return;
     }
 
     const pub = e.target.closest("[data-action=pub]");
-    if (pub) {
-      const it = byId(pub.dataset.id); if (!it) return;
-      const next = !it.verified;
-      const ok = await setTestVerified(it.id, next);
-      if (!ok) { showToast("Nu am putut publica."); return; }
-      it.verified = next;
-      pub.classList.toggle("on", next); pub.textContent = next ? "✓" : "○";
-      pub.closest(".tg-row").classList.toggle("is-pub", next);
-      showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
-      return;
-    }
-
+    if (pub) return togglePub(pub);
     const flag = e.target.closest("[data-action=flag]");
-    if (flag) {
-      const it = byId(flag.dataset.id); if (!it) return;
-      const next = !it.flagged;
-      const ok = await setTestFlagged(it.id, next);
-      if (!ok) { showToast("Nu am putut marca."); return; }
-      it.flagged = next;
-      flag.classList.toggle("on", next); flag.textContent = next ? "★" : "☆";
-      flag.closest(".tg-row").classList.toggle("is-flag", next);
-      return;
-    }
+    if (flag) return toggleFlag(flag);
   });
 
-  // Enter inside a rich cell = commit (blur), not a newline flood.
+  // Enter commits the cell (blur) instead of adding newlines.
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && e.target.closest(".tg-rich")) {
+    if (e.key === "Enter" && !e.shiftKey && (e.target.closest(".tg-rich") || e.target.closest(".tg-edit"))) {
       e.preventDefault();
       e.target.blur();
     }
   });
 }
 
-// Re-render only the table body (used while typing in the search box, to keep focus).
+// ---------- saves ----------
+async function saveRich(cell) {
+  const it = byId(cell.dataset.id); if (!it) return;
+  const field = cell.dataset.field;
+  const clean = sanitizeRich(cell.innerHTML);
+  cell.innerHTML = clean;
+  const map = { question: it.question, option_a: it.options.A, option_b: it.options.B,
+                option_c: it.options.C, option_d: it.options.D, observation: it.observation };
+  if (clean === (map[field] || "")) return;
+  showSaving();
+  const ok = await updateTestItem(it.id, { [field]: clean || null });
+  if (!ok) { showSaved(false); showToast("Nu am putut salva."); return; }
+  applyLocal(it, field, clean);
+  showSaved(true); flash(cell);
+}
+
+async function savePlain(cell) {
+  const it = byId(cell.dataset.id); if (!it) return;
+  const field = cell.dataset.field;
+  const raw = cell.textContent.trim();
+  let val, curr;
+  if (field === "year" || field === "item_no") {
+    const n = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+    val = Number.isFinite(n) ? n : null;
+    curr = field === "year" ? it.year : it.itemNo;
+  } else { val = raw || null; curr = it.session; }
+  if (String(val ?? "") === String(curr ?? "")) { cell.textContent = curr ?? ""; return; }
+  showSaving();
+  const ok = await updateTestItem(it.id, { [field]: val });
+  if (!ok) {
+    showSaved(false);
+    showToast("Nu am putut salva (poate un An/Sesiune/Nr deja folosit).");
+    cell.textContent = curr ?? ""; // revert
+    return;
+  }
+  if (field === "year") it.year = val; else if (field === "item_no") it.itemNo = val; else it.session = val;
+  showSaved(true); flash(cell);
+}
+
+// click a letter in a Corect / Corect 2026 cell
+function saveLetter(td, k) {
+  const it = byId(td.dataset.id); if (!it) return;
+  const field = td.dataset.field;
+  // 2026 is optional → clicking the active one clears it; historical is required.
+  const val = (field === "correct_2026" && it.correct2026 === k) ? null : k;
+  saveLetterValue(td, val);
+}
+async function saveLetterValue(td, val) {
+  if (!td) return;
+  const it = byId(td.dataset.id); if (!it) return;
+  const field = td.dataset.field;
+  showSaving();
+  const ok = await updateTestItem(it.id, { [field]: val });
+  if (!ok) { showSaved(false); showToast("Nu am putut salva răspunsul."); return; }
+  if (field === "correct_2026") it.correct2026 = val; else it.correct = val;
+  td.querySelectorAll(".tg-letter").forEach((b) => b.classList.toggle("on", b.dataset.k === val));
+  showSaved(true); flash(td);
+}
+
+async function togglePub(btn) {
+  const it = byId(btn.dataset.id); if (!it) return;
+  const next = !it.verified;
+  showSaving();
+  const ok = await setTestVerified(it.id, next);
+  if (!ok) { showSaved(false); showToast("Nu am putut publica."); return; }
+  it.verified = next;
+  btn.classList.toggle("on", next); btn.textContent = next ? "✓" : "○";
+  btn.closest(".tg-row").classList.toggle("is-pub", next);
+  showSaved(true);
+  showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
+}
+
+async function toggleFlag(btn) {
+  const it = byId(btn.dataset.id); if (!it) return;
+  const next = !it.flagged;
+  showSaving();
+  const ok = await setTestFlagged(it.id, next);
+  if (!ok) { showSaved(false); showToast("Nu am putut marca."); return; }
+  it.flagged = next;
+  btn.classList.toggle("on", next); btn.textContent = next ? "★" : "☆";
+  btn.closest(".tg-row").classList.toggle("is-flag", next);
+  showSaved(true);
+}
+
 function renderBodyOnly() {
-  const tb = root.querySelector(".tg-table tbody");
   const rows = filtered();
   const count = root.querySelector(".tg-count");
-  if (count) count.textContent = `${rows.length} / ${state.items.length} itemi · ${state.items.filter((i) => i.verified).length} publicați`;
+  if (count) count.textContent = `${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} publicați`;
   const scroll = root.querySelector(".tg-scroll");
   if (!scroll) return;
   if (!rows.length) { scroll.innerHTML = `<div class="tg-empty">Niciun item pentru filtrele curente.</div>`; return; }
+  const tb = root.querySelector(".tg-table tbody");
   if (!tb) { scroll.innerHTML = tableHtml(rows); return; }
   tb.innerHTML = rows.map(rowHtml).join("");
 }
@@ -302,10 +358,4 @@ function applyLocal(it, field, val) {
   else if (field === "option_b") it.options.B = val;
   else if (field === "option_c") it.options.C = val;
   else if (field === "option_d") it.options.D = val;
-}
-
-function flash(el) {
-  if (!el) return;
-  el.classList.add("tg-saved");
-  setTimeout(() => el.classList.remove("tg-saved"), 700);
 }
