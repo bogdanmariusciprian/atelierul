@@ -704,6 +704,7 @@ async function toggleVerified(btn) {
   const next = !it.verified;
   it.verified = next;
   btn.classList.toggle("on", next);        // green tick shows/hides via the .on class
+  syncCount();                             // refresh the „N verificați" count right away (was stale)
   queueChange(it.id, "verified", next);
   const ok = await flushItem(it.id);       // „verificat" = save the WHOLE item now (with retry)
   // With „Ascunde verificații" on, the item you just verified drops out.
@@ -725,6 +726,8 @@ function scheduleHide(row, it) {
 function syncCount() {
   const count = root.querySelector(".tg-count");
   if (count) count.textContent = `${filtered().length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați`;
+  const prog = root.querySelector(".tgm-progtxt"); // phone: refresh the „X verif." number too
+  if (prog) prog.innerHTML = mProgHtml(filtered());
 }
 
 async function togglePublished(btn) {
