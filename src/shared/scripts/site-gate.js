@@ -15,6 +15,10 @@
 // =========================================================
 import { supabase } from "./supabase-client.js";
 
+// TEMPORAR: poarta e DEZACTIVATĂ — tot site-ul e public, oricine intră.
+// Ca s-o REACTIVEZI la loc, pune înapoi pe `false`.
+const GATE_OFF = true;
+
 /** The accounts allowed in before launch (compared lower-cased). Being on this
  *  list only grants VIEW access; the admin role stays tied to ADMIN_EMAIL in
  *  session.js, so the extra members here see the site as pupils, not admins. */
@@ -45,6 +49,7 @@ export function revealGate() {
  * Never throws (any error is treated as "guest" → gated = fail-closed).
  */
 export async function enforceGate() {
+  if (GATE_OFF) return true; // poarta dezactivată temporar → toți intră
   // The coming-soon page is always allowed. It doesn't call this, but guard
   // against an accidental redirect loop just in case.
   if (location.pathname.startsWith(COMING_SOON_PATH)) return true;
