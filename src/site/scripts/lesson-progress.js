@@ -17,6 +17,7 @@ import { touchStreak } from "../../shared/scripts/streak.js";
 import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { currentLessonSlug, lessonHrefBySlug } from "../../shared/scripts/lessons-index.js";
+import { localDayStr } from "../../shared/scripts/format.js";
 
 const DONE_KEY = "atelier_lessons_done"; // { slug: "YYYY-MM-DD" }
 export const LESSON_COMPLETE_REWARD = 70;
@@ -83,7 +84,7 @@ export function initLessonProgress(basePath = "") {
     if (!isLoggedIn() || isAdmin()) return;
     const done = doneLessons();
     if (done[slug]) return; // already counted
-    done[slug] = new Date().toISOString().slice(0, 10);
+    done[slug] = localDayStr();
     store.set(DONE_KEY, done);
 
     // REAL: record progress + award points server-side (cheat-safe, and

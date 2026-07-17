@@ -13,10 +13,12 @@
 import { MY_PROFILE } from "./community-data.js";
 import { isLoggedIn, isAdmin } from "./session.js";
 import { showToast } from "./toast.js";
+import { localDayStr } from "./format.js";
 
 const KEY = "atelier_streak"; // { lastDay: "2026-07-04", count: n }
 
-const dayStr = (d = new Date()) => d.toISOString().slice(0, 10);
+// LOCAL calendar day (not UTC) — the streak flips at the pupil's local midnight.
+const dayStr = (d = new Date()) => localDayStr(d);
 
 function load() {
   try {

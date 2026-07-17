@@ -82,6 +82,13 @@ export async function addGroupMember(groupId, userUuid) {
   if (error && error.code !== "23505") console.warn("addGroupMember:", error.message);
 }
 
+/** Creator/admin: remove another member from the group (RLS enforces it — 0004). */
+export async function kickGroupMember(groupId, userUuid) {
+  if (!userUuid) return;
+  const { error } = await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", userUuid);
+  if (error) console.warn("kickGroupMember:", error.message);
+}
+
 /** Update a group's name/description/icon/permissions (creator or admin — RLS). */
 export async function updateGroup(groupId, fields) {
   const patch = {};

@@ -656,8 +656,14 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 }
 .tgame-cardmeta {
   font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 0.8rem;
-  user-select: none;
+  user-select: none; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
 }
+.tgame-report {
+  margin-left: auto; background: none; border: 0; cursor: pointer; font: inherit;
+  font-size: 0.78rem; color: var(--color-text-muted); opacity: 0.75;
+  padding: 0.1rem 0.35rem; border-radius: 6px;
+}
+.tgame-report:hover { opacity: 1; color: #b45309; background: rgba(180, 83, 9, 0.08); }
 .tgame-q {
   margin: 0 0 1.4rem; font-size: 1.18rem; line-height: 1.85; font-weight: 600;
   word-spacing: 0.06em; text-align: left;

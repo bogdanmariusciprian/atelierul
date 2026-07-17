@@ -1436,9 +1436,14 @@
   margin-bottom: var(--space-md);
 }
 .cx-members { display: flex; }
-.cx-member { margin-left: -0.5rem; }
+.cx-member { margin-left: -0.5rem; position: relative; }
 .cx-member:first-child { margin-left: 0; }
 .cx-member .cx-av { border: 2px solid var(--color-bg); }
+.cx-member__kick {
+  position: absolute; top: -5px; right: -5px; width: 17px; height: 17px; padding: 0;
+  border: 2px solid var(--color-bg); border-radius: 50%; background: #dc2626;
+  color: #fff; cursor: pointer; font-size: 11px; line-height: 13px;
+}
 .cx-groupbar__actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .btn-mini.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 

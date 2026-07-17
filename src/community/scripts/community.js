@@ -40,7 +40,7 @@ import {
   // aliased: a LOCAL function createGroup() (the composer handler) already
   // exists below — without the alias it would shadow this import and recurse.
   listGroups, fetchGroupPosts, postToGroup, createGroup as createGroupRow, joinGroup,
-  leaveGroup, addGroupMember, updateGroup, deleteGroup,
+  leaveGroup, addGroupMember, kickGroupMember, updateGroup, deleteGroup,
 } from "../../shared/scripts/groups-repo.js";
 import {
   fetchTodayChallenge, fetchMyChallengeSolve, solveChallenge, fetchChallengeAnswer,
@@ -76,6 +76,7 @@ import { mascotSvg } from "../../shared/scripts/mascot.js";
 import { MAX_LEVEL, xpSkin, levelInfo, setPreview, xpBarMarkup, applyBar } from "../../shared/scripts/xp-bar.js";
 import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
 import { lessonHrefBySlug, lessonBySlug, LESSONS } from "../../shared/scripts/lessons-index.js";
+import { countNoun } from "../../shared/scripts/format.js";
 
 // --- Small inline icons for the sidebar (single source, DRY) ----------
 const NAV_ICONS = {
@@ -753,7 +754,7 @@ export function renderCommunity(basePath = "") {
           <p class="cx-side__title">${g.title}</p>
           ${g.items
             .map(
-              (s) => `<button class="cx-side__item${s.id === state.section ? " on" : ""}" data-action="go" data-id="${s.id}">
+              (s) => `<button class="cx-side__item${s.id === state.section ? " on" : ""}"${s.id === state.section ? ' aria-current="page"' : ""} data-action="go" data-id="${s.id}">
                 <span class="cx-side__icon">${NAV_ICONS[s.id]}</span>
                 <span class="cx-side__label">${s.label}</span>
                 ${badgeFor(s.id)}
@@ -2547,7 +2548,7 @@ export function renderCommunity(basePath = "") {
           <span class="cx-group__body">
             <b class="cx-group__name">${escapeHtml(g.name)} ${news}</b>
             <span class="cx-group__topic">${escapeHtml(g.description)}</span>
-            <span class="cx-muted">👥 ${g.memberIds.length} membri · 💬 ${g.posts.length} postări ${pulse}${joined ? " · membru ✓" : ""}</span>
+            <span class="cx-muted">👥 ${countNoun(g.memberIds.length, "membru", "membri")} · 💬 ${countNoun(g.posts.length, "postare", "postări")} ${pulse}${joined ? " · membru ✓" : ""}</span>
           </span>
           <span class="cx-group__go" aria-hidden="true">→</span>
         </button>`;
@@ -2575,12 +2576,21 @@ export function renderCommunity(basePath = "") {
     const members = g.memberIds
       .map((mid) => {
         const name = mid === CURRENT_USER.id ? CURRENT_USER.name : (userById(mid) || {}).name || "Membru";
-        const col = mid === CURRENT_USER.id ? CURRENT_USER.color : avatarColor(mid);
-        return `<span class="cx-member" title="${escapeHtml(name)}">${avatarLink(mid)}</span>`;
+        // Creator/admin can remove any member except the creator and themselves.
+        const kick = isCreator && mid !== g.creatorId && mid !== CURRENT_USER.id
+          ? `<button type="button" class="cx-member__kick" data-action="group-kick" data-uid="${mid}" title="Scoate din grup">×</button>`
+          : "";
+        return `<span class="cx-member" title="${escapeHtml(name)}">${avatarLink(mid)}${kick}</span>`;
       })
       .join("");
 
-    const candidates = COMMUNITY_USERS.filter((u) => !g.memberIds.includes(u.id)).slice(0, 12);
+    // REAL members (not seed): those not already in the group. uuidForSurrogate
+    // then resolves each so addGroupMember actually persists.
+    const candidates = state.members
+      .filter((id) => id !== CURRENT_USER.id && !g.memberIds.includes(id))
+      .map((id) => userById(id))
+      .filter(Boolean)
+      .slice(0, 12);
     const addPanel =
       canAdd && state.addMemberOpen
         ? `<div class="cx-addmember">
@@ -2636,7 +2646,7 @@ export function renderCommunity(basePath = "") {
         <div class="cx-grouphead__id">
           <h1>${escapeHtml(g.name)}</h1>
           <p>${escapeHtml(g.description)}</p>
-          <span class="cx-muted">Creat de ${escapeHtml(creatorName)} · 👥 ${g.memberIds.length} membri</span>
+          <span class="cx-muted">Creat de ${escapeHtml(creatorName)} · 👥 ${countNoun(g.memberIds.length, "membru", "membri")}</span>
         </div>
         <button type="button" class="cx-group__join${joined ? " on" : ""}" data-action="group-toggle" data-id="${g.id}">${joined ? "Membru ✓" : "Alătură-te"}</button>
         ${adminBar}
@@ -4234,6 +4244,16 @@ export function renderCommunity(basePath = "") {
           g.memberIds.push(uid);
           const uuid = uuidForSurrogate(uid);
           if (uuid) addGroupMember(state.openGroup, uuid); // persist (RLS checks the rule)
+        }
+        return render();
+      }
+      case "group-kick": {
+        const g = findGroup(state.openGroup);
+        const uid = Number(btn.dataset.uid);
+        const uuid = uuidForSurrogate(uid);
+        if (g && (g.creatorId === CURRENT_USER.id || isAdmin()) && uuid) {
+          g.memberIds = g.memberIds.filter((m) => m !== uid);
+          kickGroupMember(state.openGroup, uuid); // persist (RLS: creator/admin)
         }
         return render();
       }
