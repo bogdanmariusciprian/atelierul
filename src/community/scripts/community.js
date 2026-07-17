@@ -3498,6 +3498,9 @@ export function renderCommunity(basePath = "") {
       }
     } catch (e) {
       console.warn("feed:", e.message);
+      // Don't fail silently: an empty hub would look the same as a real error.
+      state.notice = "⚠️ N-am putut încărca tot conținutul acum. Reîncarcă pagina sau încearcă din nou.";
+      render();
     }
   }
 

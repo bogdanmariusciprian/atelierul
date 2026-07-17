@@ -17,6 +17,7 @@ import {
   WHATS_NEW,
   USEFUL_LINKS,
 } from "../../shared/scripts/news-data.js";
+import { localDayNumber } from "../../shared/scripts/format.js";
 
 // How often the spotlight card switches to the next one. 5 minutes for
 // now; set to 3 * 60 * 60 * 1000 (3 hours) once the site is finished.
@@ -25,7 +26,7 @@ const ROTATE_MS = 5 * 60 * 1000;
 // Whole days since the epoch (UTC). Same for everyone on a given day, so
 // the "of the day" content is stable through the day and changes at
 // midnight. Weekly cards advance every 7 days.
-const dayNumber = Math.floor(Date.now() / 86_400_000);
+const dayNumber = localDayNumber(); // LOCAL day → conținutul „zilei" se schimbă la miezul nopții local
 const daily = (list) => list[dayNumber % list.length];
 const weekly = (list) => list[Math.floor(dayNumber / 7) % list.length];
 

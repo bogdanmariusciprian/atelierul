@@ -34,8 +34,9 @@ function load() {
   const s = load();
   if (!s) return; // keep the seeded mock value until the first real action
   const yesterday = dayStr(new Date(Date.now() - 864e5));
-  // A missed day means the streak is broken — show it honestly.
-  MY_PROFILE.streak = s.lastDay === dayStr() || s.lastDay === yesterday ? s.count : 0;
+  const twoDaysAgo = dayStr(new Date(Date.now() - 2 * 864e5)); // 1-day grace
+  // One missed day is forgiven (grace); two or more breaks the streak.
+  MY_PROFILE.streak = [dayStr(), yesterday, twoDaysAgo].includes(s.lastDay) ? s.count : 0;
 })();
 
 /** Current streak info for UIs (calendar strip etc.): the run of ACTIVE
@@ -50,11 +51,14 @@ export function touchStreak() {
   if (!isLoggedIn() || isAdmin()) return; // members only
   const today = dayStr();
   const yesterday = dayStr(new Date(Date.now() - 864e5));
+  const twoDaysAgo = dayStr(new Date(Date.now() - 2 * 864e5));
   const s = load();
 
   if (s && s.lastDay === today) return; // already counted today
 
-  const count = s && s.lastDay === yesterday ? s.count + 1 : 1;
+  // 1-day grace: a single missed day still continues the streak; 2+ resets to 1.
+  const continues = s && (s.lastDay === yesterday || s.lastDay === twoDaysAgo);
+  const count = continues ? s.count + 1 : 1;
   try {
     localStorage.setItem(KEY, JSON.stringify({ lastDay: today, count }));
   } catch {

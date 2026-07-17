@@ -9,6 +9,7 @@
 // =========================================================
 import { userById, initials, avatarColor } from "./community-data.js";
 import { relTime, nextId, makeComment } from "./forum-data.js";
+import { localDayStr } from "./format.js";
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -100,7 +101,7 @@ export function allChallenges() {
   return [...loadCustom(), ...CHALLENGE_SEEDS];
 }
 
-const dayStr = (d = new Date()) => d.toISOString().slice(0, 10);
+const dayStr = (d = new Date()) => localDayStr(d); // LOCAL day (provocarea fixată pe dată)
 const dayOfYear = (d = new Date()) =>
   Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5);
 
