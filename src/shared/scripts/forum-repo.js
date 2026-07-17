@@ -748,6 +748,34 @@ export async function removeProfanityTerm(id) {
   await supabase.from("profanity_terms").delete().eq("id", id);
 }
 
+// ---- Held content (kept out of the feed by the profanity filter) — admin review ----
+/** Admin: posts + comments with moderation_status='held', newest first. RLS
+ *  already lets the admin read them (posts_read/comments_read include is_admin_user). */
+export async function fetchHeldContent() {
+  const [posts, comments] = await Promise.all([
+    supabase.from("posts")
+      .select("id, body, created_at, author:profiles!posts_author_id_fkey(display_name)")
+      .eq("moderation_status", "held").order("created_at", { ascending: false }),
+    supabase.from("comments")
+      .select("id, body, created_at, author:profiles!comments_author_id_fkey(display_name)")
+      .eq("moderation_status", "held").order("created_at", { ascending: false }),
+  ]);
+  const map = (res, kind) => (res.data || []).map((r) => ({
+    kind, id: r.id, body: r.body, createdAt: new Date(r.created_at).getTime(),
+    authorName: r.author?.display_name || "Membru",
+  }));
+  return [...map(posts, "post"), ...map(comments, "comment")].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Admin: set moderation status — 'visible' (publish) or 'blocked' (hide). RLS
+ *  posts_update/comments_update already allow the admin. */
+export async function moderateContent(kind, id, status) {
+  if (!id) return;
+  const table = kind === "comment" ? "comments" : "posts";
+  const { error } = await supabase.from(table).update({ moderation_status: status }).eq("id", id);
+  if (error) console.warn("moderateContent:", error.message);
+}
+
 /** Realtime: run `onInsert(row)` whenever a row is INSERTed into `table` that
  *  this user is allowed to see (RLS applies to realtime too). Returns the channel
  *  so the caller can unsubscribe. Best-effort — never throws. */

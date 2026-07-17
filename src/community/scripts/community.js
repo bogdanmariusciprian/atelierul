@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -272,6 +272,7 @@ export function renderCommunity(basePath = "") {
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
     contentReports: [], // REAL open reports (posts/comments/test items/exercises)
     profanityTerms: [], // admin-managed custom filtered words
+    heldContent: [], // posts/comments held by the profanity filter (admin review)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
     modFilter: "all", // "all" | "held-post" | "blocked-comment" | "report" | "history"
     chEditId: null, // the custom challenge being edited ("new" = fresh form)
@@ -2937,7 +2938,24 @@ export function renderCommunity(basePath = "") {
         <div class="cx-prof-list">${state.profanityTerms.map((t) => `<span class="cx-prof-chip">${escapeHtml(t.term)}<button type="button" class="cx-prof-x" data-action="prof-del" data-id="${t.id}" title="Șterge">×</button></span>`).join("") || `<span class="cx-muted">Niciun termen custom încă.</span>`}</div>
       </div>`;
 
-    return `${realReports}${profBox}<div class="cx-box">
+    const heldBox = state.heldContent.length
+      ? `<div class="cx-box">
+          <div class="cx-admin__head"><h3>🛡️ Reținute de filtru · ${state.heldContent.length}</h3></div>
+          <div class="cx-modlist">${state.heldContent.map((h) => `
+            <div class="cx-moditem">
+              <div class="cx-moditem__body">
+                <p class="cx-moditem__text">${h.kind === "comment" ? "💬" : "📝"} „${escapeHtml((h.body || "").slice(0, 200))}${(h.body || "").length > 200 ? "…" : ""}”</p>
+                <p class="cx-moditem__meta"><span class="cx-muted">${escapeHtml(h.authorName)} · ${relTime(Math.max(0, Date.now() - h.createdAt))}</span></p>
+              </div>
+              <span class="cx-moditem__act">
+                <button type="button" class="btn-mini btn-mini--ok" data-action="held-approve" data-kind="${h.kind}" data-id="${h.id}">✓ Publică</button>
+                <button type="button" class="btn-mini btn-mini--no" data-action="held-reject" data-kind="${h.kind}" data-id="${h.id}">✕ Ascunde</button>
+              </span>
+            </div>`).join("")}</div>
+        </div>`
+      : "";
+
+    return `${realReports}${heldBox}${profBox}<div class="cx-box">
         <div class="cx-admin__head"><h3>Moderare${open.length ? ` · ${open.length} deschise` : ""}</h3></div>
         ${chips}
         <div class="cx-modlist">${items}</div>
@@ -3471,6 +3489,7 @@ export function renderCommunity(basePath = "") {
       if (isAdmin()) {
         state.adminUsers = await adminFetchUsers(); // real members (+ e-mail); also bridges them so they're messageable
         state.contentReports = await fetchContentReports(); // real reports queue (posts/comments/teste/exerciții)
+        state.heldContent = await fetchHeldContent();       // filter-held posts/comments awaiting review
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
@@ -4551,6 +4570,17 @@ export function renderCommunity(basePath = "") {
         removeProfanityTerm(pid);
         state.profanityTerms = state.profanityTerms.filter((t) => t.id !== pid);
         setCustomProfanity(state.profanityTerms);
+        return render();
+      }
+      case "held-approve": {
+        moderateContent(btn.dataset.kind, btn.dataset.id, "visible");
+        state.heldContent = state.heldContent.filter((h) => !(h.id === btn.dataset.id && h.kind === btn.dataset.kind));
+        state._feedLoaded = false; // reload so the published item shows in the feed
+        return render();
+      }
+      case "held-reject": {
+        moderateContent(btn.dataset.kind, btn.dataset.id, "blocked");
+        state.heldContent = state.heldContent.filter((h) => !(h.id === btn.dataset.id && h.kind === btn.dataset.kind));
         return render();
       }
       case "mod-approve": {
