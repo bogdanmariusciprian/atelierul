@@ -34,6 +34,13 @@ export function postUuid(surrogateId) {
 export function mapPostSurrogate(surrogateId, uuid) {
   if (surrogateId && uuid) postUuidBySurr.set(surrogateId, uuid);
 }
+/** Reverse: the numeric surrogate for a real post uuid (once the feed mapped
+ *  it), so a notification's post uuid can open the exact post. null if unknown. */
+export function surrogateForPostUuid(uuid) {
+  if (!uuid) return null;
+  for (const [sid, u] of postUuidBySurr) if (u === uuid) return sid;
+  return null;
+}
 export function mapComment(surrogateId, uuid) {
   if (surrogateId && uuid) commentUuidBySurr.set(surrogateId, uuid);
 }
@@ -670,6 +677,40 @@ export async function fetchNotifications(limit = 30) {
 export async function markNotificationsRead(ids) {
   if (!ids || !ids.length || !CURRENT_USER.authId) return;
   await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
+}
+
+/** Delete ALL of my notifications ("șterge tot"). */
+export async function deleteAllNotifications() {
+  if (!CURRENT_USER.authId) return;
+  await supabase.from("notifications").delete().eq("user_id", CURRENT_USER.authId);
+}
+
+/** The teacher's last_seen (ms) so a pupil's messenger can show the teacher as
+ *  "active now". last_seen_at is a public-safe column (0009). 0 if unknown. */
+export async function fetchTeacherPresence() {
+  try {
+    const { data } = await supabase
+      .from("profiles").select("last_seen_at").eq("role", "admin").limit(1).maybeSingle();
+    return data?.last_seen_at ? new Date(data.last_seen_at).getTime() : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Realtime: run `onInsert(row)` whenever a row is INSERTed into `table` that
+ *  this user is allowed to see (RLS applies to realtime too). Returns the channel
+ *  so the caller can unsubscribe. Best-effort — never throws. */
+export function subscribeInserts(table, onInsert) {
+  try {
+    return supabase
+      .channel(`rt:${table}:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table }, (payload) => {
+        try { onInsert(payload.new); } catch { /* ignore */ }
+      })
+      .subscribe();
+  } catch {
+    return null;
+  }
 }
 
 // ---- Teacher's inbox labels (admin) + event-access (auto "Evenimente") ----

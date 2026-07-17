@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -289,6 +289,7 @@ export function renderCommunity(basePath = "") {
     msgSlot: null, // a slotted template being filled ({opera}/{zi} pick)
     msgNewQuery: "", // "Conversație nouă" — search a member by name
     pendingMsgUuid: null, // #msg/<uuid> deep link → open that conversation after load
+    pendingPostUuid: null, // #post/<uuid> deep link → open that post after the feed loads
     convLabels: {}, // admin inbox: member UUID → 'curent'|'incheiat'|'amanat'
     eventAccessUuids: new Set(), // members with Events access (auto "Evenimente")
     msgLabelFilter: "all", // admin inbox filter
@@ -341,6 +342,17 @@ export function renderCommunity(basePath = "") {
     if (!h.startsWith("msg/")) return false;
     state.section = "mesaje";
     state.pendingMsgUuid = decodeURIComponent(h.slice(4));
+    return true;
+  }
+
+  // Notification deep link: ...#post/<post-uuid> → open the EXACT post once the
+  // feed has loaded (resolved to its numeric surrogate id).
+  applyPostHash();
+  function applyPostHash() {
+    const h = location.hash.slice(1);
+    if (!h.startsWith("post/")) return false;
+    state.section = "forum";
+    state.pendingPostUuid = decodeURIComponent(h.slice(5));
     return true;
   }
 
@@ -3465,6 +3477,12 @@ export function renderCommunity(basePath = "") {
         state.needsName = !isAdmin() && (!prof.first_name || !prof.last_name);
       }
       render();
+      // Notification deep-link to a post → open it now that the feed is here.
+      if (state.pendingPostUuid) {
+        const sid = surrogateForPostUuid(state.pendingPostUuid);
+        state.pendingPostUuid = null;
+        if (sid) goToPost(sid);
+      }
     } catch (e) {
       console.warn("feed:", e.message);
     }
@@ -5063,6 +5081,13 @@ export function renderCommunity(basePath = "") {
       );
       if (conv) state.msgOpen = conv.key;
       state.pendingMsgUuid = null;
+      return render();
+    }
+    if (applyPostHash()) {
+      // The feed is already loaded → resolve the uuid and jump to the post.
+      const sid = surrogateForPostUuid(state.pendingPostUuid);
+      state.pendingPostUuid = null;
+      if (sid) { goToPost(sid); return; }
       return render();
     }
     if (applyAdminHash()) return render();

@@ -7,10 +7,18 @@
 // (loaded via loadNotifications), so they can never disagree. Opening the tray
 // CONSUMES it: the shown notifications are marked read (server + cache).
 // =========================================================
-import { fetchNotifications, markNotificationsRead } from "./forum-repo.js";
+import { fetchNotifications, markNotificationsRead, deleteAllNotifications, subscribeInserts } from "./forum-repo.js";
 import { isLoggedIn } from "./session.js";
 
 let _notifs = []; // cache: [{ id, type, payload, read_at, created_at }]
+let _rtChannel = null; // realtime subscription (once)
+
+/** Subscribe once: a new notification for me → refresh the tray INSTANTLY
+ *  (no page reload). RLS ensures only my own rows arrive. */
+function startNotifRealtime() {
+  if (_rtChannel || !isLoggedIn()) return;
+  _rtChannel = subscribeInserts("notifications", () => loadNotifications());
+}
 
 /** Load (or refresh) the current user's notifications. Fires atelier:notifs
  *  so the badge/chip re-render. No-op (empty) for guests. */
@@ -24,7 +32,15 @@ export async function loadNotifications() {
   } catch {
     _notifs = [];
   }
+  startNotifRealtime();
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("atelier:notifs"));
+}
+
+/** "Șterge tot" — clear the tray now (optimistic) and delete on the server. */
+export async function clearAllNotifications() {
+  _notifs = [];
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("atelier:notifs"));
+  try { await deleteAllNotifications(); } catch { /* ignore */ }
 }
 
 /** The cached notifications, newest first. */

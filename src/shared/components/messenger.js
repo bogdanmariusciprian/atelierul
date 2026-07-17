@@ -12,6 +12,7 @@ import { MY_PROFILE, userById } from "../scripts/community-data.js";
 import {
   fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply,
   sendFreeMsg, reportMessage, markConversationReadReal, contactTeacher,
+  fetchTeacherPresence, subscribeInserts,
 } from "../scripts/forum-repo.js";
 import { suggestReplies, intentOfTemplate } from "../scripts/messages.js";
 import { levelInfo } from "../scripts/xp-bar.js";
@@ -29,7 +30,7 @@ const dayLabel = (ts) => {
 };
 
 let el = null;
-const st = { open: false, convKey: null, convs: [] };
+const st = { open: false, convKey: null, convs: [], teacherSeen: 0 };
 // A programmatic open (footer "Scrie-i profesorului") comes from a click
 // OUTSIDE the widget; that same click bubbles to the outside-close handler and
 // would slam the panel shut. This one-shot flag swallows exactly that click.
@@ -53,6 +54,8 @@ function ensureTeacherConv() {
 export async function reloadMessenger() {
   if (!isLoggedIn()) { st.convs = []; if (el) render(); return; }
   try { st.convs = await fetchConversations(isAdmin()); } catch { st.convs = []; }
+  // Pupils see whether the teacher is active now (his online indicator).
+  if (!isAdmin()) { try { st.teacherSeen = await fetchTeacherPresence(); } catch { /* keep old */ } }
   ensureTeacherConv();
   if (el) render();
   window.dispatchEvent(new CustomEvent("atelier:notifs"));
@@ -118,7 +121,11 @@ function composerHtml(conv) {
 function convView(conv) {
   const asAdmin = isAdmin();
   const mineIs = (m) => (asAdmin ? m.fromTeacher : m.fromId === 0 && !m.fromTeacher);
-  const partnerOnline = conv.partnerId != null && !conv.teacher ? isOnlineSince((userById(conv.partnerId) || {}).lastSeen) : false;
+  const partnerOnline = conv.teacher
+    ? isOnlineSince(st.teacherSeen)
+    : conv.partnerId != null
+      ? isOnlineSince((userById(conv.partnerId) || {}).lastSeen)
+      : false;
   let bubbles = "", lastDay = null;
   for (const m of conv.msgs) {
     const day = new Date(m.createdAt).toDateString();
@@ -135,7 +142,7 @@ function convView(conv) {
   return `
     <div class="msgr-head">
       <button type="button" class="msgr-back" data-act="back" aria-label="Înapoi">‹</button>
-      <b>${who}</b>
+      <b>${who}</b>${partnerOnline ? ` <span class="msgr-online" title="Activ acum" style="color:#16a34a">●</span>` : ""}
       <button type="button" class="msgr-x" data-act="toggle" aria-label="Închide">×</button>
     </div>
     <div class="msgr-scroll" data-role="scroll">${bubbles || `<p class="msgr-muted msgr-empty">Niciun mesaj încă. Scrie primul!</p>`}</div>
@@ -229,6 +236,12 @@ export function initMessenger(basePath = "") {
   document.body.appendChild(el);
   render();
   reloadMessenger();
+
+  // Realtime: a new message I'm allowed to see → refresh the widget instantly
+  // (RLS decides what arrives; we only ever re-fetch, never render raw payloads).
+  if (!window.__messengerRt) {
+    window.__messengerRt = subscribeInserts("messages", () => reloadMessenger());
+  }
 
   el.addEventListener("click", (e) => {
     const t = e.target.closest("[data-act]");

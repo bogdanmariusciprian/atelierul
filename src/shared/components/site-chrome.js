@@ -22,7 +22,7 @@ import { LESSON_DOMAINS } from "../scripts/domains.js";
 import { initUserMenu } from "../scripts/user-menu.js";
 import { openModerationItems } from "../scripts/moderation.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
-import { notifTotal, notifRows, consumeTray, relTime, loadNotifications } from "../scripts/notif.js";
+import { notifTotal, notifRows, consumeTray, relTime, loadNotifications, clearAllNotifications } from "../scripts/notif.js";
 import { isLoggedIn, signOut } from "../scripts/session.js";
 import { MY_PROFILE } from "../scripts/community-data.js";
 import { CURRENT_USER } from "../scripts/session.js";
@@ -734,13 +734,28 @@ function initNotifCenter(basePath) {
         case "message": return `<b>${name}</b> ți-a scris`;
         case "like": return `<b>${name}</b> ți-a apreciat o postare`;
         case "comment": return `<b>${name}</b> a comentat la postarea ta`;
+        case "reply": return `<b>${name}</b> ți-a răspuns la un comentariu`;
+        case "mention": return `<b>${name}</b> te-a menționat`;
+        case "poke": return `<b>${name}</b> te-a înghiontit 👉`;
+        case "award": {
+          const p = n.payload || {};
+          if (p.kind === "exercise-approved") return `Exercițiul tău a fost aprobat 🎉 <b>+${p.points || 0}</b> puncte`;
+          if (p.kind === "exercise-rejected") return `Propunerea ta de exercițiu n-a fost aprobată de data asta`;
+          return `Ai primit o recompensă`;
+        }
         default: return `<b>${name}</b>`;
       }
     };
     const hrefFor = (n) => {
       const p = n.payload || {};
-      if (n.type === "message") return p.actor ? `${HUB}#msg/${p.actor}` : `${HUB}#mesaje`;
+      if (n.type === "message") {
+        // A pupil's message to the teacher lands in the admin inbox; else the thread.
+        if (p.to_admin) return `${HUB}#mesaje`;
+        return p.actor ? `${HUB}#msg/${p.actor}` : `${HUB}#mesaje`;
+      }
       if (n.type === "friend") return `${HUB}#profil`;
+      if (n.type === "award") return `${HUB}#exercitii`; // exercițiu aprobat/respins
+      if (p.post_id) return `${HUB}#post/${p.post_id}`; // like/comment/reply/mention → postarea exactă
       return `${HUB}#forum`;
     };
     const rows = notifRows().map((n) =>
@@ -758,6 +773,7 @@ function initNotifCenter(basePath) {
         <div class="notif__head">
           <b>Noutățile tale</b>
           ${notifTotal() ? `<span class="notif__total">${notifTotal()} noi</span>` : ""}
+          ${notifRows().length ? `<button type="button" class="notif__clear" data-act="notif-clear" title="Șterge toate notificările">Șterge tot</button>` : ""}
         </div>
         ${!isAdmin() && CURRENT_USER.email
           ? `<div class="notif__me" title="Adresa ta de email (doar tu o vezi)">✉️ ${CURRENT_USER.email.replace(/[<>&"]/g, "")}</div>`
@@ -792,6 +808,13 @@ function initNotifCenter(basePath) {
     panel.className = "notif-wrap";
     panel.innerHTML = panelHtml();
     document.body.appendChild(panel);
+    // "Șterge tot" — clear the tray without navigating.
+    panel.querySelector("[data-act='notif-clear']")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearAllNotifications();
+      close();
+    });
     const r = anchor.getBoundingClientRect();
     const el = panel.firstElementChild;
     const w = Math.min(360, innerWidth - 16);
