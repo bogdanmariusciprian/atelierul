@@ -9,7 +9,8 @@
 // =========================================================
 import { userById, initials, avatarColor } from "./community-data.js";
 import { relTime, nextId, makeComment } from "./forum-data.js";
-import { localDayStr } from "./format.js";
+import { localDayStr, localDayNumber } from "./format.js";
+import { WORDS_OF_DAY } from "./news-data.js";
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -105,9 +106,11 @@ const dayStr = (d = new Date()) => localDayStr(d); // LOCAL day (provocarea fixa
 const dayOfYear = (d = new Date()) =>
   Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5);
 
-/** Today's word — rotates daily through the pool. */
+/** Today's word — SAME shared pool + local-day index as the homepage, so home
+ *  and community always show the SAME word of the day (no more two systems). */
 export function wordOfToday() {
-  return WORDS_POOL[dayOfYear() % WORDS_POOL.length];
+  const w = WORDS_OF_DAY[localDayNumber() % WORDS_OF_DAY.length];
+  return { word: w.word, type: w.pos, definition: w.def, example: w.example, href: w.href, synonyms: [], antonyms: [] };
 }
 
 /** Today's challenge: a date-pinned one wins; otherwise daily rotation. */

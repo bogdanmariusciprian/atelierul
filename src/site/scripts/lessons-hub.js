@@ -6,8 +6,11 @@
 // =========================================================
 import { LESSON_DOMAINS } from "../../shared/scripts/domains.js";
 import { LESSONS } from "../../shared/scripts/lessons-index.js";
-import { isLessonDone } from "./lesson-progress.js";
+import { isLessonDone, mergeServerProgress } from "./lesson-progress.js";
+import { fetchMyLessonProgress } from "../../shared/scripts/forum-repo.js";
 import { isLoggedIn } from "../../shared/scripts/session.js";
+
+let _progressSynced = false; // pull server completion state once per page
 
 /** Ring progress for a lesson: 100% once its page was marked finished.
  *  Keyed by the STABLE lesson slug (not the URL). */
@@ -279,4 +282,13 @@ export function renderLessonsHub(basePath = "") {
     ? fromHash
     : LESSON_DOMAINS[0].slug;
   activate(initial);
+
+  // Cross-device: pull real completion state ONCE, then re-render so the rings
+  // reflect lessons finished on other devices too.
+  if (isLoggedIn() && !_progressSynced) {
+    _progressSynced = true;
+    fetchMyLessonProgress().then((set) => {
+      if (mergeServerProgress([...set])) renderLessonsHub(basePath);
+    });
+  }
 }

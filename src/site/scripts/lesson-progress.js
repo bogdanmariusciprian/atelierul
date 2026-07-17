@@ -30,6 +30,16 @@ export function isLessonDone(slug) {
   return Boolean(doneLessons()[slug]);
 }
 
+/** Merge server-side completed slugs into the local view, so the Lecții hub
+ *  rings reflect progress made on OTHER devices. Returns true if anything changed. */
+export function mergeServerProgress(slugs) {
+  const d = doneLessons();
+  let changed = false;
+  for (const s of slugs || []) if (!d[s]) { d[s] = localDayStr(); changed = true; }
+  if (changed) store.set(DONE_KEY, d);
+  return changed;
+}
+
 export function initLessonProgress(basePath = "") {
   const article = document.querySelector(".lesson");
   if (!article) return;

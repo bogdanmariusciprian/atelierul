@@ -70,13 +70,13 @@ import { initMentions, invalidMentions, linkifyMentions, mentionsIn } from "../.
 import { exerciseFormFields, readExerciseForm, exerciseEditFormHtml, exercisePreviewHtml } from "../../shared/scripts/exercise-form.js";
 import { touchStreak, getStreakInfo } from "../../shared/scripts/streak.js";
 import { store } from "../../shared/scripts/store.js";
-import { getNotes, addNote, updateNote, deleteNote } from "../../shared/scripts/notebook.js";
+import { getNotes, loadNotes, addNote, updateNote, deleteNote } from "../../shared/scripts/notebook.js";
 import { MESSAGE_TEMPLATES, searchTemplates, templateStats, suggestReplies, intentOfTemplate, slotsIn, slotOptions, fillTemplate } from "../../shared/scripts/messages.js";
 import { mascotSvg } from "../../shared/scripts/mascot.js";
 import { MAX_LEVEL, xpSkin, levelInfo, setPreview, xpBarMarkup, applyBar } from "../../shared/scripts/xp-bar.js";
 import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
 import { lessonHrefBySlug, lessonBySlug, LESSONS } from "../../shared/scripts/lessons-index.js";
-import { countNoun } from "../../shared/scripts/format.js";
+import { countNoun, plural } from "../../shared/scripts/format.js";
 
 // --- Small inline icons for the sidebar (single source, DRY) ----------
 const NAV_ICONS = {
@@ -214,7 +214,7 @@ export function renderCommunity(basePath = "") {
     pointsHistory: [], // real points ledger (Puncte section)
     favorites: [], // real favorite lessons [{slug,title,href}]
     _feedLoaded: false,
-    notes: getNotes(), // persistent notebook (store.js adapter)
+    notes: [], // persistent notebook (Supabase; loaded in loadFeed)
     noteQuery: "",
     memberQuery: "", // "Membri" (discover) search
     editingNote: null, // note id being edited
@@ -401,6 +401,11 @@ export function renderCommunity(basePath = "") {
   // The author (or admin) manages a post; members may report others'.
   // Guests manage nothing (they only borrow the id-0 mock identity).
   const canManagePost = (p) => isLoggedIn() && (isAdmin() || p.authorId === CURRENT_USER.id);
+  // The creator of the OPEN group may moderate (delete) posts inside it — but not
+  // EDIT them (canEditPost stays author/admin only). RLS enforces it server-side (0039).
+  const isOpenGroupMine = () => { const g = findGroup(state.openGroup); return !!g && g.creatorId === CURRENT_USER.id; };
+  // In a group topic I created, every post shown belongs to that group → I can moderate it.
+  const canModeratePost = (p) => canManagePost(p) || (isLoggedIn() && state.section === "grupuri" && !!state.openGroup && isOpenGroupMine());
   // The author may EDIT only in the 5-minute typo window (then delete-only);
   // admin edits anytime. Same rule as comments (Marius's rule).
   const canEditPost = (p) =>
@@ -1046,7 +1051,7 @@ export function renderCommunity(basePath = "") {
 
     // Manage toolbar: the author EDITS only in the 5-minute window (admin
     // anytime); DELETING your own stays available forever.
-    const manageBar = canManagePost(post)
+    const manageBar = canModeratePost(post)
       ? `<span class="post__admin">
            ${isShare || !canEditPost(post) ? "" : `<button type="button" class="post__adminbtn" data-action="post-edit" data-id="${post.id}" title="Editează (5 min)">✎</button>`}
            <button type="button" class="post__adminbtn post__adminbtn--del" data-action="post-del" data-id="${post.id}" title="Șterge">🗑</button>
@@ -1360,7 +1365,7 @@ export function renderCommunity(basePath = "") {
 
     // Only proposals still awaiting a decision live in the "pending" tab; once
     // the admin approves/rejects, they move to the "history" tab.
-    const pending = state.proposed.filter((e) => e.status === "pending");
+    const pending = state.proposed.filter((e) => e.status === "pending").sort((a, b) => (b.votes || 0) - (a.votes || 0));
     const pendingList = pending.length
       ? pending
           .map((e) => {
@@ -1936,9 +1941,9 @@ export function renderCommunity(basePath = "") {
           { icon: "🛡️", label: "Administrator" },
         ]
       : [
-          { icon: "🔥", label: `Streak ${MY_PROFILE.streak} zile` },
-          { icon: "🏅", label: `${MY_PROFILE.points} puncte` },
-          { icon: "📚", label: `${MY_PROFILE.lessons} lecții` },
+          { icon: "🔥", label: `Streak ${MY_PROFILE.streak} ${plural(MY_PROFILE.streak, "zi", "zile")}` },
+          { icon: "🏅", label: `${MY_PROFILE.points} ${plural(MY_PROFILE.points, "punct", "puncte")}` },
+          { icon: "📚", label: `${MY_PROFILE.lessons} ${plural(MY_PROFILE.lessons, "lecție", "lecții")}` },
           { icon: "✍️", label: "Primul comentariu" },
         ];
     return items
@@ -2149,10 +2154,10 @@ export function renderCommunity(basePath = "") {
     }
 
     const badges = [
-      { icon: "🏅", label: `${pp.points.toLocaleString("ro-RO")} puncte` },
+      { icon: "🏅", label: `${pp.points.toLocaleString("ro-RO")} ${plural(pp.points, "punct", "puncte")}` },
       { icon: "📈", label: `Nivel ${levelInfo(pp.points).level}` },
-      { icon: "🔥", label: `Streak ${pp.streak} zile` },
-      { icon: "📚", label: `${pp.lessons} lecții` },
+      { icon: "🔥", label: `Streak ${pp.streak} ${plural(pp.streak, "zi", "zile")}` },
+      { icon: "📚", label: `${pp.lessons} ${plural(pp.lessons, "lecție", "lecții")}` },
       { icon: "🤝", label: `${pp.friendsCount} prieteni` },
     ]
       .map((b) => `<span class="cx-badge"><span aria-hidden="true">${b.icon}</span> ${b.label}</span>`)
@@ -2467,7 +2472,7 @@ export function renderCommunity(basePath = "") {
     const list = top
       .slice(3)
       .map((u, i) => {
-        const meta = [u.lessons ? `${u.lessons} lecții` : "", u.streak ? `🔥 ${u.streak}` : ""].filter(Boolean).join(" · ");
+        const meta = [u.lessons ? `${u.lessons} ${plural(u.lessons, "lecție", "lecții")}` : "", u.streak ? `🔥 ${u.streak}` : ""].filter(Boolean).join(" · ");
         return `<div class="cx-lb__row">
           <span class="cx-lb__rank">${i + 4}</span>
           ${userAvatar(u.id)}
@@ -3001,7 +3006,7 @@ export function renderCommunity(basePath = "") {
   // Pending exercise proposals, decidable right here (same handlers as the
   // Exerciții section — one flow, two entry points).
   function adminPendingBox() {
-    const pending = state.proposed.filter((e) => e.status === "pending");
+    const pending = state.proposed.filter((e) => e.status === "pending").sort((a, b) => (b.votes || 0) - (a.votes || 0));
     if (!pending.length) return "";
     const rows = pending
       .map(
@@ -3502,6 +3507,7 @@ export function renderCommunity(basePath = "") {
       state.favorites = favSlugs
         .map((slug) => { const l = lessonBySlug(slug); return l ? { slug, title: l.title, href: lessonHrefBySlug(slug) } : null; })
         .filter(Boolean);
+      await loadNotes(); state.notes = getNotes(); // real notebook (Supabase)
       await loadKudos(); // real claps/pokes — members are registered above, so surrogate→uuid resolves
       // Today's REAL daily challenge + whether I've already answered it.
       state.challenge = await fetchTodayChallenge();
@@ -5010,8 +5016,7 @@ export function renderCommunity(basePath = "") {
         const x = mount.querySelector("#cx-note-text")?.value.trim();
         const lessonHref = mount.querySelector("#cx-note-lesson")?.value || null;
         if (!x) return;
-        addNote({ title: t, text: x, lessonHref });
-        state.notes = getNotes();
+        addNote({ title: t, text: x, lessonHref }).then(() => { state.notes = getNotes(); render(); });
         return render();
       }
       case "note-edit":
@@ -5024,14 +5029,12 @@ export function renderCommunity(basePath = "") {
         const box = btn.closest("[data-note-id]");
         const title = box?.querySelector('[data-role="note-title"]')?.value.trim();
         const text = box?.querySelector('[data-role="note-text"]')?.value.trim();
-        if (text) updateNote(id, { title, text });
-        state.notes = getNotes();
+        if (text) updateNote(id, { title, text }).then(() => { state.notes = getNotes(); render(); });
         state.editingNote = null;
         return render();
       }
       case "note-del":
-        deleteNote(id);
-        state.notes = getNotes();
+        deleteNote(id).then(() => { state.notes = getNotes(); render(); });
         return render();
       case "save-status": {
         const box = mount.querySelector("#cx-status");
