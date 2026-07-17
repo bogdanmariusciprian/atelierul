@@ -759,14 +759,43 @@ function initNotifCenter(basePath) {
       if (p.post_id) return `${HUB}#post/${p.post_id}`; // like/comment/reply/mention → postarea exactă
       return `${HUB}#forum`;
     };
-    const rows = notifRows().map((n) =>
+    // Group repeated like/comment/reply notifications on the SAME post into one
+    // row ("X și alți N ți-au apreciat o postare"). Other types stay individual.
+    const GROUPABLE = new Set(["like", "comment", "reply"]);
+    const groups = [];
+    const byKey = new Map();
+    for (const n of notifRows()) {
+      const p = n.payload || {};
+      const key = GROUPABLE.has(n.type) && p.post_id ? `${n.type}:${p.post_id}` : `solo:${n.id}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count++;
+        if (!n.read_at) existing.unread = true;
+      } else {
+        const g = { n, count: 1, unread: !n.read_at };
+        byKey.set(key, g);
+        groups.push(g);
+      }
+    }
+    const groupTitle = (n, count) => {
+      if (count <= 1) return titleFor(n);
+      const name = esc((n.payload || {}).actor_name || "Cineva");
+      const more = `și alți ${count - 1}`;
+      switch (n.type) {
+        case "like": return `<b>${name}</b> ${more} ți-au apreciat o postare`;
+        case "comment": return `<b>${name}</b> ${more} au comentat la postarea ta`;
+        case "reply": return `<b>${name}</b> ${more} ți-au răspuns`;
+        default: return titleFor(n);
+      }
+    };
+    const rows = groups.map((g) =>
       row({
-        kind: n.type,
-        title: titleFor(n),
-        text: (n.payload || {}).snippet ? `„${esc(n.payload.snippet)}”` : "",
-        time: relTime(new Date(n.created_at).getTime()),
-        href: hrefFor(n),
-        unread: !n.read_at,
+        kind: g.n.type,
+        title: groupTitle(g.n, g.count),
+        text: (g.n.payload || {}).snippet ? `„${esc(g.n.payload.snippet)}”` : "",
+        time: relTime(new Date(g.n.created_at).getTime()),
+        href: hrefFor(g.n),
+        unread: g.unread,
       })
     );
     return `
