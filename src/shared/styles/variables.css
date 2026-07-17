@@ -30,7 +30,7 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
 
   /* Feedback (semantic, stable across palettes) */
-  --color-success: #16a34a;
+  --color-success: #15803d; /* WCAG AA: alb-pe-success 5:1 (era #16a34a, 3.3) */
   --color-danger: #dc2626;
 
   /* Reply-depth tints derive from the palette automatically. */
@@ -42,8 +42,8 @@
 
 /* ---------- Theme · „Arcade mentă” — the site's single palette ---------- */
 :root {
-  --color-primary: #0ea97b;
-  --color-primary-dark: #0b8261;
+  --color-primary: #088060; /* WCAG AA: link 4.7:1 pe bg, alb-pe-primary 4.9:1 (era #0ea97b, 2.9/3.0) */
+  --color-primary-dark: #06664b;
   --color-accent: #b4e34a;
   --color-accent-2: #3b82f6;
   --grad-brand: linear-gradient(135deg, #0ea97b 0%, #3b82f6 60%, #22d3ee 100%);

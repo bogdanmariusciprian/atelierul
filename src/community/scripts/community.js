@@ -288,6 +288,7 @@ export function renderCommunity(basePath = "") {
     msgOpen: null, // open conversation key ("t" | "u<id>" | "g:<name>")
     msgCat: -1, // template category (-1 = a taste of everything)
     msgQuery: "", // template search
+    convQuery: "", // conversation/message search (left rail)
     msgParts: [], // templates chained into the message being composed
     msgWarn: null,
     conversations: [], // REAL conversations (Supabase) — loaded in loadFeed
@@ -1745,6 +1746,11 @@ export function renderCommunity(basePath = "") {
     const shownConvs = asAdmin && state.msgLabelFilter !== "all"
       ? convs.filter((c) => (state.msgLabelFilter === "evenimente" ? convHasEvents(c) : convLabelId(c) === state.msgLabelFilter))
       : convs;
+    // Search conversations by partner name OR message content.
+    const cq = state.convQuery.trim().toLowerCase();
+    const filteredConvs = cq
+      ? shownConvs.filter((c) => (c.partnerName || "").toLowerCase().includes(cq) || c.msgs.some((m) => (m.text || "").toLowerCase().includes(cq)))
+      : shownConvs;
     let open = convs.find((c) => c.key === state.msgOpen) || null;
     // Brand-new conversation (no messages yet) → synthesize an EMPTY one so the
     // composer shows. This is how you message ANYONE — no friendship needed.
@@ -1767,7 +1773,8 @@ export function renderCommunity(basePath = "") {
       ? `<aside class="cx-chat__list">
           ${newBox}
           ${asAdmin ? adminLabelBar() : ""}
-          ${shownConvs
+          ${convs.length > 1 ? `<input class="cx-input cx-chat__search" id="cx-conv-search" type="search" placeholder="Caută în mesaje…" value="${escapeHtml(state.convQuery)}" />` : ""}
+          ${filteredConvs
             .map((c) => {
               const last = c.msgs[c.msgs.length - 1];
               const av = c.teacher
@@ -1789,6 +1796,7 @@ export function renderCommunity(basePath = "") {
               </button>`;
             })
             .join("")}
+          ${!filteredConvs.length && cq ? `<p class="cx-muted" style="padding:.6rem">Niciun rezultat pentru „${escapeHtml(state.convQuery)}".</p>` : ""}
         </aside>`
       : "";
 
@@ -5156,6 +5164,10 @@ export function renderCommunity(basePath = "") {
     if (e.target.id === "cx-member-search") {
       state.memberQuery = e.target.value;
       return rerenderKeepingFocus("cx-member-search");
+    }
+    if (e.target.id === "cx-conv-search") {
+      state.convQuery = e.target.value;
+      return rerenderKeepingFocus("cx-conv-search");
     }
     if (e.target.id === "cx-msg-search-user") {
       state.msgNewQuery = e.target.value;
