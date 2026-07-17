@@ -20,14 +20,14 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke, loadKudos } from "../../shared/scripts/kudos-repo.js";
 import {
   findProfanity, FILTER_MESSAGE, MODERATION_QUEUE, queueHeldPost,
-  queueBlockedComment, queueReport, openModerationItems, resolveModerationItem,
+  queueBlockedComment, queueReport, openModerationItems, resolveModerationItem, setCustomProfanity,
 } from "../../shared/scripts/moderation.js";
 import {
   wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
@@ -271,6 +271,7 @@ export function renderCommunity(basePath = "") {
     adminUserPage: 1, // 10 per page
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
     contentReports: [], // REAL open reports (posts/comments/test items/exercises)
+    profanityTerms: [], // admin-managed custom filtered words
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
     modFilter: "all", // "all" | "held-post" | "blocked-comment" | "report" | "history"
     chEditId: null, // the custom challenge being edited ("new" = fresh form)
@@ -2926,7 +2927,17 @@ export function renderCommunity(basePath = "") {
         </div>`
       : "";
 
-    return `${realReports}<div class="cx-box">
+    const profBox = `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Cuvinte filtrate · ${state.profanityTerms.length}</h3></div>
+        <p class="cx-muted">Termeni pe care filtrul îi reține (postări/comentarii). Se aplică și pe server.</p>
+        <div class="cx-prof-add">
+          <input class="cx-input" id="cx-prof-term" placeholder="cuvânt de interzis…" maxlength="40" />
+          <button type="button" class="btn btn--primary btn--sm" data-action="prof-add">Adaugă</button>
+        </div>
+        <div class="cx-prof-list">${state.profanityTerms.map((t) => `<span class="cx-prof-chip">${escapeHtml(t.term)}<button type="button" class="cx-prof-x" data-action="prof-del" data-id="${t.id}" title="Șterge">×</button></span>`).join("") || `<span class="cx-muted">Niciun termen custom încă.</span>`}</div>
+      </div>`;
+
+    return `${realReports}${profBox}<div class="cx-box">
         <div class="cx-admin__head"><h3>Moderare${open.length ? ` · ${open.length} deschise` : ""}</h3></div>
         ${chips}
         <div class="cx-modlist">${items}</div>
@@ -3428,6 +3439,8 @@ export function renderCommunity(basePath = "") {
       const wallPosts = await fetchFeed({ surface: "wall" });
       state.posts = [...forumPosts, ...wallPosts];
       state.members = await fetchMembers(); // real leaderboard directory (points desc)
+      state.profanityTerms = await fetchProfanityTerms(); // admin's custom filtered words
+      setCustomProfanity(state.profanityTerms); // feed them into the client filter
       await loadKudos(); // real claps/pokes — members are registered above, so surrogate→uuid resolves
       // Today's REAL daily challenge + whether I've already answered it.
       state.challenge = await fetchTodayChallenge();
@@ -4518,6 +4531,26 @@ export function renderCommunity(basePath = "") {
         const rid = btn.dataset.id;
         resolveReport(rid);
         state.contentReports = state.contentReports.filter((r) => r.id !== rid);
+        return render();
+      }
+      case "prof-add": {
+        const inp = mount.querySelector("#cx-prof-term");
+        const term = (inp?.value || "").trim().toLowerCase();
+        if (term && !state.profanityTerms.some((t) => t.term === term)) {
+          addProfanityTerm(term).then((row) => {
+            if (!row) return;
+            state.profanityTerms = [...state.profanityTerms, row].sort((a, b) => a.term.localeCompare(b.term));
+            setCustomProfanity(state.profanityTerms);
+            render();
+          });
+        }
+        return render();
+      }
+      case "prof-del": {
+        const pid = btn.dataset.id;
+        removeProfanityTerm(pid);
+        state.profanityTerms = state.profanityTerms.filter((t) => t.id !== pid);
+        setCustomProfanity(state.profanityTerms);
         return render();
       }
       case "mod-approve": {

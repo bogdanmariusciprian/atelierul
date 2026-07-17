@@ -1444,6 +1444,14 @@
   border: 2px solid var(--color-bg); border-radius: 50%; background: #dc2626;
   color: #fff; cursor: pointer; font-size: 11px; line-height: 13px;
 }
+.cx-prof-add { display: flex; gap: 0.5rem; margin: 0.5rem 0 0.8rem; }
+.cx-prof-add .cx-input { flex: 1; }
+.cx-prof-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.cx-prof-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem;
+  background: rgba(124, 58, 237, 0.08); border-radius: 999px; font-size: 0.85rem;
+}
+.cx-prof-x { border: 0; background: none; cursor: pointer; color: #dc2626; font-size: 1rem; line-height: 1; padding: 0; }
 .cx-groupbar__actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .btn-mini.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 

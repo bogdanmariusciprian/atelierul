@@ -729,6 +729,25 @@ export async function resolveReport(id) {
   await supabase.from("reports").update({ status: "resolved" }).eq("id", id);
 }
 
+// ---- Custom profanity terms (admin-managed; also used by the server trigger) ----
+export async function fetchProfanityTerms() {
+  const { data, error } = await supabase.from("profanity_terms").select("id, term").order("term");
+  if (error) { console.warn("fetchProfanityTerms:", error.message); return []; }
+  return data || [];
+}
+export async function addProfanityTerm(term) {
+  const t = (term || "").trim().toLowerCase();
+  if (!t || !CURRENT_USER.authId) return null;
+  const { data, error } = await supabase.from("profanity_terms")
+    .insert({ term: t, added_by: CURRENT_USER.authId }).select("id, term").single();
+  if (error) { console.warn("addProfanityTerm:", error.message); return null; }
+  return data;
+}
+export async function removeProfanityTerm(id) {
+  if (!id) return;
+  await supabase.from("profanity_terms").delete().eq("id", id);
+}
+
 /** Realtime: run `onInsert(row)` whenever a row is INSERTed into `table` that
  *  this user is allowed to see (RLS applies to realtime too). Returns the channel
  *  so the caller can unsubscribe. Best-effort — never throws. */

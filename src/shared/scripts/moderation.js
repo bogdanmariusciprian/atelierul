@@ -60,9 +60,22 @@ const STEMS = [
   { s: "faggot" }, { s: "wtf", exact: true }, { s: "stfu", exact: true },
 ];
 
+// Custom terms the teacher adds (loaded from Supabase via setCustomProfanity).
+// Stored NORMALIZED, matched as word-prefixes like the non-exact stems.
+const CUSTOM = new Set();
+export function setCustomProfanity(terms) {
+  CUSTOM.clear();
+  for (const t of terms || []) {
+    const n = normalizeWord(typeof t === "string" ? t : t.term || "");
+    if (n) CUSTOM.add(n);
+  }
+}
+
 function stemHits(norm) {
   if (!norm) return false;
-  return STEMS.some(({ s, exact }) => (exact ? norm === s : norm.startsWith(s)));
+  if (STEMS.some(({ s, exact }) => (exact ? norm === s : norm.startsWith(s)))) return true;
+  for (const c of CUSTOM) if (norm.startsWith(c)) return true;
+  return false;
 }
 
 /** Split text into words, merging runs of single letters so spaced-out
