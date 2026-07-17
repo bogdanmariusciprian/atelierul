@@ -3,5 +3,8 @@ Allow: /
 # Legacy pages are redirect stubs — don't index them.
 Disallow: /src/site/pages/
 Disallow: /src/community/pages/
+# Back-end plumbing served statically — no reason to index it.
+Disallow: /supabase/
+Disallow: /config/
 
 Sitemap: https://atelierulderomana.ro/sitemap.xml

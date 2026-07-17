@@ -15,6 +15,7 @@
 // answer is answer_test_item AFTER a choice. Points are awarded server-side.
 // =========================================================
 import { fetchTestItems, answerTestItem, TEST_ITEM_TYPES } from "../../shared/scripts/test-repo.js";
+import { reportContent } from "../../shared/scripts/forum-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 
@@ -200,7 +201,9 @@ function renderGame() {
       ${hud()}
       <article class="tgame-card" data-id="${it.id}">
         ${labels ? `<div class="tgame-types">${labels}</div>` : ""}
-        <div class="tgame-cardmeta">${it.year ?? ""}${it.session ? ` · ${esc(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}</div>
+        <div class="tgame-cardmeta">${it.year ?? ""}${it.session ? ` · ${esc(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}
+          <button type="button" class="tgame-report" data-act="report-item" title="Semnalează o eroare de conținut">⚑ eroare</button>
+        </div>
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
         <div class="tgame-opts">${opts || `<span class="tgame-empty">(variante indisponibile)</span>`}</div>
         <div class="tgame-fb" hidden></div>
@@ -388,6 +391,15 @@ function onClick(e) {
     if (a === "start" || a === "again") return startGame();
     if (a === "config") return renderConfig();
     if (a === "next") return advance();
+    if (a === "report-item") {
+      const card = e.target.closest(".tgame-card");
+      if (card?.dataset.id && !card.dataset.reported) {
+        card.dataset.reported = "1";
+        reportContent("test_item", card.dataset.id);
+        showToast("⚑ Mulțumim — profesorul verifică itemul.");
+      }
+      return;
+    }
   }
 
   const opt = e.target.closest(".tgame-opt");

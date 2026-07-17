@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -269,6 +269,7 @@ export function renderCommunity(basePath = "") {
     adminUserSort: "points", // "points" | "name"
     adminUserPage: 1, // 10 per page
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
+    contentReports: [], // REAL open reports (posts/comments/test items/exercises)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
     modFilter: "all", // "all" | "held-post" | "blocked-comment" | "report" | "history"
     chEditId: null, // the custom challenge being edited ("new" = fresh form)
@@ -2951,6 +2952,7 @@ export function renderCommunity(basePath = "") {
           <span class="cx-pulse__stat"><b>${postsToday}</b> postări noi</span>
           <span class="cx-pulse__stat"><b>${proposalsToday}</b> exerciții propuse</span>
           <span class="cx-pulse__stat"><b>${openModerationItems().length}</b> de moderat</span>
+          <span class="cx-pulse__stat"><b>${state.contentReports.length}</b> rapoarte</span>
           <span class="cx-pulse__stat"><b>${unreadMsgCount()}</b> mesaje necitite</span>
         </div>
         ${log.length
@@ -3429,6 +3431,7 @@ export function renderCommunity(basePath = "") {
       state.conversations = await fetchConversations(isAdmin()); // real messages
       if (isAdmin()) {
         state.adminUsers = await adminFetchUsers(); // real members (+ e-mail); also bridges them so they're messageable
+        state.contentReports = await fetchContentReports(); // real reports queue (posts/comments/teste/exerciții)
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();

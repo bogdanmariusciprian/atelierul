@@ -697,6 +697,38 @@ export async function fetchTeacherPresence() {
   }
 }
 
+/** Report content for the teacher's queue: a post/comment/test_item/exercise
+ *  (the last two = "⚑ semnalează o eroare de conținut"). targetUuid = real uuid. */
+export async function reportContent(targetType, targetUuid, reason) {
+  if (!targetUuid || !CURRENT_USER.authId) return false;
+  const { error } = await supabase.from("reports").insert({
+    reporter_id: CURRENT_USER.authId, target_type: targetType, target_id: targetUuid, reason: reason || null,
+  });
+  if (error && error.code !== "23505") { console.warn("reportContent:", error.message); return false; }
+  return true;
+}
+
+/** Admin: open reports (newest first), with the reporter's display name. */
+export async function fetchContentReports() {
+  const { data, error } = await supabase
+    .from("reports")
+    .select("id, target_type, target_id, reason, status, created_at, reporter:profiles!reports_reporter_id_fkey(display_name)")
+    .eq("status", "open")
+    .order("created_at", { ascending: false });
+  if (error) { console.warn("fetchContentReports:", error.message); return []; }
+  return (data || []).map((r) => ({
+    id: r.id, targetType: r.target_type, targetId: r.target_id, reason: r.reason,
+    createdAt: new Date(r.created_at).getTime(),
+    reporterName: r.reporter?.display_name || "Cineva",
+  }));
+}
+
+/** Admin: mark a report resolved. */
+export async function resolveReport(id) {
+  if (!id) return;
+  await supabase.from("reports").update({ status: "resolved" }).eq("id", id);
+}
+
 /** Realtime: run `onInsert(row)` whenever a row is INSERTed into `table` that
  *  this user is allowed to see (RLS applies to realtime too). Returns the channel
  *  so the caller can unsubscribe. Best-effort — never throws. */
