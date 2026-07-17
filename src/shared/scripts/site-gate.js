@@ -1,6 +1,6 @@
 // =========================================================
-// Pre-launch gate (client-side). Until the public launch, only the TEAM (3
-// accounts) may see the site; everyone else — signed out, OR signed in with a
+// Pre-launch gate (client-side). Until the public launch, only the allow-listed
+// accounts may see the site; everyone else — signed out, OR signed in with a
 // different account — is sent to the "coming soon" page (/in-curand/).
 //
 // HONEST LIMIT: this is a CLIENT-side gate, so a determined person who reads the
@@ -15,11 +15,14 @@
 // =========================================================
 import { supabase } from "./supabase-client.js";
 
-/** The only accounts allowed in before launch (compared lower-cased). */
+/** The accounts allowed in before launch (compared lower-cased). Being on this
+ *  list only grants VIEW access; the admin role stays tied to ADMIN_EMAIL in
+ *  session.js, so the extra members here see the site as pupils, not admins. */
 export const ALLOWED_EMAILS = new Set([
   "qwzky1@gmail.com",
   "bogdanmariusciprian@gmail.com",
   "marius-ciprian.bogdan@cursant.g4e.ro",
+  "matriux26@gmail.com",
 ]);
 
 /** Absolute path of the public "coming soon" page (site is at the domain root). */
