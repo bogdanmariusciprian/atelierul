@@ -14,7 +14,7 @@
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { escapeHtml } from "../../shared/scripts/thread.js";
-import { findProfanity, queueBlockedComment } from "../../shared/scripts/moderation.js";
+import { findProfanity } from "../../shared/scripts/moderation.js";
 import { touchStreak } from "../../shared/scripts/streak.js";
 import { fetchNotationWords, addNotationWord, reviewNotationWord } from "../../shared/scripts/notation-repo.js";
 
@@ -318,10 +318,6 @@ function initNotation() {
         if (!save || !v) return;
         const bad = findProfanity(v);
         if (bad.length) {
-          queueBlockedComment({
-            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text: v, matches: bad,
-            context: "Propunere de cuvânt la „Sintaxa frazei – Introducere” (Notația)",
-          });
           showToast("⚠️ Cuvânt nepotrivit – profesorul a fost anunțat.");
           return;
         }

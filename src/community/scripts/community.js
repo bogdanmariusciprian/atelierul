@@ -20,14 +20,13 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser, fetchPointsHistory, fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser, fetchPointsHistory, fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress, pinGroupPost, reportPostBySurrogate, reportCommentBySurrogate } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
 import { clapsFor, hasClapped, giveClap, hasPoked, givePoke, loadKudos } from "../../shared/scripts/kudos-repo.js";
 import {
-  findProfanity, FILTER_MESSAGE, MODERATION_QUEUE, queueHeldPost,
-  queueBlockedComment, queueReport, openModerationItems, resolveModerationItem, setCustomProfanity,
+  findProfanity, FILTER_MESSAGE, setCustomProfanity,
 } from "../../shared/scripts/moderation.js";
 import {
   wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
@@ -62,7 +61,7 @@ import {
 import { AVATAR_GIFS, CHAMPION_GIF, CHAMPION_UNLOCK_LEVEL, avatarForUser } from "../../shared/scripts/avatars.js";
 import {
   renderThread, handleThreadClick, countComments, makeUserComment, escapeHtml,
-  removeComment, CORRECT_REWARD, EDIT_WINDOW_MS,
+  CORRECT_REWARD, EDIT_WINDOW_MS,
 } from "../../shared/scripts/thread.js";
 import { pointsFx, burstAt } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -277,7 +276,6 @@ export function renderCommunity(basePath = "") {
     profanityTerms: [], // admin-managed custom filtered words
     heldContent: [], // posts/comments held by the profanity filter (admin review)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
-    modFilter: "all", // "all" | "held-post" | "blocked-comment" | "report" | "history"
     chEditId: null, // the custom challenge being edited ("new" = fresh form)
     chWarn: null,
     lightbox: null, // { postId, i } — the enlarged post image
@@ -406,6 +404,7 @@ export function renderCommunity(basePath = "") {
   const isOpenGroupMine = () => { const g = findGroup(state.openGroup); return !!g && g.creatorId === CURRENT_USER.id; };
   // In a group topic I created, every post shown belongs to that group → I can moderate it.
   const canModeratePost = (p) => canManagePost(p) || (isLoggedIn() && state.section === "grupuri" && !!state.openGroup && isOpenGroupMine());
+  const canPinHere = () => state.section === "grupuri" && !!state.openGroup && isOpenGroupMine();
   // The author may EDIT only in the 5-minute typo window (then delete-only);
   // admin edits anytime. Same rule as comments (Marius's rule).
   const canEditPost = (p) =>
@@ -521,30 +520,14 @@ export function renderCommunity(basePath = "") {
   function reportPost(p) {
     if (p.authorId === CURRENT_USER.id || p.reportedByMe) return;
     p.reportedByMe = true;
-    queueReport({
-      targetType: "post",
-      targetId: p.id,
-      authorId: p.authorId,
-      name: p.name,
-      snippet: String(p.text).replace(/<[^>]*>/g, "").slice(0, 120),
-      reporterId: CURRENT_USER.id,
-      reporterName: CURRENT_USER.name,
-    });
+    reportPostBySurrogate(p.id); // REAL: persisted to the `reports` table for the profesor
   }
   function reportComment(c) {
     if (c.reportedByMe) return;
     confirmDialog("Comentariul va fi trimis profesorului spre verificare.", { title: "Raportezi comentariul?", okLabel: "Raportează" }).then((ok) => {
       if (!ok) return;
       c.reportedByMe = true;
-      queueReport({
-        targetType: "comment",
-        targetId: c.id,
-        authorId: c.authorId,
-        name: c.name,
-        snippet: String(c.text).slice(0, 120),
-        reporterId: CURRENT_USER.id,
-        reporterName: CURRENT_USER.name,
-      });
+      reportCommentBySurrogate(c.id); // REAL: persisted to the `reports` table
       showToast("⚑ Semnalat — profesorul va arunca o privire", { kind: "success" });
       render();
     });
@@ -730,7 +713,7 @@ export function renderCommunity(basePath = "") {
     // how many things await the teacher (proposals + moderation).
     // GUESTS get a slim, read-only navigation + a join card.
     const guest = !isLoggedIn();
-    const attention = isAdmin() ? state.proposed.filter((e) => e.status === "pending").length + openModerationItems().length : 0;
+    const attention = isAdmin() ? state.proposed.filter((e) => e.status === "pending").length + state.contentReports.length + state.heldContent.length : 0;
     const unread = guest ? 0 : unreadActivityCount();
     const friendReqs = guest || isAdmin() ? 0 : MY_PROFILE.friendReqIncoming.length;
     const groupNews = guest ? 0 : state.groups.filter(groupHasNews).length;
@@ -1053,6 +1036,7 @@ export function renderCommunity(basePath = "") {
     // anytime); DELETING your own stays available forever.
     const manageBar = canModeratePost(post)
       ? `<span class="post__admin">
+           ${canPinHere() ? `<button type="button" class="post__adminbtn" data-action="post-pin" data-id="${post.id}" title="${post.pinned ? "Anulează fixarea" : "Fixează în grup"}">${post.pinned ? "📌" : "📍"}</button>` : ""}
            ${isShare || !canEditPost(post) ? "" : `<button type="button" class="post__adminbtn" data-action="post-edit" data-id="${post.id}" title="Editează (5 min)">✎</button>`}
            <button type="button" class="post__adminbtn post__adminbtn--del" data-action="post-del" data-id="${post.id}" title="Șterge">🗑</button>
          </span>`
@@ -2645,7 +2629,7 @@ export function renderCommunity(basePath = "") {
         : "";
 
     const posts = g.posts.length
-      ? g.posts.map(postCard).join("")
+      ? [...g.posts].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)).map(postCard).join("")
       : emptyState("Niciun mesaj în grup încă", "Pornește prima discuție a grupului.");
 
     const composerBox =
@@ -2879,80 +2863,7 @@ export function renderCommunity(basePath = "") {
       </div>`;
   }
 
-  // The moderation queue — held posts, blocked attempts and reports.
-  // Now with FILTERS, full-text expand, media preview on held posts and a
-  // HISTORY view (resolved items, reopenable) — built to scale.
-  const MOD_KIND_META = {
-    "held-post": { icon: "🛡️", label: "Postare reținută de filtru" },
-    "blocked-comment": { icon: "✋", label: "Comentariu blocat de filtru" },
-    report: { icon: "⚑", label: "Raportare de la un membru" },
-  };
-
-  function modItemHtml(m, resolved = false) {
-    const k = MOD_KIND_META[m.kind];
-    const matches = m.matches?.length
-      ? `<span class="cx-modmatches">${m.matches.map((w) => `<code>${escapeHtml(w)}</code>`).join(" ")}</span>`
-      : "";
-    const reporter = m.kind === "report"
-      ? `<span class="cx-muted">· semnalat de ${escapeHtml(m.reporterName || "un membru")}${m.reportCount > 1 ? ` (×${m.reportCount})` : ""}</span>`
-      : "";
-    // Full text on demand (no more deciding on 180 characters).
-    const full = String(m.text);
-    const text = full.length > 180
-      ? `<details class="cx-moditem__more"><summary>„${escapeHtml(full.slice(0, 180))}…” <b>vezi tot</b></summary><p>„${escapeHtml(full)}”</p></details>`
-      : `<p class="cx-moditem__text">„${escapeHtml(full)}”</p>`;
-    // Held posts show their media too — decide on the WHOLE post.
-    const media = m.kind === "held-post" && m.post?.media?.images?.length
-      ? `<div class="cx-moditem__media">${m.post.media.images
-          .map((im) => `<span class="cx-moditem__thumb" style="${im.src ? `background-image:url('${im.src}')` : `background:${im.gradient}`}"></span>`)
-          .join("")}</div>`
-      : "";
-    const RESOLUTION_LABELS = { approved: "publicată", rejected: "respinsă", deleted: "conținut șters", dismissed: "ignorată" };
-    const actions = resolved
-      ? `<span class="cx-tag">${RESOLUTION_LABELS[m.resolution] || m.resolution}</span>
-         <button type="button" class="btn-mini btn-mini--ghost" data-action="mod-reopen" data-id="${m.id}">↩ Redeschide</button>`
-      : m.kind === "held-post"
-        ? `<button type="button" class="btn-mini btn-mini--ok" data-action="mod-approve" data-id="${m.id}">✓ Publică</button>
-           <button type="button" class="btn-mini btn-mini--no" data-action="mod-reject" data-id="${m.id}">✕ Respinge</button>`
-        : m.kind === "report"
-          ? `<button type="button" class="btn-mini btn-mini--no" data-action="mod-delete-target" data-id="${m.id}">🗑 Șterge conținutul</button>
-             <button type="button" class="btn-mini btn-mini--ghost" data-action="mod-dismiss" data-id="${m.id}">Ignoră</button>`
-          : `<button type="button" class="btn-mini btn-mini--ghost" data-action="mod-dismiss" data-id="${m.id}">Am văzut</button>`;
-    return `<div class="cx-moditem cx-moditem--${m.kind}${resolved ? " cx-moditem--resolved" : ""}">
-        <span class="cx-moditem__ic" title="${k.label}">${k.icon}</span>
-        <div class="cx-moditem__body">
-          <p class="cx-moditem__head"><b>${k.label}</b> <span class="cx-muted">· ${userNameLink(m.authorId, m.name)} · ${m.time}</span> ${reporter}</p>
-          ${text}
-          ${media}
-          <p class="cx-moditem__meta">${matches}<span class="cx-muted">${escapeHtml(m.context || "")}</span></p>
-        </div>
-        <span class="cx-moditem__act">${actions}</span>
-      </div>`;
-  }
-
   function moderationBox() {
-    const open = openModerationItems();
-    const resolved = MODERATION_QUEUE.filter((i) => i.status === "resolved");
-    const counts = {
-      all: open.length,
-      "held-post": open.filter((i) => i.kind === "held-post").length,
-      "blocked-comment": open.filter((i) => i.kind === "blocked-comment").length,
-      report: open.filter((i) => i.kind === "report").length,
-      history: resolved.length,
-    };
-    const chip = (id, label) =>
-      `<button type="button" class="cx-fchip${state.modFilter === id ? " on" : ""}" data-action="mod-filter" data-id="${id}">${label} <span class="cx-muted">${counts[id]}</span></button>`;
-    const chips = `<div class="cx-histfilter">${chip("all", "Toate")}${chip("held-post", "🛡️ Reținute")}${chip("blocked-comment", "✋ Blocate")}${chip("report", "⚑ Raportări")}${chip("history", "🗂 Istoric")}</div>`;
-
-    const showing = state.modFilter === "history"
-      ? resolved
-      : state.modFilter === "all"
-        ? open
-        : open.filter((i) => i.kind === state.modFilter);
-    const items = showing.length
-      ? showing.map((m) => modItemHtml(m, state.modFilter === "history")).join("")
-      : `<p class="cx-muted">${state.modFilter === "history" ? "Încă n-ai moderat nimic." : "Nimic aici. 🎉"}</p>`;
-
     // REAL reports (posts/comments/test items/exercises) — persisted in Supabase.
     const RTYPE = { post: "postare", comment: "comentariu", test_item: "item de test", exercise: "exercițiu", message: "mesaj" };
     const realReports = state.contentReports.length
@@ -2996,11 +2907,10 @@ export function renderCommunity(basePath = "") {
         </div>`
       : "";
 
-    return `${realReports}${heldBox}${profBox}<div class="cx-box">
-        <div class="cx-admin__head"><h3>Moderare${open.length ? ` · ${open.length} deschise` : ""}</h3></div>
-        ${chips}
-        <div class="cx-modlist">${items}</div>
-      </div>`;
+    const nothing = (!state.contentReports.length && !state.heldContent.length)
+      ? `<p class="cx-muted">Nimic de moderat acum. 🎉</p>`
+      : "";
+    return `${realReports}${heldBox}${nothing}${profBox}`;
   }
 
   // Pending exercise proposals, decidable right here (same handlers as the
@@ -3047,7 +2957,7 @@ export function renderCommunity(basePath = "") {
         <div class="cx-pulse">
           <span class="cx-pulse__stat"><b>${postsToday}</b> postări noi</span>
           <span class="cx-pulse__stat"><b>${proposalsToday}</b> exerciții propuse</span>
-          <span class="cx-pulse__stat"><b>${openModerationItems().length}</b> de moderat</span>
+          <span class="cx-pulse__stat"><b>${state.heldContent.length}</b> de moderat</span>
           <span class="cx-pulse__stat"><b>${state.contentReports.length}</b> rapoarte</span>
           <span class="cx-pulse__stat"><b>${unreadMsgCount()}</b> mesaje necitite</span>
         </div>
@@ -3059,7 +2969,7 @@ export function renderCommunity(basePath = "") {
           : ""}
       </div>`;
     const attention = [
-      { n: openModerationItems().length, label: "de moderat", tab: "moderation" },
+      { n: state.contentReports.length + state.heldContent.length, label: "de moderat", tab: "moderation" },
       { n: state.proposed.filter((e) => e.status === "pending").length, label: "exerciții în așteptare", tab: "moderation" },
     ].filter((a) => a.n > 0);
     const attentionBox = attention.length
@@ -3279,7 +3189,7 @@ export function renderCommunity(basePath = "") {
 
   function sectionAdmin() {
     if (!isAdmin()) return sectionForum();
-    const modCount = openModerationItems().length + state.proposed.filter((e) => e.status === "pending").length;
+    const modCount = state.contentReports.length + state.heldContent.length + state.proposed.filter((e) => e.status === "pending").length;
     const TABS = [
       { id: "overview", label: "Prezentare" },
       { id: "users", label: "Utilizatori" },
@@ -3735,11 +3645,7 @@ export function renderCommunity(basePath = "") {
     // The group's name & description pass through the same language filter.
     const bad = moderate(`${name} ${c.text || ""}`);
     if (bad.length) {
-      state.notice = FILTER_MESSAGE;
-      queueBlockedComment({
-        authorId: CURRENT_USER.id, name: CURRENT_USER.name,
-        text: `${name} — ${(c.text || "").trim()}`, matches: bad, context: "Creare grup",
-      });
+      state.notice = FILTER_MESSAGE; // inline filter: warn + block (server also holds profane content)
       return;
     }
     const badM = invalidMentions(`${name} ${c.text || ""}`);
@@ -3777,11 +3683,6 @@ export function renderCommunity(basePath = "") {
           onCorrect: awardCorrect,
           moderate,
           warnMsg: "Răspunsul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.",
-          onBlocked: (text, matches) =>
-            queueBlockedComment({
-              authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches,
-              context: `Răspuns la postarea „${String(post.text).replace(/<[^>]*>/g, "").slice(0, 60)}…”`,
-            }),
           onReport: reportComment,
           // REAL: persist comment interactions to Supabase.
           onLike: (c, liked) => toggleCommentLike(c.id, liked),
@@ -3975,11 +3876,11 @@ export function renderCommunity(basePath = "") {
         }
         const post = buildPost();
         if (!post) return;
-        // Profanity gate: a flagged post is HELD for the teacher, not
-        // published. The author gets a friendly heads-up.
+        // Profanity gate (inline): a flagged post is blocked with a friendly
+        // heads-up. Anything that reaches the server is also held by the
+        // `hold_if_profane` trigger for the teacher to review.
         const bad = moderate(state.composer.text);
         if (bad.length) {
-          queueHeldPost(post, bad);
           state.notice = FILTER_MESSAGE;
           state.composer = freshComposer();
           return render();
@@ -4096,10 +3997,6 @@ export function renderCommunity(basePath = "") {
         const bad = moderate(text);
         if (bad.length) {
           state.commentWarn = { postId: id, msg: "Comentariul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat." };
-          queueBlockedComment({
-            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches: bad,
-            context: `Comentariu la postarea „${String(p.text).replace(/<[^>]*>/g, "").slice(0, 60)}…”`,
-          });
           return render();
         }
         const badM = invalidMentions(text, mentionEligibleForPost(p));
@@ -4207,9 +4104,6 @@ export function renderCommunity(basePath = "") {
         const bad = moderate(text);
         if (bad.length) {
           state.notice = FILTER_MESSAGE;
-          queueBlockedComment({
-            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches: bad, context: "Editare postare",
-          });
           state.editingPost = null;
           return render();
         }
@@ -4373,10 +4267,6 @@ export function renderCommunity(basePath = "") {
         const bad = moderate(text);
         if (bad.length) {
           state.groupWarn = "Postarea conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.";
-          queueBlockedComment({
-            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches: bad,
-            context: `Postare în grupul „${g.name}”`,
-          });
           return render();
         }
         const badM = invalidMentions(text, (u) =>
@@ -4591,10 +4481,7 @@ export function renderCommunity(basePath = "") {
         return render();
       }
 
-      // ---- moderation queue ----
-      case "mod-filter":
-        state.modFilter = btn.dataset.id;
-        return render();
+      // ---- moderation queue (real: reports + filter-held content) ----
       case "report-resolve": {
         const rid = btn.dataset.id;
         resolveReport(rid);
@@ -4653,53 +4540,11 @@ export function renderCommunity(basePath = "") {
         state.favorites = state.favorites.filter((f) => f.slug !== slug);
         return render();
       }
-      case "mod-approve": {
-        if (!isAdmin()) return;
-        const item = resolveModerationItem(id, "approved");
-        if (item?.post) state.posts.unshift(item.post); // publish the held post
-        logAdmin(`✓ ai publicat postarea reținută a lui ${item?.name || "?"}`);
+      case "post-pin": {
+        const p = findPost(Number(btn.dataset.id));
+        if (p) { p.pinned = !p.pinned; pinGroupPost(p.id, p.pinned); }
         return render();
       }
-      case "mod-reject":
-        if (!isAdmin()) return;
-        resolveModerationItem(id, "rejected");
-        logAdmin("✕ ai respins o postare reținută");
-        return render();
-      case "mod-dismiss":
-        if (!isAdmin()) return;
-        resolveModerationItem(id, "dismissed");
-        return render();
-      case "mod-delete-target": {
-        if (!isAdmin()) return;
-        confirmDialog("Conținutul raportat va fi șters definitiv.", { title: "Ștergi conținutul?", okLabel: "Șterge", danger: true }).then((ok) => {
-          if (!ok) return;
-          const item = MODERATION_QUEUE.find((i) => i.id === id);
-          if (item) {
-            if (item.targetType === "post") removePost(item.targetId);
-            else for (const p of allPosts()) if (removeComment(p.comments, item.targetId)) break;
-            resolveModerationItem(id, "deleted");
-            logAdmin(`🗑 ai șters conținut raportat (${item.targetType === "post" ? "postare" : "comentariu"})`);
-          }
-          render();
-        });
-        return;
-      }
-      case "mod-reopen": {
-        if (!isAdmin()) return;
-        const item = MODERATION_QUEUE.find((i) => i.id === id);
-        if (!item) return;
-        // Undo: an approved held post leaves the feed again.
-        if (item.kind === "held-post" && item.resolution === "approved" && item.post) {
-          state.posts = state.posts.filter((p) => p.id !== item.post.id);
-        }
-        item.status = "open";
-        item.resolution = null;
-        state.modFilter = "all";
-        logAdmin("↩ ai redeschis un caz de moderare");
-        showToast("↩ Caz redeschis — e din nou în coadă");
-        return render();
-      }
-
       // ---- exercises ----
       case "ex-toggle":
         state.exComposer.open = !state.exComposer.open;
@@ -4819,10 +4664,6 @@ export function renderCommunity(basePath = "") {
         const badEx = moderate(prompt);
         if (badEx.length) {
           state.exWarn = "Enunțul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.";
-          queueBlockedComment({
-            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text: prompt, matches: badEx,
-            context: "Propunere de exercițiu",
-          });
           return render();
         }
         // Structured fields → the exercise becomes solvable once approved.

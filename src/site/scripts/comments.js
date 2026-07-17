@@ -7,12 +7,12 @@
 // =========================================================
 import {
   fetchLessonComments, addLessonComment, toggleCommentLike, toggleCommentReaction,
-  updateComment, deleteComment, mapComment, markCommentCorrect,
+  updateComment, deleteComment, mapComment, markCommentCorrect, reportCommentBySurrogate,
 } from "../../shared/scripts/forum-repo.js";
 import { nextId } from "../../shared/scripts/forum-data.js";
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { MY_PROFILE, slugForUser } from "../../shared/scripts/community-data.js";
-import { findProfanity, queueBlockedComment, queueReport } from "../../shared/scripts/moderation.js";
+import { findProfanity } from "../../shared/scripts/moderation.js";
 import { initMentions, invalidMentions, linkifyMentions } from "../../shared/scripts/mentions.js";
 import { touchStreak } from "../../shared/scripts/streak.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -79,23 +79,11 @@ export function initLessonComments(basePath = "") {
   // Shared moderation wiring (same rules as the community hub).
   const moderate = (text) => findProfanity(text || "");
   const WARN = "Mesajul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.";
-  const logBlocked = (text, matches) =>
-    queueBlockedComment({
-      authorId: CURRENT_USER.id, name: CURRENT_USER.name, text, matches,
-      context: `Comentariu la lecția „${slug}”`,
-    });
   const report = (c) => {
     if (c.reportedByMe) return;
     c.reportedByMe = true;
-    queueReport({
-      targetType: "comment",
-      targetId: c.id,
-      authorId: c.authorId,
-      name: c.name,
-      snippet: String(c.text).slice(0, 120),
-      reporterId: CURRENT_USER.id,
-      reporterName: CURRENT_USER.name,
-    });
+    reportCommentBySurrogate(c.id); // REAL: persisted to the Supabase `reports` table
+    showToast("⚑ Semnalat — profesorul va verifica.", { kind: "success" });
   };
 
   // @mentions: lesson comments are public, so any friend is eligible; the
@@ -157,7 +145,6 @@ export function initLessonComments(basePath = "") {
       onCorrect: award,
       moderate,
       warnMsg: WARN,
-      onBlocked: logBlocked,
       onReport: report,
       validate: validateMentions,
       // REAL: persist comment interactions to Supabase (by comment surrogate id).
@@ -195,7 +182,6 @@ export function initLessonComments(basePath = "") {
       const bad = moderate(text);
       if (bad.length) {
         state.composerWarn = WARN;
-        logBlocked(text, bad);
         return render();
       }
       const vmsg = validateMentions(text);

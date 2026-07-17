@@ -20,7 +20,7 @@ import { isAdmin } from "../scripts/session.js";
 import { LESSONS } from "../scripts/lessons-index.js";
 import { LESSON_DOMAINS } from "../scripts/domains.js";
 import { initUserMenu } from "../scripts/user-menu.js";
-import { openModerationItems } from "../scripts/moderation.js";
+import { fetchOpenModerationCount } from "../scripts/forum-repo.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications, clearAllNotifications } from "../scripts/notif.js";
 import { isLoggedIn, signOut } from "../scripts/session.js";
@@ -275,12 +275,13 @@ function initAdminQuickPanel(basePath) {
   // stays synchronous. Default 0 until the first fetch resolves.
   let _exPending = 0;
   let _exLessonPending = 0;
+  let _modPending = 0;
 
   const lessonSlug = () =>
     document.querySelector("[data-lesson-slug]")?.dataset.lessonSlug || null;
 
   const build = () => {
-    const attention = openModerationItems().length + _exPending;
+    const attention = _modPending + _exPending;
     const slug = lessonSlug();
     const here = _exLessonPending;
     const link = (href, icon, label, n = 0) =>
@@ -292,7 +293,7 @@ function initAdminQuickPanel(basePath) {
       <div class="admin-quick__panel" hidden>
         <p class="admin-quick__title">Unelte de admin</p>
         ${link(`${HUB}#admin`, "🛡️", "Panou admin")}
-        ${link(`${HUB}#admin/moderare`, "⚖️", "Moderare", openModerationItems().length)}
+        ${link(`${HUB}#admin/moderare`, "⚖️", "Moderare", _modPending)}
         ${link(`${HUB}#admin/utilizatori`, "👥", "Utilizatori")}
         ${link(`${HUB}#exercitii`, "🧩", "Exerciții în așteptare", _exPending)}
         ${slug ? link("#propose-exercise", "📘", "Propunerile acestei lecții", here) : ""}
@@ -305,9 +306,10 @@ function initAdminQuickPanel(basePath) {
   async function refreshCounts() {
     if (!isAdmin()) return;
     const slug = lessonSlug();
-    [_exPending, _exLessonPending] = await Promise.all([
+    [_exPending, _exLessonPending, _modPending] = await Promise.all([
       fetchPendingCount(),
       slug ? fetchPendingCountForLesson(slug) : Promise.resolve(0),
+      fetchOpenModerationCount(),
     ]);
     if (!fab) return;
     const wasOpen = fab.classList.contains("is-open");
@@ -409,6 +411,7 @@ function initAdminFrame() {
   if (window.__adminFrameOn) return;
   window.__adminFrameOn = true;
   let pending = 0; // cached pending-exercise count (Supabase, refreshed async)
+  let modPending = 0; // cached open-moderation count (reports + filter-held)
 
   const apply = () => {
     const on = isAdmin();
@@ -425,7 +428,7 @@ function initAdminFrame() {
     // CALM by default (thin, static); the full panic-room pulse fires only
     // while something actually awaits the teacher.
     if (on && frame) {
-      const alert = openModerationItems().length + pending > 0;
+      const alert = modPending + pending > 0;
       frame.classList.toggle("admin-frame--alert", alert);
     }
   };
@@ -434,6 +437,7 @@ function initAdminFrame() {
   const refresh = async () => {
     if (!isAdmin()) return;
     try { pending = await fetchPendingCount(); } catch { pending = 0; }
+    try { modPending = await fetchOpenModerationCount(); } catch { modPending = 0; }
     apply();
   };
 

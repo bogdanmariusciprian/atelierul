@@ -2,16 +2,15 @@
 // Moderation (single source of truth, DRY):
 //   1. A profanity filter for everything users type (posts, comments,
 //      replies, edits, group names, exercise proposals, profile fields).
-//   2. A moderation QUEUE the admin reviews in the dashboard:
-//        - "held-post"       → a post kept out of the feed until approved
-//        - "blocked-comment" → a comment attempt that was stopped inline
-//        - "report"          → content flagged by a member ("Raportează")
 //
-// IMPORTANT (security): this is a CLIENT-side, UX-level filter. It keeps
-// the community friendly but is trivially bypassable via DevTools. Real
-// enforcement must be repeated server-side (Supabase) when wired.
+// The admin-facing moderation QUEUE is now fully server-side: reports live
+// in Supabase (`reports`) and profane content is held by the
+// `hold_if_profane` trigger — both surfaced in the community dashboard.
+//
+// IMPORTANT (security): this profanity filter is a CLIENT-side, UX-level
+// convenience. It keeps the community friendly but is trivially bypassable
+// via DevTools — real enforcement lives server-side (Supabase).
 // =========================================================
-import { relTime } from "./forum-data.js";
 
 // ---------------------------------------------------------
 // Normalization — lowercase, strip diacritics, undo common "leet"
@@ -125,85 +124,3 @@ export function censor(text) {
 /** The friendly message shown when something is stopped by the filter. */
 export const FILTER_MESSAGE =
   "Textul conține limbaj nepotrivit pentru comunitate. Reformulează, te rog — profesorul a fost anunțat.";
-
-// ---------------------------------------------------------
-// Moderation queue (mock, in-memory). The admin dashboard lists open
-// items; resolving them removes/keeps content accordingly.
-// ---------------------------------------------------------
-export const MODERATION_QUEUE = [];
-
-let mseq = 8000;
-const mid = () => ++mseq;
-
-function baseItem(kind, fields) {
-  return {
-    id: mid(),
-    kind, // "held-post" | "blocked-comment" | "report"
-    createdAt: Date.now(),
-    time: relTime(0),
-    status: "open", // "open" | "resolved"
-    resolution: null, // "approved" | "rejected" | "deleted" | "dismissed"
-    ...fields,
-  };
-}
-
-/** A post kept OUT of the feed until the admin approves it. Stores the
- *  ready-to-publish post object so approval can just insert it. */
-export function queueHeldPost(post, matches) {
-  const item = baseItem("held-post", {
-    authorId: post.authorId,
-    name: post.name,
-    text: post.text,
-    matches,
-    post,
-    context: "Postare nouă (reținută de filtru)",
-  });
-  MODERATION_QUEUE.unshift(item);
-  return item;
-}
-
-/** A comment/reply attempt stopped inline (nothing was published). */
-export function queueBlockedComment({ authorId, name, text, context, matches }) {
-  const item = baseItem("blocked-comment", { authorId, name, text, matches, context });
-  MODERATION_QUEUE.unshift(item);
-  return item;
-}
-
-/** A member flagged existing content ("Raportează"). */
-export function queueReport({ targetType, targetId, authorId, name, snippet, reporterId, reporterName }) {
-  // One open report per target is enough — bump the existing one instead.
-  const dup = MODERATION_QUEUE.find(
-    (i) => i.kind === "report" && i.status === "open" && i.targetType === targetType && i.targetId === targetId
-  );
-  if (dup) {
-    dup.reportCount = (dup.reportCount || 1) + 1;
-    return dup;
-  }
-  const item = baseItem("report", {
-    targetType, // "post" | "comment"
-    targetId,
-    authorId,
-    name,
-    text: snippet,
-    reporterId,
-    reporterName,
-    reportCount: 1,
-    context: targetType === "post" ? "Postare raportată" : "Comentariu raportat",
-  });
-  MODERATION_QUEUE.unshift(item);
-  return item;
-}
-
-/** Items still awaiting the admin. */
-export function openModerationItems() {
-  return MODERATION_QUEUE.filter((i) => i.status === "open");
-}
-
-/** Close an item ("approved" | "rejected" | "deleted" | "dismissed"). */
-export function resolveModerationItem(id, resolution) {
-  const item = MODERATION_QUEUE.find((i) => i.id === id);
-  if (!item) return null;
-  item.status = "resolved";
-  item.resolution = resolution;
-  return item;
-}

@@ -41,6 +41,14 @@ export function surrogateForPostUuid(uuid) {
   for (const [sid, u] of postUuidBySurr) if (u === uuid) return sid;
   return null;
 }
+
+/** Group creator/admin: pin or unpin a post inside a group (RLS-checked RPC). */
+export async function pinGroupPost(postSurrogate, pinned) {
+  const uuid = postUuidBySurr.get(postSurrogate);
+  if (!uuid) return;
+  const { error } = await supabase.rpc("set_group_pin", { p_post: uuid, p_pinned: !!pinned });
+  if (error) console.warn("pinGroupPost:", error.message);
+}
 export function mapComment(surrogateId, uuid) {
   if (surrogateId && uuid) commentUuidBySurr.set(surrogateId, uuid);
 }
@@ -114,6 +122,7 @@ function mapPost(row) {
     text: esc(row.body || ""),
     media: row.media || null,
     edited: !!row.edited_at,
+    pinned: !!row.pinned,
     likes: 0,
     likedByMe: false,
     shares: 0,
@@ -183,7 +192,7 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
   let sel = supabase
     .from("posts")
     .select(
-      "id, author_id, body, type, background, audience, share_of, surface, group_id, media, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, author_id, body, type, background, audience, share_of, surface, group_id, media, pinned, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .eq("moderation_status", "visible")
     .is("share_of", null);
@@ -749,6 +758,28 @@ export async function reportContent(targetType, targetUuid, reason) {
   });
   if (error && error.code !== "23505") { console.warn("reportContent:", error.message); return false; }
   return true;
+}
+
+/** Report a post by its numeric surrogate id (maps to the real uuid, then to `reports`). */
+export async function reportPostBySurrogate(postSurrogate, reason) {
+  const pid = postUuidBySurr.get(postSurrogate);
+  if (!pid) return false;
+  return reportContent("post", pid, reason);
+}
+/** Report a comment by its numeric surrogate id (maps to the real uuid, then to `reports`). */
+export async function reportCommentBySurrogate(commentSurrogate, reason) {
+  const cid = commentUuidBySurr.get(commentSurrogate);
+  if (!cid) return false;
+  return reportContent("comment", cid, reason);
+}
+
+/** Count of everything awaiting the teacher: open reports + filter-held content.
+ *  Used for the global admin badge/pulse (replaces the old mock queue count). */
+export async function fetchOpenModerationCount() {
+  try {
+    const [reports, held] = await Promise.all([fetchContentReports(), fetchHeldContent()]);
+    return reports.length + held.length;
+  } catch { return 0; }
 }
 
 /** Admin: open reports (newest first), with the reporter's display name. */

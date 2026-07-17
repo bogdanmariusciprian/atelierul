@@ -15,7 +15,7 @@ import {
 } from "../../shared/scripts/exercises-repo.js";
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { escapeHtml } from "../../shared/scripts/thread.js";
-import { findProfanity, queueBlockedComment } from "../../shared/scripts/moderation.js";
+import { findProfanity } from "../../shared/scripts/moderation.js";
 import { userById, slugForUser } from "../../shared/scripts/community-data.js";
 import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -288,10 +288,6 @@ export function initProposeExercise(basePath = "") {
         const bad = findProfanity(prompt);
         if (bad.length) {
           state.warn = "Enunțul conține limbaj nepotrivit. Reformulează, te rog — profesorul a fost anunțat.";
-          queueBlockedComment({
-            authorId: CURRENT_USER.id, name: CURRENT_USER.name, text: prompt, matches: bad,
-            context: `Propunere de exercițiu la lecția „${lessonTitle}”`,
-          });
           return render();
         }
         const form = readExerciseForm(mount, state.kind);
