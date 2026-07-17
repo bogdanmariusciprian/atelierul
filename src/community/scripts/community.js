@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -2910,7 +2910,23 @@ export function renderCommunity(basePath = "") {
       ? showing.map((m) => modItemHtml(m, state.modFilter === "history")).join("")
       : `<p class="cx-muted">${state.modFilter === "history" ? "Încă n-ai moderat nimic." : "Nimic aici. 🎉"}</p>`;
 
-    return `<div class="cx-box">
+    // REAL reports (posts/comments/test items/exercises) — persisted in Supabase.
+    const RTYPE = { post: "postare", comment: "comentariu", test_item: "item de test", exercise: "exercițiu", message: "mesaj" };
+    const realReports = state.contentReports.length
+      ? `<div class="cx-box">
+          <div class="cx-admin__head"><h3>⚑ Rapoarte semnalate · ${state.contentReports.length}</h3></div>
+          <div class="cx-modlist">${state.contentReports.map((r) => `
+            <div class="cx-moditem">
+              <div class="cx-moditem__body">
+                <p class="cx-moditem__text"><b>${RTYPE[r.targetType] || escapeHtml(r.targetType)}</b>${r.reason ? ` — „${escapeHtml(r.reason)}”` : ""}</p>
+                <p class="cx-moditem__meta"><span class="cx-muted">semnalat de ${escapeHtml(r.reporterName)} · ${relTime(Math.max(0, Date.now() - r.createdAt))}</span></p>
+              </div>
+              <span class="cx-moditem__act"><button type="button" class="btn-mini btn-mini--ok" data-action="report-resolve" data-id="${r.id}">✓ Rezolvă</button></span>
+            </div>`).join("")}</div>
+        </div>`
+      : "";
+
+    return `${realReports}<div class="cx-box">
         <div class="cx-admin__head"><h3>Moderare${open.length ? ` · ${open.length} deschise` : ""}</h3></div>
         ${chips}
         <div class="cx-modlist">${items}</div>
@@ -4498,6 +4514,12 @@ export function renderCommunity(basePath = "") {
       case "mod-filter":
         state.modFilter = btn.dataset.id;
         return render();
+      case "report-resolve": {
+        const rid = btn.dataset.id;
+        resolveReport(rid);
+        state.contentReports = state.contentReports.filter((r) => r.id !== rid);
+        return render();
+      }
       case "mod-approve": {
         if (!isAdmin()) return;
         const item = resolveModerationItem(id, "approved");

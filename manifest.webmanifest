@@ -1,0 +1,15 @@
+{
+  "name": "Atelierul de Română",
+  "short_name": "Atelierul",
+  "description": "Lecții interactive, exerciții cu feedback și o comunitate pentru limba și literatura română.",
+  "lang": "ro",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/assets/logo/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
