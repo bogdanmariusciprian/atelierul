@@ -27,7 +27,7 @@ const fmtTime = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2,
 let root = null;
 const G = {
   exam: null, items: [], byId: new Map(),
-  years: [], types: [],
+  years: [], availTypes: [], typeCounts: {},
   sel: { years: new Set(), types: new Set(), order: "random" },
   sessionId: null, queue: [],
   total: 0, correct: 0, wrong: 0, points: 0,
@@ -50,20 +50,23 @@ export async function initTestGame(mountEl, exam) {
   const items = await fetchTestItems({ exam }); // published only (RLS), all years
   G.items = items;
   G.byId = new Map(items.map((i) => [i.id, i]));
-  G.years = [...new Set(items.map((i) => i.year).filter((y) => y != null))].sort((a, b) => b - a);
-  const present = new Set();
-  items.forEach((i) => (i.types || []).forEach((t) => present.add(t)));
-  G.types = TEST_ITEM_TYPES.map((t) => t.code).filter((c) => present.has(c));
-  G.sel.years = new Set(G.years);   // default: everything
-  G.sel.types = new Set(G.types);
+  G.years = [...new Set(items.map((i) => i.year).filter((y) => y != null))].sort((a, b) => Number(b) - Number(a));
+  G.typeCounts = {};
+  items.forEach((i) => (i.types || []).forEach((t) => { G.typeCounts[t] = (G.typeCounts[t] || 0) + 1; }));
+  G.availTypes = TEST_ITEM_TYPES.map((t) => t.code).filter((c) => G.typeCounts[c] > 0);
+  G.sel.years = new Set(G.years.map(String)); // string-keyed → no number/text mismatch
+  G.sel.types = new Set(G.availTypes);
   renderConfig();
 }
 
 // ---------- filtering / ordering ----------
 function matchingItems() {
+  const allTypes = G.availTypes.length > 0 && G.sel.types.size === G.availTypes.length;
   return G.items.filter((it) => {
-    if (G.sel.years.size && !G.sel.years.has(it.year)) return false;
-    if (G.types.length && G.sel.types.size) {
+    if (G.sel.years.size && !G.sel.years.has(String(it.year))) return false;
+    // Type filter applies ONLY when a proper subset is chosen → untagged items
+    // still appear under „all types" (and while nothing is tagged yet).
+    if (!allTypes && G.sel.types.size) {
       const its = it.types || [];
       if (!its.some((t) => G.sel.types.has(t))) return false;
     }
@@ -76,10 +79,10 @@ function shuffle(a) {
 }
 function buildQueue(items) {
   const arr = [...items];
-  if (G.sel.order === "years") arr.sort((a, b) => (b.year - a.year) || (a.itemNo - b.itemNo));
+  if (G.sel.order === "years") arr.sort((a, b) => (Number(b.year) - Number(a.year)) || (Number(a.itemNo) - Number(b.itemNo)));
   else if (G.sel.order === "types") {
     const ft = (it) => (it.types || [])[0] || "￿";
-    arr.sort((a, b) => ft(a).localeCompare(ft(b)) || (b.year - a.year) || (a.itemNo - b.itemNo));
+    arr.sort((a, b) => ft(a).localeCompare(ft(b)) || (Number(b.year) - Number(a.year)) || (Number(a.itemNo) - Number(b.itemNo)));
   } else shuffle(arr);
   return arr.map((i) => i.id);
 }
@@ -101,18 +104,25 @@ function renderConfig() {
   const chip = (attr, val, label, on, title) =>
     `<button type="button" class="tgame-chip${on ? " on" : ""}" data-${attr}="${val}"${title ? ` title="${esc(title)}"` : ""}>${label}</button>`;
   const allYearsOn = G.years.length > 0 && G.sel.years.size === G.years.length;
-  const allTypesOn = G.types.length > 0 && G.sel.types.size === G.types.length;
+  const allTypesOn = G.availTypes.length > 0 && G.sel.types.size === G.availTypes.length;
 
   const yearChips = chip("year", "all", "Toți anii", allYearsOn)
-    + G.years.map((y) => chip("year", y, y, !allYearsOn && G.sel.years.has(y))).join("");
-  const typeBlock = G.types.length ? `
+    + G.years.map((y) => chip("year", y, y, !allYearsOn && G.sel.years.has(String(y)))).join("");
+
+  // ALL topic categories are shown; untagged ones are greyed out. Users read the
+  // FULL name (the SF/MS/… abbreviations live only in the admin grid).
+  const typeChipsHtml = TEST_ITEM_TYPES.map((t) => {
+    const cnt = G.typeCounts[t.code] || 0;
+    if (!cnt) return `<button type="button" class="tgame-chip is-empty" disabled title="Încă nu sunt itemi de acest tip">${esc(t.label)}</button>`;
+    const on = !allTypesOn && G.sel.types.has(t.code);
+    return `<button type="button" class="tgame-chip${on ? " on" : ""}" data-type="${t.code}" title="${esc(t.label)}">${esc(t.label)} <span class="tgame-chip__n">${cnt}</span></button>`;
+  }).join("");
+  const typeBlock = `
     <div class="tgame-cfg-block">
       <div class="tgame-cfg-lab">Tipuri de itemi</div>
-      <div class="tgame-chips">
-        ${chip("type", "all", "Toate", allTypesOn)}
-        ${G.types.map((c) => chip("type", c, esc(c), !allTypesOn && G.sel.types.has(c), TYPE_LABEL[c] || c)).join("")}
-      </div>
-    </div>` : "";
+      <div class="tgame-chips">${G.availTypes.length ? chip("type", "all", "Toate", allTypesOn) : ""}${typeChipsHtml}</div>
+      ${G.availTypes.length ? "" : `<p class="tgame-cfg-hint">Categoriile se activează pe măsură ce profesorul marchează itemii.</p>`}
+    </div>`;
   const orderChips = [["random", "Aleatoriu"], ["years", "Pe ani"], ["types", "Pe tipuri"]]
     .map(([v, l]) => chip("order", v, l, G.sel.order === v)).join("");
 
@@ -364,9 +374,9 @@ function confirmLeave(onYes) {
 // ---------- events ----------
 function onClick(e) {
   const year = e.target.closest("[data-year]");
-  if (year) { pick("years", G.years, year.dataset.year === "all" ? "all" : Number(year.dataset.year)); return renderConfig(); }
+  if (year) { pick("years", G.years.map(String), year.dataset.year); return renderConfig(); }
   const type = e.target.closest("[data-type]");
-  if (type) { pick("types", G.types, type.dataset.type); return renderConfig(); }
+  if (type) { pick("types", G.availTypes, type.dataset.type); return renderConfig(); }
   const order = e.target.closest("[data-order]");
   if (order) { G.sel.order = order.dataset.order; return renderConfig(); }
 
