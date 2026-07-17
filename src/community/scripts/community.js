@@ -1463,7 +1463,7 @@ export function renderCommunity(basePath = "") {
       .join("");
     const body = state.favorites.length
       ? `<div class="cx-favs">${items}</div>`
-      : emptyState("Nicio lecție favorită încă", "Deschide o lecție și apasă „⭐ Adaugă la favorite" — apare aici.");
+      : emptyState("Nicio lecție favorită încă", "Deschide o lecție și apasă „⭐ Adaugă la favorite” — apare aici.");
     return `${sectionHead("Lecțiile mele", "Lecțiile pe care le-ai marcat ca preferate.")}${body}`;
   }
 
