@@ -7,7 +7,7 @@
 // (loaded via loadNotifications), so they can never disagree. Opening the tray
 // CONSUMES it: the shown notifications are marked read (server + cache).
 // =========================================================
-import { fetchNotifications, markNotificationsRead, deleteAllNotifications, subscribeInserts } from "./forum-repo.js";
+import { fetchNotifications, markNotificationsRead, deleteAllNotifications, subscribeInserts, purgeOldReadNotifications } from "./forum-repo.js";
 import { isLoggedIn } from "./session.js";
 import { timeAgo } from "./format.js";
 
@@ -28,6 +28,7 @@ export async function loadNotifications() {
     _notifs = [];
     return;
   }
+  purgeOldReadNotifications(7).catch(() => {}); // tidy: drop read notifs older than a week
   try {
     _notifs = await fetchNotifications(30);
   } catch {

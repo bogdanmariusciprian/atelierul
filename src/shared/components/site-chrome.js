@@ -77,6 +77,7 @@ export async function renderChrome(basePath = "") {
   safe(() => renderPageBreadcrumbs(basePath), "breadcrumbs");
   safe(() => renderFooter(basePath), "footer");
   safe(revealGate, "revealGate"); // page is complete → show it (undo the flash-hide)
+  safe(() => { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); }, "sw"); // offline (network-first)
   safe(initUserMenu, "userMenu"); // right-click on any user name → copy/open
   // --- Visual flourishes + floating widgets (isolated) ---
   safe(initSmoothPageScroll, "smoothScroll");

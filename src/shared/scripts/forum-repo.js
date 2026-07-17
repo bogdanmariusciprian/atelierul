@@ -776,6 +776,17 @@ export async function moderateContent(kind, id, status) {
   if (error) console.warn("moderateContent:", error.message);
 }
 
+/** Purge MY read notifications older than `days` — keeps the tray from growing
+ *  forever (the "stuck notifications" fix). Best-effort. */
+export async function purgeOldReadNotifications(days = 7) {
+  if (!CURRENT_USER.authId) return;
+  const cutoff = new Date(Date.now() - days * 864e5).toISOString();
+  await supabase.from("notifications").delete()
+    .eq("user_id", CURRENT_USER.authId)
+    .not("read_at", "is", null)
+    .lt("read_at", cutoff);
+}
+
 /** Realtime: run `onInsert(row)` whenever a row is INSERTed into `table` that
  *  this user is allowed to see (RLS applies to realtime too). Returns the channel
  *  so the caller can unsubscribe. Best-effort — never throws. */
