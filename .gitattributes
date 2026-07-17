@@ -1,0 +1,23 @@
+# Normalizează sfârșiturile de linie (Marius e pe Windows) — text = LF în repo.
+* text=auto eol=lf
+
+# Fișiere text explicite (evită ghiceala pe extensii mai rare).
+*.js    text
+*.css   text
+*.html  text
+*.md    text
+*.svg   text
+*.sql   text
+*.json  text
+*.yml   text
+
+# Binare — nu le atinge niciodată.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary

@@ -847,7 +847,6 @@ export function renderCommunity(basePath = "") {
     const tools = isGroup
       ? ""
       : `<div class="cx-composer__tools">
-            <button type="button" class="cx-tool" data-action="pick-image" title="Adaugă imagini">🖼️ Imagine</button>
             <button type="button" class="cx-tool${c.ytOpen ? " on" : ""}" data-action="toggle-yt" title="Adaugă un clip YouTube">▶️ YouTube</button>
             <span class="cx-swatches" title="Culoare de fundal">${swatches}</span>
           </div>`;
@@ -870,7 +869,6 @@ export function renderCommunity(basePath = "") {
             <button type="button" class="btn btn--primary btn--sm" data-action="publish">${isGroup ? "Creează grupul" : "Publică"}</button>
           </div>
         </div>
-        <input type="file" id="cx-file" accept="image/*" multiple hidden />
       </div>`;
   }
 
@@ -879,18 +877,6 @@ export function renderCommunity(basePath = "") {
     if (media.kind === "youtube") {
       return `<div class="cx-mediaprev">
           <span class="cx-mediaprev__yt">▶ YouTube: ${escapeHtml(media.title || media.videoId)}</span>
-          ${editable ? `<button type="button" class="cx-x" data-action="clear-media" aria-label="Elimină">×</button>` : ""}
-        </div>`;
-    }
-    if (media.kind === "images") {
-      const thumbs = media.images
-        .map(
-          (im) =>
-            `<span class="cx-thumb" style="${im.src ? `background-image:url('${im.src}')` : `background:${im.gradient}`}"></span>`
-        )
-        .join("");
-      return `<div class="cx-mediaprev">
-          <span class="cx-mediaprev__imgs">${thumbs}</span>
           ${editable ? `<button type="button" class="cx-x" data-action="clear-media" aria-label="Elimină">×</button>` : ""}
         </div>`;
     }
@@ -913,20 +899,6 @@ export function renderCommunity(basePath = "") {
           <span class="post__yt__play" aria-hidden="true">▶</span>
           <span class="post__yt__title">${escapeHtml(post.media.title || "Clip YouTube")}</span>
         </button>`;
-    }
-    if (post.media.kind === "images") {
-      const n = post.media.images.length;
-      // Every image opens the lightbox (real uploads get copy/save too).
-      const imgs = post.media.images
-        .map((im, i) =>
-          im.src
-            ? `<button type="button" class="post__img post__img--zoom" style="background-image:url('${im.src}')"
-                 data-action="open-image" data-id="${post.id}" data-i="${i}" title="Mărește imaginea" aria-label="Mărește imaginea ${i + 1}"></button>`
-            : `<button type="button" class="post__img post__img--ph post__img--zoom" style="background:${im.gradient}"
-                 data-action="open-image" data-id="${post.id}" data-i="${i}" title="Mărește imaginea"><span>${escapeHtml(im.label || "")}</span></button>`
-        )
-        .join("");
-      return `<div class="post__imgs post__imgs--n${Math.min(n, 3)}">${imgs}</div>`;
     }
     return "";
   }
@@ -2064,6 +2036,9 @@ export function renderCommunity(basePath = "") {
   // The friend button for another user's profile — its label/action depends
   // on the current relationship (friend, requested, incoming, or none).
   function friendButton(id) {
+    // The teacher isn't in the social game — no friend requests to the admin,
+    // and you can't friend yourself.
+    if (id === CURRENT_USER.id || (userById(id) || {}).role === "admin") return "";
     if (isFriend(id))
       return `<div class="cx-friendbtns">
           <span class="cx-friendtag">✓ Prieteni</span>
@@ -3845,9 +3820,6 @@ export function renderCommunity(basePath = "") {
         state.composer.iconId = Number(btn.dataset.id);
         state.composer.iconOpen = false;
         return render();
-      case "pick-image":
-        mount.querySelector("#cx-file")?.click();
-        return;
       case "toggle-yt":
         syncComposer();
         state.composer.ytOpen = !state.composer.ytOpen;
@@ -4967,23 +4939,6 @@ export function renderCommunity(basePath = "") {
     }
   });
 
-  // Image uploads → object URLs (real client-side preview, no backend).
-  // At most 3 images per post — extra files are ignored with a heads-up.
-  const MAX_POST_IMAGES = 3;
-  mount.addEventListener("change", (e) => {
-    // "Conversație nouă…" — the select in the chat rail opens (or creates)
-    // that partner's conversation.
-    if (e.target.id !== "cx-file") return;
-    const files = [...e.target.files].filter((f) => f.type.startsWith("image/"));
-    if (!files.length) return;
-    if (files.length > MAX_POST_IMAGES) {
-      showToast(`Poți atașa cel mult ${MAX_POST_IMAGES} imagini per postare — le-am păstrat pe primele ${MAX_POST_IMAGES}.`);
-    }
-    syncComposer();
-    const images = files.slice(0, MAX_POST_IMAGES).map((f) => ({ src: URL.createObjectURL(f) }));
-    state.composer.media = { kind: "images", images };
-    render();
-  });
 
   // Esc closes the image lightbox; ←/→ walk between the post's images.
   document.addEventListener("keydown", (e) => {

@@ -106,7 +106,7 @@ function testimonials(mount) {
     // A testimonial's name links to that member's real profile. If the
     // account no longer exists (deleted), the link degrades to plain text.
     const user = COMMUNITY_USERS.find((u) => u.name === t.name);
-    const href = user ? `spatiul-meu.html#u/${slugForUser(user.id)}` : null;
+    const href = user ? `../#u/${slugForUser(user.id)}` : null;
     const avatarId = user ? user.id : i + 1; // stable mock gif either way
     const nameHtml = href
       ? `<a class="tm__name cx-userlink" href="${href}" title="Vezi profilul">${t.name}</a>`
@@ -159,7 +159,7 @@ function stickyCta() {
   bar.hidden = true;
   bar.innerHTML = `
     <span class="cl-sticky__text">Ți-a plăcut ce ai văzut?</span>
-    <a class="btn btn--primary btn--sm" href="login.html">Creează cont gratuit</a>`;
+    <a class="btn btn--primary btn--sm" href="../login/">Creează cont gratuit</a>`;
   document.body.appendChild(bar);
 
   let ticking = false;

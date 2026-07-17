@@ -903,7 +903,7 @@ function renderFooter(basePath) {
         </nav>
         <div class="site-footer__col">
           <p class="site-footer__head">Contact</p>
-          <button type="button" class="site-footer__contact" id="footer-contact">✉️ Scrie-i profesorului</button>
+          <button type="button" class="site-footer__contact" id="footer-contact">${isAdmin() ? "✉️ Mesaje" : "✉️ Scrie-i profesorului"}</button>
         </div>
       </div>
       <div class="container site-footer__inner">

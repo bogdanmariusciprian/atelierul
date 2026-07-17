@@ -140,6 +140,16 @@ export function isLoggedIn() {
 /** Sign the user out (used by the header logout). */
 export async function signOut() {
   await supabase.auth.signOut();
+  // Clear this user's LOCAL traces so a shared computer doesn't leak them to the
+  // next person (streak, cached identity, lessons-done, notebook, group-seen…).
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("atelier_")) localStorage.removeItem(k);
+    }
+  } catch {
+    /* private mode — nothing to clear */
+  }
 }
 
 // Keep the session fresh and tell the UI to re-render. Fires for
