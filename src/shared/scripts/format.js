@@ -33,3 +33,27 @@ export function plural(n, one, few) {
 export function countNoun(n, one, few) {
   return `${n} ${plural(n, one, few)}`;
 }
+
+const MONTHS_SHORT = ["ian.", "feb.", "mar.", "apr.", "mai", "iun.", "iul.", "aug.", "sept.", "oct.", "nov.", "dec."];
+
+/** ONE time policy across the site (messages, comments, proposals, approvals…):
+ *   • today     → relative ("acum", "acum N min", "acum N ore")
+ *   • yesterday → "ieri"
+ *   • older     → "D lună, HH:MM"  (ex. "15 iul., 14:30")
+ *  Accepts a ms timestamp, a Date, or an ISO string. */
+export function timeAgo(ts) {
+  const then = ts instanceof Date ? ts : new Date(ts);
+  if (isNaN(then.getTime())) return "";
+  const now = new Date();
+  const min = Math.floor((now - then) / 60000);
+  if (min < 1) return "acum";
+  if (min < 60) return `acum ${min} min`;
+  if (then.toDateString() === now.toDateString()) {
+    const h = Math.floor(min / 60);
+    return `acum ${h} ${h === 1 ? "oră" : "ore"}`;
+  }
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (then.toDateString() === y.toDateString()) return "ieri";
+  return `${then.getDate()} ${MONTHS_SHORT[then.getMonth()]}, ${pad(then.getHours())}:${pad(then.getMinutes())}`;
+}

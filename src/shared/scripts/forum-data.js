@@ -8,6 +8,7 @@
 // tint. Comments reuse the shared threaded-comments engine (thread.js).
 // =========================================================
 import { userById, initials, avatarColor } from "./community-data.js";
+import { timeAgo } from "./format.js";
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -108,17 +109,10 @@ export function makeComment({ authorId, text, agoMs = 0, likes = 0, reactions = 
   };
 }
 
-/** Rough "acum / acum N min / ore / zile" from a millisecond age. */
+/** Site-wide time policy (from a millisecond AGE): today → "acum …", yesterday
+ *  → "ieri", older → "D lună, HH:MM". Delegates to the shared timeAgo(). */
 export function relTime(ageMs) {
-  if (ageMs < MIN) return "acum";
-  if (ageMs < HOUR) return `acum ${Math.round(ageMs / MIN)} min`;
-  if (ageMs < DAY) {
-    const h = Math.round(ageMs / HOUR);
-    return `acum ${h} ${h === 1 ? "oră" : "ore"}`;
-  }
-  const d = Math.round(ageMs / DAY);
-  if (d === 1) return "ieri";
-  return `acum ${d} zile`;
+  return timeAgo(Date.now() - ageMs);
 }
 
 function makePost({ authorId, agoMs, type, bg = "none", text, media = null, likes = 0, shares = 0, followed = false, comments = [], audience = "public" }) {

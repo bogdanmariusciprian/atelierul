@@ -9,6 +9,7 @@
 // =========================================================
 import { fetchNotifications, markNotificationsRead, deleteAllNotifications, subscribeInserts } from "./forum-repo.js";
 import { isLoggedIn } from "./session.js";
+import { timeAgo } from "./format.js";
 
 let _notifs = []; // cache: [{ id, type, payload, read_at, created_at }]
 let _rtChannel = null; // realtime subscription (once)
@@ -66,11 +67,5 @@ export async function consumeTray() {
 
 /** Compact "how long ago" stamp for notification rows (RO). */
 export function relTime(ts) {
-  const min = Math.round((Date.now() - ts) / 60000);
-  if (min < 1) return "acum";
-  if (min < 60) return `${min} min`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `${h} h`;
-  const d = Math.round(h / 24);
-  return d === 1 ? "ieri" : `${d} zile`;
+  return timeAgo(ts);
 }

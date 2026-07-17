@@ -12,6 +12,7 @@
 // =========================================================
 import { supabase } from "./supabase-client.js";
 import { CURRENT_USER } from "./session.js";
+import { timeAgo } from "./format.js";
 import { surrogateForAuthor } from "./forum-repo.js";
 
 // Exercise kinds mirror the lesson engine (data-type): choice, fill, match.
@@ -24,13 +25,7 @@ export function exerciseKind(key) {
   return EXERCISE_KINDS.find((k) => k.key === key) || EXERCISE_KINDS[0];
 }
 
-const relTime = (ts) => {
-  const s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
-  if (s < 60) return "acum";
-  if (s < 3600) return `acum ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `acum ${Math.floor(s / 3600)} h`;
-  return `acum ${Math.floor(s / 86400)} zile`;
-};
+const relTime = (ts) => timeAgo(ts);
 const initialsOf = (name) =>
   (name || "").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
