@@ -409,6 +409,10 @@ function zoom(dir) {
 // ---------- events (delegated on root) ----------
 function wireEvents() {
   window.addEventListener("resize", fitHeight);
+  // Google-Docs-style safety net: write everything pending the moment the tab is
+  // hidden (switched away / minimised) or closed, so nothing is lost on close.
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushAll(); });
+  window.addEventListener("pagehide", () => flushAll());
 
   root.addEventListener("focusin", (e) => {
     const tr = e.target.closest(".tg-row");
@@ -555,6 +559,15 @@ function updateFmtButtons() {
 // visible „nesalvat / salvat" state. Fewer writes, nothing silently lost.
 const pending = new Map(); // itemId -> { field: value, … } not yet in Supabase
 let activeItemId = null;   // item currently being edited (so we flush it on leave)
+const autoTimers = new Map(); // id -> debounce timer for Google-Docs-style auto-save
+
+// Save an item shortly after you STOP editing it (even if you don't leave it),
+// so work persists like Google Docs — type, and ~1.2s later it's in Supabase,
+// even if you close the tab right after.
+function scheduleAutoFlush(id) {
+  clearTimeout(autoTimers.get(id));
+  autoTimers.set(id, setTimeout(() => { autoTimers.delete(id); flushItem(id); }, 1200));
+}
 
 function richFieldValue(it, field) {
   return field === "question" ? it.question
@@ -571,6 +584,7 @@ function queueChange(id, field, value) {
   p[field] = value;
   markRowDirty(id, true);
   updateSaveState();
+  scheduleAutoFlush(id); // auto-save ~1.2s after you stop (Google-Docs style)
 }
 
 // Toggle the „nesalvat" marker on an item's row (desktop) / card (phone).
@@ -613,6 +627,7 @@ async function updateWithRetry(id, patch, tries = 3) {
 /** Write ALL queued changes for one item in a SINGLE request (with retry).
  *  On failure the item stays „nesalvat" (queued) so nothing is lost. */
 async function flushItem(id) {
+  clearTimeout(autoTimers.get(id)); autoTimers.delete(id); // cancel a scheduled auto-save; we're saving now
   const p = pending.get(id);
   if (!p || !Object.keys(p).length) return true;
   pending.delete(id);
