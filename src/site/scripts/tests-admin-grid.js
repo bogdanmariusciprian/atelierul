@@ -19,7 +19,7 @@
 // never jolts the page.
 // =========================================================
 import {
-  adminFetchTestItems, fetchTestYears, updateTestItem, setTestVerified, setTestPublished,
+  adminFetchTestItems, fetchTestYears, updateTestItem,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich, stripRich, execBold, execUnderline, execItalic, formatState } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -70,6 +70,7 @@ function lockPageScroll(on) {
 }
 
 async function load() {
+  await flushAll();               // save any pending edits before swapping the item set
   state.loading = true; render();
   state.items = await adminFetchTestItems(state.exam, state.year);
   state.loading = false; render();
@@ -281,6 +282,7 @@ function render() {
         <button type="button" class="tg-zbtn" data-zoom="in" title="Mărește">+</button>
         <button type="button" class="tg-zbtn" data-zoom="fit" title="Potrivește pe lățime (toate coloanele)">Fit</button>
       </span>
+      <button type="button" class="tg-savebtn" data-action="save-all" title="Salvează tot ce e nesalvat">Salvează</button>
       <span class="tg-savestate" id="tg-save"></span>
       <span class="tg-count">${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați</span>
     </div>
@@ -300,8 +302,9 @@ function render() {
         ? `<div class="tg-empty">Se încarcă…</div>`
         : (!rows.length ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : tableHtml(rows))}
     </div>
-    <p class="tg-hint">Se salvează <b>automat</b> (nu e buton de submit): la ieșirea din celulă sau la clic pe A/B/C/D, Verificat sau Publicat. Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I). <b>Verificat</b> ✓ = l-ai controlat tu (intern); <b>Publicat</b> 📤 = e vizibil elevilor.</p>`;
+    <p class="tg-hint">Se salvează <b>pe item</b>: schimbările pleacă împreună când ieși de pe item, apeși <b>Salvează</b>, sau Verificat/Publicat (cu reîncercare dacă pică rețeaua). Indicatorul: „● nesalvate / ✓ Salvat". Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I).</p>`;
   requestAnimationFrame(fitHeight);
+  reapplyDirty();
 }
 
 function tableHtml(rows) {
@@ -411,13 +414,18 @@ function wireEvents() {
     const tr = e.target.closest(".tg-row");
     root.querySelectorAll(".tg-row.is-active").forEach((r) => r !== tr && r.classList.remove("is-active"));
     if (tr) tr.classList.add("is-active");
+    // Moving to a DIFFERENT item (or to the toolbar) → flush the one we just left.
+    const cell = e.target.closest("[data-id]");
+    const newId = cell ? cell.dataset.id : null;
+    if (activeItemId && newId !== activeItemId) flushItem(activeItemId);
+    activeItemId = newId;
   });
 
   root.addEventListener("focusout", (e) => {
     const rich = e.target.closest(".tg-rich");
-    if (rich) return saveRich(rich);
+    if (rich) return queueRich(rich);           // queue only — flushed when you leave the item
     const plainCell = e.target.closest(".tg-edit");
-    if (plainCell) return savePlain(plainCell);
+    if (plainCell) return queuePlain(plainCell);
   });
 
   root.addEventListener("change", (e) => {
@@ -451,6 +459,8 @@ function wireEvents() {
   root.addEventListener("click", (e) => {
     const nav = e.target.closest("[data-nav]");   // phone: ‹ / › previous-next item
     if (nav) return mGo(nav.dataset.nav === "next" ? 1 : -1);
+    const sav = e.target.closest("[data-action=save-all]");
+    if (sav) return flushAll();                   // „Salvează" → write everything pending now
     const zb = e.target.closest(".tg-zbtn");
     if (zb) return zoom(zb.dataset.zoom);
     const bc = e.target.closest("[data-boldcol]");
@@ -538,23 +548,110 @@ function updateFmtButtons() {
   btns.forEach((b) => b.classList.toggle("on", !!st[b.dataset.fmt]));
 }
 
-// ---------- saves ----------
-async function saveRich(cell) {
+// ---------- saves: batch per ITEM (not per cell) ----------
+// Edits no longer hit Supabase one-by-one. Every change is QUEUED per item in
+// `pending`, and the WHOLE item is written in ONE request when you leave it,
+// press „Salvează", or verify/publish it — with retry on a flaky network and a
+// visible „nesalvat / salvat" state. Fewer writes, nothing silently lost.
+const pending = new Map(); // itemId -> { field: value, … } not yet in Supabase
+let activeItemId = null;   // item currently being edited (so we flush it on leave)
+
+function richFieldValue(it, field) {
+  return field === "question" ? it.question
+    : field === "observation" ? it.observation
+    : field === "option_a" ? it.options.A
+    : field === "option_b" ? it.options.B
+    : field === "option_c" ? it.options.C
+    : it.options.D;
+}
+
+function queueChange(id, field, value) {
+  let p = pending.get(id);
+  if (!p) { p = {}; pending.set(id, p); }
+  p[field] = value;
+  markRowDirty(id, true);
+  updateSaveState();
+}
+
+// Toggle the „nesalvat" marker on an item's row (desktop) / card (phone).
+function markRowDirty(id, dirty) {
+  if (!root) return;
+  const el = root.querySelector(`.tg-row[data-id="${id}"], .tgm-card[data-id="${id}"]`);
+  if (el) el.classList.toggle("tg-dirty", dirty);
+}
+
+// After a re-render the DOM is fresh — re-paint the „nesalvat" markers.
+function reapplyDirty() {
+  pending.forEach((_p, id) => markRowDirty(id, true));
+  updateSaveState();
+}
+
+// Live „nesalvat N / se salvează… / ✓ salvat" indicator (shared #tg-save).
+function updateSaveState(saving) {
+  const el = root && root.querySelector("#tg-save");
+  if (!el) return;
+  clearTimeout(updateSaveState._t);
+  if (saving) { el.textContent = "Se salvează…"; el.className = "tg-savestate is-saving"; return; }
+  const n = pending.size;
+  if (n > 0) { el.textContent = `● ${n} nesalvat${n > 1 ? "e" : ""}`; el.className = "tg-savestate is-dirty"; return; }
+  el.textContent = "✓ Salvat"; el.className = "tg-savestate is-ok";
+  updateSaveState._t = setTimeout(() => {
+    if (el && !pending.size) { el.textContent = ""; el.className = "tg-savestate"; }
+  }, 1700);
+}
+
+async function updateWithRetry(id, patch, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    if (await updateTestItem(id, patch)) return true;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 350 * (i + 1)));
+  }
+  return false;
+}
+
+/** Write ALL queued changes for one item in a SINGLE request (with retry).
+ *  On failure the item stays „nesalvat" (queued) so nothing is lost. */
+async function flushItem(id) {
+  const p = pending.get(id);
+  if (!p || !Object.keys(p).length) return true;
+  pending.delete(id);
+  updateSaveState(true);
+  const ok = await updateWithRetry(id, p);
+  if (!ok) {
+    const now = pending.get(id) || {};
+    pending.set(id, { ...p, ...now }); // keep it (merge anything queued meanwhile)
+    updateSaveState();
+    showToast("Nu am putut salva itemul — rămâne «nesalvat». Reîncearcă.");
+    return false;
+  }
+  markRowDirty(id, false);
+  updateSaveState();
+  return true;
+}
+
+/** Save everything still pending (before loading another year / leaving). */
+async function flushAll() {
+  for (const id of [...pending.keys()]) {
+    // eslint-disable-next-line no-await-in-loop
+    await flushItem(id);
+  }
+}
+
+// Queue a rich cell's edit (Enunț / A–D / Observații) — no immediate write.
+function queueRich(cell) {
   const it = byId(cell.dataset.id); if (!it) return;
   const field = cell.dataset.field;
   const clean = sanitizeRich(cell.innerHTML);
   cell.innerHTML = clean;
-  const map = { question: it.question, option_a: it.options.A, option_b: it.options.B,
-                option_c: it.options.C, option_d: it.options.D, observation: it.observation };
-  if (clean === (map[field] || "")) return;
-  showSaving();
-  const ok = await updateTestItem(it.id, { [field]: clean || null });
-  if (!ok) { showSaved(false); showToast("Nu am putut salva."); return; }
+  if (clean === (richFieldValue(it, field) || "")) return; // nothing changed
   applyLocal(it, field, clean);
-  showSaved(true); flash(cell);
+  queueChange(it.id, field, clean || null);
+  flash(cell);
 }
 
-async function savePlain(cell) {
+// Queue a plain cell's edit (An / Sesiune / Nr).
+function queuePlain(cell) {
   const it = byId(cell.dataset.id); if (!it) return;
   const field = cell.dataset.field;
   const raw = cell.textContent.trim();
@@ -565,16 +662,9 @@ async function savePlain(cell) {
     curr = field === "year" ? it.year : it.itemNo;
   } else { val = raw || null; curr = it.session; }
   if (String(val ?? "") === String(curr ?? "")) { cell.textContent = curr ?? ""; return; }
-  showSaving();
-  const ok = await updateTestItem(it.id, { [field]: val });
-  if (!ok) {
-    showSaved(false);
-    showToast("Nu am putut salva (poate un An/Sesiune/Nr deja folosit).");
-    cell.textContent = curr ?? "";
-    return;
-  }
   if (field === "year") it.year = val; else if (field === "item_no") it.itemNo = val; else it.session = val;
-  showSaved(true); flash(cell);
+  queueChange(it.id, field, val);
+  flash(cell);
 }
 
 function saveLetter(td, k) {
@@ -583,29 +673,26 @@ function saveLetter(td, k) {
   const val = (field === "correct_2026" && it.correct2026 === k) ? null : k; // 2026 optional; historical required
   saveLetterValue(td, val);
 }
-async function saveLetterValue(td, val) {
+// Answer letters are queued too (one write per item), with instant highlight.
+function saveLetterValue(td, val) {
   if (!td) return;
   const it = byId(td.dataset.id); if (!it) return;
   const field = td.dataset.field;
-  showSaving();
-  const ok = await updateTestItem(it.id, { [field]: val });
-  if (!ok) { showSaved(false); showToast("Nu am putut salva răspunsul."); return; }
   if (field === "correct_2026") it.correct2026 = val; else it.correct = val;
   td.querySelectorAll(".tg-letter").forEach((b) => b.classList.toggle("on", b.dataset.k === val));
-  showSaved(true); flash(td);
+  queueChange(it.id, field, val);
+  flash(td);
 }
 
 async function toggleVerified(btn) {
   const it = byId(btn.dataset.id); if (!it) return;
   const next = !it.verified;
-  showSaving();
-  const ok = await setTestVerified(it.id, next);
-  if (!ok) { showSaved(false); showToast("Nu am putut salva."); return; }
   it.verified = next;
-  btn.classList.toggle("on", next); // the green tick shows/hides via the .on class
-  showSaved(true);
+  btn.classList.toggle("on", next);        // green tick shows/hides via the .on class
+  queueChange(it.id, "verified", next);
+  const ok = await flushItem(it.id);       // „verificat" = save the WHOLE item now (with retry)
   // With „Ascunde verificații" on, the item you just verified drops out.
-  if (next && state.hideVerified) {
+  if (ok && next && state.hideVerified) {
     if (isMobile()) renderMobile();                 // phone: re-filter → auto-advances to the next item
     else scheduleHide(btn.closest(".tg-row"), it);  // desktop: fade the row out after 1s
   }
@@ -628,15 +715,13 @@ function syncCount() {
 async function togglePublished(btn) {
   const it = byId(btn.dataset.id); if (!it) return;
   const next = !it.published;
-  showSaving();
-  const ok = await setTestPublished(it.id, next);
-  if (!ok) { showSaved(false); showToast("Nu am putut publica."); return; }
   it.published = next;
   btn.classList.toggle("on", next); // the upload icon stays; color signals the state
   const pubRow = btn.closest(".tg-row"); // desktop only — the phone card has no table row
   if (pubRow) pubRow.classList.toggle("is-pub", next); // row "live" = published
-  showSaved(true);
-  showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
+  queueChange(it.id, "published", next);
+  const ok = await flushItem(it.id); // publish = save the WHOLE item now (with retry)
+  if (ok) showToast(next ? "Publicat — vizibil elevilor." : "Retras de la elevi.");
 }
 
 function renderBodyOnly() {
@@ -648,8 +733,9 @@ function renderBodyOnly() {
   if (!scroll) return;
   if (!rows.length) { scroll.innerHTML = `<div class="tg-empty">Niciun item pentru filtrele curente.</div>`; return; }
   const tb = root.querySelector(".tg-table tbody");
-  if (!tb) { scroll.innerHTML = tableHtml(rows); return; }
+  if (!tb) { scroll.innerHTML = tableHtml(rows); reapplyDirty(); return; }
   tb.innerHTML = rows.map(rowHtml).join("");
+  reapplyDirty();
 }
 
 function applyLocal(it, field, val) {
@@ -678,7 +764,10 @@ function mGo(delta) {
   const rows = filtered();
   if (!rows.length) return;
   const ae = document.activeElement;
-  if (ae && ae.blur) ae.blur();                 // commit any open edit before moving on
+  if (ae && ae.blur) ae.blur();                 // fire focusout → queue the open edit
+  const cur = rows[state.mIndex];
+  if (cur) flushItem(cur.id);                   // SAVE this item before moving on
+  activeItemId = null;
   state.mIndex = Math.max(0, Math.min(state.mIndex + delta, rows.length - 1));
   renderMobile();
   window.scrollTo(0, 0);                         // show the new card from the top
@@ -704,7 +793,7 @@ function mCardHtml(it) {
   const optRow = (k, field, val) =>
     `<div class="tgm-opt"><span class="tgm-optk">${k}</span>${rich(field, val, " tgm-optt")}</div>`;
   return `
-    <div class="tgm-card" data-id="${rid}">
+    <div class="tgm-card${pending.has(it.id) ? " tg-dirty" : ""}" data-id="${rid}">
       <div class="tgm-head">
         <span class="tgm-year-chip">${esc(it.year ?? "")}</span>
         <span class="tgm-meta">
@@ -713,6 +802,7 @@ function mCardHtml(it) {
           <span class="tgm-ed tgm-ed--no tg-edit" contenteditable="true" data-id="${rid}" data-field="item_no">${esc(it.itemNo ?? "")}</span>
         </span>
         <span class="tgm-spacer"></span>
+        <span class="tgm-dirty-chip" title="Modificări nesalvate">● nesalvat</span>
         <button type="button" class="tgm-verify${it.verified ? " on" : ""}" data-action="verify" data-id="${rid}" aria-label="${it.verified ? "Verificat" : "Marchează verificat"}">${VERIFY_SVG}</button>
         <button type="button" class="tgm-publish${it.published ? " on" : ""}" data-action="publish" data-id="${rid}" aria-label="${it.published ? "Publicat — vizibil elevilor" : "Publică"}">${UPLOAD_SVG}</button>
       </div>
@@ -763,6 +853,7 @@ function renderMobile() {
       <div class="tgm-prog">
         <button type="button" class="tgm-navbtn" data-nav="prev" aria-label="Precedentul">‹</button>
         <span class="tgm-progtxt">${mProgHtml(rows)}</span>
+        <button type="button" class="tgm-savebtn" data-action="save-all">Salvează</button>
         <span class="tg-savestate tgm-save" id="tg-save"></span>
         <button type="button" class="tgm-navbtn" data-nav="next" aria-label="Următorul">›</button>
       </div>
@@ -779,6 +870,7 @@ function renderMobile() {
         <button type="button" class="tgm-navbig" data-nav="next">Înainte ›</button>
       </div>
     </div>`;
+  reapplyDirty();
 }
 
 // Refresh only the card + progress (used while typing in search, to keep focus).
@@ -793,4 +885,5 @@ function mUpdateBody() {
   cur.outerHTML = state.loading
     ? `<div class="tg-empty">Se încarcă…</div>`
     : (!it ? `<div class="tg-empty">Niciun item pentru filtrele curente.</div>` : mCardHtml(it));
+  reapplyDirty();
 }

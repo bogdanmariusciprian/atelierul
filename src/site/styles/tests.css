@@ -432,6 +432,13 @@
 .tg-savestate.is-saving { color: var(--color-text-muted); }
 .tg-savestate.is-ok { color: #16a34a; }
 .tg-savestate.is-err { color: #dc2626; }
+.tg-savestate.is-dirty { color: #b45309; } /* amber = there are unsaved edits */
+
+/* „Salvează" button + per-row „nesalvat" dot (batch-per-item saving) */
+.tg-savebtn { font: inherit; font-weight: 800; font-size: 0.78rem; cursor: pointer; padding: 0.3rem 0.75rem; border-radius: 8px; border: 1px solid var(--color-primary); background: var(--color-primary); color: #fff; }
+.tg-savebtn:hover { filter: brightness(1.08); }
+.tg-row.tg-dirty .tg-c1 { position: relative; }
+.tg-row.tg-dirty .tg-c1::after { content: "●"; position: absolute; top: 1px; right: 2px; font-size: 0.5rem; color: #f59e0b; }
 
 /* full-screen editor mode: hide the page hero + let the grid fill the window,
    and lock the PAGE scroll so it can't fight the table's own scroll */
@@ -536,4 +543,9 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   .tgm-navbig:active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
   .tgm-fmt { display: inline-flex; gap: 0.3rem; flex: none; }
   .tgm-fmt .tg-fmt { width: 2.6rem; height: 2.6rem; font-size: 1.1rem; }
+
+  /* „Salvează" (mobil) + chip „nesalvat" pe card */
+  .tgm-savebtn { flex: none; font: inherit; font-weight: 800; font-size: 0.78rem; cursor: pointer; padding: 0.35rem 0.7rem; border-radius: 8px; border: 1px solid var(--color-primary); background: var(--color-primary); color: #fff; }
+  .tgm-dirty-chip { display: none; flex: none; font-size: 0.72rem; font-weight: 700; color: #92600a; background: #fef3c7; padding: 2px 9px; border-radius: 999px; }
+  .tgm-card.tg-dirty .tgm-dirty-chip { display: inline-block; }
 }
