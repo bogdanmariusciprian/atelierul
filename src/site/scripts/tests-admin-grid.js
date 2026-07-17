@@ -44,6 +44,7 @@ const state = {
   session: "", hideVerified: false, onlyNo2026: false, search: "",
   zoom: 1, mIndex: 0,
   find: "", repl: "", frWhole: true, frCase: true,
+  colWidths: {}, // Excel-like column resize: 1-based column index → px width
 };
 
 export async function initTestAdminGrid(mountEl) {
@@ -309,6 +310,7 @@ function render() {
     <p class="tg-hint">Se salvează <b>pe item</b>: schimbările pleacă împreună când ieși de pe item, apeși <b>Salvează</b>, sau Verificat/Publicat (cu reîncercare dacă pică rețeaua). Indicatorul: „● nesalvate / ✓ Salvat". Formatare: selectează text, apoi <b>B</b>/<u>U</u>/<i>I</i> (sau Ctrl+B/U/I).</p>`;
   requestAnimationFrame(fitHeight);
   reapplyDirty();
+  wireColResize();
 }
 
 function tableHtml(rows) {
@@ -378,6 +380,51 @@ function fitHeight() {
   if (!sc) return;
   const top = sc.getBoundingClientRect().top;
   sc.style.height = Math.max(180, window.innerHeight - top - 8) + "px";
+}
+
+// ---------- Excel-like column resize (desktop table) ----------
+// A single <style> holds per-column width rules (nth-child), so widths persist
+// across re-renders. The sticky An/Sesiune/Nr columns are NOT resizable (their
+// fixed left offsets would break).
+function applyColWidths() {
+  let style = document.getElementById("tg-colw");
+  if (!style) { style = document.createElement("style"); style.id = "tg-colw"; document.head.appendChild(style); }
+  style.textContent = Object.entries(state.colWidths)
+    .map(([col, w]) => `.tg-table tr > *:nth-child(${col}){width:${w}px;min-width:${w}px;max-width:${w}px;}`)
+    .join("");
+}
+function wireColResize() {
+  const table = root.querySelector(".tg-table");
+  if (!table) return;
+  table.querySelectorAll("thead th").forEach((th, i) => {
+    if (i < 3) return;                        // skip the sticky An / Sesiune / Nr
+    if (th.querySelector(".tg-resizer")) return;
+    const h = document.createElement("i");
+    h.className = "tg-resizer";
+    h.dataset.col = i + 1;                     // 1-based nth-child
+    th.appendChild(h);
+  });
+  applyColWidths();
+}
+function startColResize(e, rz) {
+  e.preventDefault();
+  const col = rz.dataset.col;
+  const th = rz.closest("th");
+  const z = state.zoom || 1;
+  const startX = e.clientX;
+  const startW = th.getBoundingClientRect().width / z; // layout px (undo the CSS zoom)
+  document.body.classList.add("tg-col-resizing");
+  const move = (ev) => {
+    state.colWidths[col] = Math.max(48, Math.round(startW + (ev.clientX - startX) / z));
+    applyColWidths();
+  };
+  const up = () => {
+    document.removeEventListener("mousemove", move);
+    document.removeEventListener("mouseup", up);
+    document.body.classList.remove("tg-col-resizing");
+  };
+  document.addEventListener("mousemove", move);
+  document.addEventListener("mouseup", up);
 }
 
 // ---------- save-state indicator ----------
@@ -460,6 +507,8 @@ function wireEvents() {
 
   // format buttons must NOT steal the caret from the focused cell
   root.addEventListener("mousedown", (e) => {
+    const rz = e.target.closest(".tg-resizer");
+    if (rz) return startColResize(e, rz);   // drag a column border to resize (Excel-like)
     const fmt = e.target.closest(".tg-fmt");
     if (fmt) {
       e.preventDefault();

@@ -52,9 +52,11 @@ export function initTestsHub(mountEl) {
 function route() {
   const slug = (location.hash || "").replace(/^#/, "");
   const cat = CAT_BY_SLUG[slug];
+  const inGame = !!(cat && cat.live && !adminMode);
+  document.body.classList.toggle("tgame-active", inGame); // shrink the „Teste" hero while playing
   if (cat && cat.live && adminMode) { initTestAdminGrid(root); return; } // teacher → editor
   leaveAdminMode();
-  if (cat && cat.live) initTestGame(root, cat.slug); // pupil / guest → mini-game
+  if (inGame) initTestGame(root, cat.slug); // pupil / guest → mini-game
   else renderHub();
 }
 
