@@ -15,9 +15,23 @@
 // =========================================================
 import { supabase } from "./supabase-client.js";
 
-// TEMPORAR: poarta e DEZACTIVATĂ — tot site-ul e public, oricine intră.
-// Ca s-o REACTIVEZI la loc, pune înapoi pe `false`.
-const GATE_OFF = true;
+/** Read the teacher-controlled kill-switch: when app_flags.gate_off = true, the
+ *  whole site is public. Fail-closed: any read error → false (stay gated). */
+export async function getGateOff() {
+  try {
+    const { data } = await supabase.from("app_flags").select("value").eq("key", "gate_off").maybeSingle();
+    return !!(data && data.value);
+  } catch {
+    return false;
+  }
+}
+
+/** Flip the pre-launch gate (admin only — enforced by RLS on app_flags). */
+export async function setGateOff(on) {
+  const { error } = await supabase.from("app_flags").update({ value: !!on }).eq("key", "gate_off");
+  if (error) console.warn("setGateOff:", error.message);
+  return !error;
+}
 
 /** The accounts allowed in before launch (compared lower-cased). Being on this
  *  list only grants VIEW access; the admin role stays tied to ADMIN_EMAIL in
@@ -49,10 +63,12 @@ export function revealGate() {
  * Never throws (any error is treated as "guest" → gated = fail-closed).
  */
 export async function enforceGate() {
-  if (GATE_OFF) return true; // poarta dezactivată temporar → toți intră
   // The coming-soon page is always allowed. It doesn't call this, but guard
   // against an accidental redirect loop just in case.
   if (location.pathname.startsWith(COMING_SOON_PATH)) return true;
+
+  // Teacher kill-switch (admin panel): when ON, the whole site is public.
+  if (await getGateOff()) return true;
 
   let email = null;
   try {

@@ -19,6 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
+import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
 import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
@@ -268,6 +269,7 @@ export function renderCommunity(basePath = "") {
     adminUserSort: "points", // "points" | "name"
     adminUserPage: 1, // 10 per page
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
+    gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
     modFilter: "all", // "all" | "held-post" | "blocked-comment" | "report" | "history"
     chEditId: null, // the custom challenge being edited ("new" = fresh form)
     chWarn: null,
@@ -3019,6 +3021,13 @@ export function renderCommunity(basePath = "") {
       <div class="cx-adminstats">${stats}</div>
       ${pulse}
       <div class="cx-box">
+        <div class="cx-admin__head"><h3>Poartă pre-lansare</h3></div>
+        <p class="cx-muted">Când e <b>oprită</b>, tot site-ul e public. Când e <b>pornită</b>, doar conturile permise intră; restul văd „în curând".</p>
+        <button type="button" class="cx-gatebtn${state.gateOff ? " is-off" : " is-on"}" data-action="gate-toggle">
+          ${state.gateOff ? "Site public (poarta oprită) — pornește poarta" : "Poarta pornită (doar echipa) — oprește poarta"}
+        </button>
+      </div>
+      <div class="cx-box">
         <div class="cx-admin__head"><h3>Unde gestionezi conținutul</h3></div>
         <p class="cx-muted">Controalele de editare/ștergere sunt inline, exact unde trăiește conținutul.</p>
         <div class="cx-crud">${crud}</div>
@@ -3433,6 +3442,7 @@ export function renderCommunity(basePath = "") {
       state.conversations = await fetchConversations(isAdmin()); // real messages
       if (isAdmin()) {
         state.adminUsers = await adminFetchUsers(); // real members (+ e-mail); also bridges them so they're messageable
+        state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
       }
@@ -4398,6 +4408,17 @@ export function renderCommunity(basePath = "") {
         // Shareable, quick-panel-compatible URL for this exact tab.
         history.replaceState(null, "", `#admin/${ADMIN_SLUG_BY_TAB[state.adminTab] || "prezentare"}`);
         return render();
+      case "gate-toggle": {
+        if (!isAdmin()) return;
+        const next = !state.gateOff;
+        setGateOff(next).then((ok) => {
+          if (!ok) { showToast("Nu am putut schimba poarta.", { kind: "error" }); return; }
+          state.gateOff = next;
+          showToast(next ? "Poarta oprită — site public." : "Poarta pornită — doar echipa intră.", { kind: "success" });
+          render();
+        });
+        return;
+      }
       case "admin-user-sort":
         if (!isAdmin()) return;
         state.adminUserSort = btn.dataset.key;

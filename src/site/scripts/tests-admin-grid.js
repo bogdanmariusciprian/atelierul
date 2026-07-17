@@ -19,9 +19,9 @@
 // never jolts the page.
 // =========================================================
 import {
-  adminFetchTestItems, fetchTestYears, updateTestItem,
+  adminFetchTestItems, fetchTestYears, updateTestItem, TEST_ITEM_TYPES,
 } from "../../shared/scripts/test-repo.js";
-import { sanitizeRich, stripRich, execBold, execUnderline, execItalic, formatState } from "../../shared/scripts/rich-text.js";
+import { sanitizeRich, stripRich, execBold, execUnderline, execItalic, execStrike, execSuper, wrapSelection, formatState } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -275,6 +275,10 @@ function render() {
         <button type="button" class="tg-fmt" data-fmt="bold"><b>B</b></button>
         <button type="button" class="tg-fmt" data-fmt="underline"><u>U</u></button>
         <button type="button" class="tg-fmt" data-fmt="italic"><i>I</i></button>
+        <button type="button" class="tg-fmt" data-fmt="strike" title="Tăiat"><s>S</s></button>
+        <button type="button" class="tg-fmt" data-fmt="super" title="Exponent">x<sup>2</sup></button>
+        <button type="button" class="tg-fmt" data-fmt="paren" title="Încadrează selecția în ( )">( )</button>
+        <button type="button" class="tg-fmt" data-fmt="bracket" title="Încadrează selecția în [ ]">[ ]</button>
       </span>
       <span class="tg-zoom">
         <button type="button" class="tg-zbtn" data-zoom="out" title="Micșorează">−</button>
@@ -320,6 +324,7 @@ function tableHtml(rows) {
           <th title="Răspunsul din grila oficială (istoric)">Corect (ist.)</th>
           <th title="Răspunsul pe gramatica 2026">Corect 2026</th>
           <th>Observații</th>
+          <th title="Tipuri de item (SF, MS, M, MIV, DEX, DOOM, G, F) — atinge ca să bifezi">Tipuri</th>
           <th title="Verificat de profesor (control intern)">Verificat</th>
           <th title="Publicat → vizibil elevilor">Publicat</th>
         </tr>
@@ -333,6 +338,13 @@ function letters(field, id, current) {
     ${LETTERS.map((k) => `<button type="button" class="tg-letter${current === k ? " on" : ""}" data-k="${k}">${k}</button>`).join("")}
     ${field === "correct_2026" ? `<button type="button" class="tg-same" data-id="${id}" title="Pune la 2026 același răspuns ca cel istoric">= ist.</button>` : ""}
   </td>`;
+}
+
+// Tap-chips to tag an item's topic type(s) — SF, MS, M, MIV, DEX, DOOM, G, F.
+function typeChips(it) {
+  const set = new Set(it.types || []);
+  return TEST_ITEM_TYPES.map((t) =>
+    `<button type="button" class="tg-typechip${set.has(t.code) ? " on" : ""}" data-typecode="${t.code}" data-id="${it.id}" title="${esc(t.label)}">${t.code}</button>`).join("");
 }
 
 function rowHtml(it) {
@@ -354,6 +366,7 @@ function rowHtml(it) {
       ${letters("correct", rid, it.correct)}
       ${letters("correct_2026", rid, it.correct2026)}
       ${rich("observation", it.observation)}
+      <td class="tg-types">${typeChips(it)}</td>
       <td class="tg-tg"><button type="button" class="tg-verify${it.verified ? " on" : ""}" data-action="verify" data-id="${rid}" title="${it.verified ? "Verificat" : "Neverificat"}">${VERIFY_SVG}</button></td>
       <td class="tg-tg"><button type="button" class="tg-publish${it.published ? " on" : ""}" data-action="publish" data-id="${rid}" title="${it.published ? "Publicat — vizibil elevilor" : "Nepublicat"}">${UPLOAD_SVG}</button></td>
     </tr>`;
@@ -450,10 +463,15 @@ function wireEvents() {
     const fmt = e.target.closest(".tg-fmt");
     if (fmt) {
       e.preventDefault();
-      if (fmt.dataset.fmt === "bold") execBold();
-      else if (fmt.dataset.fmt === "underline") execUnderline();
-      else execItalic();
-      updateFmtButtons();                 // reflect the new state on the B/U/I buttons
+      const f = fmt.dataset.fmt;
+      if (f === "bold") execBold();
+      else if (f === "underline") execUnderline();
+      else if (f === "italic") execItalic();
+      else if (f === "strike") execStrike();
+      else if (f === "super") execSuper();
+      else if (f === "paren") wrapSelection("(", ")");
+      else if (f === "bracket") wrapSelection("[", "]");
+      updateFmtButtons();                 // reflect the new state on the format buttons
     }
   });
 
@@ -478,6 +496,9 @@ function wireEvents() {
 
     const letter = e.target.closest(".tg-letter");
     if (letter) return saveLetter(letter.closest(".tg-ans"), letter.dataset.k);
+
+    const typechip = e.target.closest(".tg-typechip");
+    if (typechip) return toggleType(typechip);
 
     const same = e.target.closest(".tg-same");
     if (same) {
@@ -699,6 +720,17 @@ function saveLetterValue(td, val) {
   flash(td);
 }
 
+// Toggle a topic type on an item — queued like everything else (batch save).
+function toggleType(chip) {
+  const it = byId(chip.dataset.id); if (!it) return;
+  const code = chip.dataset.typecode;
+  const set = new Set(it.types || []);
+  if (set.has(code)) set.delete(code); else set.add(code);
+  it.types = TEST_ITEM_TYPES.map((t) => t.code).filter((c) => set.has(c)); // canonical order
+  chip.classList.toggle("on", set.has(code));
+  queueChange(it.id, "types", it.types);
+}
+
 async function toggleVerified(btn) {
   const it = byId(btn.dataset.id); if (!it) return;
   const next = !it.verified;
@@ -839,6 +871,9 @@ function mCardHtml(it) {
         <div class="tgm-ans-row"><span class="tgm-ans-lab">corect 2026</span>${mLetters("correct_2026", rid, it.correct2026)}</div>
       </div>
 
+      <div class="tgm-lab">tipuri de item</div>
+      <div class="tgm-types-edit">${typeChips(it)}</div>
+
       <div class="tgm-lab">observații <small>(le vede elevul)</small></div>
       ${rich("observation", it.observation, " tgm-obs")}
     </div>`;
@@ -884,6 +919,10 @@ function renderMobile() {
           <button type="button" class="tg-fmt" data-fmt="bold"><b>B</b></button>
           <button type="button" class="tg-fmt" data-fmt="underline"><u>U</u></button>
           <button type="button" class="tg-fmt" data-fmt="italic"><i>I</i></button>
+          <button type="button" class="tg-fmt" data-fmt="strike" title="Tăiat"><s>S</s></button>
+          <button type="button" class="tg-fmt" data-fmt="super" title="Exponent">x<sup>2</sup></button>
+          <button type="button" class="tg-fmt" data-fmt="paren" title="( )">( )</button>
+          <button type="button" class="tg-fmt" data-fmt="bracket" title="[ ]">[ ]</button>
         </span>
         <button type="button" class="tgm-navbig" data-nav="next">Înainte ›</button>
       </div>

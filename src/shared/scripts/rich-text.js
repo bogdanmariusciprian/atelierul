@@ -28,10 +28,14 @@ function fmtTagsFor(el) {
   const italic = tag === "i" || tag === "em" || fst === "italic" || fst === "oblique";
   const dec = String(s.textDecoration || s.textDecorationLine || "").toLowerCase();
   const underline = tag === "u" || dec.includes("underline");
+  const strike = tag === "s" || tag === "strike" || tag === "del" || dec.includes("line-through");
+  const sup = tag === "sup" || String(s.verticalAlign || "").toLowerCase() === "super";
   const tags = [];
   if (bold) tags.push("b");
   if (italic) tags.push("i");
   if (underline) tags.push("u");
+  if (strike) tags.push("s");     // tăiat
+  if (sup) tags.push("sup");      // exponent
   if (tag === "mark") tags.push("mark");
   return tags;
 }
@@ -86,11 +90,27 @@ function ensureTagMode() {
 export function execBold() { ensureTagMode(); document.execCommand("bold"); }
 export function execUnderline() { ensureTagMode(); document.execCommand("underline"); }
 export function execItalic() { ensureTagMode(); document.execCommand("italic"); }
+export function execStrike() { ensureTagMode(); document.execCommand("strikeThrough"); }
+export function execSuper() { ensureTagMode(); document.execCommand("superscript"); }
+
+/** Surround the current selection with `before`/`after` (e.g. „(" … „)" or
+ *  „[" … „]"), keeping any inner formatting. No-op when nothing is selected. */
+export function wrapSelection(before, after) {
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const tail = range.cloneRange(); tail.collapse(false); tail.insertNode(document.createTextNode(after));
+  const head = range.cloneRange(); head.collapse(true); head.insertNode(document.createTextNode(before));
+  sel.removeAllRanges();
+}
 
 /** On/off state of the formatting at the caret/selection — so toolbar buttons
  *  (B/U/I) can light up to match what's active. Guarded: queryCommandState can
  *  throw when there's no live selection. */
 export function formatState() {
   const q = (c) => { try { return document.queryCommandState(c); } catch { return false; } };
-  return { bold: q("bold"), underline: q("underline"), italic: q("italic") };
+  return {
+    bold: q("bold"), underline: q("underline"), italic: q("italic"),
+    strike: q("strikeThrough"), super: q("superscript"),
+  };
 }

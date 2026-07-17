@@ -2796,3 +2796,13 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
   .cx-chat__scroll { max-height: 15rem; }
   .cx-bubble { max-width: 92%; }
 }
+
+/* Pre-launch gate toggle (admin overview) */
+.cx-gatebtn {
+  font: inherit; font-weight: 700; cursor: pointer; width: 100%; text-align: left;
+  padding: 0.75rem 1rem; border-radius: 10px; border: 1.5px solid var(--color-border);
+  background: var(--color-bg); color: var(--color-text);
+}
+.cx-gatebtn.is-off { border-color: #16a34a; color: #166534; background: #f0fdf4; }
+.cx-gatebtn.is-on { border-color: #b45309; color: #92600a; background: #fffbeb; }
+.cx-gatebtn:hover { filter: brightness(0.97); }

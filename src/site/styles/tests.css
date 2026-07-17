@@ -318,7 +318,7 @@
 .tg-search { font: inherit; padding: 0.3rem 0.6rem; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); min-width: 12rem; flex: 1 1 10rem; }
 .tg-fmt-group { display: inline-flex; gap: 0.25rem; }
 .tg-fmt {
-  width: 1.9rem; height: 1.9rem; border-radius: 8px; cursor: pointer;
+  min-width: 1.9rem; height: 1.9rem; padding: 0 0.4rem; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-size: 0.95rem;
 }
 .tg-fmt:hover { border-color: var(--color-primary); }
@@ -387,6 +387,16 @@
 
 /* clickable A/B/C/D answer cells (historical + 2026) */
 .tg-ans { white-space: nowrap; text-align: center; }
+/* topic-type chips in the grid (tap to tag an item: SF / MS / M / …) */
+.tg-types { text-align: center; white-space: normal; min-width: 150px; }
+.tg-typechip {
+  font: inherit; font-weight: 800; font-size: 0.66rem; cursor: pointer; user-select: none;
+  margin: 1px; padding: 0.12rem 0.42rem; border-radius: 6px;
+  border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-muted);
+}
+.tg-typechip:hover { border-color: var(--color-primary); }
+.tg-typechip.on { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+
 .tg-letter {
   width: 1.5rem; height: 1.5rem; margin: 1px; border-radius: 6px; cursor: pointer;
   font: inherit; font-weight: 800; font-size: 0.8rem;
@@ -474,7 +484,7 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   body.tg-mode .site-header { display: none !important; }
   body.tg-mode #header { height: 0 !important; }
 
-  .tgm { display: flex; flex-direction: column; gap: 0.55rem; padding-bottom: 4.8rem; }
+  .tgm { display: flex; flex-direction: column; gap: 0.55rem; padding-bottom: 6.2rem; }
 
   /* top bar: back · year · search · hide-verified */
   .tgm-top { display: flex; align-items: center; gap: 0.4rem; padding: 0.1rem 0; }
@@ -542,10 +552,164 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   .tgm-navbig { flex: 1 1 auto; padding: 0.75rem 0.5rem; border-radius: 12px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
   .tgm-navbig:active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
   .tgm-fmt { display: inline-flex; gap: 0.3rem; flex: none; }
-  .tgm-fmt .tg-fmt { width: 2.6rem; height: 2.6rem; font-size: 1.1rem; }
+  .tgm-fmt { flex-wrap: wrap; justify-content: center; }
+  .tgm-fmt .tg-fmt { min-width: 1.95rem; width: auto; height: 2.2rem; padding: 0 0.3rem; font-size: 0.95rem; }
+  .tgm-types-edit { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .tgm-types-edit .tg-typechip { font-size: 0.85rem; padding: 0.4rem 0.75rem; border-radius: 8px; }
 
   /* „Salvează" (mobil) + chip „nesalvat" pe card */
   .tgm-savebtn { flex: none; font: inherit; font-weight: 800; font-size: 0.78rem; cursor: pointer; padding: 0.35rem 0.7rem; border-radius: 8px; border: 1px solid var(--color-primary); background: var(--color-primary); color: #fff; }
   .tgm-dirty-chip { display: none; flex: none; font-size: 0.72rem; font-weight: 700; color: #92600a; background: #fef3c7; padding: 2px 9px; border-radius: 999px; }
   .tgm-card.tg-dirty .tgm-dirty-chip { display: inline-block; }
+}
+
+/* =========================================================
+   Teste — MINI-GAME (pupil / guest). Config screen + one-item play.
+   Airy spacing, calm palette, tap-chips (no dropdowns).
+   ========================================================= */
+.tgame-wrap { margin-block: var(--space-lg); }
+.tgame-loading { padding: var(--space-xl); text-align: center; color: var(--color-text-muted); }
+
+.tgame-back {
+  display: inline-block; margin-bottom: var(--space-md);
+  text-decoration: none; font-weight: 700; font-size: 0.9rem; color: var(--color-text-muted);
+  user-select: none;
+}
+.tgame-back:hover { color: var(--color-primary); }
+
+/* shared chip + button */
+.tgame-chip {
+  font: inherit; font-weight: 700; font-size: 0.92rem; cursor: pointer; user-select: none;
+  padding: 0.5rem 1rem; border-radius: 999px;
+  border: 1.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text);
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.06s ease;
+}
+.tgame-chip:hover { border-color: var(--color-primary); }
+.tgame-chip:active { transform: scale(0.97); }
+.tgame-chip.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.tgame-btn {
+  font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; user-select: none;
+  padding: 0.7rem 1.5rem; border-radius: 999px;
+  border: 1.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text);
+}
+.tgame-btn:hover { border-color: var(--color-primary); }
+.tgame-btn--primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.tgame-btn--primary:hover { filter: brightness(1.08); }
+.tgame-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- config screen ---- */
+.tgame-config { max-width: 680px; margin: 0 auto; }
+.tgame-config__title { margin: 0 0 0.3rem; font-size: 1.5rem; }
+.tgame-config__sub { margin: 0 0 var(--space-lg); color: var(--color-text-muted); line-height: 1.6; }
+.tgame-cfg-block { margin-bottom: var(--space-lg); }
+.tgame-cfg-lab {
+  font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--color-text-muted); margin-bottom: 0.7rem;
+}
+.tgame-chips { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+.tgame-cfg-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-md);
+  flex-wrap: wrap; margin-top: var(--space-xl);
+  padding-top: var(--space-lg); border-top: 1px solid var(--color-border);
+}
+.tgame-cfg-count { color: var(--color-text-muted); font-size: 0.95rem; }
+.tgame-cfg-count b { color: var(--color-text); font-size: 1.15rem; }
+
+/* ---- game: top bar (discreet) ---- */
+.tgame { max-width: 720px; margin: 0 auto; }
+.tgame-top {
+  display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap;
+  margin-bottom: var(--space-md); color: var(--color-text-muted); font-size: 0.9rem;
+}
+.tgame-top .tgame-back { margin: 0; }
+.tgame-timer {
+  font-variant-numeric: tabular-nums; font-weight: 700; color: var(--color-text-muted);
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.82rem;
+}
+.tgame-score { margin-left: auto; font-weight: 600; }
+.tgame-score .ok { color: #16a34a; }
+.tgame-score .no { color: #dc2626; }
+.tgame-left { color: var(--color-text-muted); font-weight: 500; }
+
+/* ---- game: the question card ---- */
+.tgame-card {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: 16px; box-shadow: var(--shadow-sm);
+  padding: clamp(1.1rem, 3vw, 2rem);
+}
+.tgame-types { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.9rem; }
+.tgame-typelab {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.03em;
+  padding: 0.2rem 0.6rem; border-radius: 6px;
+  background: #efe7ff; color: #5b21b6;
+}
+.tgame-cardmeta {
+  font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 0.8rem;
+  user-select: none;
+}
+.tgame-q {
+  margin: 0 0 1.4rem; font-size: 1.18rem; line-height: 1.85; font-weight: 600;
+  word-spacing: 0.06em; text-align: left;
+}
+
+.tgame-opts { display: flex; flex-direction: column; gap: 0.7rem; }
+.tgame-opt {
+  display: flex; align-items: flex-start; gap: 0.85rem; width: 100%; text-align: left;
+  font: inherit; font-size: 1.03rem; line-height: 1.65;
+  padding: 0.85rem 1rem; border-radius: 12px;
+  border: 1.5px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
+  cursor: pointer; transition: border-color 0.12s ease, background 0.12s ease, transform 0.08s ease;
+}
+.tgame-opt:not(:disabled):hover { border-color: var(--color-primary); transform: translateX(3px); }
+.tgame-opt:disabled { cursor: default; }
+.tgame-opt__k {
+  flex: none; width: 2rem; height: 2rem; display: grid; place-items: center;
+  border-radius: 50%; font-weight: 800; font-size: 0.9rem;
+  background: var(--color-bg); border: 1.5px solid var(--color-border);
+}
+.tgame-opt__t { padding-top: 0.15rem; }
+.tgame-card.is-checking { opacity: 0.6; pointer-events: none; }
+/* answered states */
+.tgame-opt.opt-correct { border-color: #16a34a; background: #f0fdf4; }
+.tgame-opt.opt-correct .tgame-opt__k { background: #16a34a; color: #fff; border-color: #16a34a; }
+.tgame-opt.opt-wrong { border-color: #dc2626; background: #fef2f2; }
+.tgame-opt.opt-wrong .tgame-opt__k { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+/* ---- game: feedback ---- */
+.tgame-fb { margin-top: 1.3rem; }
+.tgame-verdict { font-weight: 800; font-size: 1.05rem; margin-bottom: 0.6rem; }
+.tgame-verdict.ok { color: #166534; }
+.tgame-verdict.no { color: #b91c1c; }
+.tgame-pts {
+  display: inline-block; margin-left: 0.4rem; font-size: 0.85rem; font-weight: 800;
+  color: #166534; background: #dcfce7; padding: 0.1rem 0.5rem; border-radius: 999px;
+}
+.tgame-hist { margin-bottom: 0.6rem; font-size: 0.95rem; color: var(--color-text-muted); }
+.tgame-obs {
+  padding: 0.9rem 1.1rem; border-left: 3px solid var(--color-primary);
+  background: var(--color-surface); border-radius: 0 12px 12px 0; line-height: 1.8;
+}
+.tgame-obs__lab {
+  display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--color-primary); margin-bottom: 0.3rem;
+}
+.tgame-next { margin-top: 1.3rem; display: flex; justify-content: flex-end; }
+
+/* ---- done screen ---- */
+.tgame-done { max-width: 560px; text-align: center; padding-top: var(--space-lg); }
+.tgame-done__badge {
+  width: 4.5rem; height: 4.5rem; margin: 0 auto 1rem; display: grid; place-items: center;
+  border-radius: 50%; background: #dcfce7; color: #16a34a; font-size: 2.2rem; font-weight: 900;
+}
+.tgame-done__title { margin: 0 0 0.6rem; font-size: 1.5rem; }
+.tgame-done__stats { color: var(--color-text-muted); font-size: 1.05rem; line-height: 1.8; }
+.tgame-done__stats .ok { color: #16a34a; }
+.tgame-done__stats .no { color: #dc2626; }
+.tgame-done__actions { display: flex; gap: 0.7rem; justify-content: center; flex-wrap: wrap; margin-top: var(--space-lg); }
+
+@media (max-width: 600px) {
+  .tgame-q { font-size: 1.08rem; line-height: 1.75; }
+  .tgame-opt { font-size: 0.98rem; }
+  .tgame-score { margin-left: 0; width: 100%; }
 }

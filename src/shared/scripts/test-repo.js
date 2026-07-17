@@ -11,9 +11,22 @@
 // =========================================================
 import { supabase } from "./supabase-client.js";
 
+/** Topic tags an item can carry (edited by the teacher, shown on the quiz card
+ *  and used to filter the mini-game). Shared by the admin grid + the game. */
+export const TEST_ITEM_TYPES = [
+  { code: "SF", label: "Sintaxa frazei" },
+  { code: "MS", label: "Morfo-sintaxă" },
+  { code: "M", label: "Morfologie" },
+  { code: "MIV", label: "Îmbogățirea vocabularului" },
+  { code: "DEX", label: "Sensurile cuvintelor" },
+  { code: "DOOM", label: "Forma cuvintelor" },
+  { code: "G", label: "Greșeli" },
+  { code: "F", label: "Fonetică" },
+];
+
 // Everything EXCEPT `correct` (that column is locked for anon/authenticated).
 const PUBLIC_COLS =
-  "id, exam, year, session, item_no, question, option_a, option_b, option_c, option_d, observation, verified";
+  "id, exam, year, session, item_no, question, option_a, option_b, option_c, option_d, observation, verified, types";
 
 function mapRow(r) {
   if (!r) return null;
@@ -32,6 +45,7 @@ function mapRow(r) {
     verified: !!r.verified,   // teacher QA marker
     published: !!r.published, // visible to pupils
     flagged: !!r.flagged,
+    types: Array.isArray(r.types) ? r.types : [], // topic tags (SF, MS, M, …)
   };
 }
 
@@ -72,6 +86,26 @@ export async function checkTestItem(id, answer) {
     // set only when the 2026 answer differs from the historical one
     historical: data.historical || null,
     observation: data.observation || "",
+  };
+}
+
+/** Submit an answer IN A MINI-GAME — the SERVER checks, reveals, and awards a
+ *  few points once per (user, item, session). Cheat-safe (answer key never
+ *  ships). Returns { correct, correctAnswer, historical, observation, awarded,
+ *  points } or null on error. */
+export async function answerTestItem(id, answer, sessionId) {
+  const { data, error } = await supabase.rpc("answer_test_item", {
+    p_id: id, p_answer: answer, p_session: sessionId || null,
+  });
+  if (error) { console.warn("answerTestItem:", error.message); return null; }
+  if (!data || data.error) return null;
+  return {
+    correct: !!data.correct,
+    correctAnswer: data.correct_answer,
+    historical: data.historical || null,
+    observation: data.observation || "",
+    awarded: !!data.awarded,
+    points: data.points || 0,
   };
 }
 
@@ -122,7 +156,7 @@ export async function updateTestItem(id, patch) {
   const allowed = {};
   for (const k of ["question", "option_a", "option_b", "option_c", "option_d",
                    "correct", "correct_2026", "observation", "verified", "published", "flagged",
-                   "year", "session", "item_no"]) {
+                   "year", "session", "item_no", "types"]) {
     if (k in patch) allowed[k] = patch[k];
   }
   const { error } = await supabase.from("test_items").update(allowed).eq("id", id);
