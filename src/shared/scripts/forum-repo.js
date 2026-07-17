@@ -468,6 +468,28 @@ export async function fetchMembers({ limit = 200 } = {}) {
   return (data || []).map((p) => surrogateForAuthor(p));
 }
 
+/** ADMIN ONLY — the full REAL member directory for the teacher's Utilizatori
+ *  panel, with e-mail. Each row is registered in the surrogate bridge (so the
+ *  render helpers resolve them AND the teacher can message them), returned as
+ *  { id: surrogate, name, points, email, role, joinedAt, lastSeen, status }. */
+export async function adminFetchUsers() {
+  const { data, error } = await supabase.rpc("admin_list_users");
+  if (error) {
+    console.warn("adminFetchUsers:", error.message);
+    return [];
+  }
+  return (data || []).map((p) => ({
+    id: surrogateForAuthor(p),                 // registers in the bridge → messageable + clickable
+    name: p.display_name || "Membru",
+    points: p.points || 0,
+    email: p.email || "",
+    role: p.role || "member",
+    status: p.status_line || "",
+    joinedAt: p.created_at ? new Date(p.created_at).getTime() : 0,
+    lastSeen: p.last_seen_at ? new Date(p.last_seen_at).getTime() : 0,
+  }));
+}
+
 export async function sendFriendRequest(userSurrogate) {
   const other = userUuidBySurr.get(userSurrogate);
   if (!other || !CURRENT_USER.authId) return;

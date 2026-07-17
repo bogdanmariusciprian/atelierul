@@ -19,7 +19,7 @@
 // Everything is mock (local state + mock session) for preview.
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
-import { fetchFeed, fetchMembers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -267,6 +267,7 @@ export function renderCommunity(basePath = "") {
     adminUserQuery: "",
     adminUserSort: "points", // "points" | "name"
     adminUserPage: 1, // 10 per page
+    adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
     modFilter: "all", // "all" | "held-post" | "blocked-comment" | "report" | "history"
     chEditId: null, // the custom challenge being edited ("new" = fresh form)
     chWarn: null,
@@ -2733,7 +2734,7 @@ export function renderCommunity(basePath = "") {
   function adminUserRow(u, hasAccess, isMe) {
     const li = levelInfo(u.points || 0);
     return `<div class="cx-adminrow">
-      <span class="cx-adminrow__u">${avatarLink(u.id)} ${userNameLink(u.id, u.name)}${isMe ? ' <span class="cx-adminchip">tu</span>' : ""}</span>
+      <span class="cx-adminrow__u">${avatarLink(u.id)} ${userNameLink(u.id, u.name)}${u.email ? `<br><small class="cx-muted cx-adminrow__email">${escapeHtml(u.email)}</small>` : ""}${isMe ? ' <span class="cx-adminchip">tu</span>' : ""}</span>
       <span>${(u.points || 0).toLocaleString("ro-RO")} <span class="cx-levelchip">Nv ${li.level}${li.prestige ? ` ⭐${li.prestige}` : ""}</span></span>
       <span><button type="button" class="cx-toggle${hasAccess ? " on" : ""}" data-action="grant-events" data-uid="${u.id}">${hasAccess ? "Acordat ✓" : "Acordă"}</button></span>
       <span class="cx-crudbtns"><button type="button" class="btn-mini" data-action="admin-view" data-uid="${u.id}">Vezi profil</button></span>
@@ -2985,7 +2986,7 @@ export function renderCommunity(basePath = "") {
 
     // Every number is a real door: it opens the place where you act on it.
     const stats = [
-      { n: COMMUNITY_USERS.length + 1, l: "utilizatori", tab: "users" },
+      { n: state.adminUsers.length, l: "utilizatori", tab: "users" },
       { n: totalPosts, l: "postări", go: "forum" },
       { n: state.groups.length, l: "grupuri", go: "grupuri" },
       { n: state.proposed.length, l: "exerciții", go: "exercitii" },
@@ -3026,7 +3027,7 @@ export function renderCommunity(basePath = "") {
 
   function adminTabUsers() {
     const q = state.adminUserQuery.trim().toLowerCase();
-    let users = [...COMMUNITY_USERS];
+    let users = [...state.adminUsers];
     if (q) users = users.filter((u) => u.name.toLowerCase().includes(q));
     users.sort(state.adminUserSort === "name" ? (a, b) => a.name.localeCompare(b.name, "ro") : (a, b) => b.points - a.points);
 
@@ -3431,6 +3432,7 @@ export function renderCommunity(basePath = "") {
       }));
       state.conversations = await fetchConversations(isAdmin()); // real messages
       if (isAdmin()) {
+        state.adminUsers = await adminFetchUsers(); // real members (+ e-mail); also bridges them so they're messageable
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
       }
@@ -4782,9 +4784,14 @@ export function renderCommunity(basePath = "") {
         const conv = state.msgOpen;
         if (isAdmin()) {
           const open = state.conversations.find((c) => c.key === conv);
-          if (!open || open.partnerId == null) return; // (guest replies: 4c)
-          sendTeacherReply(open.partnerId, text).then(reloadConversations); // REAL
-          showToast("✉️ Răspuns trimis", { kind: "success" });
+          // Partner surrogate: from an existing conversation, OR parsed from a
+          // fresh "u<sid>" key when the teacher STARTS a chat with a member who
+          // hasn't written first (before, this returned → the message never sent).
+          let partner = open ? open.partnerId : null;
+          if (partner == null && typeof conv === "string" && /^u\d+$/.test(conv)) partner = Number(conv.slice(1));
+          if (partner == null) return; // guest replies are handled elsewhere
+          sendTeacherReply(partner, text).then(reloadConversations); // REAL
+          showToast("✉️ Mesaj trimis", { kind: "success" });
         } else {
           if (conv !== "t") return; // members' free text goes ONLY to the teacher
           sendTeacherMsg(text).then(reloadConversations); // REAL
