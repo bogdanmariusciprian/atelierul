@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>În curând — Atelierul de Română</title>
+  <meta name="description" content="Atelierul de Română se lansează în curând: lecții, teste și o comunitate de învățare a limbii și literaturii române." />
+  <meta property="og:title" content="Atelierul de Română — în curând" />
+  <meta property="og:description" content="Lucrăm la lansare. Revenim curând cu lecții, teste și o comunitate de învățare." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <style>
+    :root {
+      --brand: #7c3aed;
+      --brand-dark: #5b21b6;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --line: #e7e5ee;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #efe9ff 0%, rgba(239, 233, 255, 0) 60%),
+        #faf9ff;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      width: min(560px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(43, 20, 92, 0.10);
+      padding: 40px 34px 30px;
+      text-align: center;
+    }
+    .logo { width: 76px; height: 76px; object-fit: contain; margin-bottom: 14px; }
+    .eyebrow {
+      margin: 0 0 6px;
+      font-size: 0.82rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--brand-dark);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2.2rem, 7vw, 3rem); line-height: 1.05; font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    .lead { margin: 0 auto; max-width: 44ch; color: var(--muted); font-size: 1.02rem; line-height: 1.65; }
+
+    .team { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .team-toggle {
+      font: inherit; font-size: 0.82rem; font-weight: 700; color: var(--muted);
+      background: none; border: none; cursor: pointer; padding: 6px 10px; border-radius: 8px;
+    }
+    .team-toggle:hover { color: var(--brand-dark); background: #f5f3ff; }
+    .team-area { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 12px; }
+    .google-slot { min-height: 44px; display: flex; justify-content: center; }
+    .team-hint { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
+
+    .btn {
+      font: inherit; font-weight: 700; cursor: pointer;
+      padding: 10px 18px; border-radius: 999px; border: 1px solid var(--brand);
+      background: var(--brand); color: #fff;
+    }
+    .btn:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+    .btn-ghost { background: #fff; color: var(--brand-dark); }
+    .btn-ghost:hover { background: #f5f3ff; }
+
+    .denied { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .denied p { margin: 0 0 12px; color: var(--ink); }
+    .denied b { color: var(--brand-dark); }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/assets/logo/logo.png" alt="Atelierul de Română" onerror="this.style.display='none'" />
+    <p class="eyebrow">Atelierul de Română</p>
+    <h1>În curând</h1>
+    <p class="lead">
+      Punem la punct platforma de limba și literatura română — lecții, teste și o
+      comunitate de învățare. Ne întoarcem curând. Mulțumim pentru răbdare!
+    </p>
+
+    <div id="login" class="team">
+      <button id="team-toggle" type="button" class="team-toggle" aria-expanded="false">Acces echipă</button>
+      <div id="team-area" class="team-area" hidden>
+        <div id="google-slot" class="google-slot"></div>
+        <button id="google-fallback" type="button" class="btn" hidden>Continuă cu Google</button>
+        <p class="team-hint">Doar conturile echipei pot intra înainte de lansare.</p>
+      </div>
+    </div>
+
+    <div id="denied" class="denied" hidden>
+      <p>Contul <b id="denied-email"></b> nu are acces la previzualizare încă.</p>
+      <button id="logout" type="button" class="btn btn-ghost">Ieși din cont</button>
+    </div>
+  </main>
+
+  <script type="module">
+    // Standalone: this page does NOT load main.css and does NOT run the gate, so
+    // it shows immediately. It only reuses the shared auth + the allow-list.
+    import { supabase } from "../src/shared/scripts/supabase-client.js";
+    import { isAllowedEmail } from "../src/shared/scripts/site-gate.js";
+    import { mountGoogleSignIn } from "../src/shared/scripts/google-onetap.js";
+    import { signInWithGoogle, signOut } from "../src/shared/scripts/auth.js";
+
+    const $ = (id) => document.getElementById(id);
+    const loginBox = $("login"), deniedBox = $("denied"), deniedEmail = $("denied-email");
+    const teamToggle = $("team-toggle"), teamArea = $("team-area");
+    const googleSlot = $("google-slot"), fallbackBtn = $("google-fallback");
+
+    const enterSite = () => location.replace("/");
+    const showLogin = () => { deniedBox.hidden = true; loginBox.hidden = false; };
+    const showDenied = (email) => { deniedEmail.textContent = email; loginBox.hidden = true; deniedBox.hidden = false; };
+
+    // Allowed team account → into the site; other signed-in account → "no access";
+    // guest → show the discreet team login.
+    function react(email) {
+      if (isAllowedEmail(email)) { enterSite(); return; }
+      if (email) { showDenied(email); return; }
+      showLogin();
+    }
+
+    supabase.auth.onAuthStateChange((_e, session) => react(session?.user?.email || null));
+    try {
+      const { data } = await supabase.auth.getSession();
+      react(data?.session?.user?.email || null);
+    } catch { showLogin(); }
+
+    // Discreet team login — reveal Google sign-in on demand (One Tap uses an ID
+    // token, no redirect, so no extra Supabase config is needed).
+    let mounted = false;
+    teamToggle.addEventListener("click", () => {
+      teamArea.hidden = !teamArea.hidden;
+      teamToggle.setAttribute("aria-expanded", String(!teamArea.hidden));
+      if (teamArea.hidden || mounted) return;
+      mounted = true;
+      mountGoogleSignIn(googleSlot, {
+        oneTap: false,
+        onError: () => {
+          googleSlot.hidden = true;
+          fallbackBtn.hidden = false;
+          fallbackBtn.addEventListener("click", () => signInWithGoogle().catch(() => {}));
+        },
+      });
+    });
+
+    $("logout").addEventListener("click", async () => {
+      try { await signOut(); } catch { /* ignore */ }
+      showLogin();
+    });
+  </script>
+</body>
+</html>

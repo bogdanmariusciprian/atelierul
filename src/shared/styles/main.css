@@ -11,3 +11,10 @@
 @import "./admin-frame.css";
 @import "./toast.css";
 @import "./auth.css";
+
+/* Pre-launch gate: keep every page hidden until site-gate.js (run by
+   renderChrome on each page) confirms an allowed team account and adds
+   .gate-ready. Non-team visitors are redirected to /in-curand/ before this
+   resolves, so the real site never flashes. Fail-closed: with JS disabled the
+   page stays blank. Remove this rule (and the gate) at public launch. */
+html:not(.gate-ready) body { visibility: hidden; }

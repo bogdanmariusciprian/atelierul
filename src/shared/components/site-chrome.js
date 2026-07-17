@@ -30,6 +30,7 @@ import { supabase } from "../scripts/supabase-client.js";
 import { startPresence } from "../scripts/presence.js";
 import { store } from "../scripts/store.js";
 import { initMessenger, openMessenger } from "./messenger.js";
+import { enforceGate, revealGate } from "../scripts/site-gate.js";
 
 // Public navigation (visible to everyone). Labels are in Romanian
 // (UI language); code identifiers stay in English.
@@ -48,7 +49,12 @@ const NAV_LINKS = [
   // "Intră în cont" button, members get their identity chip (name + XP).
 ];
 
-export function renderChrome(basePath = "") {
+export async function renderChrome(basePath = "") {
+  // PRE-LAUNCH GATE, first of all: a non-team visitor is sent to /in-curand/ and
+  // we stop here (the page stays hidden via main.css). A team account continues,
+  // and we reveal the page once the essential chrome is in place (see below).
+  if (!(await enforceGate())) return;
+
   // Every step is ISOLATED: a throw in one widget must NEVER take down the rest
   // of the chrome (header, nav, footer, logout). The label is logged so a
   // failing widget is obvious in the console instead of silently blanking the
@@ -70,6 +76,7 @@ export function renderChrome(basePath = "") {
   safe(() => renderHeader(basePath), "header");
   safe(() => renderPageBreadcrumbs(basePath), "breadcrumbs");
   safe(() => renderFooter(basePath), "footer");
+  safe(revealGate, "revealGate"); // page is complete → show it (undo the flash-hide)
   safe(initUserMenu, "userMenu"); // right-click on any user name → copy/open
   // --- Visual flourishes + floating widgets (isolated) ---
   safe(initSmoothPageScroll, "smoothScroll");
