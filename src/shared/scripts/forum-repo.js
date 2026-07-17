@@ -475,6 +475,49 @@ export async function fetchMembers({ limit = 200 } = {}) {
   return (data || []).map((p) => surrogateForAuthor(p));
 }
 
+/** My real points history (append-only ledger, newest first). Each row:
+ *  { points, reason, when(ms) } — the UI turns `reason` into a friendly label. */
+export async function fetchPointsHistory(limit = 50) {
+  const me = CURRENT_USER.authId;
+  if (!me) return [];
+  const { data, error } = await supabase
+    .from("points_ledger")
+    .select("delta, reason, created_at")
+    .eq("user_id", me)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) { console.warn("fetchPointsHistory:", error.message); return []; }
+  return (data || []).map((r) => ({ points: r.delta, reason: r.reason, when: new Date(r.created_at).getTime() }));
+}
+
+// ---- Favorites (Lecțiile mele) — real, per account ----
+export async function fetchFavorites() {
+  const me = CURRENT_USER.authId;
+  if (!me) return [];
+  const { data, error } = await supabase.from("favorites")
+    .select("lesson_slug").eq("user_id", me).order("created_at", { ascending: false });
+  if (error) { console.warn("fetchFavorites:", error.message); return []; }
+  return (data || []).map((r) => r.lesson_slug);
+}
+export async function addFavorite(slug) {
+  if (!slug || !CURRENT_USER.authId) return;
+  const { error } = await supabase.from("favorites").insert({ user_id: CURRENT_USER.authId, lesson_slug: slug });
+  if (error && error.code !== "23505") console.warn("addFavorite:", error.message);
+}
+export async function removeFavorite(slug) {
+  if (!slug || !CURRENT_USER.authId) return;
+  await supabase.from("favorites").delete().eq("user_id", CURRENT_USER.authId).eq("lesson_slug", slug);
+}
+
+// ---- Finished lessons (real, cross-device) — reads lesson_progress (0002) ----
+export async function fetchMyLessonProgress() {
+  const me = CURRENT_USER.authId;
+  if (!me) return new Set();
+  const { data, error } = await supabase.from("lesson_progress").select("lesson_slug").eq("user_id", me);
+  if (error) { console.warn("fetchMyLessonProgress:", error.message); return new Set(); }
+  return new Set((data || []).map((r) => r.lesson_slug));
+}
+
 /** ADMIN ONLY — the full REAL member directory for the teacher's Utilizatori
  *  panel, with e-mail. Each row is registered in the surrogate bridge (so the
  *  render helpers resolve them AND the teacher can message them), returned as

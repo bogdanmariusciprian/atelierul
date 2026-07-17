@@ -18,6 +18,7 @@ import { pointsFx } from "../../shared/scripts/points-fx.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { currentLessonSlug, lessonHrefBySlug } from "../../shared/scripts/lessons-index.js";
 import { localDayStr } from "../../shared/scripts/format.js";
+import { fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress } from "../../shared/scripts/forum-repo.js";
 
 const DONE_KEY = "atelier_lessons_done"; // { slug: "YYYY-MM-DD" }
 export const LESSON_COMPLETE_REWARD = 70;
@@ -36,6 +37,18 @@ export function initLessonProgress(basePath = "") {
   const slug = currentLessonSlug();
   if (!slug) return;
   const title = (article.querySelector("h1")?.textContent || document.title).trim();
+  let isFav = false;
+
+  // Real + cross-device: reflect server lesson progress + favorite state on load.
+  if (isLoggedIn() && !isAdmin()) {
+    fetchMyLessonProgress().then((set) => {
+      if (set.has(slug)) {
+        const d = doneLessons();
+        if (!d[slug]) { d[slug] = localDayStr(); store.set(DONE_KEY, d); render(); }
+      }
+    });
+    fetchFavorites().then((slugs) => { isFav = slugs.includes(slug); render(); });
+  }
 
   // ---------- Completion card ----------
   const mount = document.createElement("section");
@@ -61,6 +74,7 @@ export function initLessonProgress(basePath = "") {
       return;
     }
     const doneAt = doneLessons()[slug];
+    const favBtn = `<button type="button" class="btn btn--ghost btn--sm lesson-fav" data-action="lesson-fav">${isFav ? "⭐ La favorite" : "☆ Adaugă la favorite"}</button>`;
     mount.innerHTML = doneAt
       ? `<div class="lesson-done__card lesson-done__card--done">
            <span class="lesson-done__ic" aria-hidden="true">✅</span>
@@ -68,6 +82,7 @@ export function initLessonProgress(basePath = "") {
              <b>Lecție finalizată</b>
              <p>Bravo! Ai bifat-o pe ${new Date(doneAt + "T12:00").toLocaleDateString("ro-RO")}. E și în caietul tău.</p>
            </div>
+           ${favBtn}
          </div>`
       : `<div class="lesson-done__card">
            <span class="lesson-done__ic" aria-hidden="true">🏁</span>
@@ -76,10 +91,18 @@ export function initLessonProgress(basePath = "") {
              <p>Marcheaz-o ca finalizată: +${LESSON_COMPLETE_REWARD} puncte, streak-ul crește, iar lecția intră în caietul tău.</p>
            </div>
            <button type="button" class="btn btn--primary btn--sm" data-action="lesson-done">✔ Marchează ca finalizată</button>
+           ${favBtn}
          </div>`;
   }
 
   mount.addEventListener("click", (e) => {
+    if (e.target.closest('[data-action="lesson-fav"]')) {
+      if (!isLoggedIn() || isAdmin()) return;
+      isFav = !isFav;
+      (isFav ? addFavorite(slug) : removeFavorite(slug));
+      showToast(isFav ? "⭐ Adăugată la favorite" : "Scoasă de la favorite", { kind: "success" });
+      return render();
+    }
     if (!e.target.closest('[data-action="lesson-done"]')) return;
     if (!isLoggedIn() || isAdmin()) return;
     const done = doneLessons();

@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser, fetchPointsHistory, fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -211,6 +211,8 @@ export function renderCommunity(basePath = "") {
     posts: [], // real posts load from Supabase (loadFeed) on first render
     members: [], // real member directory (surrogate ids, points desc) — leaderboard
     blockedIds: new Set(), // members I've blocked (their content is hidden)
+    pointsHistory: [], // real points ledger (Puncte section)
+    favorites: [], // real favorite lessons [{slug,title,href}]
     _feedLoaded: false,
     notes: getNotes(), // persistent notebook (store.js adapter)
     noteQuery: "",
@@ -224,7 +226,7 @@ export function renderCommunity(basePath = "") {
     openComments: new Set(),
     playing: new Set(),
     composer: freshComposer(),
-    exComposer: { open: false, lesson: MY_PROFILE.favorites[0]?.title || "", kind: "choice" },
+    exComposer: { open: false, lesson: LESSONS[0]?.title || "", kind: "choice" },
     thread: { openReplyId: null, openReactId: null, openEditId: null, warnId: null, warnMsg: null },
     activityTab: "primite",
     given: [], // "Oferite" — derived from my REAL posts/comments/likes/kudos
@@ -1333,8 +1335,8 @@ export function renderCommunity(basePath = "") {
     const kinds = EXERCISE_KINDS.map(
       (k) => `<button type="button" class="cx-kind${state.exComposer.kind === k.key ? " on" : ""}" data-action="ex-kind" data-key="${k.key}" title="${k.hint}">${k.label}</button>`
     ).join("");
-    const lessonOpts = MY_PROFILE.favorites
-      .map((f) => `<option value="${escapeHtml(f.title)}"${state.exComposer.lesson === f.title ? " selected" : ""}>${escapeHtml(f.title)}</option>`)
+    const lessonOpts = LESSONS
+      .map((l) => `<option value="${escapeHtml(l.title)}"${state.exComposer.lesson === l.title ? " selected" : ""}>${escapeHtml(l.title)}</option>`)
       .join("");
 
     const composerBox = state.exComposer.open
@@ -1440,17 +1442,24 @@ export function renderCommunity(basePath = "") {
       ${body}`;
   }
 
+  const lessonTitleByHref = (href) => (LESSONS.find((l) => lessonHrefBySlug(l.slug) === href) || {}).title || "lecția";
+
   function sectionLessons() {
-    const items = MY_PROFILE.favorites
+    const items = state.favorites
       .map(
-        (f) => `<a class="cx-fav" href="${basePath}${f.href}">
-          <span class="cx-fav__star" aria-hidden="true">⭐</span>
-          <span class="cx-fav__title">${escapeHtml(f.title)}</span>
-          <span class="cx-fav__go" aria-hidden="true">→</span>
-        </a>`
+        (f) => `<div class="cx-fav">
+          <a class="cx-fav__link" href="${basePath}${f.href}">
+            <span class="cx-fav__star" aria-hidden="true">⭐</span>
+            <span class="cx-fav__title">${escapeHtml(f.title)}</span>
+          </a>
+          <button type="button" class="cx-fav__rm" data-action="fav-remove" data-slug="${escapeHtml(f.slug)}" title="Scoate de la favorite">×</button>
+        </div>`
       )
       .join("");
-    return `${sectionHead("Lecțiile mele", "Lecțiile pe care le-ai marcat ca preferate.")}<div class="cx-favs">${items}</div>`;
+    const body = state.favorites.length
+      ? `<div class="cx-favs">${items}</div>`
+      : emptyState("Nicio lecție favorită încă", "Deschide o lecție și apasă „⭐ Adaugă la favorite" — apare aici.");
+    return `${sectionHead("Lecțiile mele", "Lecțiile pe care le-ai marcat ca preferate.")}${body}`;
   }
 
   function sectionNotebook() {
@@ -1471,7 +1480,7 @@ export function renderCommunity(basePath = "") {
           </div>`;
       }
       const lesson = n.lessonHref
-        ? `<a class="cx-lessonlink" href="${basePath}${n.lessonHref}">📘 ${escapeHtml(MY_PROFILE.favorites.find((f) => f.href === n.lessonHref)?.title || "lecția")}</a>`
+        ? `<a class="cx-lessonlink" href="${basePath}${n.lessonHref}">📘 ${escapeHtml(lessonTitleByHref(n.lessonHref))}</a>`
         : "";
       return `<div class="cx-note" data-note-id="${n.id}">
           <div class="cx-note__head">
@@ -1494,7 +1503,7 @@ export function renderCommunity(basePath = "") {
         : emptyState("Caiet gol", "Notează o regulă sau un truc ca să nu-l uiți.");
 
     const lessonOpts = [`<option value="">— fără lecție —</option>`]
-      .concat(MY_PROFILE.favorites.map((f) => `<option value="${escapeHtml(f.href)}">${escapeHtml(f.title)}</option>`))
+      .concat(LESSONS.map((l) => `<option value="${escapeHtml(lessonHrefBySlug(l.slug))}">${escapeHtml(l.title)}</option>`))
       .join("");
 
     return `
@@ -1871,16 +1880,27 @@ export function renderCommunity(basePath = "") {
       <div class="cx-feed">${feed}</div>`;
   }
 
+  function pointsReasonLabel(reason) {
+    const r = reason || "";
+    if (r.startsWith("lesson:")) { const l = lessonBySlug(r.slice(7)); return l ? `Lecția «${l.title}»` : "Lecție finalizată"; }
+    if (r.startsWith("exercise-solved:")) return "Exercițiu rezolvat";
+    if (r.startsWith("exercise:")) return "Exercițiu propus, aprobat";
+    if (r.startsWith("challenge")) return "Provocarea zilei";
+    if (r.startsWith("test")) return "Răspuns corect la un test";
+    if (r.includes("correct")) return "Răspuns marcat corect";
+    return r || "Puncte";
+  }
+
   function sectionPoints() {
-    const rows = MY_PROFILE.pointsLog
+    const rows = state.pointsHistory
       .map(
         (e) => `<li class="cx-plog">
-          <span class="cx-plog__label">${escapeHtml(e.label)}</span>
-          <span class="cx-plog__when">${e.when}</span>
+          <span class="cx-plog__label">${escapeHtml(pointsReasonLabel(e.reason))}</span>
+          <span class="cx-plog__when">${relTime(Math.max(0, Date.now() - e.when))}</span>
           <span class="cx-plog__pts${e.points < 0 ? " cx-plog__pts--neg" : ""}">${e.points > 0 ? "+" : ""}${e.points}</span>
         </li>`
       )
-      .join("");
+      .join("") || `<li class="cx-muted" style="padding:.5rem 0">Încă niciun punct — termină o lecție ca să începi!</li>`;
     // Level context — the page finally talks to the XP bar above it.
     const info = levelInfo(MY_PROFILE.points);
     const toNext = Math.max(0, Math.round(info.next - info.pointsInRun));
@@ -3477,6 +3497,11 @@ export function renderCommunity(basePath = "") {
       setCustomProfanity(state.profanityTerms); // feed them into the client filter
       state.blockedIds = await fetchMyBlocks(); // members I've blocked → hide their posts
       if (state.blockedIds.size) state.posts = state.posts.filter((p) => !state.blockedIds.has(p.authorId));
+      state.pointsHistory = await fetchPointsHistory(); // real points ledger
+      const favSlugs = await fetchFavorites(); // real favorite lessons
+      state.favorites = favSlugs
+        .map((slug) => { const l = lessonBySlug(slug); return l ? { slug, title: l.title, href: lessonHrefBySlug(slug) } : null; })
+        .filter(Boolean);
       await loadKudos(); // real claps/pokes — members are registered above, so surrogate→uuid resolves
       // Today's REAL daily challenge + whether I've already answered it.
       state.challenge = await fetchTodayChallenge();
@@ -4614,6 +4639,12 @@ export function renderCommunity(basePath = "") {
         state.blockedIds.delete(uid);
         unblockUser(uid);
         state._feedLoaded = false; // reload so their posts come back
+        return render();
+      }
+      case "fav-remove": {
+        const slug = btn.dataset.slug;
+        removeFavorite(slug);
+        state.favorites = state.favorites.filter((f) => f.slug !== slug);
         return render();
       }
       case "mod-approve": {
