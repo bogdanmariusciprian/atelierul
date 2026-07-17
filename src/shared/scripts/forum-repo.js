@@ -776,6 +776,32 @@ export async function moderateContent(kind, id, status) {
   if (error) console.warn("moderateContent:", error.message);
 }
 
+// ---- Blocks (mute a member: hide their content; manage only your own) ----
+/** Set of surrogate ids I've blocked (registers them so userById resolves). */
+export async function fetchMyBlocks() {
+  const me = CURRENT_USER.authId;
+  if (!me) return new Set();
+  const { data, error } = await supabase
+    .from("user_blocks")
+    .select("blocked_id, blocked:profiles!user_blocks_blocked_id_fkey(id, display_name, avatar_color, avatar, status_line, points, last_seen_at, role)")
+    .eq("blocker_id", me);
+  if (error) { console.warn("fetchMyBlocks:", error.message); return new Set(); }
+  const set = new Set();
+  for (const r of data || []) if (r.blocked) set.add(surrogateForAuthor(r.blocked));
+  return set;
+}
+export async function blockUser(surrogate) {
+  const uuid = uuidForSurrogate(surrogate);
+  if (!uuid || !CURRENT_USER.authId) return;
+  const { error } = await supabase.from("user_blocks").insert({ blocker_id: CURRENT_USER.authId, blocked_id: uuid });
+  if (error && error.code !== "23505") console.warn("blockUser:", error.message);
+}
+export async function unblockUser(surrogate) {
+  const uuid = uuidForSurrogate(surrogate);
+  if (!uuid || !CURRENT_USER.authId) return;
+  await supabase.from("user_blocks").delete().eq("blocker_id", CURRENT_USER.authId).eq("blocked_id", uuid);
+}
+
 /** Purge MY read notifications older than `days` — keeps the tray from growing
  *  forever (the "stuck notifications" fix). Best-effort. */
 export async function purgeOldReadNotifications(days = 7) {

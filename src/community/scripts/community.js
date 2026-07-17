@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -210,6 +210,7 @@ export function renderCommunity(basePath = "") {
     // post; "Pagina mea" is just the filter of your own. Sorted newest-first.
     posts: [], // real posts load from Supabase (loadFeed) on first render
     members: [], // real member directory (surrogate ids, points desc) — leaderboard
+    blockedIds: new Set(), // members I've blocked (their content is hidden)
     _feedLoaded: false,
     notes: getNotes(), // persistent notebook (store.js adapter)
     noteQuery: "",
@@ -2070,6 +2071,13 @@ export function renderCommunity(basePath = "") {
     return `<button type="button" class="btn btn--primary btn--sm" data-action="friend-add" data-uid="${id}">+ Adaugă prieten</button>`;
   }
 
+  // Block/mute a member: you stop seeing their posts. Teacher isn't blockable
+  // (handled by only showing this for non-admin targets, like friendButton).
+  function blockButton(id) {
+    const blocked = state.blockedIds.has(id);
+    return `<button type="button" class="btn-mini btn-mini--ghost" data-action="${blocked ? "unblock" : "block"}" data-uid="${id}" title="${blocked ? "Deblochează" : "Nu-i mai vezi postările"}">${blocked ? "🚫 Deblochează" : "🚫 Blochează"}</button>`;
+  }
+
   // TRANSITIONAL mock profile — used ONLY for seed users (from modules not yet
   // wired to Supabase, e.g. groups). Real members go through otherProfile()
   // below → real data via get_public_profile. Removed entirely in Batch 6.
@@ -2096,7 +2104,7 @@ export function renderCommunity(basePath = "") {
           <p class="cx-muted">„${escapeHtml(pp.status)}”</p>
           <span class="cx-vis"><span aria-hidden="true">👁️</span> ${VIS_LABELS[pp.visibility]}</span>
         </div>
-        ${isLoggedIn() && !isAdmin() ? friendButton(id) : ""}
+        ${isLoggedIn() && !isAdmin() ? friendButton(id) + blockButton(id) : ""}
       </div>`;
 
     if (!canView) {
@@ -2497,7 +2505,7 @@ export function renderCommunity(basePath = "") {
   function sectionMembers() {
     const q = state.memberQuery.trim().toLowerCase();
     const list = state.members
-      .filter((id) => id !== CURRENT_USER.id)
+      .filter((id) => id !== CURRENT_USER.id && !state.blockedIds.has(id))
       .map((id) => userById(id))
       .filter(Boolean);
     const filtered = q ? list.filter((u) => (u.name || "").toLowerCase().includes(q)) : list;
@@ -3459,6 +3467,8 @@ export function renderCommunity(basePath = "") {
       state.members = await fetchMembers(); // real leaderboard directory (points desc)
       state.profanityTerms = await fetchProfanityTerms(); // admin's custom filtered words
       setCustomProfanity(state.profanityTerms); // feed them into the client filter
+      state.blockedIds = await fetchMyBlocks(); // members I've blocked → hide their posts
+      if (state.blockedIds.size) state.posts = state.posts.filter((p) => !state.blockedIds.has(p.authorId));
       await loadKudos(); // real claps/pokes — members are registered above, so surrogate→uuid resolves
       // Today's REAL daily challenge + whether I've already answered it.
       state.challenge = await fetchTodayChallenge();
@@ -4581,6 +4591,21 @@ export function renderCommunity(basePath = "") {
       case "held-reject": {
         moderateContent(btn.dataset.kind, btn.dataset.id, "blocked");
         state.heldContent = state.heldContent.filter((h) => !(h.id === btn.dataset.id && h.kind === btn.dataset.kind));
+        return render();
+      }
+      case "block": {
+        const uid = Number(btn.dataset.uid);
+        state.blockedIds.add(uid);
+        blockUser(uid);
+        state.posts = state.posts.filter((p) => p.authorId !== uid); // hide their content now
+        showToast("🚫 Blocat — nu-i mai vezi postările.");
+        return render();
+      }
+      case "unblock": {
+        const uid = Number(btn.dataset.uid);
+        state.blockedIds.delete(uid);
+        unblockUser(uid);
+        state._feedLoaded = false; // reload so their posts come back
         return render();
       }
       case "mod-approve": {
