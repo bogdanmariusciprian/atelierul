@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/assets/logo/logo.png" />
+  <meta name="theme-color" content="#b45309" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <title>Admitere Drept — Teste — Atelierul-LRO</title>
+  <meta name="description" content="Itemi de limba română de la admiterea la Facultatea de Drept (2002–2026), cu antrenament interactiv și explicații." />
+  <meta property="og:title" content="Admitere Drept — Teste — Atelierul-LRO" />
+  <meta property="og:description" content="Antrenament interactiv pe itemi de admitere la Drept, cu explicații după fiecare răspuns." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="../../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../../src/site/styles/tests.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <nav class="page-crumbs" aria-label="Unde te afli">
+      <a href="/">Acasă</a> <span aria-hidden="true">›</span>
+      <a href="../">Teste</a> <span aria-hidden="true">›</span> Admitere Drept
+    </nav>
+    <div id="test-category"></div>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    // Chrome (header/footer) + the category page. Presentation, downloads and
+    // the practice all live in test-category.js (one source, DRY).
+    import { renderChrome } from "../../src/shared/components/site-chrome.js";
+    import { initTestCategory } from "../../src/site/scripts/test-category.js";
+
+    renderChrome("../../");
+
+    const mount = document.getElementById("test-category");
+    if (mount) initTestCategory(mount, "admitere-drept");
+  </script>
+</body>
+</html>

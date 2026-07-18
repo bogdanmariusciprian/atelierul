@@ -341,7 +341,7 @@ function renderConfig() {
 
   root.innerHTML = `
     <section class="tgame-config tgame-cfg2">
-      <a class="tgame-back" href="#" data-act="home">‹ Toate testele</a>
+      <a class="tgame-back" href="#" data-act="home">‹ Înapoi</a>
       <div class="tgame-config__hero">
         <span class="tgame-config__badge" aria-hidden="true">⚖️</span>
         <h2 class="tgame-config__title">Antrenament — Admitere Drept</h2>
@@ -987,7 +987,13 @@ function onClick(e) {
   const act = e.target.closest("[data-act]");
   if (act) {
     const a = act.dataset.act;
-    if (a === "home") { e.preventDefault(); stopTimer(); location.hash = ""; return; }
+    if (a === "home") {
+      e.preventDefault(); stopTimer();
+      // Back to the category intro: drop BOTH #joc and any ?item= deep link.
+      // (Clearing the hash alone does nothing when you arrived without one.)
+      location.replace(location.pathname);
+      return;
+    }
     if (a === "quit") {
       e.preventDefault();
       return confirmLeave(async () => {

@@ -24,8 +24,9 @@
     <section class="page-hero">
       <h1>Teste</h1>
       <p class="page-hero__lead">
-        Modele de test pentru examene și admitere. Alege o categorie —
-        „Admitere Drept" e disponibilă, cu itemi de-a lungul anilor (2002–2026).
+        Modele de test pentru examene și admitere. Fiecare categorie are pagina ei,
+        cu testele descărcabile și cu antrenamentul interactiv. „Admitere Drept" e
+        deschisă deja, cu itemi de-a lungul anilor (2002–2026).
       </p>
     </section>
 
@@ -37,8 +38,8 @@
   <div id="footer"></div>
 
   <script type="module">
-    // Chrome (header/footer) + the Teste hub. The category grid and the live
-    // "Admitere Drept" item practice live in tests-hub.js (single source, DRY).
+    // Chrome (header/footer) + the category directory. Each category's own
+    // page (/teste/<slug>/) holds its downloads and its practice.
     import { renderChrome } from "../src/shared/components/site-chrome.js";
     import { initTestsHub } from "../src/site/scripts/tests-hub.js";
 

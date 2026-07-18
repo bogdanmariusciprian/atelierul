@@ -570,6 +570,52 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 }
 
 /* =========================================================
+   One category = one page (/teste/<slug>/). Everything borrows --cat-color,
+   which test-category.js sets from the category's own symbol colour.
+   ========================================================= */
+.tcat { margin-block: var(--space-lg); }
+.tcat__hero {
+  display: flex; align-items: center; gap: var(--space-md);
+  padding: var(--space-lg); margin-bottom: var(--space-lg);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--cat-color) 8%, var(--color-bg));
+  border: 1.5px solid color-mix(in srgb, var(--cat-color) 22%, transparent);
+}
+.tcat__icon { font-size: 2.6rem; line-height: 1; }
+.tcat__title { margin: 0 0 0.2rem; font-size: 1.7rem; color: var(--cat-color); }
+.tcat__desc { margin: 0; color: var(--color-text-muted); line-height: 1.6; }
+
+.tcat__panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-lg); }
+.tcat__panel {
+  border: 1.5px solid var(--color-border); border-radius: 18px;
+  padding: var(--space-lg); background: var(--color-bg);
+}
+.tcat__panel--play {
+  border-color: color-mix(in srgb, var(--cat-color) 35%, transparent);
+  background: color-mix(in srgb, var(--cat-color) 5%, var(--color-bg));
+}
+.tcat__ph { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; font-size: 1.05rem; }
+.tcat__soon { margin: 0; color: var(--color-text-muted); font-style: italic; }
+.tcat__lead { margin: 0 0 var(--space-md); color: var(--color-text-muted); line-height: 1.6; }
+
+.tcat__play {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  padding: 0.85rem 1.6rem; border-radius: 999px;
+  background: var(--cat-color); color: #fff; text-decoration: none;
+  font-weight: 800; font-size: 1.05rem; user-select: none;
+  box-shadow: 0 8px 20px -8px var(--cat-color);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.tcat__play:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 12px 26px -8px var(--cat-color); }
+.tcat__play:active { transform: translateY(0) scale(0.98); }
+.tcat__play__ic { font-size: 1.1rem; }
+
+@media (max-width: 560px) {
+  .tcat__hero { flex-direction: column; text-align: center; }
+  .tcat__play { width: 100%; justify-content: center; }
+}
+
+/* =========================================================
    Teste — MINI-GAME (pupil / guest). Config screen + one-item play.
    Airy spacing, calm palette, tap-chips (no dropdowns).
    ========================================================= */

@@ -765,7 +765,7 @@ function initNotifCenter(basePath) {
       if (n.type === "friend") return `${HUB}#profil`;
       if (n.type === "award") return `${HUB}#exercitii`; // exercițiu aprobat/respins
       // Flagged item was fixed → open THAT item (not a fresh game).
-      if (n.type === "report_ok") return `${basePath}teste/?item=${encodeURIComponent(p.item_id || "")}#admitere-drept`;
+      if (n.type === "report_ok") return `${basePath}teste/admitere-drept/?item=${encodeURIComponent(p.item_id || "")}`;
       if (p.post_id) return `${HUB}#post/${p.post_id}`; // like/comment/reply/mention → postarea exactă
       return `${HUB}#forum`;
     };

@@ -2913,7 +2913,7 @@ export function renderCommunity(basePath = "") {
           ${chosen === k ? `<em class="cx-reptag cx-reptag--pick">bifat de elev</em>` : ""}
         </li>`).join("");
       return `<div class="cx-repcard">
-          <a class="cx-repcard__go" href="${basePath}teste/?item=${encodeURIComponent(it.id)}#admitere-drept" title="Deschide itemul în grila de itemi">
+          <a class="cx-repcard__go" href="${basePath}teste/admitere-drept/?item=${encodeURIComponent(it.id)}" title="Deschide itemul în grila de itemi">
             <span class="cx-repcard__meta">${it.year ?? ""}${it.session ? ` · ${escapeHtml(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""} · deschide în grilă ↗</span>
             <p class="cx-repcard__q">${sanitizeRich(it.question)}</p>
             <ul class="cx-repopts">${opts}</ul>

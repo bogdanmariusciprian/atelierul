@@ -287,7 +287,7 @@ function render() {
 
   root.innerHTML = `
     <div class="tg-bar">
-      <a class="tg-back" href="#">‹ Toate testele</a>
+      <a class="tg-back" href="./">‹ Înapoi</a>
       <h2 class="tg-title">⚖️ Admitere Drept <span class="tg-sub">— editor profesor</span></h2>
     </div>
 
@@ -960,7 +960,7 @@ function mBars() {
     `<option value="${y.year}"${y.year === state.year ? " selected" : ""}>${y.year} (${y.n})</option>`).join("");
   return `
     <div class="tgm-top">
-      <a class="tg-back" href="#" aria-label="Toate testele">‹</a>
+      <a class="tg-back" href="./" aria-label="Înapoi la categorie">‹</a>
       <select id="tg-year" class="tgm-year" aria-label="An">${yearsSel}</select>
       <input id="tg-search" class="tgm-search" type="search" placeholder="Caută…" value="${esc(state.search)}" />
       <button type="button" class="tg-chip tgm-chip${state.hideVerified ? " on" : ""}" data-toggle="hideVerified" title="Ascunde itemii verificați">✓ ascunde</button>

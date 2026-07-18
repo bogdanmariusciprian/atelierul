@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/assets/logo/logo.png" />
+  <meta name="theme-color" content="#6d28d9" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <title>Clasa a 12-a — Teste — Atelierul-LRO</title>
+  <meta name="description" content="Bacalaureat — proba de limba și literatura română. Teste și antrenament, în pregătire." />
+  <meta property="og:title" content="Clasa a 12-a — Teste — Atelierul-LRO" />
+  <meta property="og:description" content="Bacalaureat — proba de limba și literatura română. În pregătire." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/assets/logo/logo.png" />
+  <link rel="stylesheet" href="../../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../../src/site/styles/tests.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <nav class="page-crumbs" aria-label="Unde te afli">
+      <a href="/">Acasă</a> <span aria-hidden="true">›</span>
+      <a href="../">Teste</a> <span aria-hidden="true">›</span> Clasa a 12-a
+    </nav>
+    <div id="test-category"></div>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "../../src/shared/components/site-chrome.js";
+    import { initTestCategory } from "../../src/site/scripts/test-category.js";
+
+    renderChrome("../../");
+
+    const mount = document.getElementById("test-category");
+    if (mount) initTestCategory(mount, "clasa-12");
+  </script>
+</body>
+</html>
