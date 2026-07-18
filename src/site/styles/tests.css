@@ -676,9 +676,11 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tgame-cfg-count b { color: var(--color-text); font-size: 1.15rem; }
 
 /* ---- config v2: filters + a LIVE summary that shows the pool narrowing ---- */
-.tgame-cfg2 { max-width: 940px; }
-.tgame-cfg2__grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--space-xl); }
-.tgame-cfg2__main { min-width: 0; }
+/* Base = one column (small screens). The three-column stage is switched on
+   from the ≥1000px block further down, together with the fixed frame. */
+.tgame-cfg2 { max-width: 1280px; }
+.tgame-cfg2__grid { display: grid; grid-template-columns: 1fr; gap: var(--space-lg); }
+.tgame-cfg2__col { min-width: 0; }
 .tgame-cfg2__side { min-width: 0; }
 .tgame-cfg-hint2 { margin-left: 0.5rem; font-weight: 600; text-transform: none; letter-spacing: 0; opacity: 0.8; }
 .tgame-chips--tight { margin-bottom: 0.6rem; }
@@ -864,6 +866,75 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
 .tgame-verdict.is-mute { color: var(--color-text-muted); font-weight: 700; }
 
 /* =========================================================
+   FIXED STAGE — the whole game lives inside one 1280×920 frame.
+   Two promises: the page never scrolls, and no region moves because a
+   NEIGHBOUR's content changed size. Regions get reserved shares of the
+   height; only a long question or a long explanation scrolls, and only
+   inside its own box.
+   Below 1000px the stage steps aside and the layout flows again — a
+   1280-wide frame squeezed onto a phone would be unreadable.
+   ========================================================= */
+/* four option slots ALWAYS exist, whatever the item carries */
+.tgame-opt--void { visibility: hidden; }
+.tgame-opt--cut { opacity: 0.4; text-decoration: line-through; cursor: default; }
+
+@media (min-width: 1000px) {
+  .tstage {
+    width: min(1280px, 100%);
+    height: min(920px, calc(100dvh - 7rem));
+    margin: 0 auto;
+    display: flex; flex-direction: column; gap: 0.75rem;
+    overflow: hidden;
+  }
+  .tstage__top { flex: 0 0 auto; }
+
+  /* ---- configurator: three columns ---- */
+  .tstage--cfg .tgame-cfg2__grid {
+    flex: 1 1 auto; min-height: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 0.95fr);
+    gap: 1rem;
+  }
+  .tgame-cfg2__col { min-height: 0; display: flex; flex-direction: column; gap: 0.9rem; }
+  .tgame-cfg2__col > .tgame-cfg-block { margin-bottom: 0; }
+  .tgame-cfg-block--grow { margin-top: auto; }          /* mode sits at the bottom */
+  .tgame-cfg-block--fill { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .tstage--cfg .tgame-tl { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 0.3rem; }
+  .tstage--cfg .tgame-sum { position: static; }
+  /* a slimmer header, so the columns get the height */
+  .tstage__top .tgame-config__hero { display: flex; align-items: center; gap: 0.8rem; margin: 0; }
+  .tstage__top .tgame-config__badge { width: 2.6rem; height: 2.6rem; font-size: 1.2rem; margin: 0; }
+  .tstage__top .tgame-config__title { margin: 0; font-size: 1.2rem; }
+  .tstage__top .tgame-config__sub { margin: 0; font-size: 0.82rem; }
+  .tstage__top .tgame-saved { margin: 0.6rem 0 0; }
+  .tstage__top .tgame-back { margin-bottom: 0.5rem; }
+
+  /* ---- play: the card owns the rest, in fixed proportions ---- */
+  .tstage--play .tgame-card {
+    flex: 1 1 auto; min-height: 0; margin: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 0.9fr) minmax(0, 1.35fr) minmax(0, 0.75fr) auto;
+    gap: 0.7rem;
+  }
+  .tstage--play .tgame-q { min-height: 0; margin: 0; overflow-y: auto; }
+  .tstage--play .tgame-opts {
+    min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 0.5rem;
+  }
+  .tstage--play .tgame-opt { min-height: 0; overflow: hidden; align-items: flex-start; }
+  .tstage--play .tgame-opt__t { max-height: 100%; overflow-y: auto; }
+  /* the verdict area is reserved even while empty — revealing it moves nothing */
+  .tstage--play .tgame-fb { min-height: 0; overflow-y: auto; }
+  .tgame-cardfoot {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+  }
+  .tgame-cardfoot .tgame-nav { margin: 0; padding: 0; border-top: 0; }
+  .tgame-cardfoot .tgame-next { margin: 0; }
+
+  /* ---- results: the chart fits, its detail panel scrolls on its own ---- */
+  .tstage--done { overflow-y: auto; }
+  .tstage--done .tgc-detail { max-height: 15rem; overflow-y: auto; }
+}
+
+/* =========================================================
    CLASSIC MODE — lives, the satchel of boosters, and the flying bonus.
    ========================================================= */
 .tgame-lives { margin-left: auto; letter-spacing: 0.08em; font-size: 0.95rem; user-select: none; }
@@ -928,9 +999,8 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
 /* the option you picked, shown WITHOUT saying whether it was right */
 .tgame-opt.opt-picked { border-color: var(--color-primary); }
 
-@media (max-width: 860px) {
-  .tgame-cfg2__grid { grid-template-columns: 1fr; gap: var(--space-lg); }
-  .tgame-sum { position: static; }
+@media (max-width: 999px) {
+  .tgame-sum { position: static; } /* no sticky summary in the flowing layout */
 }
 
 /* ---- in-game: small round controls (refresh, prev/next) ---- */

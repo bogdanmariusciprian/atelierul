@@ -455,18 +455,21 @@ function renderConfig() {
     `<button type="button" class="tgame-em${em === G.emoji ? " on" : ""}" data-emoji="${em}" aria-label="Semn: ${em}">${em}</button>`).join("");
 
   root.innerHTML = `
-    <section class="tgame-config tgame-cfg2">
-      <a class="tgame-back" href="#" data-act="home">‹ Înapoi</a>
-      <div class="tgame-config__hero">
-        <span class="tgame-config__badge" aria-hidden="true">⚖️</span>
-        <h2 class="tgame-config__title">Antrenament — Admitere Drept</h2>
-        <p class="tgame-config__sub">Alege ce exersezi, apoi rezolvi câte un item pe rând. Cei greșiți revin până îi nimerești.</p>
-      </div>
-
-      ${savedStrip()}
+    <section class="tgame-config tgame-cfg2 tstage tstage--cfg">
+      <header class="tstage__top">
+        <a class="tgame-back" href="#" data-act="home">‹ Înapoi</a>
+        <div class="tgame-config__hero">
+          <span class="tgame-config__badge" aria-hidden="true">⚖️</span>
+          <div>
+            <h2 class="tgame-config__title">Antrenament — Admitere Drept</h2>
+            <p class="tgame-config__sub">Alege ce exersezi, apoi rezolvi câte un item pe rând.</p>
+          </div>
+        </div>
+        ${savedStrip()}
+      </header>
 
       <div class="tgame-cfg2__grid">
-        <div class="tgame-cfg2__main">
+        <div class="tgame-cfg2__col">
           <div class="tgame-cfg-block">
             <div class="tgame-cfg-lab">Ani</div>
             <div class="tgame-chips">${groupChips("years", "year", "Toți anii", yearOpts)}</div>
@@ -479,35 +482,37 @@ function renderConfig() {
           </div>` : ""}
 
           <div class="tgame-cfg-block">
-            <div class="tgame-cfg-lab">Tipuri de itemi <span class="tgame-cfg-hint2">trage de ⠿ ca să stabilești ordinea</span></div>
-            <div class="tgame-chips tgame-chips--tight">${G.availTypes.length ? chip("type", "all", "Toate", G.all.types, allRedundant("types") ? ` disabled title="Ai bifat deja tot — scurtătura n-are ce adăuga"` : "") : ""}</div>
-            ${typeList()}
-            ${G.availTypes.length ? "" : `<p class="tgame-cfg-hint">Categoriile se activează pe măsură ce profesorul marchează itemii.</p>`}
-          </div>
-
-          <div class="tgame-cfg-block">
             <div class="tgame-cfg-lab">Ordine</div>
             <div class="tgame-chips">${orderChips}</div>
-          </div>
-
-          <div class="tgame-cfg-block">
-            <div class="tgame-cfg-lab">Mod</div>
-            <div class="tgame-chips">${modeChips}</div>
-            <p class="tgame-cfg-hint">${{
-              invatare: "Afli imediat dacă ai nimerit, iar explicația o deschizi când vrei tu. Itemii greșiți revin până îi rezolvi.",
-              examen: "Răspunzi la tot fără să afli pe loc dacă ai nimerit; verdictele și explicațiile vin la final, ca la proba adevărată.",
-              clasic: "Trei vieți, până la patru. Fiecare greșeală ia una. Din când în când trece pe ecran o întrebare bonus: prinde-o, răspunde-i și câștigi un ajutor pe care îl folosești când vrei.",
-              provocare: "O singură viață. Prima greșeală încheie runda — fără ajutoare, fără a doua șansă.",
-            }[G.sel.mode]}</p>
           </div>
 
           <div class="tgame-cfg-block">
             <div class="tgame-cfg-lab">Timp pe item</div>
             <div class="tgame-chips">${limitChips}</div>
           </div>
+
+          <div class="tgame-cfg-block tgame-cfg-block--grow">
+            <div class="tgame-cfg-lab">Mod</div>
+            <div class="tgame-chips">${modeChips}</div>
+            <p class="tgame-cfg-hint">${{
+              invatare: "Afli imediat dacă ai nimerit, iar explicația o deschizi când vrei tu. Itemii greșiți revin până îi rezolvi.",
+              examen: "Răspunzi la tot fără să afli pe loc dacă ai nimerit; verdictele și explicațiile vin la final, ca la proba adevărată.",
+              clasic: "Trei vieți, până la patru. Fiecare greșeală ia una. Din când în când trece o întrebare bonus: prinde-o, răspunde-i și câștigi un ajutor.",
+              provocare: "O singură viață. Prima greșeală încheie runda — fără ajutoare, fără a doua șansă.",
+            }[G.sel.mode]}</p>
+          </div>
         </div>
 
-        <aside class="tgame-cfg2__side">
+        <div class="tgame-cfg2__col">
+          <div class="tgame-cfg-block tgame-cfg-block--fill">
+            <div class="tgame-cfg-lab">Tipuri de itemi</div>
+            <div class="tgame-chips tgame-chips--tight">${G.availTypes.length ? chip("type", "all", "Toate", G.all.types, allRedundant("types") ? ` disabled title="Ai bifat deja tot — scurtătura n-are ce adăuga"` : "") : ""}</div>
+            ${typeList()}
+            ${G.availTypes.length ? "" : `<p class="tgame-cfg-hint">Categoriile se activează pe măsură ce profesorul marchează itemii.</p>`}
+          </div>
+        </div>
+
+        <aside class="tgame-cfg2__col tgame-cfg2__side">
           <div class="tgame-sum">
             <div class="tgame-sum__head">
               <span class="tgame-sum__em" aria-hidden="true">${esc(G.emoji)}</span>
@@ -743,8 +748,12 @@ function cardHead(it) {
     </div>`;
 }
 
+// ALWAYS four slots. An item with three options still reserves the fourth as
+// an empty placeholder, so the block below never shifts from item to item.
 const optionsHtml = (it, render) =>
-  OPTS.filter((k) => it.options?.[k] != null && it.options[k] !== "").map((k) => render(k)).join("");
+  OPTS.map((k) => ((it.options?.[k] != null && it.options[k] !== "")
+    ? render(k)
+    : `<span class="tgame-opt tgame-opt--void" aria-hidden="true"></span>`)).join("");
 
 // Where we are on the strip of answered items (+ the live one at the end).
 function navState() {
@@ -779,23 +788,31 @@ function postBar(i) {
 function renderLive() {
   if (!G.queue.length) return renderDone();
   const it = G.byId.get(G.queue[0]);
-  // A „taie o variantă" booster removes wrong options for this item only.
-  const opts = optionsHtml(it, (k) => G.cut.includes(k) ? "" : `
-    <button type="button" class="tgame-opt" data-k="${k}">
-      <span class="tgame-opt__k">${k}</span>
-      <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
-    </button>`);
+  // A „taie o variantă" booster strikes wrong options out — it does NOT remove
+  // the slot, so the block keeps its shape and you can see the help working.
+  const opts = optionsHtml(it, (k) => G.cut.includes(k)
+    ? `<span class="tgame-opt tgame-opt--cut" aria-hidden="true">
+         <span class="tgame-opt__k">${k}</span><span class="tgame-opt__t">tăiată</span>
+       </span>`
+    : `<button type="button" class="tgame-opt" data-k="${k}">
+         <span class="tgame-opt__k">${k}</span>
+         <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
+       </button>`);
   root.innerHTML = `
-    <section class="tgame">
-      ${hud()}
-      ${G.sel.limit ? `<div class="tgame-clock"><i id="tgame-clock" style="width:100%"></i></div>` : ""}
+    <section class="tgame tstage tstage--play">
+      <header class="tstage__top">
+        ${hud()}
+        ${G.sel.limit ? `<div class="tgame-clock"><i id="tgame-clock" style="width:100%"></i></div>` : ""}
+      </header>
       <article class="tgame-card" data-id="${it.id}">
         ${cardHead(it)}
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
-        <div class="tgame-opts">${opts || `<span class="tgame-empty">(variante indisponibile)</span>`}</div>
-        <div class="tgame-fb" hidden></div>
-        <div class="tgame-next" hidden><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>
-        ${navBar()}
+        <div class="tgame-opts">${opts}</div>
+        <div class="tgame-fb"></div>
+        <footer class="tgame-cardfoot">
+          ${navBar()}
+          <div class="tgame-next" hidden><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>
+        </footer>
       </article>
     </section>`;
   startItemClock();
@@ -828,17 +845,17 @@ function renderAnswered(i, isLive) {
        ${e.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(e.observation)}</div>` : ""}
        ${postBar(i)}`;
   root.innerHTML = `
-    <section class="tgame">
-      ${hud()}
+    <section class="tgame tstage tstage--play">
+      <header class="tstage__top">${hud()}</header>
       <article class="tgame-card ${exam ? "" : (e.correct ? "is-correct" : "is-wrong")}${isLive ? "" : " is-review"}" data-id="${e.id}" data-hi="${i}" data-done="1">
         ${cardHead(it)}
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : ""}</p>
         <div class="tgame-opts">${opts}</div>
-        <div class="tgame-fb">
-          ${verdict}
-        </div>
-        ${isLive ? `<div class="tgame-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>` : ""}
-        ${navBar()}
+        <div class="tgame-fb">${verdict}</div>
+        <footer class="tgame-cardfoot">
+          ${navBar()}
+          ${isLive ? `<div class="tgame-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>` : ""}
+        </footer>
       </article>
     </section>`;
 }
@@ -1223,7 +1240,7 @@ function renderDone() {
     deleteTestSession(done);
   }
   root.innerHTML = `
-    <section class="tgame tgame-done">
+    <section class="tgame tgame-done tstage tstage--done">
       <div class="tgame-done__badge" aria-hidden="true">${G.over ? "☠️" : "✓"}</div>
       <h2 class="tgame-done__title">${G.over
         ? "Ai pierdut seria — o greșeală a încheiat runda."
