@@ -27,7 +27,7 @@
 import {
   fetchTestItems, fetchTestItem, answerTestItem, TEST_ITEM_TYPES,
   fetchMyTestSessions, saveTestSession, deleteTestSession, reportTestItem,
-  useBooster, fetchBoosters,
+  useBooster, fetchBoosters, revealObservation,
 } from "../../shared/scripts/test-repo.js";
 import { initBonus, maybeSpawn, clearBonus } from "./bonus.js";
 import { createPost } from "../../shared/scripts/forum-repo.js";
@@ -753,13 +753,16 @@ function fitText(el, max, min) {
     el.style.fontSize = `${size}rem`;
   }
 }
-// Run after the browser has laid the stage out, so the boxes have real heights.
+// A LAST-RESORT safety net, not a design device. At full width almost nothing
+// needs shrinking, so the bounds are deliberately tight: text nudges down a
+// little only if it would otherwise be clipped, and never below a readable
+// size. Better a barely smaller line than a scrollbar or a cut-off word.
 function fitStage() {
   requestAnimationFrame(() => {
-    fitText(root.querySelector(".tgame-q"), 1.3, 0.72);
-    root.querySelectorAll(".tgame-opt__t").forEach((t) => fitText(t, 1.02, 0.6));
-    fitText(root.querySelector(".tgame-fb"), 0.98, 0.62);
-    fitText(root.querySelector(".tgc-detail"), 0.95, 0.6);
+    fitText(root.querySelector(".tgame-q"), 1.3, 0.95);
+    root.querySelectorAll(".tgame-opt__t").forEach((t) => fitText(t, 1.02, 0.82));
+    fitText(root.querySelector(".tgame-fb"), 0.98, 0.8);
+    fitText(root.querySelector(".tgc-detail"), 0.95, 0.78);
   });
 }
 
@@ -846,7 +849,10 @@ function renderLive() {
         </article>
         <aside class="tgame-side">
           <div class="tgame-fb">
-            <p class="tgame-side__wait">Alege o variantă.<br />Verdictul și explicația apar aici.</p>
+            <p class="tgame-side__wait">Alege o variantă.<br />Verdictul apare aici.</p>
+            ${G.sel.mode === "invatare" ? `
+              <button type="button" class="tgame-obsbtn" data-act="peek-obs">Vezi explicația acum</button>
+              <p class="tgame-side__note">Deschisă înainte de răspuns, îți arată practic soluția — de aceea itemul nu mai aduce puncte.</p>` : ""}
           </div>
         </aside>
       </div>
@@ -1453,6 +1459,20 @@ function onClick(e) {
       return;
     }
     if (a === "use-booster") return spendBooster(act.dataset.kind);
+    if (a === "peek-obs") {
+      const card = root.querySelector(".tgame-card");
+      if (!card || card.dataset.done) return;
+      revealObservation(card.dataset.id, G.sessionId).then((obs) => {
+        const fb = root.querySelector(".tgame-fb");
+        if (!fb) return;
+        fb.innerHTML = obs
+          ? `<div class="tgame-obs"><span class="tgame-obs__lab">Explicație</span>${sanitizeRich(obs)}</div>
+             <p class="tgame-side__note">Ai deschis explicația — itemul acesta nu mai aduce puncte.</p>`
+          : `<p class="tgame-side__wait">Itemul acesta n-are explicație scrisă.</p>`;
+        fitStage();
+      });
+      return;
+    }
     if (a === "prev-item") return goTo(navState().idx - 1);
     if (a === "next-item") return goTo(navState().idx + 1);
     if (a === "refresh-item") return refreshItem(e.target.closest(".tgame-card"));

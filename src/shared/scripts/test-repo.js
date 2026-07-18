@@ -271,6 +271,16 @@ export async function answerBonusQuestion(id, text, sessionId) {
   return data;
 }
 
+/** Learning mode: read the explanation BEFORE answering. The server records
+ *  it, and that item then earns no points — the trade is the whole point. */
+export async function revealObservation(itemId, sessionId) {
+  const { data, error } = await supabase.rpc("reveal_observation", {
+    p_item: itemId, p_session: sessionId || null,
+  });
+  if (error) { console.warn("revealObservation:", error.message); return ""; }
+  return data?.observation || "";
+}
+
 /** Spend one: `peek` returns the explanation, `cut1`/`cut2` the wrong letters. */
 export async function useBooster(sessionId, kind, itemId = null) {
   const { data, error } = await supabase.rpc("use_booster", {

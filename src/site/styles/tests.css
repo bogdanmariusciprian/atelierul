@@ -899,10 +899,19 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   margin: auto 0; text-align: center; line-height: 1.7;
   font-size: 0.9rem; color: var(--color-text-muted);
 }
+.tgame-side__note {
+  margin: 0.5rem 0 0; font-size: 0.76rem; line-height: 1.55;
+  color: var(--color-text-muted); font-style: italic;
+}
+.tgame-side .tgame-obsbtn { align-self: center; }
 
 @media (min-width: 1000px) {
   .tstage {
     width: min(1280px, 100%);
+    /* .tgame and .tgame-config carry an old max-width (720/680px) meant for the
+       single-column era; without clearing it the stage would keep collapsing
+       back to that width, which is what made the text need shrinking. */
+    max-width: none;
     height: min(920px, calc(100dvh - 7rem));
     margin: 0 auto;
     display: flex; flex-direction: column; gap: 0.75rem;
