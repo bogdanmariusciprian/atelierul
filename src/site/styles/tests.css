@@ -960,7 +960,11 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   }
   .tstage--play .tgame-q {
     min-height: 0; margin: 0; overflow: hidden;
-    display: flex; align-items: center; /* short questions sit centred, not stranded at the top */
+    /* Anchored to the TOP. The question row keeps a fixed share of the stage
+       (so the options never move between items), and a short question simply
+       leaves its slack BELOW the text — where the eye doesn't trip over it.
+       Centring it looked like a hole punched above the question. */
+    display: flex; align-items: flex-start;
   }
   .tstage--play .tgame-opts {
     min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 0.5rem;
