@@ -908,15 +908,18 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
 @media (min-width: 1000px) {
   .tstage {
     width: min(1280px, 100%);
-    /* .tgame and .tgame-config carry an old max-width (720/680px) meant for the
-       single-column era; without clearing it the stage would keep collapsing
-       back to that width, which is what made the text need shrinking. */
-    max-width: none;
     height: min(920px, calc(100dvh - 7rem));
     margin: 0 auto;
     display: flex; flex-direction: column; gap: 0.75rem;
     overflow: hidden;
   }
+  /* .tgame (720px), .tgame-config (680px) and .tgame-done (560px) carry
+     max-widths from the single-column era. They sit LOWER in this file, so at
+     equal specificity they would win on source order alone — hence the
+     compound selectors, which outrank them wherever they live. */
+  .tstage.tgame,
+  .tstage.tgame-config,
+  .tstage.tgame-done { max-width: none; }
   .tstage__top { flex: 0 0 auto; }
 
   /* ---- configurator: three columns ---- */
@@ -942,9 +945,11 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   /* ---- play: the ITEM on the left, the VERDICT on the right.
      Separate columns is the whole point — a long explanation can no longer
      squeeze the answer options, because it isn't above them any more. ---- */
+  /* The explanation panel keeps a comfortable reading width; ALL the extra
+     space goes to the item card, which is what needs it. */
   .tstage--play .tgame-play {
     flex: 1 1 auto; min-height: 0;
-    display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1rem;
+    display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1rem;
   }
   /* Every region gets a FRACTION OF THE STAGE, never a size derived from its
      content — that's what makes the layout identical on every item. Nothing
