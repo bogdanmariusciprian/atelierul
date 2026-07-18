@@ -851,8 +851,8 @@ function renderLive() {
           <div class="tgame-fb">
             <p class="tgame-side__wait">Alege o variantă.<br />Verdictul apare aici.</p>
             ${G.sel.mode === "invatare" ? `
-              <button type="button" class="tgame-obsbtn" data-act="peek-obs">Vezi explicația acum</button>
-              <p class="tgame-side__note">Deschisă înainte de răspuns, îți arată practic soluția — de aceea itemul nu mai aduce puncte.</p>` : ""}
+              <button type="button" class="tgame-obsbtn" data-act="peek-obs">Vezi explicația</button>
+              <p class="tgame-side__note">Explicația arată raționamentul, nu varianta corectă. Pe aceea o afli după ce răspunzi.</p>` : ""}
           </div>
         </aside>
       </div>
@@ -1467,7 +1467,7 @@ function onClick(e) {
         if (!fb) return;
         fb.innerHTML = obs
           ? `<div class="tgame-obs"><span class="tgame-obs__lab">Explicație</span>${sanitizeRich(obs)}</div>
-             <p class="tgame-side__note">Ai deschis explicația — itemul acesta nu mai aduce puncte.</p>`
+             <p class="tgame-side__note">Acum alege varianta. Cea corectă ți se arată după ce răspunzi.</p>`
           : `<p class="tgame-side__wait">Itemul acesta n-are explicație scrisă.</p>`;
         fitStage();
       });

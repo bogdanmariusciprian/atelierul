@@ -1,17 +1,15 @@
 -- =========================================================
 -- Migration 0045 — Explicația, la cerere, ÎNAINTE de răspuns (modul învățare).
 --
--- E un mod de învățare, deci are sens să poți citi explicația când vrei.
--- Dar explicația conține, practic, răspunsul — așa că itemul deschis astfel
--- NU mai aduce puncte. Regula se aplică pe SERVER: clientul n-o poate ocoli
--- promițând că „n-a citit".
+-- Observația e RAȚIONAMENT, nu cheie: spune de ce, nu spune „răspunsul e B".
+-- Elevul o citește, judecă singur și abia apoi alege; varianta corectă i se
+-- dezvăluie după ce a răspuns, ca întotdeauna. Deci citirea ei NU costă puncte.
 --
--- NOTĂ onestă despre limită: pontajul e reținut pe (user, item, sesiune), la
--- fel ca recompensa. Cine ar chema RPC-ul cu un id de sesiune inventat și ar
--- răspunde apoi cu cel real ar putea ocoli regula. E același nivel de efort
--- ca orice manipulare directă de API, iar premiul mare (cheia de răspuns)
--- rămâne oricum inaccesibil. Dacă devine o problemă, mutăm pontajul pe
--- (user, item) și acceptăm că e definitiv.
+-- Acest RPC e necesar fiindcă 0044 a revocat `test_items.observation`: fără el,
+-- explicația n-ar mai putea ajunge la elev decât după răspuns.
+--
+-- Pontajul se reține totuși (fără efect asupra punctelor) — e un semnal util
+-- pentru profesor: se vede cine se sprijină mereu pe explicație.
 --
 -- Depinde de 0032 (answer_test_item) + 0044 (observation revocată).
 -- Sigur la re-rulare.
@@ -27,12 +25,13 @@ create table if not exists public.test_item_peeks (
 
 alter table public.test_item_peeks enable row level security;
 drop policy if exists peeks_own on public.test_item_peeks;
-create policy peeks_own on public.test_item_peeks for select using (user_id = auth.uid());
+create policy peeks_own on public.test_item_peeks for select
+  using (user_id = auth.uid() or public.is_admin_user());
 grant select on public.test_item_peeks to authenticated;
 -- scrierea doar prin RPC-ul de mai jos
 
--- Întoarce explicația și reține că ai cerut-o (dacă ești logat și în sesiune).
--- Vizitatorii o pot citi liber: ei oricum nu primesc puncte.
+-- Întoarce explicația și reține discret că a fost cerută. Vizitatorii o pot
+-- citi liber (n-au sesiune și oricum nu primesc puncte).
 create or replace function public.reveal_observation(p_item uuid, p_session uuid default null)
 returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -49,13 +48,15 @@ begin
     on conflict do nothing;
   end if;
 
+  -- DOAR explicația. Cheia rămâne exclusiv în answer_test_item.
   return jsonb_build_object('observation', coalesce(it.observation, ''));
 end; $$;
 
 grant execute on function public.reveal_observation(uuid, uuid) to anon, authenticated;
 
--- answer_test_item: aceeași logică, plus refuzul recompensei pentru itemii
--- a căror explicație a fost deschisă în ACEASTĂ sesiune.
+-- Restabilesc answer_test_item la regula curată (fără penalizare pentru
+-- explicația citită), ca aplicarea acestei migrări să ducă mereu în starea
+-- corectă, indiferent ce versiune era instalată înainte.
 create or replace function public.answer_test_item(p_id uuid, p_answer text, p_session uuid default null)
 returns jsonb
 language plpgsql
@@ -68,7 +69,6 @@ declare
   is_correct boolean;
   uid        uuid := auth.uid();
   awarded    boolean := false;
-  peeked     boolean := false;
   pts        integer := 5;
 begin
   select * into it from public.test_items where id = p_id and published = true;
@@ -79,19 +79,9 @@ begin
   eff := coalesce(it.correct_2026, it.correct);
   is_correct := upper(coalesce(p_answer, '')) = eff;
 
-  if uid is not null and p_session is not null then
-    peeked := exists (
-      select 1 from public.test_item_peeks
-       where session_id = p_session and user_id = uid and item_id = p_id
-    );
-  end if;
-
-  -- Puncte: corect + logat + nu admin + prima dată în ACEASTĂ sesiune +
-  -- explicația NU a fost deschisă înainte.
   if is_correct
      and uid is not null
      and p_session is not null
-     and not peeked
      and not exists (select 1 from public.profiles where id = uid and role = 'admin')
   then
     begin
@@ -111,7 +101,6 @@ begin
     'historical',     case when it.correct is distinct from eff then it.correct else null end,
     'observation',    coalesce(it.observation, ''),
     'awarded',        awarded,
-    'peeked',         peeked,
     'points',         case when awarded then pts else 0 end
   );
 end;
