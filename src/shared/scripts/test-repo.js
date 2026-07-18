@@ -10,6 +10,7 @@
 //     adminFetchTestItems and edits/verifies through RLS-gated updates.
 // =========================================================
 import { supabase } from "./supabase-client.js";
+import { CURRENT_USER } from "./session.js";
 
 /** Topic tags an item can carry (edited by the teacher, shown on the quiz card
  *  and used to filter the mini-game). Shared by the admin grid + the game. */
@@ -165,4 +166,53 @@ export async function updateTestItem(id, patch) {
     return false;
   }
   return true;
+}
+
+// ---- Saved training sessions (members only; RLS keeps them private) ----
+// The queue holds ONLY item ids, so resuming never leaks an answer key.
+
+/** My saved sessions for this exam, most recently played first. */
+export async function fetchMyTestSessions(exam = "admitere-drept") {
+  if (!CURRENT_USER.authId) return [];
+  const { data, error } = await supabase
+    .from("test_sessions")
+    .select("id, emoji, label, config, queue, stats, updated_at")
+    .eq("exam", exam)
+    .order("updated_at", { ascending: false });
+  if (error) { console.warn("fetchMyTestSessions:", error.message); return []; }
+  return (data || []).map((r) => ({
+    id: r.id,
+    emoji: r.emoji || "⚖️",
+    label: r.label || "",
+    config: r.config || {},
+    queue: Array.isArray(r.queue) ? r.queue : [],
+    stats: r.stats || {},
+    updatedAt: new Date(r.updated_at).getTime(),
+  }));
+}
+
+/** Create or update a session. Returns its id (progress autosaves as you play). */
+export async function saveTestSession({ id, exam = "admitere-drept", emoji, label, config, queue, stats } = {}) {
+  if (!CURRENT_USER.authId) return null;
+  const row = {
+    user_id: CURRENT_USER.authId,
+    exam,
+    emoji: emoji || "⚖️",
+    label: label || null,
+    config: config || {},
+    queue: queue || [],
+    stats: stats || {},
+    updated_at: new Date().toISOString(),
+  };
+  if (id) row.id = id;
+  const { data, error } = await supabase.from("test_sessions").upsert(row).select("id").single();
+  if (error) { console.warn("saveTestSession:", error.message); return null; }
+  return data?.id || null;
+}
+
+/** Drop a session (finished, or the pupil deleted it). */
+export async function deleteTestSession(id) {
+  if (!id || !CURRENT_USER.authId) return;
+  const { error } = await supabase.from("test_sessions").delete().eq("id", id);
+  if (error) console.warn("deleteTestSession:", error.message);
 }

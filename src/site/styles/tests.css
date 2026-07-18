@@ -625,6 +625,113 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tgame-cfg-count { color: var(--color-text-muted); font-size: 0.95rem; }
 .tgame-cfg-count b { color: var(--color-text); font-size: 1.15rem; }
 
+/* ---- config v2: filters + a LIVE summary that shows the pool narrowing ---- */
+.tgame-cfg2 { max-width: 940px; }
+.tgame-cfg2__grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--space-xl); }
+.tgame-cfg2__main { min-width: 0; }
+.tgame-cfg2__side { min-width: 0; }
+.tgame-cfg-hint2 { margin-left: 0.5rem; font-weight: 600; text-transform: none; letter-spacing: 0; opacity: 0.8; }
+.tgame-chips--tight { margin-bottom: 0.6rem; }
+
+/* A shortcut with nothing left to add ("Toate" when all are ticked by hand). */
+.tgame-chip[disabled] { opacity: 0.42; cursor: not-allowed; border-style: dashed; }
+.tgame-chip[disabled]:hover { border-color: var(--color-border); }
+
+/* summary card (sticky, clears the XP bar) */
+.tgame-sum {
+  position: sticky; top: var(--sticky-top, 104px); /* clear the sticky header + XP bar */
+  background: var(--color-surface); border: 1.5px solid var(--color-border);
+  border-radius: 18px; padding: var(--space-lg);
+}
+.tgame-sum__head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.9rem; }
+.tgame-sum__em { font-size: 1.8rem; line-height: 1; }
+.tgame-sum__t { margin: 0; font-weight: 800; font-size: 1rem; }
+.tgame-sum__m { margin: 0; font-size: 0.8rem; color: var(--color-text-muted); }
+.tgame-sum__go { width: 100%; margin-top: var(--space-md); }
+
+.tgame-ems { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.7rem; }
+.tgame-em {
+  font-size: 1.15rem; line-height: 1; cursor: pointer; user-select: none;
+  padding: 0.28rem 0.36rem; border-radius: 10px;
+  border: 1.5px solid transparent; background: none; opacity: 0.5;
+  transition: opacity 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+}
+.tgame-em:hover { opacity: 1; }
+.tgame-em:active { transform: scale(0.92); }
+.tgame-em.on { opacity: 1; border-color: var(--color-primary); background: var(--color-bg); }
+
+.tgame-nameinput {
+  width: 100%; font: inherit; font-size: 0.9rem; padding: 0.5rem 0.8rem;
+  border: 1.5px solid var(--color-border); border-radius: 12px;
+  background: var(--color-bg); color: var(--color-text);
+}
+.tgame-nameinput:focus { outline: none; border-color: var(--color-primary); }
+
+/* the funnel: each row narrows the pool */
+.tgame-fn { margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--color-border); }
+.tgame-fn__row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; font-size: 0.82rem; }
+.tgame-fn__lab { color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tgame-fn__v { font-weight: 800; font-variant-numeric: tabular-nums; }
+.tgame-fn__v.is-final { color: var(--color-primary); font-size: 1.05rem; }
+.tgame-fn__bar { height: 7px; border-radius: 4px; background: var(--color-border); margin: 0.25rem 0 0.7rem; overflow: hidden; }
+.tgame-fn__bar i { display: block; height: 100%; background: var(--color-primary); border-radius: 4px; transition: width 0.25s ease; }
+
+/* drag-to-order list of topic types */
+.tgame-tl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.tgame-tl__row {
+  display: flex; align-items: center; gap: 0.5rem;
+  border: 1.5px solid var(--color-border); border-radius: 12px;
+  background: var(--color-bg); padding: 0.3rem 0.6rem;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.tgame-tl__row.on { border-color: var(--color-primary); background: var(--color-surface); }
+.tgame-tl__row.is-empty { opacity: 0.42; border-style: dashed; }
+.tgame-tl__row.is-dragging { border-color: var(--color-primary); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); }
+.tgame-tl__grip {
+  cursor: grab; touch-action: none; user-select: none;
+  color: var(--color-text-muted); font-size: 1rem; letter-spacing: -0.15em; padding: 0.2rem 0.1rem;
+}
+.tgame-tl__row.is-dragging .tgame-tl__grip { cursor: grabbing; }
+.tgame-tl__row.is-empty .tgame-tl__grip { cursor: not-allowed; }
+.tgame-tl__btn {
+  flex: 1; text-align: left; font: inherit; font-weight: 700; font-size: 0.92rem;
+  background: none; border: 0; padding: 0.35rem 0; color: inherit; cursor: pointer; user-select: none;
+}
+.tgame-tl__n { font-size: 0.75rem; font-weight: 800; color: var(--color-text-muted); }
+.tgame-tl__ord {
+  min-width: 1.35rem; height: 1.35rem; display: grid; place-items: center;
+  border-radius: 50%; background: var(--color-surface); color: var(--color-text-muted);
+  font-size: 0.72rem; font-weight: 800;
+}
+.tgame-tl__row.on .tgame-tl__ord { background: var(--color-primary); color: #fff; }
+
+/* saved sessions ("continuă unde ai rămas") */
+.tgame-saved { margin-bottom: var(--space-lg); }
+.tgame-saved__row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.tgame-scard {
+  display: flex; align-items: center; gap: 0.6rem;
+  border: 1.5px solid var(--color-border); border-radius: 14px;
+  background: var(--color-surface); padding: 0.5rem 0.6rem 0.5rem 0.75rem;
+}
+.tgame-scard__em { font-size: 1.4rem; line-height: 1; }
+.tgame-scard__body { min-width: 0; }
+.tgame-scard__t { margin: 0; font-weight: 800; font-size: 0.9rem; }
+.tgame-scard__m { margin: 0; font-size: 0.76rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.tgame-scard__x {
+  font: inherit; font-size: 1rem; line-height: 1; cursor: pointer; user-select: none;
+  background: none; border: 0; color: var(--color-text-muted); padding: 0.2rem 0.3rem; border-radius: 8px;
+}
+.tgame-scard__x:hover { color: #b91c1c; background: var(--color-bg); }
+.tgame-btn--sm { font-size: 0.85rem; padding: 0.4rem 0.9rem; }
+
+/* the session's marker rides along in the game HUD */
+.tgame-hud__tag { font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted); }
+
+@media (max-width: 860px) {
+  .tgame-cfg2__grid { grid-template-columns: 1fr; gap: var(--space-lg); }
+  .tgame-sum { position: static; }
+}
+
 /* ---- game: top bar (discreet) ---- */
 .tgame { max-width: 720px; margin: 0 auto; }
 .tgame-top {
