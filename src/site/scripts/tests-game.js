@@ -155,8 +155,6 @@ export async function initTestGame(mountEl, exam) {
     // Chart bars answer to both the mouse and the keyboard.
     root.addEventListener("mouseover", onBarPeek);
     root.addEventListener("focusin", onBarPeek);
-    // The boxes change size with the window, so the text has to be refitted.
-    window.addEventListener("resize", () => { if (G.inGame) fitStage(); });
     root.__gameWired = true;
   }
   if (!window.__tgameBeforeUnload) {
@@ -738,46 +736,22 @@ function hud() {
     </div>`;
 }
 
-// ---------- fit text to its box ----------
-// No scrollbars anywhere: every box has a fixed share of the stage, and the
-// TEXT shrinks until it fits. That keeps the layout identical from item to
-// item — a long question or a long option changes its own type size, never
-// the position of anything around it.
-function fitText(el, max, min) {
-  if (!el) return;
-  let size = max;
-  el.style.fontSize = `${size}rem`;
-  let guard = 60; // never spin, whatever the box reports
-  while (guard-- > 0 && size > min && el.scrollHeight > el.clientHeight + 1) {
-    size = Math.max(min, size - 0.035);
-    el.style.fontSize = `${size}rem`;
-  }
-}
-// A LAST-RESORT safety net, not a design device. At full width almost nothing
-// needs shrinking, so the bounds are deliberately tight: text nudges down a
-// little only if it would otherwise be clipped, and never below a readable
-// size. Better a barely smaller line than a scrollbar or a cut-off word.
-function fitStage() {
-  requestAnimationFrame(() => {
-    fitText(root.querySelector(".tgame-q"), 1.3, 0.95);
-    root.querySelectorAll(".tgame-opt__t").forEach((t) => fitText(t, 1.02, 0.82));
-    fitText(root.querySelector(".tgame-fb"), 0.98, 0.8);
-    fitText(root.querySelector(".tgc-detail"), 0.95, 0.78);
-  });
-}
-
-// Shared card chrome. Topic tags read as FULL names (discreet grey), and the
-// ⟳ button re-reads the teacher's latest wording without touching the answer.
+// Shared card chrome — ONE row: topic tags, then the item's coordinates, then
+// the two actions. The question starts immediately under it, so nothing sits
+// between the header and the text the pupil came to read.
 function cardHead(it) {
   const labels = (it.types || []).map((c) =>
     `<span class="tgame-typelab">${esc(TYPE_LABEL[c] || c)}</span>`).join("");
   return `
-    ${labels ? `<div class="tgame-types">${labels}</div>` : ""}
-    <div class="tgame-cardmeta">${it.year ?? ""}${it.session ? ` · ${esc(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}
-      <button type="button" class="tgame-mini" data-act="refresh-item" title="Actualizează textul itemului (răspunsul tău rămâne)" aria-label="Actualizează textul itemului">⟳</button>
-      ${G.reported.has(it.id)
-        ? `<button type="button" class="tgame-report" disabled>⚑ semnalat</button>`
-        : `<button type="button" class="tgame-report" data-act="report-item" title="Semnalează o eroare de conținut">⚑ eroare</button>`}
+    <div class="tgame-cardmeta">
+      ${labels ? `<span class="tgame-types">${labels}</span>` : ""}
+      <span class="tgame-cardmeta__id">${it.year ?? ""}${it.session ? ` · ${esc(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}</span>
+      <span class="tgame-cardmeta__acts">
+        <button type="button" class="tgame-mini" data-act="refresh-item" title="Actualizează textul itemului (răspunsul tău rămâne)" aria-label="Actualizează textul itemului">⟳</button>
+        ${G.reported.has(it.id)
+          ? `<button type="button" class="tgame-report" disabled>⚑ semnalat</button>`
+          : `<button type="button" class="tgame-report" data-act="report-item" title="Semnalează o eroare de conținut">⚑ eroare</button>`}
+      </span>
     </div>`;
 }
 
@@ -858,7 +832,6 @@ function renderLive() {
       </div>
     </section>`;
   startItemClock();
-  fitStage();
 }
 
 // An item that's already been answered — read-only, so no second attempt and
@@ -905,7 +878,6 @@ function renderAnswered(i, isLive) {
         </aside>
       </div>
     </section>`;
-  fitStage();
 }
 
 // One entry point: review, answered-live, or fresh live.
@@ -1012,7 +984,6 @@ async function submit(card, k) {
   const nav = card.querySelector(".tgame-nav");
   if (nav) nav.outerHTML = navBar(); // the strip grew by one
   updateHud();
-  fitStage(); // the verdict panel just filled up — refit it, nothing else moves
 }
 
 // ---------- boosters ----------
@@ -1303,7 +1274,6 @@ function renderDone() {
       </div>
     </section>`;
   burstConfetti(root.querySelector(".tgame-done__badge") || root);
-  fitStage();
 }
 
 // ---------- timer ----------
@@ -1469,7 +1439,6 @@ function onClick(e) {
           ? `<div class="tgame-obs"><span class="tgame-obs__lab">Explicație</span>${sanitizeRich(obs)}</div>
              <p class="tgame-side__note">Acum alege varianta. Cea corectă ți se arată după ce răspunzi.</p>`
           : `<p class="tgame-side__wait">Itemul acesta n-are explicație scrisă.</p>`;
-        fitStage();
       });
       return;
     }

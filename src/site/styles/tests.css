@@ -884,6 +884,15 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
    Below 1000px the stage steps aside and the layout flows again — a
    1280-wide frame squeezed onto a phone would be unreadable.
    ========================================================= */
+/* Header on ONE line: topic tags, the item's coordinates, then the actions
+   pushed right. The question begins immediately below it. */
+.tgame-cardmeta {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  margin-bottom: 0;
+}
+.tgame-cardmeta__acts { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; }
+.tgame-types { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; margin: 0; }
+
 /* four option slots ALWAYS exist, whatever the item carries */
 .tgame-opt--void { visibility: hidden; }
 .tgame-opt--cut { opacity: 0.4; text-decoration: line-through; cursor: default; }
@@ -953,24 +962,25 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   }
   /* Every region gets a FRACTION OF THE STAGE, never a size derived from its
      content — that's what makes the layout identical on every item. Nothing
-     scrolls: overflow is hidden and the text shrinks to fit (fitStage()). */
+     scrolls, and the type size is identical on every item. */
+  /* A column: header, then the question right under it, then all the slack,
+     then the options anchored to the BOTTOM by `margin-top: auto`. That single
+     line is what keeps the options in the same place on every item while the
+     question is free to be as short or as long as it is — no font juggling,
+     no scrolling, nothing shifting. */
   .tstage--play .tgame-card {
     min-height: 0; margin: 0;
-    display: grid; grid-template-rows: auto minmax(0, 1.05fr) minmax(0, 1.95fr) auto; gap: 0.7rem;
+    display: flex; flex-direction: column; gap: 0.7rem;
   }
   .tstage--play .tgame-q {
-    min-height: 0; margin: 0; overflow: hidden;
-    /* Anchored to the TOP. The question row keeps a fixed share of the stage
-       (so the options never move between items), and a short question simply
-       leaves its slack BELOW the text — where the eye doesn't trip over it.
-       Centring it looked like a hole punched above the question. */
-    display: flex; align-items: flex-start;
+    margin: 0; font-size: 1.15rem; line-height: 1.7; /* the SAME on every item */
   }
   .tstage--play .tgame-opts {
-    min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 0.5rem;
+    margin-top: auto; flex: 0 0 auto;
+    display: grid; grid-template-rows: repeat(4, 5rem); gap: 0.5rem;
   }
   .tstage--play .tgame-opt { min-height: 0; overflow: hidden; align-items: center; }
-  .tstage--play .tgame-opt__t { overflow: hidden; }
+  .tstage--play .tgame-opt__t { font-size: 0.97rem; line-height: 1.5; }
   .tstage--play .tgame-side { min-height: 0; overflow: hidden; }
   .tstage--play .tgame-fb { flex: 1 1 auto; min-height: 0; overflow: hidden; margin: 0; }
   .tgame-cardfoot {
