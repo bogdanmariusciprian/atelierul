@@ -827,6 +827,28 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   .tgc-stat { flex-basis: 4.5rem; }
 }
 
+/* the „what's wrong with this item?" box */
+.tgame-reason {
+  width: 100%; font: inherit; font-size: 0.92rem; padding: 0.6rem 0.8rem;
+  border: 1.5px solid var(--color-border); border-radius: 12px; resize: vertical;
+  background: var(--color-bg); color: var(--color-text);
+}
+.tgame-reason:focus { outline: none; border-color: var(--color-primary); }
+.tgame-report[disabled] { opacity: 0.6; cursor: default; }
+
+/* landing on a single item after „am corectat ce ai semnalat" */
+.tgame-single__note {
+  margin: 0 0 var(--space-md); padding: 0.6rem 0.9rem; border-radius: 12px;
+  background: var(--color-surface); color: var(--color-text-muted); font-size: 0.9rem;
+}
+
+/* the row a report deep-linked to */
+.tg-flash { animation: tg-flash 2.2s ease-out; }
+@keyframes tg-flash {
+  0%, 40% { background: #fef3c7; }
+  100% { background: transparent; }
+}
+
 /* ---- game: top bar (discreet) ---- */
 .tgame { max-width: 720px; margin: 0 auto; }
 .tgame-top {

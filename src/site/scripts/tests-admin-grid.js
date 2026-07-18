@@ -19,7 +19,7 @@
 // never jolts the page.
 // =========================================================
 import {
-  adminFetchTestItems, fetchTestYears, updateTestItem, TEST_ITEM_TYPES,
+  adminFetchTestItems, adminFetchTestItem, fetchTestYears, updateTestItem, TEST_ITEM_TYPES,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich, stripRich, execBold, execUnderline, execItalic, execStrike, execSuper, wrapSelection, formatState } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -56,10 +56,37 @@ export async function initTestAdminGrid(mountEl) {
   state.loading = true;
   render();
   if (!state.years.length) state.years = await fetchTestYears(state.exam);
+  // Deep link from a flagged report (?item=<uuid>) → land straight on that row.
+  // Filters are cleared, otherwise the item could be filtered out of view.
+  let jumpTo = null;
+  const wanted = new URLSearchParams(location.search).get("item");
+  if (wanted) {
+    const it = await adminFetchTestItem(wanted);
+    if (it) {
+      jumpTo = it.id;
+      state.year = it.year;
+      state.session = ""; state.hideVerified = false; state.onlyNo2026 = false; state.search = "";
+    }
+  }
   if (state.year == null || !state.years.some((y) => y.year === state.year)) {
     state.year = state.years.length ? state.years[state.years.length - 1].year : null;
   }
   await load();
+  if (jumpTo) revealRow(jumpTo);
+}
+
+// Bring one item into view and flash it, so it's obvious where you landed.
+function revealRow(id) {
+  if (isMobile()) {
+    const i = filtered().findIndex((x) => x.id === id); // phone shows one card at a time
+    if (i >= 0) { state.mIndex = i; render(); }
+    return;
+  }
+  const el = root.querySelector(`.tg-row[data-id="${id}"]`);
+  if (!el) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  el.classList.add("is-active", "tg-flash");
+  setTimeout(() => el.classList.remove("tg-flash"), 2200);
 }
 
 // Locking BOTH <html> and <body> is what actually stops the page from moving

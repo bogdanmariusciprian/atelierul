@@ -26,9 +26,9 @@
 // =========================================================
 import {
   fetchTestItems, fetchTestItem, answerTestItem, TEST_ITEM_TYPES,
-  fetchMyTestSessions, saveTestSession, deleteTestSession,
+  fetchMyTestSessions, saveTestSession, deleteTestSession, reportTestItem,
 } from "../../shared/scripts/test-repo.js";
-import { reportContent, createPost } from "../../shared/scripts/forum-repo.js";
+import { createPost } from "../../shared/scripts/forum-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { isLoggedIn } from "../../shared/scripts/session.js";
@@ -61,6 +61,7 @@ const G = {
   // review AND the results chart. Each entry is a closed book: it keeps the
   // answer the server revealed, so revisiting never re-asks the server.
   history: [], view: null, liveAnswered: false, itemStart: 0,
+  reported: new Set(), // items already flagged this sitting (survives re-renders)
   total: 0, correct: 0, wrong: 0, points: 0,
   inGame: false, startAt: 0, elapsedBase: 0, timer: null,
 };
@@ -103,7 +104,34 @@ export async function initTestGame(mountEl, exam) {
   G.sel.years = new Set(); G.sel.sessions = new Set(); G.sel.types = new Set();
   G.all = { years: true, sessions: true, types: true };
   G.saved = isLoggedIn() ? await fetchMyTestSessions(exam) : [];
+  // „Ți-am corectat itemul semnalat" → land on that item alone, no new game.
+  const wanted = new URLSearchParams(location.search).get("item");
+  if (wanted && G.byId.has(wanted)) return renderSingleItem(wanted);
   renderConfig();
+}
+
+// One item, read-only. The answer key is NOT shown: this is a „look what
+// changed" view, not a shortcut around solving it.
+function renderSingleItem(id) {
+  const it = G.byId.get(id);
+  const opts = optionsHtml(it, (k) => `
+    <button type="button" class="tgame-opt" disabled>
+      <span class="tgame-opt__k">${k}</span>
+      <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
+    </button>`);
+  root.innerHTML = `
+    <section class="tgame">
+      <a class="tgame-back" href="#" data-act="config">‹ Înapoi la antrenament</a>
+      <p class="tgame-single__note">✓ Profesorul a verificat itemul pe care l-ai semnalat. Așa arată acum.</p>
+      <article class="tgame-card is-review" data-id="${it.id}">
+        ${cardHead(it)}
+        <p class="tgame-q">${it.question ? sanitizeRich(it.question) : ""}</p>
+        <div class="tgame-opts">${opts}</div>
+      </article>
+      <div class="tgame-done__actions">
+        <button type="button" class="tgame-btn tgame-btn--primary" data-act="config">Alege un antrenament ▸</button>
+      </div>
+    </section>`;
 }
 
 // ---------- selection model ----------
@@ -453,7 +481,9 @@ function cardHead(it) {
     ${labels ? `<div class="tgame-types">${labels}</div>` : ""}
     <div class="tgame-cardmeta">${it.year ?? ""}${it.session ? ` · ${esc(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}
       <button type="button" class="tgame-mini" data-act="refresh-item" title="Actualizează textul itemului (răspunsul tău rămâne)" aria-label="Actualizează textul itemului">⟳</button>
-      <button type="button" class="tgame-report" data-act="report-item" title="Semnalează o eroare de conținut">⚑ eroare</button>
+      ${G.reported.has(it.id)
+        ? `<button type="button" class="tgame-report" disabled>⚑ semnalat</button>`
+        : `<button type="button" class="tgame-report" data-act="report-item" title="Semnalează o eroare de conținut">⚑ eroare</button>`}
     </div>`;
 }
 
@@ -714,6 +744,56 @@ function postItem(i) {
   });
 }
 
+// ---------- flag a content error ----------
+// Which letter did the pupil pick on this card (if they'd answered yet)?
+function chosenForCard(card) {
+  const hi = card?.dataset.hi;
+  if (hi != null && G.history[Number(hi)]) return G.history[Number(hi)].chosen;
+  const last = G.history[G.history.length - 1];
+  if (G.liveAnswered && last && last.id === card?.dataset.id) return last.chosen;
+  return null;
+}
+
+// Guests report too — the RPC behind this accepts anonymous reports, they
+// simply can't be replied to.
+function askReport(card) {
+  const id = card?.dataset.id;
+  if (!id || G.reported.has(id)) return;
+  if (document.querySelector(".tgame-modal")) return;
+  const back = document.createElement("div");
+  back.className = "tgame-modal";
+  back.innerHTML = `
+    <div class="tgame-modal__card tgame-modal__card--wide" role="dialog" aria-modal="true" aria-label="Semnalează o eroare">
+      <h3 class="tgame-modal__title">Ce nu e în regulă la acest item?</h3>
+      <p class="tgame-modal__text">Scrie pe scurt ce ai observat: o greșeală de tipar, un enunț neclar, un răspuns care ți se pare greșit…</p>
+      <textarea class="tgame-reason" id="tgame-reason" rows="4" maxlength="500" placeholder="Explicația ta…"></textarea>
+      <div class="tgame-modal__actions">
+        <button type="button" class="tgame-btn" data-modal="cancel">Renunț</button>
+        <button type="button" class="tgame-btn tgame-btn--primary" data-modal="send">Trimite semnalarea</button>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+  const ta = back.querySelector("#tgame-reason");
+  setTimeout(() => ta?.focus(), 30);
+  const close = () => back.remove();
+  back.addEventListener("click", async (ev) => {
+    if (ev.target === back || ev.target.closest("[data-modal=cancel]")) return close();
+    if (!ev.target.closest("[data-modal=send]")) return;
+    const reason = (ta?.value || "").trim();
+    if (!reason) { ta?.focus(); return showToast("Scrie pe scurt ce ai observat."); }
+    close();
+    const ok = await reportTestItem(id, reason, chosenForCard(card));
+    if (!ok) return showToast("N-am putut trimite semnalarea. Încearcă din nou.");
+    G.reported.add(id);
+    const btn = card.querySelector('[data-act="report-item"]');
+    if (btn) { btn.disabled = true; btn.removeAttribute("data-act"); btn.textContent = "⚑ semnalat"; }
+    showToast("⚑ Mulțumim — profesorul verifică itemul.");
+  });
+  document.addEventListener("keydown", function esc4(ev) {
+    if (ev.key === "Escape") { close(); document.removeEventListener("keydown", esc4); }
+  });
+}
+
 // ---------- results chart ----------
 function detailHtml(i) {
   const e = G.history[i];
@@ -932,15 +1012,7 @@ function onClick(e) {
       showToast("Sesiune ștearsă.");
       return renderConfig();
     }
-    if (a === "report-item") {
-      const card = e.target.closest(".tgame-card");
-      if (card?.dataset.id && !card.dataset.reported) {
-        card.dataset.reported = "1";
-        reportContent("test_item", card.dataset.id);
-        showToast("⚑ Mulțumim — profesorul verifică itemul.");
-      }
-      return;
-    }
+    if (a === "report-item") return askReport(e.target.closest(".tgame-card"));
   }
 
   const opt = e.target.closest(".tgame-opt");

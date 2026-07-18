@@ -62,6 +62,25 @@ export async function fetchTestItems({ exam = "admitere-drept", year = null } = 
   return (data || []).map(mapRow);
 }
 
+/** Flag a content error on an item. Works for GUESTS too: the insert happens
+ *  inside a security-definer RPC, so `anon` never gets write access to the
+ *  reports table. `chosen` is the letter the pupil had picked, if any. */
+export async function reportTestItem(itemId, reason, chosen = null) {
+  const { error } = await supabase.rpc("report_test_item", {
+    p_item: itemId, p_reason: reason, p_chosen: chosen,
+  });
+  if (error) { console.warn("reportTestItem:", error.message); return false; }
+  return true;
+}
+
+/** The FULL row (answer key included) behind a report — teacher only. */
+export async function adminFetchTestItem(id) {
+  if (!id) return null;
+  const { data, error } = await supabase.rpc("admin_test_item", { p_id: id });
+  if (error) { console.warn("adminFetchTestItem:", error.message); return null; }
+  return mapRow((data || [])[0]);
+}
+
 /** Re-read ONE item's public text (question, options, observation) — used by the
  *  little refresh button so a teacher's wording fix reaches a pupil mid-game
  *  without disturbing the answer they already picked. Never returns the key. */

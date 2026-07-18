@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser, fetchPointsHistory, fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress, pinGroupPost, reportPostBySurrogate, reportCommentBySurrogate } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser, fetchPointsHistory, fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress, pinGroupPost, reportPostBySurrogate, reportCommentBySurrogate, resolveTestReport } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -28,6 +28,8 @@ import { clapsFor, hasClapped, giveClap, hasPoked, givePoke, loadKudos } from ".
 import {
   findProfanity, FILTER_MESSAGE, setCustomProfanity,
 } from "../../shared/scripts/moderation.js";
+import { adminFetchTestItem } from "../../shared/scripts/test-repo.js";
+import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import {
   wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
 } from "../../shared/scripts/discover-data.js";
@@ -273,6 +275,7 @@ export function renderCommunity(basePath = "") {
     adminUserPage: 1, // 10 per page
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
     contentReports: [], // REAL open reports (posts/comments/test items/exercises)
+    reportItems: {},    // id → full test item behind a flagged-item report
     profanityTerms: [], // admin-managed custom filtered words
     heldContent: [], // posts/comments held by the profanity filter (admin review)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
@@ -2879,17 +2882,60 @@ export function renderCommunity(basePath = "") {
   function moderationBox() {
     // REAL reports (posts/comments/test items/exercises) — persisted in Supabase.
     const RTYPE = { post: "postare", comment: "comentariu", test_item: "item de test", exercise: "exercițiu", message: "mesaj" };
+    const OPTL = ["A", "B", "C", "D"];
+    const reportCard = (r) => {
+      const who = `<span class="cx-muted">semnalat de ${escapeHtml(r.reporterName)} · ${relTime(Math.max(0, Date.now() - r.createdAt))}</span>`;
+      // Anything that isn't a flagged item keeps the old compact row.
+      if (r.targetType !== "test_item") {
+        return `<div class="cx-moditem">
+            <div class="cx-moditem__body">
+              <p class="cx-moditem__text"><b>${RTYPE[r.targetType] || escapeHtml(r.targetType)}</b>${r.reason ? ` — „${escapeHtml(r.reason)}”` : ""}</p>
+              <p class="cx-moditem__meta">${who}</p>
+            </div>
+            <span class="cx-moditem__act"><button type="button" class="btn-mini btn-mini--ok" data-action="report-resolve" data-id="${r.id}">✓ Rezolvă</button></span>
+          </div>`;
+      }
+      const it = state.reportItems[r.targetId];
+      if (!it) {
+        return `<div class="cx-moditem"><div class="cx-moditem__body">
+            <p class="cx-moditem__text">Item semnalat — nu s-a putut încărca.</p>
+            <p class="cx-moditem__meta">${who}</p></div>
+            <span class="cx-moditem__act"><button type="button" class="btn-mini btn-mini--ok" data-action="report-resolve" data-id="${r.id}">✓ Rezolvă</button></span>
+          </div>`;
+      }
+      // The answer that counts today (2026 grammar wins where it differs).
+      const key = it.correct2026 || it.correct;
+      const chosen = r.meta?.chosen || null;
+      const opts = OPTL.filter((k) => it.options?.[k]).map((k) => `
+        <li class="cx-repopt${key === k ? " is-key" : ""}${chosen === k ? " is-pick" : ""}">
+          <b>${k}</b><span>${sanitizeRich(it.options[k])}</span>
+          ${key === k ? `<em class="cx-reptag cx-reptag--key">corect</em>` : ""}
+          ${chosen === k ? `<em class="cx-reptag cx-reptag--pick">bifat de elev</em>` : ""}
+        </li>`).join("");
+      return `<div class="cx-repcard">
+          <a class="cx-repcard__go" href="${basePath}teste/?item=${encodeURIComponent(it.id)}#admitere-drept" title="Deschide itemul în grila de itemi">
+            <span class="cx-repcard__meta">${it.year ?? ""}${it.session ? ` · ${escapeHtml(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""} · deschide în grilă ↗</span>
+            <p class="cx-repcard__q">${sanitizeRich(it.question)}</p>
+            <ul class="cx-repopts">${opts}</ul>
+          </a>
+          <div class="cx-repcard__say">
+            <span class="cx-repcard__lab">Ce spune elevul</span>
+            <p>„${escapeHtml(r.reason || "")}”</p>
+            <p class="cx-moditem__meta">${who}${chosen ? "" : ` · <span class="cx-muted">n-a apucat să răspundă</span>`}</p>
+          </div>
+          ${r.reporterId
+            ? `<input class="cx-input cx-repnote" data-rid="${r.id}" maxlength="300" placeholder="notă pentru elev (opțională)…" />`
+            : `<p class="cx-muted cx-repnote__none">Semnalare de la un vizitator — n-are cont, deci nu poate primi răspuns.</p>`}
+          <div class="cx-repacts">
+            <button type="button" class="btn-mini btn-mini--ok" data-action="report-founded" data-id="${r.id}">✓ Întemeiată${r.reporterId ? " · anunță + puncte" : ""}</button>
+            <button type="button" class="btn-mini btn-mini--no" data-action="report-unfounded" data-id="${r.id}">✕ Neîntemeiată${r.reporterId ? " · trimite nota" : ""}</button>
+          </div>
+        </div>`;
+    };
     const realReports = state.contentReports.length
       ? `<div class="cx-box">
           <div class="cx-admin__head"><h3>⚑ Rapoarte semnalate · ${state.contentReports.length}</h3></div>
-          <div class="cx-modlist">${state.contentReports.map((r) => `
-            <div class="cx-moditem">
-              <div class="cx-moditem__body">
-                <p class="cx-moditem__text"><b>${RTYPE[r.targetType] || escapeHtml(r.targetType)}</b>${r.reason ? ` — „${escapeHtml(r.reason)}”` : ""}</p>
-                <p class="cx-moditem__meta"><span class="cx-muted">semnalat de ${escapeHtml(r.reporterName)} · ${relTime(Math.max(0, Date.now() - r.createdAt))}</span></p>
-              </div>
-              <span class="cx-moditem__act"><button type="button" class="btn-mini btn-mini--ok" data-action="report-resolve" data-id="${r.id}">✓ Rezolvă</button></span>
-            </div>`).join("")}</div>
+          <div class="cx-modlist">${state.contentReports.map(reportCard).join("")}</div>
         </div>`
       : "";
 
@@ -3462,6 +3508,12 @@ export function renderCommunity(basePath = "") {
         state.adminUsers = await adminFetchUsers(); // real members (+ e-mail); also bridges them so they're messageable
         state.contentReports = await fetchContentReports(); // real reports queue (posts/comments/teste/exerciții)
         state.heldContent = await fetchHeldContent();       // filter-held posts/comments awaiting review
+        // Flagged test items are shown IN FULL (question, options, key), so the
+        // teacher can judge without leaving the moderation tab.
+        state.reportItems = {};
+        await Promise.all([...new Set(state.contentReports
+          .filter((r) => r.targetType === "test_item").map((r) => r.targetId))]
+          .map(async (id) => { const it = await adminFetchTestItem(id); if (it) state.reportItems[id] = it; }));
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
@@ -4499,6 +4551,21 @@ export function renderCommunity(basePath = "") {
         const rid = btn.dataset.id;
         resolveReport(rid);
         state.contentReports = state.contentReports.filter((r) => r.id !== rid);
+        return render();
+      }
+      // Closing a flagged item also answers the pupil: founded → notification
+      // (+ points), unfounded → the teacher's note in their inbox. The server
+      // decides both, so neither can be triggered from the client alone.
+      case "report-founded":
+      case "report-unfounded": {
+        const rid = btn.dataset.id;
+        const founded = btn.dataset.action === "report-founded";
+        const note = mount.querySelector(`.cx-repnote[data-rid="${rid}"]`)?.value || "";
+        resolveTestReport(rid, founded, note);
+        state.contentReports = state.contentReports.filter((r) => r.id !== rid);
+        showToast(founded
+          ? "✓ Întemeiată — elevul a fost anunțat și premiat."
+          : "Respinsă — explicația a plecat în mesageria elevului.");
         return render();
       }
       case "prof-add": {

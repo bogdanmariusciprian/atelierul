@@ -786,15 +786,29 @@ export async function fetchOpenModerationCount() {
 export async function fetchContentReports() {
   const { data, error } = await supabase
     .from("reports")
-    .select("id, target_type, target_id, reason, status, created_at, reporter:profiles!reports_reporter_id_fkey(display_name)")
+    .select("id, target_type, target_id, reason, status, meta, reporter_id, created_at, reporter:profiles!reports_reporter_id_fkey(display_name)")
     .eq("status", "open")
     .order("created_at", { ascending: false });
   if (error) { console.warn("fetchContentReports:", error.message); return []; }
   return (data || []).map((r) => ({
     id: r.id, targetType: r.target_type, targetId: r.target_id, reason: r.reason,
+    meta: r.meta || {},
+    // No reporter → a signed-out visitor flagged it; there's nobody to reply to.
+    reporterId: r.reporter_id || null,
     createdAt: new Date(r.created_at).getTime(),
-    reporterName: r.reporter?.display_name || "Cineva",
+    reporterName: r.reporter?.display_name || (r.reporter_id ? "Cineva" : "Vizitator"),
   }));
+}
+
+/** Close a content report. Founded → the pupil gets a notification + points;
+ *  unfounded → the teacher's note lands in their inbox. Server-enforced. */
+export async function resolveTestReport(id, founded, note) {
+  if (!id) return false;
+  const { error } = await supabase.rpc("resolve_test_report", {
+    p_report: id, p_founded: !!founded, p_note: note || null,
+  });
+  if (error) { console.warn("resolveTestReport:", error.message); return false; }
+  return true;
 }
 
 /** Admin: mark a report resolved. */

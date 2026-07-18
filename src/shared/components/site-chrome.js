@@ -742,6 +742,10 @@ function initNotifCenter(basePath) {
         case "reply": return `<b>${name}</b> ți-a răspuns la un comentariu`;
         case "mention": return `<b>${name}</b> te-a menționat`;
         case "poke": return `<b>${name}</b> te-a înghiontit 👉`;
+        case "report_ok": {
+          const note = esc((n.payload || {}).note || "");
+          return `Ai avut dreptate: itemul semnalat a fost corectat ⚑ <b>+10</b> puncte${note ? ` — „${note}”` : ""}`;
+        }
         case "award": {
           const p = n.payload || {};
           if (p.kind === "exercise-approved") return `Exercițiul tău a fost aprobat 🎉 <b>+${p.points || 0}</b> puncte`;
@@ -760,6 +764,8 @@ function initNotifCenter(basePath) {
       }
       if (n.type === "friend") return `${HUB}#profil`;
       if (n.type === "award") return `${HUB}#exercitii`; // exercițiu aprobat/respins
+      // Flagged item was fixed → open THAT item (not a fresh game).
+      if (n.type === "report_ok") return `${basePath}teste/?item=${encodeURIComponent(p.item_id || "")}#admitere-drept`;
       if (p.post_id) return `${HUB}#post/${p.post_id}`; // like/comment/reply/mention → postarea exactă
       return `${HUB}#forum`;
     };
