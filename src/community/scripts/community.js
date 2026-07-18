@@ -183,7 +183,7 @@ function parseYouTubeId(url) {
 function freshComposer() {
   return {
     type: "discutie", bg: "none", media: null, text: "",
-    audience: "public", // "public" | "friends"
+    audience: "public", // "public" | "members" | "friends" | "private"
     ytOpen: false, typeOpen: false, bgOpen: false,
     // Group-creation fields (used when type === "grup")
     groupName: "", iconId: 0, iconOpen: false,
@@ -376,7 +376,10 @@ export function renderCommunity(basePath = "") {
   // Guests see ONLY public posts — so "🌐 Public" finally means public.
   const canSeePost = (p) => {
     if (!isLoggedIn()) return p.audience === "public";
-    return p.audience !== "friends" || p.authorId === CURRENT_USER.id || isFriend(p.authorId) || isAdmin();
+    if (isAdmin() || p.authorId === CURRENT_USER.id) return true;
+    if (p.audience === "private") return false;
+    if (p.audience === "friends") return isFriend(p.authorId);
+    return true; // public + members (and I'm logged in)
   };
 
   // A user's wall = their posts from the unified feed that I may see.
@@ -480,7 +483,7 @@ export function renderCommunity(basePath = "") {
   // Reshare toggle — used by the post footer AND the image lightbox (DRY).
   // Creates/removes the wrapper post on my wall and confirms with a toast.
   function toggleShare(p) {
-    if (!p || p.shareOf || p.inGroup || (p.audience === "friends" && p.authorId !== CURRENT_USER.id)) return;
+    if (!p || p.shareOf || p.inGroup || p.audience !== "public") return; // only public posts travel
     p.sharedByMe = !p.sharedByMe;
     p.shares += p.sharedByMe ? 1 : -1;
     if (p.sharedByMe) {
@@ -653,6 +656,8 @@ export function renderCommunity(basePath = "") {
       const g = state.groups.find((x) => x.posts.some((p) => p.id === post.id));
       return g && g.memberIds.includes(u.id) ? true : "nu e membru al acestui grup";
     }
+    if (post.audience === "private")
+      return "postarea e privată — n-o vede nimeni altcineva";
     if (post.audience === "friends" && post.authorId !== CURRENT_USER.id)
       return "postarea e doar pentru prietenii autorului, iar el/ea s-ar putea să n-o vadă";
     return true;
@@ -669,17 +674,24 @@ export function renderCommunity(basePath = "") {
     }
   }
 
-  // Small audience tag shown on each post ("public" is the default).
-  const audienceBadge = (a) =>
-    a === "friends"
-      ? `<span class="post__aud" title="Vizibilă doar prietenilor tăi">👥 Prieteni</span>`
-      : `<span class="post__aud" title="Vizibilă tuturor">🌐 Public</span>`;
-
-  // Public/Friends toggle in the composer bar.
+  // The four audience levels. Server-side RLS is what actually enforces them
+  // (migration 0042); this is the label + picker the pupil sees.
+  const AUD_META = {
+    public: { icon: "🌐", label: "Public", title: "Vizibilă tuturor, chiar și vizitatorilor" },
+    members: { icon: "🎓", label: "Elevii cu cont", title: "Vizibilă doar celor conectați" },
+    friends: { icon: "👥", label: "Prieteni", title: "Vizibilă doar prietenilor tăi" },
+    private: { icon: "🔒", label: "Doar eu", title: "Vizibilă doar ție" },
+  };
+  const audienceBadge = (a) => {
+    const m = AUD_META[a] || AUD_META.public;
+    return `<span class="post__aud" title="${m.title}">${m.icon} ${m.label}</span>`;
+  };
   const audiencePicker = (a) => {
-    const opt = (key, label) =>
-      `<button type="button" class="cx-audopt${a === key ? " on" : ""}" data-action="set-audience" data-key="${key}">${label}</button>`;
-    return `<div class="cx-audience" title="Cine vede postarea">${opt("public", "🌐 Public")}${opt("friends", "👥 Prieteni")}</div>`;
+    const opt = (key) => {
+      const m = AUD_META[key];
+      return `<button type="button" class="cx-audopt${a === key ? " on" : ""}" data-action="set-audience" data-key="${key}" title="${m.title}">${m.icon} ${m.label}</button>`;
+    };
+    return `<div class="cx-audience" title="Cine vede postarea">${opt("public")}${opt("members")}${opt("friends")}${opt("private")}</div>`;
   };
 
   // ---------- Guest bits ----------
@@ -991,10 +1003,11 @@ export function renderCommunity(basePath = "") {
     const commentsCount = countComments(post.comments);
     const open = state.openComments.has(post.id);
 
-    // Sharing: not on shares-of-shares, never on friends-only posts and
-    // never on group posts (both would leak past the intended audience).
+    // Sharing: only PUBLIC posts travel. Anything narrower (members, friends,
+    // private) or inside a group would leak past its intended audience once
+    // the resharer picks their own.
     const shareBtn =
-      isShare || post.audience === "friends" || post.inGroup
+      isShare || post.audience !== "public" || post.inGroup
         ? ""
         : `<button type="button" class="post__act${post.sharedByMe ? " is-shared" : ""}" data-action="share" data-id="${post.id}"
              title="${post.sharedByMe ? "Anulează redistribuirea" : "Redistribuie pe pagina ta"}">

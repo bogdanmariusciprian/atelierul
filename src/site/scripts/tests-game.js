@@ -25,10 +25,10 @@
 // reload can't farm points. The saved queue holds only item ids.
 // =========================================================
 import {
-  fetchTestItems, answerTestItem, TEST_ITEM_TYPES,
+  fetchTestItems, fetchTestItem, answerTestItem, TEST_ITEM_TYPES,
   fetchMyTestSessions, saveTestSession, deleteTestSession,
 } from "../../shared/scripts/test-repo.js";
-import { reportContent } from "../../shared/scripts/forum-repo.js";
+import { reportContent, createPost } from "../../shared/scripts/forum-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { isLoggedIn } from "../../shared/scripts/session.js";
@@ -57,11 +57,17 @@ const G = {
   emoji: EMOJIS[0], label: "",
   saved: [], savedId: null,
   sessionId: null, queue: [],
+  // Every answer given this sitting, in order — powers the back/forward
+  // review AND the results chart. Each entry is a closed book: it keeps the
+  // answer the server revealed, so revisiting never re-asks the server.
+  history: [], view: null, liveAnswered: false, itemStart: 0,
   total: 0, correct: 0, wrong: 0, points: 0,
   inGame: false, startAt: 0, elapsedBase: 0, timer: null,
 };
 
 const elapsedSec = () => G.elapsedBase + Math.floor((Date.now() - G.startAt) / 1000);
+const fmtSec = (ms) => `${(ms / 1000).toFixed(1)}s`;
+const plain = (s) => String(s ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 
 // ---------- entry ----------
 export async function initTestGame(mountEl, exam) {
@@ -72,6 +78,9 @@ export async function initTestGame(mountEl, exam) {
   if (!root.__gameWired) {
     root.addEventListener("click", onClick);
     root.addEventListener("input", onInput);
+    // Chart bars answer to both the mouse and the keyboard.
+    root.addEventListener("mouseover", onBarPeek);
+    root.addEventListener("focusin", onBarPeek);
     root.__gameWired = true;
   }
   if (!window.__tgameBeforeUnload) {
@@ -203,7 +212,9 @@ function resumeSession(id) {
     showToast("Sesiunea era deja terminată.");
     return renderConfig();
   }
-  G.inGame = true; G.startAt = Date.now();
+  // A resumed sitting starts a fresh review strip (the chart covers this sitting).
+  G.history = []; G.view = null; G.liveAnswered = false;
+  G.inGame = true; G.startAt = Date.now(); G.itemStart = Date.now();
   startTimer();
   renderGame();
 }
@@ -406,7 +417,8 @@ function startGame() {
   G.total = items.length;
   G.correct = 0; G.wrong = 0; G.points = 0;
   G.elapsedBase = 0;
-  G.inGame = true; G.startAt = Date.now();
+  G.history = []; G.view = null; G.liveAnswered = false;
+  G.inGame = true; G.startAt = Date.now(); G.itemStart = Date.now();
   persist();
   startTimer();
   renderGame();
@@ -432,31 +444,119 @@ function hud() {
     </div>`;
 }
 
-function renderGame() {
+// Shared card chrome. Topic tags read as FULL names (discreet grey), and the
+// ⟳ button re-reads the teacher's latest wording without touching the answer.
+function cardHead(it) {
+  const labels = (it.types || []).map((c) =>
+    `<span class="tgame-typelab">${esc(TYPE_LABEL[c] || c)}</span>`).join("");
+  return `
+    ${labels ? `<div class="tgame-types">${labels}</div>` : ""}
+    <div class="tgame-cardmeta">${it.year ?? ""}${it.session ? ` · ${esc(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}
+      <button type="button" class="tgame-mini" data-act="refresh-item" title="Actualizează textul itemului (răspunsul tău rămâne)" aria-label="Actualizează textul itemului">⟳</button>
+      <button type="button" class="tgame-report" data-act="report-item" title="Semnalează o eroare de conținut">⚑ eroare</button>
+    </div>`;
+}
+
+const optionsHtml = (it, render) =>
+  OPTS.filter((k) => it.options?.[k] != null && it.options[k] !== "").map((k) => render(k)).join("");
+
+// Where we are on the strip of answered items (+ the live one at the end).
+function navState() {
+  const h = G.history.length;
+  const liveIdx = G.liveAnswered ? h - 1 : h; // the live card IS the last entry once answered
+  const total = liveIdx + 1;
+  const idx = G.view === null ? liveIdx : G.view;
+  return { h, liveIdx, total, idx };
+}
+
+// Back walks over what you've already answered; forward only ever lands on an
+// item you've solved — or returns you to the live one. You can never skip ahead.
+function navBar() {
+  const { total, idx, liveIdx } = navState();
+  if (total < 2) return "";
+  return `<div class="tgame-nav">
+      <button type="button" class="tgame-mini" data-act="prev-item"${idx > 0 ? "" : " disabled"} title="Itemul anterior" aria-label="Itemul anterior">‹</button>
+      <span class="tgame-nav__pos">${idx + 1} / ${total}</span>
+      <button type="button" class="tgame-mini" data-act="next-item"${idx < liveIdx ? "" : " disabled"} title="Itemul următor" aria-label="Itemul următor">›</button>
+    </div>`;
+}
+
+function postBar(i) {
+  const e = G.history[i];
+  if (!e || !isLoggedIn()) return "";
+  return `<div class="tgame-postbar">${e.posted
+    ? `<span class="tgame-posted">✓ Postat pe pagina ta</span>`
+    : `<button type="button" class="tgame-btn tgame-btn--sm" data-act="post-item" data-hi="${i}">📌 Postează pe pagina mea</button>`}</div>`;
+}
+
+// The live, unanswered item.
+function renderLive() {
   if (!G.queue.length) return renderDone();
   const it = G.byId.get(G.queue[0]);
-  const labels = (it.types || []).map((c) =>
-    `<span class="tgame-typelab" title="${esc(TYPE_LABEL[c] || c)}">${esc(c)}</span>`).join("");
-  const opts = OPTS.filter((k) => it.options[k] != null && it.options[k] !== "").map((k) => `
+  const opts = optionsHtml(it, (k) => `
     <button type="button" class="tgame-opt" data-k="${k}">
       <span class="tgame-opt__k">${k}</span>
       <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
-    </button>`).join("");
-
+    </button>`);
   root.innerHTML = `
     <section class="tgame">
       ${hud()}
       <article class="tgame-card" data-id="${it.id}">
-        ${labels ? `<div class="tgame-types">${labels}</div>` : ""}
-        <div class="tgame-cardmeta">${it.year ?? ""}${it.session ? ` · ${esc(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}
-          <button type="button" class="tgame-report" data-act="report-item" title="Semnalează o eroare de conținut">⚑ eroare</button>
-        </div>
+        ${cardHead(it)}
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
         <div class="tgame-opts">${opts || `<span class="tgame-empty">(variante indisponibile)</span>`}</div>
         <div class="tgame-fb" hidden></div>
         <div class="tgame-next" hidden><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>
+        ${navBar()}
       </article>
     </section>`;
+}
+
+// An item that's already been answered — read-only, so no second attempt and
+// no second helping of points. `isLive` adds the „Continuă" button.
+function renderAnswered(i, isLive) {
+  const e = G.history[i];
+  if (!e) return renderLive();
+  const it = G.byId.get(e.id) || { options: {} };
+  const opts = optionsHtml(it, (k) => {
+    const cls = k === e.correctAnswer ? " opt-correct" : (k === e.chosen && !e.correct ? " opt-wrong" : "");
+    return `
+    <button type="button" class="tgame-opt${cls}" disabled>
+      <span class="tgame-opt__k">${k}</span>
+      <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
+    </button>`;
+  });
+  root.innerHTML = `
+    <section class="tgame">
+      ${hud()}
+      <article class="tgame-card ${e.correct ? "is-correct" : "is-wrong"}${isLive ? "" : " is-review"}" data-id="${e.id}" data-hi="${i}" data-done="1">
+        ${cardHead(it)}
+        <p class="tgame-q">${it.question ? sanitizeRich(it.question) : ""}</p>
+        <div class="tgame-opts">${opts}</div>
+        <div class="tgame-fb">
+          <div class="tgame-verdict ${e.correct ? "ok" : "no"}">${e.correct ? "✓ Corect" : `✗ Greșit — corect era <b>${esc(e.correctAnswer)}</b>`}</div>
+          ${e.historical ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(e.historical)}</b>.</div>` : ""}
+          ${e.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(e.observation)}</div>` : ""}
+          ${postBar(i)}
+        </div>
+        ${isLive ? `<div class="tgame-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>` : ""}
+        ${navBar()}
+      </article>
+    </section>`;
+}
+
+// One entry point: review, answered-live, or fresh live.
+function renderGame() {
+  if (G.view !== null) return renderAnswered(G.view, false);
+  if (G.liveAnswered && G.history.length) return renderAnswered(G.history.length - 1, true);
+  return renderLive();
+}
+
+function goTo(newIdx) {
+  const { total, liveIdx } = navState();
+  if (newIdx < 0 || newIdx >= total) return;
+  G.view = newIdx === liveIdx ? null : newIdx;
+  renderGame();
 }
 
 function updateHud() {
@@ -484,6 +584,19 @@ async function submit(btn) {
   card.dataset.correct = res.correct ? "1" : "0";
   if (res.correct) { G.correct++; G.points += res.points || 0; } else { G.wrong++; }
 
+  // Close the book on this attempt: what the server revealed is kept locally,
+  // so reviewing it later never asks again (and never re-awards points).
+  G.history.push({
+    id, chosen: k,
+    correct: !!res.correct,
+    correctAnswer: res.correctAnswer || "",
+    observation: res.observation || "",
+    historical: res.historical || "",
+    points: res.awarded ? (res.points || 0) : 0,
+    ms: Math.max(0, Date.now() - G.itemStart),
+  });
+  G.liveAnswered = true;
+
   card.classList.add(res.correct ? "is-correct" : "is-wrong");
   card.querySelectorAll(".tgame-opt").forEach((b) => {
     if (b.dataset.k === res.correctAnswer) b.classList.add("opt-correct");
@@ -496,8 +609,11 @@ async function submit(btn) {
   fb.innerHTML = `
     <div class="tgame-verdict ${res.correct ? "ok" : "no"}">${res.correct ? "✓ Corect" : `✗ Greșit — corect era <b>${esc(res.correctAnswer)}</b>`}</div>
     ${hist}
-    ${res.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(res.observation)}</div>` : ""}`;
+    ${res.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(res.observation)}</div>` : ""}
+    ${postBar(G.history.length - 1)}`;
   card.querySelector(".tgame-next").hidden = false;
+  const nav = card.querySelector(".tgame-nav");
+  if (nav) nav.outerHTML = navBar(); // the strip grew by one
 
   updateHud();
   if (res.correct) { burstConfetti(card); if (res.awarded) floatPoints(res.points); }
@@ -505,13 +621,141 @@ async function submit(btn) {
 }
 
 function advance() {
-  const card = root.querySelector(".tgame-card");
-  const wasCorrect = card && card.dataset.correct === "1";
+  const last = G.history[G.history.length - 1];
   const id = G.queue.shift();
-  if (!wasCorrect && id != null) G.queue.push(id); // wrong → back of the queue
+  if (!(last && last.correct) && id != null) G.queue.push(id); // wrong → back of the queue
+  G.liveAnswered = false;
+  G.view = null;
+  G.itemStart = Date.now();
   persist(); // progress is safe from here on
   if (!G.queue.length) return renderDone();
   renderGame();
+}
+
+// ---------- refresh one item's text ----------
+// The teacher fixes a word mid-game → pull the new WORDING only. The answer
+// already picked, the verdict and the score are untouched.
+async function refreshItem(card) {
+  const id = card?.dataset.id;
+  if (!id || card.dataset.refreshing) return;
+  card.dataset.refreshing = "1";
+  const btn = card.querySelector('[data-act="refresh-item"]');
+  btn?.classList.add("is-spinning");
+  const fresh = await fetchTestItem(id);
+  btn?.classList.remove("is-spinning");
+  delete card.dataset.refreshing;
+  if (!fresh) { showToast("N-am putut actualiza itemul acum."); return; }
+  const old = G.byId.get(id);
+  if (old) {
+    old.question = fresh.question;
+    old.options = fresh.options;
+    old.observation = fresh.observation;
+    old.types = fresh.types;
+  } else G.byId.set(id, fresh);
+  // Entries already answered carry their own copy of the explanation.
+  if (fresh.observation) for (const e of G.history) if (e.id === id) e.observation = fresh.observation;
+  renderGame();
+  showToast("Item actualizat ✓");
+}
+
+// ---------- post an item on my page ----------
+const AUDIENCES = [
+  ["public", "🌐 Public", "oricine, chiar și fără cont"],
+  ["members", "🎓 Elevii cu cont", "doar cine e conectat"],
+  ["friends", "👥 Prietenii mei", "doar prietenii din listă"],
+  ["private", "🔒 Doar eu", "însemnare personală"],
+];
+
+// Posts store plain text (escaped at render), so the item's rich markup is
+// flattened here rather than shipped as tags.
+function itemPostText(e) {
+  const it = G.byId.get(e.id) || { options: {} };
+  const head = `📘 Item admitere drept${it.year ? ` · ${it.year}` : ""}${it.session ? ` · ${it.session}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}`;
+  const opts = OPTS.filter((k) => it.options?.[k] != null && it.options[k] !== "")
+    .map((k) => `${k}) ${plain(it.options[k])}`).join("\n");
+  const obs = e.observation ? `\n\n💡 ${plain(e.observation)}` : "";
+  return `${head}\n\n${plain(it.question)}\n\n${opts}\n\n✅ Răspuns corect: ${e.correctAnswer}${obs}`;
+}
+
+function askAudience(onPick) {
+  if (document.querySelector(".tgame-modal")) return;
+  const back = document.createElement("div");
+  back.className = "tgame-modal";
+  back.innerHTML = `
+    <div class="tgame-modal__card tgame-modal__card--wide" role="dialog" aria-modal="true" aria-label="Cine vede postarea?">
+      <h3 class="tgame-modal__title">Cine vede postarea?</h3>
+      <div class="tgame-audlist">
+        ${AUDIENCES.map(([k, label, hint]) =>
+          `<button type="button" class="tgame-audopt" data-aud="${k}"><b>${label}</b><span>${hint}</span></button>`).join("")}
+      </div>
+      <div class="tgame-modal__actions"><button type="button" class="tgame-btn" data-modal="cancel">Renunț</button></div>
+    </div>`;
+  document.body.appendChild(back);
+  const close = () => back.remove();
+  back.addEventListener("click", (ev) => {
+    if (ev.target === back || ev.target.closest("[data-modal=cancel]")) return close();
+    const pick = ev.target.closest("[data-aud]");
+    if (pick) { close(); onPick(pick.dataset.aud); }
+  });
+  document.addEventListener("keydown", function esc3(ev) {
+    if (ev.key === "Escape") { close(); document.removeEventListener("keydown", esc3); }
+  });
+}
+
+function postItem(i) {
+  const e = G.history[i];
+  if (!e || e.posted || !isLoggedIn()) return;
+  askAudience(async (audience) => {
+    const row = await createPost({ type: "resursa", audience, text: itemPostText(e), surface: "wall" });
+    if (!row) { showToast("N-am putut posta acum. Încearcă din nou."); return; }
+    e.posted = true;
+    showToast("📌 Postat pe pagina ta.");
+    renderGame();
+  });
+}
+
+// ---------- results chart ----------
+function detailHtml(i) {
+  const e = G.history[i];
+  if (!e) return "";
+  const it = G.byId.get(e.id) || { options: {} };
+  const tags = (it.types || []).map((c) => `<span class="tgame-typelab">${esc(TYPE_LABEL[c] || c)}</span>`).join("");
+  return `
+    <p class="tgc-detail__meta">itemul ${i + 1} din ${G.history.length} · ${e.correct ? "✓ corect" : "✗ greșit"} · ${fmtSec(e.ms)}${e.points ? ` · +${e.points} puncte` : ""}</p>
+    ${tags ? `<div class="tgame-types">${tags}</div>` : ""}
+    <p class="tgc-detail__q">${it.question ? sanitizeRich(it.question) : ""}</p>
+    <p class="tgc-detail__a">Ai bifat <b>${esc(e.chosen)}</b>${e.correct ? "" : ` — corect era <b>${esc(e.correctAnswer)}</b>`}</p>
+    ${e.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(e.observation)}</div>` : ""}`;
+}
+
+function resultsChart() {
+  const h = G.history;
+  if (!h.length) return "";
+  const times = h.map((e) => e.ms);
+  const maxMs = Math.max(...times, 1);
+  const avgMs = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+  const fastest = h.reduce((a, b) => (b.ms < a.ms ? b : a));
+  const bars = h.map((e, i) => `
+    <button type="button" class="tgc-bar${e.correct ? " ok" : " no"}" data-hi="${i}"
+      style="height:${Math.max(6, Math.round((e.ms / maxMs) * 100))}%"
+      aria-label="Itemul ${i + 1}: ${e.correct ? "corect" : "greșit"}, ${fmtSec(e.ms)}"></button>`).join("");
+  const stat = (v, l) => `<div class="tgc-stat"><b>${v}</b><span>${l}</span></div>`;
+  return `
+    <div class="tgc">
+      <div class="tgc-stats">
+        ${stat(G.correct, "corecte")}
+        ${stat(G.wrong, "greșite")}
+        ${stat(fmtSec(avgMs), "timp mediu")}
+        ${stat(fmtSec(fastest.ms), "cel mai rapid")}
+        ${stat(G.points, "puncte")}
+      </div>
+      <p class="tgc-hint">Fiecare bară e un răspuns, iar înălțimea ei e timpul de gândire. Treci peste ea (sau cu Tab) ca să vezi itemul.</p>
+      <div class="tgc-plot">
+        <div class="tgc-avgline" style="bottom:${Math.round((avgMs / maxMs) * 100)}%"><span>media ${fmtSec(avgMs)}</span></div>
+        <div class="tgc-bars">${bars}</div>
+      </div>
+      <div class="tgc-detail" id="tgc-detail">${detailHtml(0)}</div>
+    </div>`;
 }
 
 // ---------- DONE ----------
@@ -532,6 +776,7 @@ function renderDone() {
       <div class="tgame-done__badge" aria-hidden="true">✓</div>
       <h2 class="tgame-done__title">Gata! Ai rezolvat corect toți itemii.</h2>
       <p class="tgame-done__stats"><b>${G.total}</b> itemi · <b class="ok">${G.correct}</b> corecte · <b class="no">${G.wrong}</b> greșite · <b class="pts">${G.points}</b> puncte · timp <b>${time}</b></p>
+      ${resultsChart()}
       <div class="tgame-done__actions">
         <button type="button" class="tgame-btn tgame-btn--primary" data-act="again">Încă o dată</button>
         <button type="button" class="tgame-btn" data-act="config">Altă configurație</button>
@@ -638,6 +883,15 @@ function onInput(e) {
   if (e.target.id === "tgame-label") G.label = e.target.value.slice(0, 40); // no re-render: keeps focus
 }
 
+function onBarPeek(e) {
+  const bar = e.target.closest?.(".tgc-bar");
+  if (!bar) return;
+  const panel = root.querySelector("#tgc-detail");
+  if (panel) panel.innerHTML = detailHtml(Number(bar.dataset.hi));
+  root.querySelectorAll(".tgc-bar.on").forEach((b) => b.classList.remove("on"));
+  bar.classList.add("on");
+}
+
 function onClick(e) {
   const year = e.target.closest("[data-year]");
   if (year) { pickGroup("years", year.dataset.year); return renderConfig(); }
@@ -666,6 +920,10 @@ function onClick(e) {
     if (a === "start" || a === "again") return startGame();
     if (a === "config") return renderConfig();
     if (a === "next") return advance();
+    if (a === "prev-item") return goTo(navState().idx - 1);
+    if (a === "next-item") return goTo(navState().idx + 1);
+    if (a === "refresh-item") return refreshItem(e.target.closest(".tgame-card"));
+    if (a === "post-item") return postItem(Number(act.dataset.hi));
     if (a === "resume") return resumeSession(act.dataset.id);
     if (a === "drop-session") {
       const id = act.dataset.id;

@@ -62,6 +62,16 @@ export async function fetchTestItems({ exam = "admitere-drept", year = null } = 
   return (data || []).map(mapRow);
 }
 
+/** Re-read ONE item's public text (question, options, observation) — used by the
+ *  little refresh button so a teacher's wording fix reaches a pupil mid-game
+ *  without disturbing the answer they already picked. Never returns the key. */
+export async function fetchTestItem(id) {
+  if (!id) return null;
+  const { data, error } = await supabase.from("test_items").select(PUBLIC_COLS).eq("id", id).single();
+  if (error) { console.warn("fetchTestItem:", error.message); return null; }
+  return mapRow(data);
+}
+
 /** Years available with counts (verified-only for pupils, all for admin). */
 export async function fetchTestYears(exam = "admitere-drept") {
   const { data, error } = await supabase.rpc("test_item_years", { p_exam: exam });
