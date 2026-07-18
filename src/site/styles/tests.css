@@ -744,18 +744,32 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 /* no items under the CURRENT year/session choice — still listed, just quiet */
 .tgame-tl__row.is-none { opacity: 0.55; }
 
-/* handles are inert unless „Ordinea mea" is the chosen order */
-.tgame-tl.is-locked .tgame-tl__grip { cursor: default; opacity: 0.3; }
+/* Handles only exist under „Ordinea mea". Hiding them outright (instead of
+   dimming) is the honest signal: no handle, nothing to grab. The rows stay
+   fully clickable — it's the REORDERING that's off, not the selection. */
+.tgame-tl.is-locked .tgame-tl__grip { display: none; }
+.tgame-tl.is-locked .tgame-tl__row { padding-left: 0.9rem; }
 .tgame-tl__hint {
-  margin: 0 0 0.5rem; font-size: 0.8rem; color: var(--color-text-muted);
+  display: flex; align-items: center; gap: 0.45rem;
+  margin: 0 0 0.6rem; padding: 0.45rem 0.75rem;
+  border-radius: 10px; border: 1px dashed var(--color-border);
+  font-size: 0.8rem; color: var(--color-text-muted);
 }
+.tgame-tl__hint::before { content: "🔒"; font-size: 0.9rem; }
+/* and when it IS unlocked, the rows advertise that they can be grabbed */
+.tgame-tl:not(.is-locked) .tgame-tl__row:hover { border-color: var(--color-primary); }
+.tgame-tl:not(.is-locked) .tgame-tl__row:hover .tgame-tl__grip { color: var(--color-primary); }
 
 /* ---- drag: the row lifts out and floats under the finger ---- */
 .tgame-tl__float {
   position: fixed; z-index: 9999; margin: 0; pointer-events: none;
   border-color: var(--color-primary);
   box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.45);
-  transform: scale(1.03) rotate(-0.5deg);
+  /* Origin in the TOP-LEFT corner — the same corner we position by, and the
+     corner the grip sits in. Scaling from the centre (the default) shifts the
+     card away from the cursor and makes dropping it a guessing game. */
+  transform-origin: 0 0;
+  transform: scale(1.02) rotate(-0.4deg);
   transition: transform 0.12s ease, opacity 0.12s ease;
 }
 /* released out here and it won't take — say so before they let go */
@@ -848,6 +862,69 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
 .tgame-obsbtn:hover { border-color: var(--color-primary); color: var(--color-primary); border-style: solid; }
 /* exam mode: a verdict that deliberately says nothing */
 .tgame-verdict.is-mute { color: var(--color-text-muted); font-weight: 700; }
+
+/* =========================================================
+   CLASSIC MODE — lives, the satchel of boosters, and the flying bonus.
+   ========================================================= */
+.tgame-lives { margin-left: auto; letter-spacing: 0.08em; font-size: 0.95rem; user-select: none; }
+
+.tgame-boosters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.tgame-boosters.is-empty {
+  margin: 0.6rem 0 0; font-size: 0.78rem; font-style: italic; color: var(--color-text-muted);
+}
+.tgame-booster {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font: inherit; font-size: 0.95rem; cursor: pointer; user-select: none;
+  padding: 0.25rem 0.6rem; border-radius: 999px;
+  border: 1.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text);
+  transition: border-color 0.12s ease, transform 0.06s ease;
+}
+.tgame-booster:hover { border-color: var(--color-primary); }
+.tgame-booster:active { transform: scale(0.94); }
+.tgame-booster b { font-size: 0.72rem; font-weight: 800; color: var(--color-text-muted); }
+
+/* five seconds of explanation, then gone */
+.tgame-peek {
+  margin-top: var(--space-md); padding: 0.7rem 0.9rem; border-radius: 14px;
+  background: var(--color-surface); border: 1.5px solid var(--color-primary);
+}
+.tgame-peek__lab {
+  display: block; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--color-primary); margin-bottom: 0.3rem;
+}
+.tgame-peek__txt { line-height: 1.6; }
+.tgame-peek__bar { display: block; height: 3px; border-radius: 2px; background: var(--color-border); margin-top: 0.5rem; overflow: hidden; }
+.tgame-peek__bar i { display: block; height: 100%; width: 100%; background: var(--color-primary); animation: tgame-peek 5s linear forwards; }
+@keyframes tgame-peek { to { width: 0; } }
+
+/* ---- the flying bonus question ---- */
+.tbonus-flyer {
+  position: fixed; z-index: 9998; left: -14rem;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font: inherit; font-weight: 800; font-size: 0.9rem; cursor: pointer; user-select: none;
+  padding: 0.5rem 1.1rem; border-radius: 999px; border: 0;
+  background: var(--color-primary); color: #fff;
+  box-shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.5);
+}
+.tbonus-flyer__ic { animation: tbonus-spin 1.6s linear infinite; }
+@keyframes tbonus-spin { to { transform: rotate(360deg); } }
+.tbonus-flyer.fly-lr { animation: tbonus-lr linear forwards; }
+.tbonus-flyer.fly-rl { animation: tbonus-rl linear forwards; }
+@keyframes tbonus-lr { from { left: -14rem; } to { left: 105vw; } }
+@keyframes tbonus-rl { from { left: 105vw; } to { left: -14rem; } }
+/* someone asked for less motion: it simply waits to be tapped */
+.tbonus-flyer.is-still { left: auto; right: 1.2rem; animation: none; }
+.tbonus-flyer:hover { filter: brightness(1.1); }
+
+.tbonus-kicker {
+  margin: 0 0 0.3rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-primary);
+}
+.tbonus-q { font-size: 1.05rem; }
+.tbonus-input { margin-top: 0.6rem; }
+.tbonus-bar { height: 4px; border-radius: 2px; background: var(--color-border); overflow: hidden; margin-bottom: 0.8rem; }
+.tbonus-bar i { display: block; height: 100%; width: 100%; background: var(--color-primary); border-radius: 2px; transition: width 0.1s linear; }
+.tgame-modal__card.is-checking { opacity: 0.6; pointer-events: none; }
 /* the option you picked, shown WITHOUT saying whether it was right */
 .tgame-opt.opt-picked { border-color: var(--color-primary); }
 

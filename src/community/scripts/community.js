@@ -28,7 +28,9 @@ import { clapsFor, hasClapped, giveClap, hasPoked, givePoke, loadKudos } from ".
 import {
   findProfanity, FILTER_MESSAGE, setCustomProfanity,
 } from "../../shared/scripts/moderation.js";
-import { adminFetchTestItem } from "../../shared/scripts/test-repo.js";
+import {
+  adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
+} from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import {
   wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
@@ -276,6 +278,7 @@ export function renderCommunity(basePath = "") {
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
     contentReports: [], // REAL open reports (posts/comments/test items/exercises)
     reportItems: {},    // id → full test item behind a flagged-item report
+    bonusQs: [],        // flying bonus questions (teacher-authored)
     profanityTerms: [], // admin-managed custom filtered words
     heldContent: [], // posts/comments held by the profanity filter (admin review)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
@@ -308,7 +311,7 @@ export function renderCommunity(basePath = "") {
   const unreadMsgCount = () => state.conversations.reduce((n, c) => n + (c.unread || 0), 0);
   // Deep links into a specific admin tab: #admin/moderare, #admin/utilizatori…
   // (used by the floating admin quick-panel, from any page of the site).
-  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification" };
+  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification", bonus: "bonus" };
   const ADMIN_SLUG_BY_TAB = Object.fromEntries(Object.entries(ADMIN_TAB_BY_SLUG).map(([s, t]) => [t, s]));
   function applyAdminHash() {
     const h = location.hash.slice(1);
@@ -3218,6 +3221,30 @@ export function renderCommunity(basePath = "") {
       </div>`;
   }
 
+  // Short, easy questions that fly across the screen in the game's classic
+  // mode. The accepted answers never reach a pupil's browser (the column is
+  // revoked); they come back here through a definer RPC.
+  function adminTabBonus() {
+    const rows = state.bonusQs.map((q) => `
+      <div class="cx-bonusrow" data-id="${q.id}">
+        <input class="cx-input" data-f="prompt" value="${escapeHtml(q.prompt)}" placeholder="întrebarea…" maxlength="140" />
+        <input class="cx-input" data-f="answers" value="${escapeHtml((q.answers || []).join(", "))}" placeholder="răspunsuri acceptate, separate prin virgulă" maxlength="200" />
+        <label class="cx-bonusrow__on"><input type="checkbox" data-f="active"${q.active ? " checked" : ""} /> activă</label>
+        <button type="button" class="btn-mini btn-mini--ok" data-action="bonus-save" data-id="${q.id}">Salvează</button>
+        <button type="button" class="btn-mini btn-mini--no" data-action="bonus-del" data-id="${q.id}">Șterge</button>
+      </div>`).join("");
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>✦ Întrebări bonus · ${state.bonusQs.length}</h3></div>
+        <p class="cx-muted">Întrebări scurte și ușoare. În modul clasic trec în zbor pe ecran; elevul le prinde, răspunde și câștigă un ajutor. Poți trece mai multe variante acceptate, separate prin virgulă — comparația ignoră diacriticele, majusculele și semnele de punctuație.</p>
+        <div class="cx-bonusrow cx-bonusrow--new">
+          <input class="cx-input" id="cx-bonus-prompt" placeholder="întrebarea nouă…" maxlength="140" />
+          <input class="cx-input" id="cx-bonus-answers" placeholder="răspunsuri acceptate, separate prin virgulă" maxlength="200" />
+          <button type="button" class="btn btn--primary btn--sm" data-action="bonus-add">Adaugă</button>
+        </div>
+        ${rows || `<p class="cx-muted">Încă nicio întrebare bonus.</p>`}
+      </div>`;
+  }
+
   function adminTabGamification() {
     return `
       <div class="cx-box">
@@ -3255,6 +3282,7 @@ export function renderCommunity(basePath = "") {
       { id: "moderation", label: "Moderare", badge: modCount },
       { id: "challenges", label: "Provocări" },
       { id: "gamification", label: "Gamificare" },
+      { id: "bonus", label: "Întrebări bonus" },
     ];
     const tabBar = `<div class="cx-tabs cx-tabs--admin">${TABS.map(
       (t) => `<button class="cx-tabbtn${state.adminTab === t.id ? " on" : ""}" data-action="admin-tab" data-id="${t.id}">
@@ -3268,6 +3296,7 @@ export function renderCommunity(basePath = "") {
       moderation: adminTabModeration,
       challenges: adminTabChallenges,
       gamification: adminTabGamification,
+      bonus: adminTabBonus,
     };
     return `
       ${sectionHead("Panou de administrare", "Vizibil doar pentru tine. Tot ce ține de administrarea comunității, organizat pe file.")}
@@ -3514,6 +3543,7 @@ export function renderCommunity(basePath = "") {
         await Promise.all([...new Set(state.contentReports
           .filter((r) => r.targetType === "test_item").map((r) => r.targetId))]
           .map(async (id) => { const it = await adminFetchTestItem(id); if (it) state.reportItems[id] = it; }));
+        state.bonusQs = await adminFetchBonusQuestions(); // with their answers (definer RPC)
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
@@ -4566,6 +4596,36 @@ export function renderCommunity(basePath = "") {
         showToast(founded
           ? "✓ Întemeiată — elevul a fost anunțat și premiat."
           : "Respinsă — explicația a plecat în mesageria elevului.");
+        return render();
+      }
+      case "bonus-add": {
+        const p = (mount.querySelector("#cx-bonus-prompt")?.value || "").trim();
+        const a = (mount.querySelector("#cx-bonus-answers")?.value || "")
+          .split(",").map((s) => s.trim()).filter(Boolean);
+        if (!p || !a.length) { showToast("Scrie întrebarea și cel puțin un răspuns."); return; }
+        saveBonusQuestion({ prompt: p, answers: a, active: true }).then(async (ok) => {
+          if (!ok) return showToast("N-am putut salva întrebarea.");
+          state.bonusQs = await adminFetchBonusQuestions();
+          render();
+        });
+        return;
+      }
+      case "bonus-save": {
+        const row = btn.closest(".cx-bonusrow");
+        if (!row) return;
+        const prompt = row.querySelector('[data-f="prompt"]')?.value.trim() || "";
+        const answers = (row.querySelector('[data-f="answers"]')?.value || "")
+          .split(",").map((s) => s.trim()).filter(Boolean);
+        const active = !!row.querySelector('[data-f="active"]')?.checked;
+        if (!prompt || !answers.length) { showToast("Întrebarea și răspunsurile nu pot fi goale."); return; }
+        saveBonusQuestion({ id: btn.dataset.id, prompt, answers, active })
+          .then((ok) => showToast(ok ? "Salvat." : "N-am putut salva."));
+        return;
+      }
+      case "bonus-del": {
+        const bid = btn.dataset.id;
+        deleteBonusQuestion(bid);
+        state.bonusQs = state.bonusQs.filter((q) => q.id !== bid);
         return render();
       }
       case "prof-add": {

@@ -27,7 +27,9 @@
 import {
   fetchTestItems, fetchTestItem, answerTestItem, TEST_ITEM_TYPES,
   fetchMyTestSessions, saveTestSession, deleteTestSession, reportTestItem,
+  useBooster, fetchBoosters,
 } from "../../shared/scripts/test-repo.js";
+import { initBonus, maybeSpawn, clearBonus } from "./bonus.js";
 import { createPost } from "../../shared/scripts/forum-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -53,12 +55,14 @@ const G = {
   // NOT the same as "every option ticked by hand" — see pickGroup below.
   sel: {
     years: new Set(), sessions: new Set(), types: new Set(), order: "random",
-    mode: "invatare", // "invatare" (verdict now) | "examen" (verdicts at the end)
-    limit: 0,         // seconds allowed per item; 0 = no clock
-    sudden: false,    // one mistake ends the run
+    // invatare = verdict now, misses come back · examen = mute, one pass
+    // clasic   = 3 lives + flying bonuses · provocare = one life, no help
+    mode: "invatare",
+    limit: 0, // seconds allowed per item; 0 = no clock
   },
   all: { years: true, sessions: true, types: true },
   fx: { sound: true, vibrate: true },
+  lives: 0, boosters: {}, cut: [], // cut = letters a booster hid on this item
   typeOrder: [], // the pupil's drag order → playing order under „Ordinea mea"
   emoji: EMOJIS[0], label: "",
   saved: [], savedId: null,
@@ -76,6 +80,16 @@ const G = {
 const elapsedSec = () => G.elapsedBase + Math.floor((Date.now() - G.startAt) / 1000);
 const fmtSec = (ms) => `${(ms / 1000).toFixed(1)}s`;
 const isExam = () => G.sel.mode === "examen";
+const isClassic = () => G.sel.mode === "clasic";
+// Lives belong to the MODE, so there's never a contradictory combination.
+const MAX_LIVES = 4;
+const livesFor = (mode) => (mode === "clasic" ? 3 : mode === "provocare" ? 1 : 0);
+const BOOSTERS = {
+  cut1: { icon: "➖", label: "Taie o variantă" },
+  cut2: { icon: "✂️", label: "Taie două variante" },
+  peek: { icon: "💡", label: "Explicația, 5 secunde" },
+  life: { icon: "❤️", label: "+1 viață" },
+};
 
 // ---------- feel: sound + haptics (synthesised, so nothing to download) ----------
 const FX_KEY = "tgame:fx";
@@ -258,7 +272,7 @@ function currentConfig() {
     allYears: G.all.years, allSessions: G.all.sessions, allTypes: G.all.types,
     years: [...G.sel.years], sessions: [...G.sel.sessions], types: [...G.sel.types],
     order: G.sel.order, typeOrder: G.typeOrder,
-    mode: G.sel.mode, limit: G.sel.limit, sudden: G.sel.sudden,
+    mode: G.sel.mode, limit: G.sel.limit,
   };
 }
 // Autosaves after every item, so leaving mid-game loses nothing.
@@ -285,7 +299,6 @@ function resumeSession(id) {
   G.sel.order = c.order || "random";
   G.sel.mode = c.mode || "invatare";
   G.sel.limit = Number(c.limit) || 0;
-  G.sel.sudden = !!c.sudden;
   G.typeOrder = (c.typeOrder || []).filter((t) => G.availTypes.includes(t));
   for (const t of G.availTypes) if (!G.typeOrder.includes(t)) G.typeOrder.push(t);
   G.emoji = s.emoji; G.label = s.label;
@@ -430,11 +443,12 @@ function renderConfig() {
   const orderChips = [["random", "Aleatoriu"], ["years", "Pe ani"], ["types", "Pe tipuri"]]
     .concat(G.typeOrder.length > 1 ? [["mine", "Ordinea mea"]] : [])
     .map(([v, l]) => chip("order", v, l, G.sel.order === v)).join("");
-  const modeChips = [["invatare", "📖 Învățare"], ["examen", "📝 Examen"]]
-    .map(([v, l]) => chip("mode", v, l, G.sel.mode === v)).join("");
+  const modeChips = [
+    ["invatare", "📖 Învățare"], ["examen", "📝 Examen"],
+    ["clasic", "❤️ Clasic"], ["provocare", "☠️ Provocare"],
+  ].map(([v, l]) => chip("mode", v, l, G.sel.mode === v)).join("");
   const limitChips = [[0, "Fără"], [30, "30 s"], [60, "60 s"], [90, "90 s"]]
     .map(([v, l]) => chip("limit", String(v), l, G.sel.limit === v)).join("");
-  const suddenChip = chip("sudden", G.sel.sudden ? "off" : "on", "☠️ Fără greșeli", G.sel.sudden);
   // With a clock the run is predictable; without one we lean on your own pace.
   const estMs = G.sel.limit ? n * G.sel.limit * 1000 : n * avgMsPerItem();
   const emojiChips = EMOJIS.map((em) =>
@@ -479,20 +493,17 @@ function renderConfig() {
           <div class="tgame-cfg-block">
             <div class="tgame-cfg-lab">Mod</div>
             <div class="tgame-chips">${modeChips}</div>
-            <p class="tgame-cfg-hint">${isExam()
-              ? "Răspunzi la tot fără să afli pe loc dacă ai nimerit; verdictele și explicațiile vin la final, ca la proba adevărată."
-              : "Afli imediat dacă ai nimerit, iar explicația o deschizi când vrei tu. Itemii greșiți revin până îi rezolvi."}</p>
+            <p class="tgame-cfg-hint">${{
+              invatare: "Afli imediat dacă ai nimerit, iar explicația o deschizi când vrei tu. Itemii greșiți revin până îi rezolvi.",
+              examen: "Răspunzi la tot fără să afli pe loc dacă ai nimerit; verdictele și explicațiile vin la final, ca la proba adevărată.",
+              clasic: "Trei vieți, până la patru. Fiecare greșeală ia una. Din când în când trece pe ecran o întrebare bonus: prinde-o, răspunde-i și câștigi un ajutor pe care îl folosești când vrei.",
+              provocare: "O singură viață. Prima greșeală încheie runda — fără ajutoare, fără a doua șansă.",
+            }[G.sel.mode]}</p>
           </div>
 
           <div class="tgame-cfg-block">
             <div class="tgame-cfg-lab">Timp pe item</div>
             <div class="tgame-chips">${limitChips}</div>
-          </div>
-
-          <div class="tgame-cfg-block">
-            <div class="tgame-cfg-lab">Provocare</div>
-            <div class="tgame-chips">${suddenChip}</div>
-            ${G.sel.sudden ? `<p class="tgame-cfg-hint">Prima greșeală încheie runda.</p>` : ""}
           </div>
         </div>
 
@@ -640,21 +651,65 @@ function startGame() {
   G.correct = 0; G.wrong = 0; G.points = 0;
   G.elapsedBase = 0;
   G.history = []; G.view = null; G.liveAnswered = false; G.over = false;
+  G.lives = livesFor(G.sel.mode); G.boosters = {}; G.cut = [];
   G.inGame = true; G.startAt = Date.now(); G.itemStart = Date.now();
+  if (isClassic()) wireBonus();
   persist();
   startTimer();
   renderGame();
 }
 
+// The flying-bonus layer talks to the game through these four hooks. The
+// clock hand-off matters most: engaging with a bonus must never cost you time
+// on the item you're trying to win help for.
+function wireBonus() {
+  initBonus({
+    sessionId: () => G.sessionId,
+    onOpen: () => { stopItemClock(); G.pausedAt = Date.now(); },
+    onClose: (note) => {
+      if (G.pausedAt) { G.itemStart += Date.now() - G.pausedAt; G.pausedAt = 0; }
+      if (note) showToast(note);
+      startItemClock();
+    },
+    onBooster: async (kind) => {
+      beep("ok"); buzz(30);
+      showToast(`${BOOSTERS[kind].icon} Ai câștigat: ${BOOSTERS[kind].label}`, { kind: "success" });
+      G.boosters = await fetchBoosters(G.sessionId);
+      renderGame();
+    },
+  });
+}
+
 // In exam mode the HUD must stay mute: a live „corecte / greșite" tally would
 // tell you the verdict the card is deliberately withholding.
 function hudDone() { return isExam() ? G.history.length : G.correct; }
+
+// Hearts: filled for what's left, hollow for what you've spent. The row grows
+// to 4 if a booster pushed you past the starting three.
+function hearts() {
+  const start = livesFor(G.sel.mode);
+  if (!start) return "";
+  const cap = Math.max(start, G.lives);
+  let out = "";
+  for (let i = 0; i < cap; i++) out += i < G.lives ? "❤️" : "🖤";
+  return `<span class="tgame-lives" title="${G.lives} ${G.lives === 1 ? "viață rămasă" : "vieți rămase"}">${out}</span>`;
+}
+
+// The satchel — tap one to spend it on the item in front of you.
+function boosterBar() {
+  if (!isClassic()) return "";
+  const has = Object.entries(G.boosters).filter(([, q]) => q > 0);
+  if (!has.length) return `<p class="tgame-boosters is-empty">Prinde o întrebare bonus ca să câștigi ajutoare.</p>`;
+  return `<div class="tgame-boosters">${has.map(([k, q]) =>
+    `<button type="button" class="tgame-booster" data-act="use-booster" data-kind="${k}" title="${esc(BOOSTERS[k].label)}">
+       <span aria-hidden="true">${BOOSTERS[k].icon}</span><b>${q}</b>
+     </button>`).join("")}</div>`;
+}
 function hud() {
   const exam = isExam();
   const pct = G.total ? Math.round((hudDone() / G.total) * 100) : 0;
   const stats = exam
-    ? `<span class="tgame-stat"><b id="tgame-ok">${G.history.length}</b> din ${G.total} rezolvați</span>
-       ${G.sel.sudden ? `<span class="tgame-stat">☠️ fără greșeli</span>` : ""}`
+    ? `<span class="tgame-stat"><b id="tgame-ok">${G.history.length}</b> din ${G.total} rezolvați</span>`
     : `<span class="tgame-stat ok"><b id="tgame-ok">${G.correct}</b> corecte</span>
        <span class="tgame-stat no"><b id="tgame-no">${G.wrong}</b> greșite</span>
        <span class="tgame-stat pts"><b id="tgame-pts">${G.points}</b> puncte</span>`;
@@ -668,7 +723,8 @@ function hud() {
       <div class="tgame-progress"><div class="tgame-progress__fill" id="tgame-fill" style="width:${pct}%"></div>
         <span class="tgame-progress__txt" id="tgame-ptxt">${hudDone()} / ${G.total}</span>
       </div>
-      <div class="tgame-hud__stats">${stats}</div>
+      <div class="tgame-hud__stats">${stats}${hearts()}</div>
+      ${boosterBar()}
     </div>`;
 }
 
@@ -723,7 +779,8 @@ function postBar(i) {
 function renderLive() {
   if (!G.queue.length) return renderDone();
   const it = G.byId.get(G.queue[0]);
-  const opts = optionsHtml(it, (k) => `
+  // A „taie o variantă" booster removes wrong options for this item only.
+  const opts = optionsHtml(it, (k) => G.cut.includes(k) ? "" : `
     <button type="button" class="tgame-opt" data-k="${k}">
       <span class="tgame-opt__k">${k}</span>
       <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
@@ -872,7 +929,13 @@ async function submit(card, k) {
     else { beep("no"); buzz([40, 60, 40]); wrongFx(card); }
   }
 
-  if (!res.correct && G.sel.sudden) G.over = true; // „fără greșeli"
+  // A miss costs a life in the modes that have them; at zero the run is over
+  // and the satchel goes with it (the wallet is keyed to this session).
+  if (!res.correct && livesFor(G.sel.mode) > 0) {
+    G.lives = Math.max(0, G.lives - 1);
+    buzz([70, 50, 70]);
+    if (G.lives === 0) G.over = true;
+  }
 
   const next = card.querySelector(".tgame-next");
   next.hidden = false;
@@ -883,6 +946,49 @@ async function submit(card, k) {
   const nav = card.querySelector(".tgame-nav");
   if (nav) nav.outerHTML = navBar(); // the strip grew by one
   updateHud();
+}
+
+// ---------- boosters ----------
+// The wallet lives on the server, so spending is authoritative: you can't use
+// what you didn't win, and „peek" is the only route to an explanation before
+// answering (the column itself is revoked).
+async function spendBooster(kind) {
+  if (!BOOSTERS[kind] || !(G.boosters[kind] > 0)) return;
+  const card = root.querySelector(".tgame-card");
+  if (kind !== "life") {
+    if (!card || card.dataset.done) return showToast("Folosește ajutorul înainte să răspunzi.");
+    if (kind === "cut1" || kind === "cut2") {
+      const leftOptions = card.querySelectorAll(".tgame-opt").length;
+      if (leftOptions <= 2) return showToast("Au mai rămas prea puține variante.");
+    }
+  }
+  if (kind === "life" && G.lives >= MAX_LIVES) return showToast("Ai deja maximul de vieți.");
+
+  const res = await useBooster(G.sessionId, kind, card?.dataset.id || null);
+  if (!res || res.error) return showToast("Ajutorul nu s-a putut folosi.");
+  G.boosters[kind] = Math.max(0, (G.boosters[kind] || 1) - 1);
+
+  if (kind === "life") { G.lives = Math.min(MAX_LIVES, G.lives + 1); beep("ok"); buzz(30); return renderGame(); }
+  if (kind === "peek") return peekObservation(res.observation);
+  G.cut = Array.isArray(res.cut) ? res.cut.filter(Boolean) : [];
+  beep("tick");
+  renderGame();
+}
+
+// Five seconds of explanation, then it's gone — enough to grasp, not to copy.
+function peekObservation(text) {
+  if (!text) return showToast("Itemul ăsta n-are explicație scrisă.");
+  const card = root.querySelector(".tgame-card");
+  if (!card) return;
+  card.querySelector(".tgame-peek")?.remove();
+  const box = document.createElement("div");
+  box.className = "tgame-peek";
+  box.innerHTML = `<span class="tgame-peek__lab">Explicația · 5 secunde</span>
+    <div class="tgame-peek__txt">${sanitizeRich(text)}</div>
+    <span class="tgame-peek__bar"><i></i></span>`;
+  card.appendChild(box);
+  beep("tick");
+  setTimeout(() => box.remove(), 5000);
 }
 
 // ---------- per-item clock ----------
@@ -916,10 +1022,12 @@ function advance() {
   if (!isExam() && !(last && last.correct) && id != null) G.queue.push(id);
   G.liveAnswered = false;
   G.view = null;
+  G.cut = []; // a fresh item comes with all its options back
   G.itemStart = Date.now();
   persist(); // progress is safe from here on
   if (G.over || !G.queue.length) return renderDone();
   renderGame();
+  if (isClassic()) maybeSpawn(); // …and maybe something flies past
 }
 
 // ---------- refresh one item's text ----------
@@ -937,9 +1045,9 @@ async function refreshItem(card) {
   if (!fresh) { showToast("N-am putut actualiza itemul acum."); return; }
   const old = G.byId.get(id);
   if (old) {
+    // Only the wording travels — the explanation isn't part of a public fetch.
     old.question = fresh.question;
     old.options = fresh.options;
-    old.observation = fresh.observation;
     old.types = fresh.types;
   } else G.byId.set(id, fresh);
   // Entries already answered carry their own copy of the explanation.
@@ -1102,6 +1210,7 @@ function resultsChart() {
 function renderDone() {
   stopTimer();
   stopItemClock();
+  clearBonus();   // nothing keeps flying once the run is over
   rememberPace(); // your pace feeds the next run's estimate
   G.inGame = false;
   const time = fmtTime(elapsedSec());
@@ -1249,8 +1358,6 @@ function onClick(e) {
   if (mode) { G.sel.mode = mode.dataset.mode; return renderConfig(); }
   const limit = e.target.closest("[data-limit]");
   if (limit) { G.sel.limit = Number(limit.dataset.limit) || 0; return renderConfig(); }
-  const sudden = e.target.closest("[data-sudden]");
-  if (sudden) { G.sel.sudden = sudden.dataset.sudden === "on"; return renderConfig(); }
   const em = e.target.closest("[data-emoji]");
   if (em) { G.emoji = em.dataset.emoji; return renderConfig(); }
 
@@ -1268,7 +1375,7 @@ function onClick(e) {
       e.preventDefault();
       return confirmLeave(async () => {
         persist();
-        G.inGame = false; stopTimer();
+        G.inGame = false; stopTimer(); stopItemClock(); clearBonus();
         await refreshSaved();
         renderConfig();
       });
@@ -1283,6 +1390,7 @@ function onClick(e) {
       if (box) { box.hidden = false; act.remove(); }
       return;
     }
+    if (a === "use-booster") return spendBooster(act.dataset.kind);
     if (a === "prev-item") return goTo(navState().idx - 1);
     if (a === "next-item") return goTo(navState().idx + 1);
     if (a === "refresh-item") return refreshItem(e.target.closest(".tgame-card"));

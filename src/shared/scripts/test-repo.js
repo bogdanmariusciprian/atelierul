@@ -26,8 +26,11 @@ export const TEST_ITEM_TYPES = [
 ];
 
 // Everything EXCEPT `correct` (that column is locked for anon/authenticated).
+// NOTE: `observation` is deliberately absent — like `correct`, its SELECT is
+// revoked (migration 0044), so the explanation can't be read before answering.
+// It arrives with the server's verdict, or through the „peek" booster.
 const PUBLIC_COLS =
-  "id, exam, year, session, item_no, question, option_a, option_b, option_c, option_d, observation, verified, types";
+  "id, exam, year, session, item_no, question, option_a, option_b, option_c, option_d, verified, types";
 
 function mapRow(r) {
   if (!r) return null;
@@ -81,7 +84,8 @@ export async function adminFetchTestItem(id) {
   return mapRow((data || [])[0]);
 }
 
-/** Re-read ONE item's public text (question, options, observation) — used by the
+/** Re-read ONE item's public text (question + options; the explanation is
+ *  revoked and never travels with the item) — used by the
  *  little refresh button so a teacher's wording fix reaches a pupil mid-game
  *  without disturbing the answer they already picked. Never returns the key. */
 export async function fetchTestItem(id) {
@@ -244,4 +248,64 @@ export async function deleteTestSession(id) {
   if (!id || !CURRENT_USER.authId) return;
   const { error } = await supabase.from("test_sessions").delete().eq("id", id);
   if (error) console.warn("deleteTestSession:", error.message);
+}
+
+// ---- Flying bonus questions + boosters (classic mode) ----
+// The accepted answers and the booster odds live on the server; the wallet is
+// keyed by game session, so a new run always starts empty.
+
+/** Active prompts only — never the answers. */
+export async function fetchBonusQuestions() {
+  const { data, error } = await supabase
+    .from("bonus_questions").select("id, prompt").eq("active", true);
+  if (error) { console.warn("fetchBonusQuestions:", error.message); return []; }
+  return data || [];
+}
+
+/** Catch one. Correct → the server rolls a booster and banks it for you. */
+export async function answerBonusQuestion(id, text, sessionId) {
+  const { data, error } = await supabase.rpc("answer_bonus_question", {
+    p_id: id, p_text: text, p_session: sessionId,
+  });
+  if (error) { console.warn("answerBonusQuestion:", error.message); return null; }
+  return data;
+}
+
+/** Spend one: `peek` returns the explanation, `cut1`/`cut2` the wrong letters. */
+export async function useBooster(sessionId, kind, itemId = null) {
+  const { data, error } = await supabase.rpc("use_booster", {
+    p_session: sessionId, p_kind: kind, p_item: itemId,
+  });
+  if (error) { console.warn("useBooster:", error.message); return null; }
+  return data;
+}
+
+/** What's left in this run's satchel → { cut1: 2, peek: 1, … }. */
+export async function fetchBoosters(sessionId) {
+  if (!sessionId || !CURRENT_USER.authId) return {};
+  const { data, error } = await supabase
+    .from("game_boosters").select("kind, qty").eq("session_id", sessionId);
+  if (error) { console.warn("fetchBoosters:", error.message); return {}; }
+  return Object.fromEntries((data || []).filter((r) => r.qty > 0).map((r) => [r.kind, r.qty]));
+}
+
+// ---- Teacher: authoring the bonus questions ----
+export async function adminFetchBonusQuestions() {
+  const { data, error } = await supabase.rpc("admin_bonus_questions");
+  if (error) { console.warn("adminFetchBonusQuestions:", error.message); return []; }
+  return (data || []).map((r) => ({
+    id: r.id, prompt: r.prompt || "", answers: r.answers || [], active: !!r.active,
+  }));
+}
+export async function saveBonusQuestion({ id, prompt, answers, active }) {
+  const row = { prompt, answers: answers || [], active: active !== false };
+  const { error } = id
+    ? await supabase.from("bonus_questions").update(row).eq("id", id)
+    : await supabase.from("bonus_questions").insert(row);
+  if (error) { console.warn("saveBonusQuestion:", error.message); return false; }
+  return true;
+}
+export async function deleteBonusQuestion(id) {
+  const { error } = await supabase.from("bonus_questions").delete().eq("id", id);
+  if (error) console.warn("deleteBonusQuestion:", error.message);
 }
