@@ -591,9 +591,12 @@ function wireTypeDrag() {
     const clone = row.cloneNode(true);
     clone.className = `tgame-tl__row tgame-tl__float${row.classList.contains("on") ? " on" : ""}`;
     clone.style.cssText = `left:${r.left}px; top:${r.top}px; width:${r.width}px;`;
-    // Into <main>, not <body>: the console skin remaps its colours there, and a
-    // fixed element still floats over the page from either parent.
-    (list.closest("main") || document.body).appendChild(clone);
+    // Straight into <body>. A `position: fixed` box is only guaranteed to be
+    // viewport-relative when NO ancestor establishes a containing block
+    // (transform, filter, contain, will-change…). Parking it on <body> makes
+    // the maths exact no matter what the page around it does later; the
+    // console skin re-states the float's colours for this case.
+    document.body.appendChild(clone);
     row.classList.add("is-ghost"); // keeps its space, so the list doesn't jump
 
     st = {
@@ -804,16 +807,22 @@ function renderLive() {
         ${hud()}
         ${G.sel.limit ? `<div class="tgame-clock"><i id="tgame-clock" style="width:100%"></i></div>` : ""}
       </header>
-      <article class="tgame-card" data-id="${it.id}">
-        ${cardHead(it)}
-        <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
-        <div class="tgame-opts">${opts}</div>
-        <div class="tgame-fb"></div>
-        <footer class="tgame-cardfoot">
-          ${navBar()}
-          <div class="tgame-next" hidden><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>
-        </footer>
-      </article>
+      <div class="tgame-play">
+        <article class="tgame-card" data-id="${it.id}">
+          ${cardHead(it)}
+          <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
+          <div class="tgame-opts">${opts}</div>
+          <footer class="tgame-cardfoot">
+            ${navBar()}
+            <div class="tgame-next" hidden><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>
+          </footer>
+        </article>
+        <aside class="tgame-side">
+          <div class="tgame-fb">
+            <p class="tgame-side__wait">Alege o variantă.<br />Verdictul și explicația apar aici.</p>
+          </div>
+        </aside>
+      </div>
     </section>`;
   startItemClock();
 }
@@ -847,16 +856,20 @@ function renderAnswered(i, isLive) {
   root.innerHTML = `
     <section class="tgame tstage tstage--play">
       <header class="tstage__top">${hud()}</header>
-      <article class="tgame-card ${exam ? "" : (e.correct ? "is-correct" : "is-wrong")}${isLive ? "" : " is-review"}" data-id="${e.id}" data-hi="${i}" data-done="1">
-        ${cardHead(it)}
-        <p class="tgame-q">${it.question ? sanitizeRich(it.question) : ""}</p>
-        <div class="tgame-opts">${opts}</div>
-        <div class="tgame-fb">${verdict}</div>
-        <footer class="tgame-cardfoot">
-          ${navBar()}
-          ${isLive ? `<div class="tgame-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>` : ""}
-        </footer>
-      </article>
+      <div class="tgame-play">
+        <article class="tgame-card ${exam ? "" : (e.correct ? "is-correct" : "is-wrong")}${isLive ? "" : " is-review"}" data-id="${e.id}" data-hi="${i}" data-done="1">
+          ${cardHead(it)}
+          <p class="tgame-q">${it.question ? sanitizeRich(it.question) : ""}</p>
+          <div class="tgame-opts">${opts}</div>
+          <footer class="tgame-cardfoot">
+            ${navBar()}
+            ${isLive ? `<div class="tgame-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>` : ""}
+          </footer>
+        </article>
+        <aside class="tgame-side">
+          <div class="tgame-fb">${verdict}</div>
+        </aside>
+      </div>
     </section>`;
 }
 
@@ -920,7 +933,8 @@ async function submit(card, k) {
   });
   G.liveAnswered = true;
 
-  const fb = card.querySelector(".tgame-fb");
+  const fb = root.querySelector(".tgame-fb"); // now lives in the side panel
+  if (!fb) return;
   fb.hidden = false;
 
   if (isExam()) {
@@ -995,7 +1009,7 @@ async function spendBooster(kind) {
 // Five seconds of explanation, then it's gone — enough to grasp, not to copy.
 function peekObservation(text) {
   if (!text) return showToast("Itemul ăsta n-are explicație scrisă.");
-  const card = root.querySelector(".tgame-card");
+  const card = root.querySelector(".tgame-side") || root.querySelector(".tgame-card");
   if (!card) return;
   card.querySelector(".tgame-peek")?.remove();
   const box = document.createElement("div");
