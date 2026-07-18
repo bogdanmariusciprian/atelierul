@@ -920,7 +920,7 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   .tgame-cfg2__col > .tgame-cfg-block { margin-bottom: 0; }
   .tgame-cfg-block--grow { margin-top: auto; }          /* mode sits at the bottom */
   .tgame-cfg-block--fill { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-  .tstage--cfg .tgame-tl { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 0.3rem; }
+  .tstage--cfg .tgame-tl { flex: 1 1 auto; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 0.35rem; }
   .tstage--cfg .tgame-sum { position: static; }
   /* a slimmer header, so the columns get the height */
   .tstage__top .tgame-config__hero { display: flex; align-items: center; gap: 0.8rem; margin: 0; }
@@ -937,26 +937,34 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
     flex: 1 1 auto; min-height: 0;
     display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1rem;
   }
+  /* Every region gets a FRACTION OF THE STAGE, never a size derived from its
+     content — that's what makes the layout identical on every item. Nothing
+     scrolls: overflow is hidden and the text shrinks to fit (fitStage()). */
   .tstage--play .tgame-card {
     min-height: 0; margin: 0;
-    display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 0.8rem;
+    display: grid; grid-template-rows: auto minmax(0, 1.05fr) minmax(0, 1.95fr) auto; gap: 0.7rem;
   }
-  .tstage--play .tgame-q { min-height: 0; margin: 0; overflow-y: auto; }
-  /* four slots of FIXED height: the block is identical on every single item */
-  .tstage--play .tgame-opts { display: grid; grid-template-rows: repeat(4, 3.5rem); gap: 0.5rem; }
-  .tstage--play .tgame-opt { overflow: hidden; align-items: center; }
-  .tstage--play .tgame-opt__t { max-height: 100%; overflow-y: auto; }
-  .tstage--play .tgame-side { min-height: 0; }
-  .tstage--play .tgame-fb { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; }
+  .tstage--play .tgame-q {
+    min-height: 0; margin: 0; overflow: hidden;
+    display: flex; align-items: center; /* short questions sit centred, not stranded at the top */
+  }
+  .tstage--play .tgame-opts {
+    min-height: 0; display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 0.5rem;
+  }
+  .tstage--play .tgame-opt { min-height: 0; overflow: hidden; align-items: center; }
+  .tstage--play .tgame-opt__t { overflow: hidden; }
+  .tstage--play .tgame-side { min-height: 0; overflow: hidden; }
+  .tstage--play .tgame-fb { flex: 1 1 auto; min-height: 0; overflow: hidden; margin: 0; }
   .tgame-cardfoot {
     display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
   }
   .tgame-cardfoot .tgame-nav { margin: 0; padding: 0; border-top: 0; }
   .tgame-cardfoot .tgame-next { margin: 0; }
 
-  /* ---- results: the chart fits, its detail panel scrolls on its own ---- */
-  .tstage--done { overflow-y: auto; }
-  .tstage--done .tgc-detail { max-height: 15rem; overflow-y: auto; }
+  /* ---- results: everything fits, nothing scrolls ---- */
+  .tstage--done { overflow: hidden; }
+  .tstage--done .tgc { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .tstage--done .tgc-detail { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 }
 
 /* =========================================================
@@ -1089,9 +1097,10 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   position: relative; height: 150px;
   border-bottom: 1.5px solid var(--color-border); margin-bottom: var(--space-md);
 }
-.tgc-bars { display: flex; align-items: flex-end; gap: 2px; height: 100%; overflow-x: auto; }
+/* No horizontal scroll: with 100+ answers the bars simply get thinner. */
+.tgc-bars { display: flex; align-items: flex-end; gap: 2px; height: 100%; overflow: hidden; }
 .tgc-bar {
-  flex: 1 0 8px; min-width: 8px; border: 0; padding: 0; cursor: pointer;
+  flex: 1 1 0; min-width: 2px; border: 0; padding: 0; cursor: pointer;
   border-radius: 3px 3px 0 0; background: var(--color-primary); opacity: 0.55;
   transition: opacity 0.12s ease, transform 0.12s ease;
 }

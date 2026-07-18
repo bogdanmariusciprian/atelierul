@@ -155,6 +155,8 @@ export async function initTestGame(mountEl, exam) {
     // Chart bars answer to both the mouse and the keyboard.
     root.addEventListener("mouseover", onBarPeek);
     root.addEventListener("focusin", onBarPeek);
+    // The boxes change size with the window, so the text has to be refitted.
+    window.addEventListener("resize", () => { if (G.inGame) fitStage(); });
     root.__gameWired = true;
   }
   if (!window.__tgameBeforeUnload) {
@@ -736,6 +738,31 @@ function hud() {
     </div>`;
 }
 
+// ---------- fit text to its box ----------
+// No scrollbars anywhere: every box has a fixed share of the stage, and the
+// TEXT shrinks until it fits. That keeps the layout identical from item to
+// item — a long question or a long option changes its own type size, never
+// the position of anything around it.
+function fitText(el, max, min) {
+  if (!el) return;
+  let size = max;
+  el.style.fontSize = `${size}rem`;
+  let guard = 60; // never spin, whatever the box reports
+  while (guard-- > 0 && size > min && el.scrollHeight > el.clientHeight + 1) {
+    size = Math.max(min, size - 0.035);
+    el.style.fontSize = `${size}rem`;
+  }
+}
+// Run after the browser has laid the stage out, so the boxes have real heights.
+function fitStage() {
+  requestAnimationFrame(() => {
+    fitText(root.querySelector(".tgame-q"), 1.3, 0.72);
+    root.querySelectorAll(".tgame-opt__t").forEach((t) => fitText(t, 1.02, 0.6));
+    fitText(root.querySelector(".tgame-fb"), 0.98, 0.62);
+    fitText(root.querySelector(".tgc-detail"), 0.95, 0.6);
+  });
+}
+
 // Shared card chrome. Topic tags read as FULL names (discreet grey), and the
 // ⟳ button re-reads the teacher's latest wording without touching the answer.
 function cardHead(it) {
@@ -825,6 +852,7 @@ function renderLive() {
       </div>
     </section>`;
   startItemClock();
+  fitStage();
 }
 
 // An item that's already been answered — read-only, so no second attempt and
@@ -871,6 +899,7 @@ function renderAnswered(i, isLive) {
         </aside>
       </div>
     </section>`;
+  fitStage();
 }
 
 // One entry point: review, answered-live, or fresh live.
@@ -977,6 +1006,7 @@ async function submit(card, k) {
   const nav = card.querySelector(".tgame-nav");
   if (nav) nav.outerHTML = navBar(); // the strip grew by one
   updateHud();
+  fitStage(); // the verdict panel just filled up — refit it, nothing else moves
 }
 
 // ---------- boosters ----------
@@ -1267,6 +1297,7 @@ function renderDone() {
       </div>
     </section>`;
   burstConfetti(root.querySelector(".tgame-done__badge") || root);
+  fitStage();
 }
 
 // ---------- timer ----------
