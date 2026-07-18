@@ -263,21 +263,32 @@ function groupChips(name, attr, allLabel, options) {
   )).join("");
 }
 
+// RANK and QUANTITY are deliberately different visual languages: the rank is a
+// small slot on the LEFT, welded to the drag handle (it reads as „position"),
+// while the count sits right with its unit spelled out and a strength bar.
+// Two bare numbers side by side were impossible to tell apart.
 function typeList() {
+  const max = Math.max(1, ...G.typeOrder.map((c) => G.typeCounts[c] || 0));
+  const qty = (n) => `
+    <span class="tgame-tl__qty">
+      <b>${n} ${n === 1 ? "item" : "itemi"}</b>
+      <span class="tgame-tl__bar"><i style="width:${Math.round((n / max) * 100)}%"></i></span>
+    </span>`;
   const rows = G.typeOrder.map((code, i) => {
     const on = !G.all.types && G.sel.types.has(code);
     return `<li class="tgame-tl__row${on ? " on" : ""}" data-tcode="${esc(code)}">
         <span class="tgame-tl__grip" title="Trage ca să reordonezi" aria-hidden="true">⠿</span>
+        <span class="tgame-tl__ord" title="Locul ${i + 1} în ordinea de joc">${i + 1}</span>
         <button type="button" class="tgame-tl__btn" data-type="${esc(code)}">${esc(TYPE_LABEL[code] || code)}</button>
-        <span class="tgame-tl__n">${G.typeCounts[code] || 0}</span>
-        <span class="tgame-tl__ord">${i + 1}</span>
+        ${qty(G.typeCounts[code] || 0)}
       </li>`;
   }).join("");
   const missing = TEST_ITEM_TYPES.filter((t) => !(G.typeCounts[t.code] > 0)).map((t) =>
     `<li class="tgame-tl__row is-empty" title="Încă nu sunt itemi de acest tip">
        <span class="tgame-tl__grip" aria-hidden="true">⠿</span>
+       <span class="tgame-tl__ord">·</span>
        <span class="tgame-tl__btn">${esc(t.label)}</span>
-       <span class="tgame-tl__n">0</span>
+       <span class="tgame-tl__qty"><b>niciun item</b></span>
      </li>`).join("");
   return `<ul class="tgame-tl" id="tgame-tl">${rows}${missing}</ul>`;
 }

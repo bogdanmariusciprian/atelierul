@@ -573,6 +573,10 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
    One category = one page (/teste/<slug>/). Everything borrows --cat-color,
    which test-category.js sets from the category's own symbol colour.
    ========================================================= */
+/* Default so the console never renders colourless on first paint; the real
+   value is set inline on <html> by test-category.js (inline style wins). */
+:root { --cat-color: #6d28d9; }
+
 .tcat { margin-block: var(--space-lg); }
 .tcat__hero {
   display: flex; align-items: center; gap: var(--space-md);
@@ -743,13 +747,26 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   flex: 1; text-align: left; font: inherit; font-weight: 700; font-size: 0.92rem;
   background: none; border: 0; padding: 0.35rem 0; color: inherit; cursor: pointer; user-select: none;
 }
-.tgame-tl__n { font-size: 0.75rem; font-weight: 800; color: var(--color-text-muted); }
+/* RANK — a slot welded to the drag handle, so it reads as „position". */
 .tgame-tl__ord {
-  min-width: 1.35rem; height: 1.35rem; display: grid; place-items: center;
-  border-radius: 50%; background: var(--color-surface); color: var(--color-text-muted);
-  font-size: 0.72rem; font-weight: 800;
+  flex: 0 0 1.5rem; height: 1.5rem; display: grid; place-items: center;
+  border-radius: 7px; background: var(--color-surface); color: var(--color-text-muted);
+  font-size: 0.74rem; font-weight: 800; font-variant-numeric: tabular-nums;
 }
 .tgame-tl__row.on .tgame-tl__ord { background: var(--color-primary); color: #fff; }
+.tgame-tl__row.is-empty .tgame-tl__ord { background: none; }
+/* QUANTITY — a different language entirely: unit spelled out + a strength bar. */
+.tgame-tl__qty { text-align: right; min-width: 4.6rem; }
+.tgame-tl__qty b {
+  display: block; font-size: 0.74rem; font-weight: 700;
+  color: var(--color-text-muted); font-variant-numeric: tabular-nums;
+}
+.tgame-tl__bar {
+  display: block; width: 100%; height: 4px; margin-top: 3px;
+  border-radius: 2px; background: var(--color-surface); overflow: hidden;
+}
+.tgame-tl__bar i { display: block; height: 100%; border-radius: 2px; background: var(--color-border); }
+.tgame-tl__row.on .tgame-tl__bar i { background: var(--color-primary); }
 
 /* saved sessions ("continuă unde ai rămas") */
 .tgame-saved { margin-bottom: var(--space-lg); }
@@ -893,6 +910,109 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 @keyframes tg-flash {
   0%, 40% { background: #fef3c7; }
   100% { background: transparent; }
+}
+
+/* =========================================================
+   CONSOLE SKIN — the category page becomes a dark game panel.
+   Rather than restyling a hundred rules, we REMAP the site's own colour
+   variables inside this page's <main>: every component below (chips, cards,
+   HUD, chart) already reads them, so one block flips the lot.
+   The header and footer keep the site's normal look, so the console reads as
+   a panel embedded in the site, not as a different website.
+   The accent stays the CATEGORY's own colour, lightened for a dark ground.
+   The admin item grid (.tg-mode) is deliberately excluded — it's a data
+   editor, not a game, and Marius wants it untouched.
+   ========================================================= */
+body.tcat-page:not(.tg-mode) main.container {
+  --tc-deep: color-mix(in srgb, var(--cat-color) 9%, #15131e);
+  --tc-panel: color-mix(in srgb, var(--cat-color) 11%, #201d2b);
+  --tc-row: color-mix(in srgb, var(--cat-color) 13%, #2a2637);
+  --tc-accent: color-mix(in srgb, var(--cat-color) 55%, #ffffff);
+  --tc-ink: #1b1726;  /* text that sits ON the accent */
+  --tc-ok: #4ade80;
+  --tc-no: #fca5a5;
+  --tc-pts: #c4b5fd;
+
+  /* the remap the whole page rides on */
+  --color-bg: var(--tc-row);
+  --color-surface: var(--tc-panel);
+  --color-border: color-mix(in srgb, var(--cat-color) 20%, #3b3550);
+  --color-text: #f5f3ff;
+  --color-text-muted: #ada7c8;
+  --color-primary: var(--tc-accent);
+
+  background: var(--tc-deep);
+  color: var(--color-text);
+  border-radius: 24px;
+  padding: var(--space-lg);
+  margin-block: var(--space-lg);
+}
+body.tcat-page:not(.tg-mode) .page-crumbs,
+body.tcat-page:not(.tg-mode) .page-crumbs a { color: var(--color-text-muted); }
+
+/* anything sitting ON the bright accent needs dark ink, not white */
+body.tcat-page:not(.tg-mode) .tgame-chip.on,
+body.tcat-page:not(.tg-mode) .tgame-btn--primary,
+body.tcat-page:not(.tg-mode) .tcat__play,
+body.tcat-page:not(.tg-mode) .tgame-tl__row.on .tgame-tl__ord { color: var(--tc-ink); }
+
+/* ---- presentation panels ---- */
+body.tcat-page:not(.tg-mode) .tcat__hero {
+  background: color-mix(in srgb, var(--cat-color) 18%, transparent);
+  border-color: color-mix(in srgb, var(--cat-color) 36%, transparent);
+}
+body.tcat-page:not(.tg-mode) .tcat__title { color: var(--tc-accent); }
+body.tcat-page:not(.tg-mode) .tcat__panel { background: var(--tc-panel); border-color: var(--color-border); }
+body.tcat-page:not(.tg-mode) .tcat__panel--play {
+  background: color-mix(in srgb, var(--cat-color) 15%, var(--tc-panel));
+  border-color: color-mix(in srgb, var(--cat-color) 42%, transparent);
+}
+body.tcat-page:not(.tg-mode) .tcat__play { background: var(--tc-accent); box-shadow: none; }
+
+/* ---- the drag list, console style: slot, name, strength bar ---- */
+body.tcat-page:not(.tg-mode) .tgame-tl__row {
+  background: var(--tc-row); border-color: transparent; border-radius: 10px;
+}
+body.tcat-page:not(.tg-mode) .tgame-tl__row.on {
+  background: color-mix(in srgb, var(--cat-color) 24%, var(--tc-row));
+  border-color: color-mix(in srgb, var(--cat-color) 45%, transparent);
+}
+body.tcat-page:not(.tg-mode) .tgame-tl__ord { background: var(--tc-deep); }
+body.tcat-page:not(.tg-mode) .tgame-tl__bar { background: var(--tc-deep); }
+
+/* ---- answers: the light green/red tints would blind a dark card ---- */
+body.tcat-page:not(.tg-mode) .tgame-opt.opt-correct {
+  background: color-mix(in srgb, #16a34a 22%, var(--tc-row)); border-color: var(--tc-ok);
+}
+body.tcat-page:not(.tg-mode) .tgame-opt.opt-wrong {
+  background: color-mix(in srgb, #dc2626 20%, var(--tc-row)); border-color: var(--tc-no);
+}
+body.tcat-page:not(.tg-mode) .tgame-verdict.ok { color: var(--tc-ok); }
+body.tcat-page:not(.tg-mode) .tgame-verdict.no { color: var(--tc-no); }
+body.tcat-page:not(.tg-mode) .tgame-obs {
+  background: var(--tc-panel); color: var(--color-text);
+}
+body.tcat-page:not(.tg-mode) .tgame-obs__lab { color: var(--tc-ok); background: none; }
+body.tcat-page:not(.tg-mode) .tgame-hist { color: var(--color-text-muted); }
+
+/* ---- live counters ---- */
+body.tcat-page:not(.tg-mode) .tgame-stat.ok b,
+body.tcat-page:not(.tg-mode) .tgame-done__stats .ok { color: var(--tc-ok); }
+body.tcat-page:not(.tg-mode) .tgame-stat.no b,
+body.tcat-page:not(.tg-mode) .tgame-done__stats .no { color: var(--tc-no); }
+body.tcat-page:not(.tg-mode) .tgame-stat.pts b,
+body.tcat-page:not(.tg-mode) .tgame-done__stats .pts { color: var(--tc-pts); }
+body.tcat-page:not(.tg-mode) .tgame-report:hover {
+  color: var(--tc-accent); background: color-mix(in srgb, var(--cat-color) 18%, transparent);
+}
+body.tcat-page:not(.tg-mode) .tgame-scard__x:hover { color: var(--tc-no); }
+body.tcat-page:not(.tg-mode) .tgame-config__badge,
+body.tcat-page:not(.tg-mode) .tgame-done__badge {
+  background: color-mix(in srgb, var(--cat-color) 26%, var(--tc-panel)); color: var(--tc-accent);
+}
+
+@media (max-width: 560px) {
+  body.tcat-page:not(.tg-mode) main.container { border-radius: 16px; padding: var(--space-md); }
 }
 
 /* ---- game: top bar (discreet) ---- */

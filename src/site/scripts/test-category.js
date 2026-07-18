@@ -25,8 +25,9 @@ export function initTestCategory(mountEl, slug) {
   cat = TEST_CAT_BY_SLUG[slug];
   if (!mountEl || !cat) return;
   root = mountEl;
-  // The whole page dresses in the category's colour.
+  // The whole page dresses in the category's colour, on a dark console base.
   document.documentElement.style.setProperty("--cat-color", cat.color);
+  document.body.classList.add("tcat-page");
   adminMode = isAdmin();
   window.addEventListener("hashchange", route);
   // The session may settle after first paint (teacher signs in) → re-route.
