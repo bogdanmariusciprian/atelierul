@@ -51,8 +51,14 @@ const G = {
   years: [], sessions: [], availTypes: [], typeCounts: {},
   // Each group has an explicit "all mode" (the shortcut is pressed) that is
   // NOT the same as "every option ticked by hand" — see pickGroup below.
-  sel: { years: new Set(), sessions: new Set(), types: new Set(), order: "random" },
+  sel: {
+    years: new Set(), sessions: new Set(), types: new Set(), order: "random",
+    mode: "invatare", // "invatare" (verdict now) | "examen" (verdicts at the end)
+    limit: 0,         // seconds allowed per item; 0 = no clock
+    sudden: false,    // one mistake ends the run
+  },
   all: { years: true, sessions: true, types: true },
+  fx: { sound: true, vibrate: true },
   typeOrder: [], // the pupil's drag order → playing order under „Ordinea mea"
   emoji: EMOJIS[0], label: "",
   saved: [], savedId: null,
@@ -64,10 +70,62 @@ const G = {
   reported: new Set(), // items already flagged this sitting (survives re-renders)
   total: 0, correct: 0, wrong: 0, points: 0,
   inGame: false, startAt: 0, elapsedBase: 0, timer: null,
+  itemTimer: null, over: false, pausedAt: 0, // over = „fără greșeli" ended the run early
 };
 
 const elapsedSec = () => G.elapsedBase + Math.floor((Date.now() - G.startAt) / 1000);
 const fmtSec = (ms) => `${(ms / 1000).toFixed(1)}s`;
+const isExam = () => G.sel.mode === "examen";
+
+// ---------- feel: sound + haptics (synthesised, so nothing to download) ----------
+const FX_KEY = "tgame:fx";
+const PACE_KEY = "tgame:pace";
+let audioCtx = null;
+function loadFx() {
+  try { Object.assign(G.fx, JSON.parse(localStorage.getItem(FX_KEY) || "{}")); } catch { /* keep defaults */ }
+}
+function saveFx() {
+  try { localStorage.setItem(FX_KEY, JSON.stringify(G.fx)); } catch { /* private mode */ }
+}
+function beep(kind) {
+  if (!G.fx.sound) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = "triangle";
+    o.connect(g); g.connect(audioCtx.destination);
+    if (kind === "ok") { o.frequency.setValueAtTime(660, t); o.frequency.setValueAtTime(990, t + 0.08); }
+    else if (kind === "no") { o.frequency.setValueAtTime(230, t); o.frequency.setValueAtTime(150, t + 0.12); }
+    else o.frequency.setValueAtTime(520, t); // neutral tick — exam mode must not leak the verdict
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    o.start(t); o.stop(t + 0.28);
+  } catch { /* sound is a nicety, never a blocker */ }
+}
+function buzz(pattern) {
+  if (!G.fx.vibrate || !navigator.vibrate) return;
+  try { navigator.vibrate(pattern); } catch { /* ignore */ }
+}
+
+// The pupil's own pace, remembered between sittings, so „≈ N minute" means
+// something instead of being a guess.
+function avgMsPerItem() {
+  const v = Number(localStorage.getItem(PACE_KEY)) || 0;
+  return v > 2000 ? v : 30000;
+}
+function rememberPace() {
+  if (!G.history.length) return;
+  const avg = G.history.reduce((a, e) => a + e.ms, 0) / G.history.length;
+  const prev = Number(localStorage.getItem(PACE_KEY)) || avg;
+  try { localStorage.setItem(PACE_KEY, String(Math.round(prev * 0.6 + avg * 0.4))); } catch { /* ignore */ }
+}
+const fmtMins = (ms) => {
+  const m = Math.round(ms / 60000);
+  return m < 1 ? "sub un minut" : `≈ ${m} ${m === 1 ? "minut" : "minute"}`;
+};
 const plain = (s) => String(s ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 
 // ---------- entry ----------
@@ -76,6 +134,7 @@ export async function initTestGame(mountEl, exam) {
   G.exam = exam;
   G.inGame = false;
   root.className = "tgame-wrap";
+  loadFx(); // sound/haptics preference, remembered on this device
   if (!root.__gameWired) {
     root.addEventListener("click", onClick);
     root.addEventListener("input", onInput);
@@ -199,6 +258,7 @@ function currentConfig() {
     allYears: G.all.years, allSessions: G.all.sessions, allTypes: G.all.types,
     years: [...G.sel.years], sessions: [...G.sel.sessions], types: [...G.sel.types],
     order: G.sel.order, typeOrder: G.typeOrder,
+    mode: G.sel.mode, limit: G.sel.limit, sudden: G.sel.sudden,
   };
 }
 // Autosaves after every item, so leaving mid-game loses nothing.
@@ -223,6 +283,9 @@ function resumeSession(id) {
   G.sel.sessions = new Set(c.sessions || []);
   G.sel.types = new Set(c.types || []);
   G.sel.order = c.order || "random";
+  G.sel.mode = c.mode || "invatare";
+  G.sel.limit = Number(c.limit) || 0;
+  G.sel.sudden = !!c.sudden;
   G.typeOrder = (c.typeOrder || []).filter((t) => G.availTypes.includes(t));
   for (const t of G.availTypes) if (!G.typeOrder.includes(t)) G.typeOrder.push(t);
   G.emoji = s.emoji; G.label = s.label;
@@ -241,7 +304,7 @@ function resumeSession(id) {
     return renderConfig();
   }
   // A resumed sitting starts a fresh review strip (the chart covers this sitting).
-  G.history = []; G.view = null; G.liveAnswered = false;
+  G.history = []; G.view = null; G.liveAnswered = false; G.over = false;
   G.inGame = true; G.startAt = Date.now(); G.itemStart = Date.now();
   startTimer();
   renderGame();
@@ -263,24 +326,42 @@ function groupChips(name, attr, allLabel, options) {
   )).join("");
 }
 
+// How many items each type contributes UNDER THE CURRENT year/session choice.
+// The global tally decides which types exist at all; this one decides what the
+// list shows, so the numbers here can never contradict the funnel.
+function typeCountsNow() {
+  const c = {};
+  for (const it of G.items) {
+    if (!matchYearSession(it)) continue;
+    for (const t of it.types || []) c[t] = (c[t] || 0) + 1;
+  }
+  return c;
+}
+
 // RANK and QUANTITY are deliberately different visual languages: the rank is a
 // small slot on the LEFT, welded to the drag handle (it reads as „position"),
 // while the count sits right with its unit spelled out and a strength bar.
 // Two bare numbers side by side were impossible to tell apart.
+//
+// The bar compares a type against the RICHEST type in the current pool, with a
+// floor so a single item still shows a visible nub instead of nothing.
 function typeList() {
-  const max = Math.max(1, ...G.typeOrder.map((c) => G.typeCounts[c] || 0));
+  const counts = typeCountsNow();
+  const max = Math.max(1, ...G.typeOrder.map((c) => counts[c] || 0));
+  const locked = G.sel.order !== "mine"; // dragging only means something under „Ordinea mea"
   const qty = (n) => `
     <span class="tgame-tl__qty">
       <b>${n} ${n === 1 ? "item" : "itemi"}</b>
-      <span class="tgame-tl__bar"><i style="width:${Math.round((n / max) * 100)}%"></i></span>
+      <span class="tgame-tl__bar"><i style="width:${n ? Math.max(8, Math.round((n / max) * 100)) : 0}%"></i></span>
     </span>`;
   const rows = G.typeOrder.map((code, i) => {
+    const n = counts[code] || 0;
     const on = !G.all.types && G.sel.types.has(code);
-    return `<li class="tgame-tl__row${on ? " on" : ""}" data-tcode="${esc(code)}">
-        <span class="tgame-tl__grip" title="Trage ca să reordonezi" aria-hidden="true">⠿</span>
+    return `<li class="tgame-tl__row${on ? " on" : ""}${n ? "" : " is-none"}" data-tcode="${esc(code)}">
+        <span class="tgame-tl__grip"${locked ? "" : ` title="Trage ca să reordonezi"`} aria-hidden="true">⠿</span>
         <span class="tgame-tl__ord" title="Locul ${i + 1} în ordinea de joc">${i + 1}</span>
         <button type="button" class="tgame-tl__btn" data-type="${esc(code)}">${esc(TYPE_LABEL[code] || code)}</button>
-        ${qty(G.typeCounts[code] || 0)}
+        ${qty(n)}
       </li>`;
   }).join("");
   const missing = TEST_ITEM_TYPES.filter((t) => !(G.typeCounts[t.code] > 0)).map((t) =>
@@ -290,7 +371,9 @@ function typeList() {
        <span class="tgame-tl__btn">${esc(t.label)}</span>
        <span class="tgame-tl__qty"><b>niciun item</b></span>
      </li>`).join("");
-  return `<ul class="tgame-tl" id="tgame-tl">${rows}${missing}</ul>`;
+  return `
+    ${locked ? `<p class="tgame-tl__hint">Alege <b>„Ordinea mea"</b> la Ordine ca să poți rearanja categoriile.</p>` : ""}
+    <ul class="tgame-tl${locked ? " is-locked" : ""}" id="tgame-tl">${rows}${missing}</ul>`;
 }
 
 function savedStrip() {
@@ -347,6 +430,13 @@ function renderConfig() {
   const orderChips = [["random", "Aleatoriu"], ["years", "Pe ani"], ["types", "Pe tipuri"]]
     .concat(G.typeOrder.length > 1 ? [["mine", "Ordinea mea"]] : [])
     .map(([v, l]) => chip("order", v, l, G.sel.order === v)).join("");
+  const modeChips = [["invatare", "📖 Învățare"], ["examen", "📝 Examen"]]
+    .map(([v, l]) => chip("mode", v, l, G.sel.mode === v)).join("");
+  const limitChips = [[0, "Fără"], [30, "30 s"], [60, "60 s"], [90, "90 s"]]
+    .map(([v, l]) => chip("limit", String(v), l, G.sel.limit === v)).join("");
+  const suddenChip = chip("sudden", G.sel.sudden ? "off" : "on", "☠️ Fără greșeli", G.sel.sudden);
+  // With a clock the run is predictable; without one we lean on your own pace.
+  const estMs = G.sel.limit ? n * G.sel.limit * 1000 : n * avgMsPerItem();
   const emojiChips = EMOJIS.map((em) =>
     `<button type="button" class="tgame-em${em === G.emoji ? " on" : ""}" data-emoji="${em}" aria-label="Semn: ${em}">${em}</button>`).join("");
 
@@ -385,6 +475,25 @@ function renderConfig() {
             <div class="tgame-cfg-lab">Ordine</div>
             <div class="tgame-chips">${orderChips}</div>
           </div>
+
+          <div class="tgame-cfg-block">
+            <div class="tgame-cfg-lab">Mod</div>
+            <div class="tgame-chips">${modeChips}</div>
+            <p class="tgame-cfg-hint">${isExam()
+              ? "Răspunzi la tot fără să afli pe loc dacă ai nimerit; verdictele și explicațiile vin la final, ca la proba adevărată."
+              : "Afli imediat dacă ai nimerit, iar explicația o deschizi când vrei tu. Itemii greșiți revin până îi rezolvi."}</p>
+          </div>
+
+          <div class="tgame-cfg-block">
+            <div class="tgame-cfg-lab">Timp pe item</div>
+            <div class="tgame-chips">${limitChips}</div>
+          </div>
+
+          <div class="tgame-cfg-block">
+            <div class="tgame-cfg-lab">Provocare</div>
+            <div class="tgame-chips">${suddenChip}</div>
+            ${G.sel.sudden ? `<p class="tgame-cfg-hint">Prima greșeală încheie runda.</p>` : ""}
+          </div>
         </div>
 
         <aside class="tgame-cfg2__side">
@@ -399,6 +508,13 @@ function renderConfig() {
             <div class="tgame-ems">${emojiChips}</div>
             <input class="tgame-nameinput" id="tgame-label" maxlength="40" placeholder="nume (ex. recapitulare sintaxă)" value="${esc(G.label)}" />
             ${funnel()}
+            <div class="tgame-sum__row">
+              <span class="tgame-sum__est" title="${G.sel.limit ? "Din timpul pe care l-ai pus pe item" : "Din ritmul tău de până acum"}">⏱ ${n ? fmtMins(estMs) : "—"}</span>
+              <span class="tgame-fx">
+                <button type="button" class="tgame-fxbtn${G.fx.sound ? " on" : ""}" data-act="fx-sound" aria-label="Sunet" title="Sunet">${G.fx.sound ? "🔊" : "🔇"}</button>
+                <button type="button" class="tgame-fxbtn${G.fx.vibrate ? " on" : ""}" data-act="fx-vibrate" aria-label="Vibrație" title="Vibrație">📳</button>
+              </span>
+            </div>
             <button type="button" class="tgame-btn tgame-btn--primary tgame-btn--lg tgame-sum__go" data-act="start"${n ? "" : " disabled"}>
               Începe cu ${n} ${n === 1 ? "item" : "itemi"} ▸
             </button>
@@ -409,41 +525,108 @@ function renderConfig() {
   wireTypeDrag();
 }
 
-// Pointer-based drag (works with mouse AND touch, unlike HTML5 drag events).
-// The DOM is reordered live; on release the new order is read back.
+// Drag to reorder — pointer events, so mouse and touch behave the same.
+//   • the row LIFTS OUT of the list and floats over the page under the finger;
+//   • the remaining rows slide apart to open a gap (FLIP: measure, move, animate);
+//   • letting go anywhere outside the list cancels and the row flies home.
+// Only wired under „Ordinea mea" — reordering a list nothing sorts by would be
+// a lie, so elsewhere the handles are simply inert.
+const DROP_PAD = 60; // how far outside the list still counts as „over" it
 function wireTypeDrag() {
   const list = root.querySelector("#tgame-tl");
-  if (!list) return;
-  let row = null;
-  list.addEventListener("pointerdown", (e) => {
-    const grip = e.target.closest(".tgame-tl__grip");
-    if (!grip) return;
-    const li = grip.closest(".tgame-tl__row");
-    if (!li || li.classList.contains("is-empty")) return;
-    row = li;
-    row.classList.add("is-dragging");
-    grip.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  list.addEventListener("pointermove", (e) => {
-    if (!row) return;
-    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest(".tgame-tl__row");
-    if (!over || over === row || over.classList.contains("is-empty") || over.parentElement !== list) return;
-    const r = over.getBoundingClientRect();
-    list.insertBefore(row, e.clientY > r.top + r.height / 2 ? over.nextSibling : over);
-  });
-  const end = () => {
-    if (!row) return;
-    row.classList.remove("is-dragging");
-    row = null;
-    G.typeOrder = [...list.querySelectorAll(".tgame-tl__row[data-tcode]")].map((li) => li.dataset.tcode);
-    // Ordering by hand only means something under „Ordinea mea" — and that
-    // chip only exists once there are at least two types to order.
-    if (G.typeOrder.length > 1) G.sel.order = "mine";
-    renderConfig();
+  if (!list || G.sel.order !== "mine") return;
+
+  let st = null;
+  const rows = () => [...list.querySelectorAll(".tgame-tl__row[data-tcode]")];
+
+  // FLIP — remember where everyone is, reorder, then slide them from their old
+  // spot to the new one so the gap opens smoothly instead of snapping.
+  const flip = (mutate) => {
+    const before = new Map(rows().map((r) => [r, r.getBoundingClientRect().top]));
+    mutate();
+    for (const r of rows()) {
+      if (r === st?.row) continue; // the dragged row is hidden; the clone represents it
+      const dy = before.get(r) - r.getBoundingClientRect().top;
+      if (!dy) continue;
+      r.style.transition = "none";
+      r.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => {
+        r.style.transition = "transform 0.18s ease";
+        r.style.transform = "";
+      });
+    }
   };
-  list.addEventListener("pointerup", end);
-  list.addEventListener("pointercancel", end);
+
+  const overList = (x, y) => {
+    const b = list.getBoundingClientRect();
+    return x >= b.left - DROP_PAD && x <= b.right + DROP_PAD
+        && y >= b.top - DROP_PAD && y <= b.bottom + DROP_PAD;
+  };
+
+  list.addEventListener("pointerdown", (e) => {
+    if (st) return;
+    const grip = e.target.closest(".tgame-tl__grip");
+    const row = grip?.closest(".tgame-tl__row");
+    if (!row || !row.dataset.tcode) return;
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+
+    const r = row.getBoundingClientRect();
+    const clone = row.cloneNode(true);
+    clone.className = `tgame-tl__row tgame-tl__float${row.classList.contains("on") ? " on" : ""}`;
+    clone.style.cssText = `left:${r.left}px; top:${r.top}px; width:${r.width}px;`;
+    // Into <main>, not <body>: the console skin remaps its colours there, and a
+    // fixed element still floats over the page from either parent.
+    (list.closest("main") || document.body).appendChild(clone);
+    row.classList.add("is-ghost"); // keeps its space, so the list doesn't jump
+
+    st = {
+      row, clone,
+      grabX: e.clientX - r.left, grabY: e.clientY - r.top,
+      homeRect: r, homeNext: row.nextSibling,
+    };
+    document.body.classList.add("tgame-dragging");
+  });
+
+  list.addEventListener("pointermove", (e) => {
+    if (!st) return;
+    st.clone.style.left = `${e.clientX - st.grabX}px`;
+    st.clone.style.top = `${e.clientY - st.grabY}px`;
+
+    const inside = overList(e.clientX, e.clientY);
+    st.clone.classList.toggle("is-out", !inside); // visual cue: this drop won't take
+    if (!inside) return;
+
+    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest(".tgame-tl__row");
+    if (!over || over === st.row || !over.dataset.tcode || over.parentElement !== list) return;
+    const b = over.getBoundingClientRect();
+    flip(() => list.insertBefore(st.row, e.clientY > b.top + b.height / 2 ? over.nextSibling : over));
+  });
+
+  const finish = (cancelled) => {
+    if (!st) return;
+    const s = st;
+    st = null;
+    document.body.classList.remove("tgame-dragging");
+    if (cancelled) list.insertBefore(s.row, s.homeNext); // back where it started
+    const dest = cancelled ? s.homeRect : s.row.getBoundingClientRect();
+
+    s.clone.classList.remove("is-out");
+    s.clone.classList.add("is-landing");
+    s.clone.style.left = `${dest.left}px`;
+    s.clone.style.top = `${dest.top}px`;
+    setTimeout(() => {
+      s.clone.remove();
+      s.row.classList.remove("is-ghost");
+      for (const r of rows()) { r.style.transition = ""; r.style.transform = ""; }
+      if (cancelled) return;
+      G.typeOrder = rows().map((r) => r.dataset.tcode);
+      renderConfig(); // repaint the rank slots
+    }, 190);
+  };
+
+  list.addEventListener("pointerup", (e) => finish(!overList(e.clientX, e.clientY)));
+  list.addEventListener("pointercancel", () => finish(true));
 }
 
 // ---------- GAME ----------
@@ -456,15 +639,25 @@ function startGame() {
   G.total = items.length;
   G.correct = 0; G.wrong = 0; G.points = 0;
   G.elapsedBase = 0;
-  G.history = []; G.view = null; G.liveAnswered = false;
+  G.history = []; G.view = null; G.liveAnswered = false; G.over = false;
   G.inGame = true; G.startAt = Date.now(); G.itemStart = Date.now();
   persist();
   startTimer();
   renderGame();
 }
 
+// In exam mode the HUD must stay mute: a live „corecte / greșite" tally would
+// tell you the verdict the card is deliberately withholding.
+function hudDone() { return isExam() ? G.history.length : G.correct; }
 function hud() {
-  const pct = G.total ? Math.round((G.correct / G.total) * 100) : 0;
+  const exam = isExam();
+  const pct = G.total ? Math.round((hudDone() / G.total) * 100) : 0;
+  const stats = exam
+    ? `<span class="tgame-stat"><b id="tgame-ok">${G.history.length}</b> din ${G.total} rezolvați</span>
+       ${G.sel.sudden ? `<span class="tgame-stat">☠️ fără greșeli</span>` : ""}`
+    : `<span class="tgame-stat ok"><b id="tgame-ok">${G.correct}</b> corecte</span>
+       <span class="tgame-stat no"><b id="tgame-no">${G.wrong}</b> greșite</span>
+       <span class="tgame-stat pts"><b id="tgame-pts">${G.points}</b> puncte</span>`;
   return `
     <div class="tgame-hud">
       <div class="tgame-hud__top">
@@ -473,13 +666,9 @@ function hud() {
         <span class="tgame-timer" id="tgame-timer">${fmtTime(elapsedSec())}</span>
       </div>
       <div class="tgame-progress"><div class="tgame-progress__fill" id="tgame-fill" style="width:${pct}%"></div>
-        <span class="tgame-progress__txt" id="tgame-ptxt">${G.correct} / ${G.total}</span>
+        <span class="tgame-progress__txt" id="tgame-ptxt">${hudDone()} / ${G.total}</span>
       </div>
-      <div class="tgame-hud__stats">
-        <span class="tgame-stat ok"><b id="tgame-ok">${G.correct}</b> corecte</span>
-        <span class="tgame-stat no"><b id="tgame-no">${G.wrong}</b> greșite</span>
-        <span class="tgame-stat pts"><b id="tgame-pts">${G.points}</b> puncte</span>
-      </div>
+      <div class="tgame-hud__stats">${stats}</div>
     </div>`;
 }
 
@@ -542,6 +731,7 @@ function renderLive() {
   root.innerHTML = `
     <section class="tgame">
       ${hud()}
+      ${G.sel.limit ? `<div class="tgame-clock"><i id="tgame-clock" style="width:100%"></i></div>` : ""}
       <article class="tgame-card" data-id="${it.id}">
         ${cardHead(it)}
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
@@ -551,34 +741,44 @@ function renderLive() {
         ${navBar()}
       </article>
     </section>`;
+  startItemClock();
 }
 
 // An item that's already been answered — read-only, so no second attempt and
 // no second helping of points. `isLive` adds the „Continuă" button.
 function renderAnswered(i, isLive) {
+  stopItemClock(); // a settled item is never on the clock
   const e = G.history[i];
   if (!e) return renderLive();
   const it = G.byId.get(e.id) || { options: {} };
+  // Revisiting during an EXAM must stay as mute as the live card was: marking
+  // the key here would hand over the answer the exam is withholding.
+  const exam = isExam();
   const opts = optionsHtml(it, (k) => {
-    const cls = k === e.correctAnswer ? " opt-correct" : (k === e.chosen && !e.correct ? " opt-wrong" : "");
+    const cls = exam
+      ? (k === e.chosen ? " opt-picked" : "")
+      : (k === e.correctAnswer ? " opt-correct" : (k === e.chosen && !e.correct ? " opt-wrong" : ""));
     return `
     <button type="button" class="tgame-opt${cls}" disabled>
       <span class="tgame-opt__k">${k}</span>
       <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
     </button>`;
   });
+  const verdict = exam
+    ? `<div class="tgame-verdict is-mute">Răspuns înregistrat${e.chosen && e.chosen !== "-" ? `: <b>${esc(e.chosen)}</b>` : " — n-ai apucat să bifezi"}</div>`
+    : `<div class="tgame-verdict ${e.correct ? "ok" : "no"}">${e.correct ? "✓ Corect" : `✗ Greșit — corect era <b>${esc(e.correctAnswer)}</b>`}</div>
+       ${e.historical ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(e.historical)}</b>.</div>` : ""}
+       ${e.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(e.observation)}</div>` : ""}
+       ${postBar(i)}`;
   root.innerHTML = `
     <section class="tgame">
       ${hud()}
-      <article class="tgame-card ${e.correct ? "is-correct" : "is-wrong"}${isLive ? "" : " is-review"}" data-id="${e.id}" data-hi="${i}" data-done="1">
+      <article class="tgame-card ${exam ? "" : (e.correct ? "is-correct" : "is-wrong")}${isLive ? "" : " is-review"}" data-id="${e.id}" data-hi="${i}" data-done="1">
         ${cardHead(it)}
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : ""}</p>
         <div class="tgame-opts">${opts}</div>
         <div class="tgame-fb">
-          <div class="tgame-verdict ${e.correct ? "ok" : "no"}">${e.correct ? "✓ Corect" : `✗ Greșit — corect era <b>${esc(e.correctAnswer)}</b>`}</div>
-          ${e.historical ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(e.historical)}</b>.</div>` : ""}
-          ${e.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(e.observation)}</div>` : ""}
-          ${postBar(i)}
+          ${verdict}
         </div>
         ${isLive ? `<div class="tgame-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continuă ▸</button></div>` : ""}
         ${navBar()}
@@ -596,22 +796,29 @@ function renderGame() {
 function goTo(newIdx) {
   const { total, liveIdx } = navState();
   if (newIdx < 0 || newIdx >= total) return;
+  const wasLive = G.view === null;
   G.view = newIdx === liveIdx ? null : newIdx;
+  const nowLive = G.view === null;
+  // Reading an old item must not burn the current item's clock — pause it
+  // while you're away and push the deadline back by exactly that long.
+  if (wasLive && !nowLive) G.pausedAt = Date.now();
+  else if (!wasLive && nowLive && G.pausedAt) { G.itemStart += Date.now() - G.pausedAt; G.pausedAt = 0; }
   renderGame();
 }
 
 function updateHud() {
   const set = (id, v) => { const el = root.querySelector("#" + id); if (el) el.textContent = v; };
-  set("tgame-ok", G.correct); set("tgame-no", G.wrong); set("tgame-pts", G.points);
-  set("tgame-ptxt", `${G.correct} / ${G.total}`);
+  if (isExam()) set("tgame-ok", G.history.length);
+  else { set("tgame-ok", G.correct); set("tgame-no", G.wrong); set("tgame-pts", G.points); }
+  set("tgame-ptxt", `${hudDone()} / ${G.total}`);
   const fill = root.querySelector("#tgame-fill");
-  if (fill) fill.style.width = (G.total ? Math.round((G.correct / G.total) * 100) : 0) + "%";
+  if (fill) fill.style.width = (G.total ? Math.round((hudDone() / G.total) * 100) : 0) + "%";
 }
 
-async function submit(btn) {
-  const card = btn.closest(".tgame-card");
+async function submit(card, k) {
   if (!card || card.dataset.done) return;
-  const id = card.dataset.id, k = btn.dataset.k;
+  stopItemClock();
+  const id = card.dataset.id;
   card.querySelectorAll(".tgame-opt").forEach((b) => (b.disabled = true));
   card.classList.add("is-checking");
   const res = await answerTestItem(id, k, G.sessionId);
@@ -619,6 +826,7 @@ async function submit(btn) {
   if (!res) {
     showToast("Nu am putut verifica acum. Încearcă din nou.");
     card.querySelectorAll(".tgame-opt").forEach((b) => (b.disabled = false));
+    startItemClock(); // give the clock back too
     return;
   }
   card.dataset.done = "1";
@@ -638,38 +846,79 @@ async function submit(btn) {
   });
   G.liveAnswered = true;
 
-  card.classList.add(res.correct ? "is-correct" : "is-wrong");
-  card.querySelectorAll(".tgame-opt").forEach((b) => {
-    if (b.dataset.k === res.correctAnswer) b.classList.add("opt-correct");
-    if (b.dataset.k === k && !res.correct) b.classList.add("opt-wrong");
-  });
-
-  const hist = res.historical ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(res.historical)}</b>.</div>` : "";
   const fb = card.querySelector(".tgame-fb");
   fb.hidden = false;
-  fb.innerHTML = `
-    <div class="tgame-verdict ${res.correct ? "ok" : "no"}">${res.correct ? "✓ Corect" : `✗ Greșit — corect era <b>${esc(res.correctAnswer)}</b>`}</div>
-    ${hist}
-    ${res.observation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(res.observation)}</div>` : ""}
-    ${postBar(G.history.length - 1)}`;
-  card.querySelector(".tgame-next").hidden = false;
+
+  if (isExam()) {
+    // Nothing may leak in exam mode: no verdict, no key, no colours — and a
+    // neutral tick, because even the sound would give the answer away.
+    beep("tick"); buzz(15);
+    fb.innerHTML = `<div class="tgame-verdict is-mute">Răspuns înregistrat · rezultatele vin la final</div>`;
+  } else {
+    card.classList.add(res.correct ? "is-correct" : "is-wrong");
+    card.querySelectorAll(".tgame-opt").forEach((b) => {
+      if (b.dataset.k === res.correctAnswer) b.classList.add("opt-correct");
+      if (b.dataset.k === k && !res.correct) b.classList.add("opt-wrong");
+    });
+    const hist = res.historical ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(res.historical)}</b>.</div>` : "";
+    fb.innerHTML = `
+      <div class="tgame-verdict ${res.correct ? "ok" : "no"}">${res.correct ? "✓ Corect" : `✗ Greșit — corect era <b>${esc(res.correctAnswer)}</b>`}</div>
+      ${hist}
+      ${res.observation ? `
+        <button type="button" class="tgame-obsbtn" data-act="show-obs">Vezi explicația</button>
+        <div class="tgame-obs" hidden><span class="tgame-obs__lab">Observație</span>${sanitizeRich(res.observation)}</div>` : ""}
+      ${postBar(G.history.length - 1)}`;
+    if (res.correct) { beep("ok"); buzz(25); burstConfetti(card); if (res.awarded) floatPoints(res.points); }
+    else { beep("no"); buzz([40, 60, 40]); wrongFx(card); }
+  }
+
+  if (!res.correct && G.sel.sudden) G.over = true; // „fără greșeli"
+
+  const next = card.querySelector(".tgame-next");
+  next.hidden = false;
+  if (G.over) {
+    const b = next.querySelector("[data-act=next]");
+    if (b) b.textContent = "Vezi rezultatul ▸";
+  }
   const nav = card.querySelector(".tgame-nav");
   if (nav) nav.outerHTML = navBar(); // the strip grew by one
-
   updateHud();
-  if (res.correct) { burstConfetti(card); if (res.awarded) floatPoints(res.points); }
-  else wrongFx(card);
 }
+
+// ---------- per-item clock ----------
+function startItemClock() {
+  stopItemClock();
+  if (!G.sel.limit || G.view !== null) return;
+  const span = G.sel.limit * 1000;
+  G.itemTimer = setInterval(() => {
+    const left = G.itemStart + span - Date.now();
+    const bar = root.querySelector("#tgame-clock");
+    if (bar) {
+      bar.style.width = `${Math.max(0, Math.min(100, (left / span) * 100))}%`;
+      bar.parentElement.classList.toggle("is-low", left < span * 0.25);
+    }
+    if (left <= 0) {
+      stopItemClock();
+      const card = root.querySelector(".tgame-card");
+      // A letter no option can match: the server closes the item and reveals
+      // the key without awarding anything.
+      if (card && !card.dataset.done) { buzz([60, 40, 60]); submit(card, "-"); }
+    }
+  }, 100);
+}
+function stopItemClock() { if (G.itemTimer) { clearInterval(G.itemTimer); G.itemTimer = null; } }
 
 function advance() {
   const last = G.history[G.history.length - 1];
   const id = G.queue.shift();
-  if (!(last && last.correct) && id != null) G.queue.push(id); // wrong → back of the queue
+  // In LEARNING mode a miss returns to the back of the queue until you get it.
+  // In EXAM mode every item is asked exactly once, like the real paper.
+  if (!isExam() && !(last && last.correct) && id != null) G.queue.push(id);
   G.liveAnswered = false;
   G.view = null;
   G.itemStart = Date.now();
   persist(); // progress is safe from here on
-  if (!G.queue.length) return renderDone();
+  if (G.over || !G.queue.length) return renderDone();
   renderGame();
 }
 
@@ -852,6 +1101,8 @@ function resultsChart() {
 // ---------- DONE ----------
 function renderDone() {
   stopTimer();
+  stopItemClock();
+  rememberPace(); // your pace feeds the next run's estimate
   G.inGame = false;
   const time = fmtTime(elapsedSec());
   // Finished sessions don't belong in „continuă" any more. Cleaned up in the
@@ -864,8 +1115,10 @@ function renderDone() {
   }
   root.innerHTML = `
     <section class="tgame tgame-done">
-      <div class="tgame-done__badge" aria-hidden="true">✓</div>
-      <h2 class="tgame-done__title">Gata! Ai rezolvat corect toți itemii.</h2>
+      <div class="tgame-done__badge" aria-hidden="true">${G.over ? "☠️" : "✓"}</div>
+      <h2 class="tgame-done__title">${G.over
+        ? "Ai pierdut seria — o greșeală a încheiat runda."
+        : isExam() ? "Gata. Iată cum ai stat." : "Gata! Ai rezolvat corect toți itemii."}</h2>
       <p class="tgame-done__stats"><b>${G.total}</b> itemi · <b class="ok">${G.correct}</b> corecte · <b class="no">${G.wrong}</b> greșite · <b class="pts">${G.points}</b> puncte · timp <b>${time}</b></p>
       ${resultsChart()}
       <div class="tgame-done__actions">
@@ -992,6 +1245,12 @@ function onClick(e) {
   if (type) { pickGroup("types", type.dataset.type); return renderConfig(); }
   const order = e.target.closest("[data-order]");
   if (order) { G.sel.order = order.dataset.order; return renderConfig(); }
+  const mode = e.target.closest("[data-mode]");
+  if (mode) { G.sel.mode = mode.dataset.mode; return renderConfig(); }
+  const limit = e.target.closest("[data-limit]");
+  if (limit) { G.sel.limit = Number(limit.dataset.limit) || 0; return renderConfig(); }
+  const sudden = e.target.closest("[data-sudden]");
+  if (sudden) { G.sel.sudden = sudden.dataset.sudden === "on"; return renderConfig(); }
   const em = e.target.closest("[data-emoji]");
   if (em) { G.emoji = em.dataset.emoji; return renderConfig(); }
 
@@ -1017,6 +1276,13 @@ function onClick(e) {
     if (a === "start" || a === "again") return startGame();
     if (a === "config") return renderConfig();
     if (a === "next") return advance();
+    if (a === "fx-sound") { G.fx.sound = !G.fx.sound; saveFx(); if (G.fx.sound) beep("tick"); return renderConfig(); }
+    if (a === "fx-vibrate") { G.fx.vibrate = !G.fx.vibrate; saveFx(); if (G.fx.vibrate) buzz(30); return renderConfig(); }
+    if (a === "show-obs") {
+      const box = act.parentElement?.querySelector(".tgame-obs");
+      if (box) { box.hidden = false; act.remove(); }
+      return;
+    }
     if (a === "prev-item") return goTo(navState().idx - 1);
     if (a === "next-item") return goTo(navState().idx + 1);
     if (a === "refresh-item") return refreshItem(e.target.closest(".tgame-card"));
@@ -1033,5 +1299,5 @@ function onClick(e) {
   }
 
   const opt = e.target.closest(".tgame-opt");
-  if (opt && !opt.disabled) return submit(opt);
+  if (opt && !opt.disabled) return submit(opt.closest(".tgame-card"), opt.dataset.k);
 }

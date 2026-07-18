@@ -736,13 +736,37 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 }
 .tgame-tl__row.on { border-color: var(--color-primary); background: var(--color-surface); }
 .tgame-tl__row.is-empty { opacity: 0.42; border-style: dashed; }
-.tgame-tl__row.is-dragging { border-color: var(--color-primary); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); }
 .tgame-tl__grip {
   cursor: grab; touch-action: none; user-select: none;
   color: var(--color-text-muted); font-size: 1rem; letter-spacing: -0.15em; padding: 0.2rem 0.1rem;
 }
-.tgame-tl__row.is-dragging .tgame-tl__grip { cursor: grabbing; }
 .tgame-tl__row.is-empty .tgame-tl__grip { cursor: not-allowed; }
+/* no items under the CURRENT year/session choice — still listed, just quiet */
+.tgame-tl__row.is-none { opacity: 0.55; }
+
+/* handles are inert unless „Ordinea mea" is the chosen order */
+.tgame-tl.is-locked .tgame-tl__grip { cursor: default; opacity: 0.3; }
+.tgame-tl__hint {
+  margin: 0 0 0.5rem; font-size: 0.8rem; color: var(--color-text-muted);
+}
+
+/* ---- drag: the row lifts out and floats under the finger ---- */
+.tgame-tl__float {
+  position: fixed; z-index: 9999; margin: 0; pointer-events: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.45);
+  transform: scale(1.03) rotate(-0.5deg);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+/* released out here and it won't take — say so before they let go */
+.tgame-tl__float.is-out { opacity: 0.55; transform: scale(0.97) rotate(-2deg); }
+.tgame-tl__float.is-landing {
+  transition: left 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), top 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), transform 0.18s ease;
+  transform: scale(1);
+}
+/* the original keeps its space so the list never jumps */
+.tgame-tl__row.is-ghost { visibility: hidden; }
+body.tgame-dragging { cursor: grabbing; user-select: none; }
 .tgame-tl__btn {
   flex: 1; text-align: left; font: inherit; font-weight: 700; font-size: 0.92rem;
   background: none; border: 0; padding: 0.35rem 0; color: inherit; cursor: pointer; user-select: none;
@@ -789,6 +813,43 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 
 /* the session's marker rides along in the game HUD */
 .tgame-hud__tag { font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted); }
+
+/* estimate + sound/haptics, in the summary card */
+.tgame-sum__row {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  margin-top: var(--space-md);
+}
+.tgame-sum__est { font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted); }
+.tgame-fx { display: inline-flex; gap: 0.2rem; }
+.tgame-fxbtn {
+  font: inherit; font-size: 0.95rem; line-height: 1; cursor: pointer; user-select: none;
+  background: none; border: 0; padding: 0.25rem 0.35rem; border-radius: 8px; opacity: 0.4;
+}
+.tgame-fxbtn.on { opacity: 1; }
+.tgame-fxbtn:hover { background: var(--color-bg); }
+
+/* ---- per-item countdown ---- */
+.tgame-clock {
+  height: 6px; border-radius: 999px; background: var(--color-surface);
+  overflow: hidden; margin-bottom: var(--space-md);
+}
+.tgame-clock i {
+  display: block; height: 100%; background: var(--color-primary);
+  border-radius: 999px; transition: width 0.1s linear;
+}
+.tgame-clock.is-low i { background: #dc2626; }
+
+/* explanation on demand: you get the verdict, the reasoning only if you ask */
+.tgame-obsbtn {
+  font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; user-select: none;
+  margin-top: 0.5rem; padding: 0.35rem 0.9rem; border-radius: 999px;
+  border: 1.5px dashed var(--color-border); background: none; color: var(--color-text-muted);
+}
+.tgame-obsbtn:hover { border-color: var(--color-primary); color: var(--color-primary); border-style: solid; }
+/* exam mode: a verdict that deliberately says nothing */
+.tgame-verdict.is-mute { color: var(--color-text-muted); font-weight: 700; }
+/* the option you picked, shown WITHOUT saying whether it was right */
+.tgame-opt.opt-picked { border-color: var(--color-primary); }
 
 @media (max-width: 860px) {
   .tgame-cfg2__grid { grid-template-columns: 1fr; gap: var(--space-lg); }
