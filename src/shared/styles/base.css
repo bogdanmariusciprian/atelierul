@@ -48,7 +48,8 @@ body {
 
   /* SELECTABLE POLICY (Marius): nothing is selectable by default. The ONLY
      selectable things are re-enabled below: the lessons' actual text, the
-     comments' text, the posts' text — plus form fields (typing needs it). */
+     comments' text, the posts' text, a test item's question — plus form
+     fields (typing needs it). */
   user-select: none;
   -webkit-user-select: none;
 
@@ -68,13 +69,17 @@ textarea,
 [contenteditable],
 .post__text,
 .thr__text,
+.tgame-q,
 .lesson-section:not(.comments):not(.propose) :is(p, li, td, blockquote) {
   user-select: text;
   -webkit-user-select: text;
 }
-/* Sub-elements of selectable text (bold, links in a paragraph…) follow it. */
+/* Sub-elements of selectable text (bold, links in a paragraph…) follow it.
+   A test item's question is rich text (sanitizeRich), so its inline markup
+   must stay selectable together with the question. */
 .post__text *,
-.thr__text * {
+.thr__text *,
+.tgame-q * {
   user-select: inherit;
   -webkit-user-select: inherit;
 }
