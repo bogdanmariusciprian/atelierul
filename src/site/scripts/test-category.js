@@ -113,8 +113,17 @@ function downloadList() {
   const cols = columnar ? kinds.length : Math.max(1, ...[...byYear.values()].map((f) => f.length));
 
   const rows = [...byYear.entries()].map(([year, files]) => {
+    // Order inside a year comes from the session names, NOT from the stored
+    // `sort`. That column can go stale — every row currently holds 0 — and a
+    // page that renders differently depending on a field nobody maintains is
+    // a page that breaks quietly. The names are the truth; use them.
+    const ordered = [...files].sort((a, b) => {
+      const ka = sessionKind(sessionName(a, year)), kb = sessionKind(sessionName(b, year));
+      return kinds.indexOf(ka) - kinds.indexOf(kb)
+          || sessionName(a, year).localeCompare(sessionName(b, year), "ro");
+    });
     const cells = new Array(cols).fill("");
-    for (const f of files) {
+    for (const f of ordered) {
       const name = sessionName(f, year);
       const tip = [f.note, f.kind || "PDF"].filter(Boolean).join(" · ");
       const cell = `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
