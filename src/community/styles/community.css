@@ -478,7 +478,9 @@
 .post__follow.on { background: var(--color-accent); border-color: var(--color-accent); color: #3a2a00; }
 
 .post__body { margin: 0.6rem 0 0.2rem; }
-.post__text { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+/* pre-wrap: keep the line breaks people actually typed. Without it every
+   multi-paragraph post collapsed into one block of text. */
+.post__text { margin: 0; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
 
 /* Images */
 .post__imgs {

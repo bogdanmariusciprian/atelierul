@@ -141,6 +141,14 @@ const fmtMins = (ms) => {
   return m < 1 ? "sub un minut" : `≈ ${m} ${m === 1 ? "minut" : "minute"}`;
 };
 const plain = (s) => String(s ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+// Same, but keeps the line breaks the teacher wrote (posts render pre-wrap).
+const plainLines = (s) => String(s ?? "")
+  .replace(/<br\s*\/?>/gi, "\n")
+  .replace(/<\/(p|div|li)\s*>/gi, "\n")
+  .replace(/<[^>]*>/g, "")
+  .replace(/[ \t]+/g, " ")
+  .replace(/\n{3,}/g, "\n\n")
+  .trim();
 
 // ---------- entry ----------
 export async function initTestGame(mountEl, exam) {
@@ -1104,13 +1112,27 @@ const AUDIENCES = [
 
 // Posts store plain text (escaped at render), so the item's rich markup is
 // flattened here rather than shipped as tags.
+// Laid out in clear blocks rather than one paragraph: heading, coordinates,
+// the question, the options one per line, the answer, then the explanation.
 function itemPostText(e) {
   const it = G.byId.get(e.id) || { options: {} };
-  const head = `📘 Item admitere drept${it.year ? ` · ${it.year}` : ""}${it.session ? ` · ${it.session}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}`;
-  const opts = OPTS.filter((k) => it.options?.[k] != null && it.options[k] !== "")
-    .map((k) => `${k}) ${plain(it.options[k])}`).join("\n");
-  const obs = e.observation ? `\n\n💡 ${plain(e.observation)}` : "";
-  return `${head}\n\n${plain(it.question)}\n\n${opts}\n\n✅ Răspuns corect: ${e.correctAnswer}${obs}`;
+  const coords = [it.year, it.session, it.itemNo != null ? `itemul ${it.itemNo}` : null]
+    .filter(Boolean).join(" · ");
+  const opts = OPTS
+    .filter((k) => it.options?.[k] != null && it.options[k] !== "")
+    .map((k) => `${k})  ${plain(it.options[k])}`).join("\n");
+  const parts = [
+    "🏅 Item de admitere · Drept",
+    coords,
+    "",
+    plainLines(it.question),
+    "",
+    opts,
+    "",
+    `✅ Răspuns corect: ${e.correctAnswer}`,
+  ];
+  if (e.observation) parts.push("", "💡 Explicație", plainLines(e.observation));
+  return parts.filter((p) => p !== null && p !== undefined).join("\n");
 }
 
 function askAudience(onPick) {
@@ -1142,7 +1164,8 @@ function postItem(i) {
   const e = G.history[i];
   if (!e || e.posted || !isLoggedIn()) return;
   askAudience(async (audience) => {
-    const row = await createPost({ type: "resursa", audience, text: itemPostText(e), surface: "wall" });
+    // „Reușită", not „Resursă": the pupil is sharing something they solved.
+    const row = await createPost({ type: "reusita", audience, text: itemPostText(e), surface: "wall" });
     if (!row) { showToast("N-am putut posta acum. Încearcă din nou."); return; }
     e.posted = true;
     showToast("📌 Postat pe pagina ta.");
