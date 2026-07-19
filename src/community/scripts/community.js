@@ -31,10 +31,11 @@ import {
 import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
   adminFetchTestDownloads, saveTestDownload, deleteTestDownload, directDownloadUrl,
+  listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 // Shared with the Teste pages: one source for the category colours.
-import { TEST_CAT_BY_SLUG } from "../../site/scripts/test-categories.js";
+import { TEST_CATEGORIES, TEST_CAT_BY_SLUG } from "../../site/scripts/test-categories.js";
 import {
   wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
 } from "../../shared/scripts/discover-data.js";
@@ -283,6 +284,8 @@ export function renderCommunity(basePath = "") {
     reportItems: {},    // id → full test item behind a flagged-item report
     bonusQs: [],        // flying bonus questions (teacher-authored)
     downloads: [],      // downloadable tests (files on the teacher's Drive)
+    settings: {},       // private settings: Drive key + folder per category
+    driveFiles: {},     // slug → { loading, error, files } after a „Încarcă"
     profanityTerms: [], // admin-managed custom filtered words
     heldContent: [], // posts/comments held by the profanity filter (admin review)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
@@ -3265,8 +3268,55 @@ export function renderCommunity(basePath = "") {
   // share link exactly as Drive gives it — the site turns it into a direct
   // download by itself, so there's no URL surgery to learn.
   function adminTabDownloads() {
-    const rows = state.downloads.map((d) => `
-      <div class="cx-dlrow" data-id="${d.id}">
+    const key = state.settings.drive_api_key || "";
+    // One block per category: its Drive folder, a Load button, whatever that
+    // load found, and the files already published.
+    const blocks = TEST_CATEGORIES.map((c) => {
+      const folder = state.settings[`drive_folder_${c.slug}`] || "";
+      const st = state.driveFiles[c.slug] || {};
+      const mine = state.downloads.filter((d) => d.exam === c.slug);
+      const known = new Set(mine.map((d) => driveFileId(d.url)).filter(Boolean));
+      const found = (st.files || []).map((f) => {
+        const already = known.has(f.id);
+        return `<div class="cx-dlfound${already ? " is-known" : ""}">
+            <span class="cx-dlfound__n">${escapeHtml(f.name)}</span>
+            ${already
+              ? `<span class="cx-muted">deja adăugat</span>`
+              : `<button type="button" class="btn-mini btn-mini--ok" data-action="drive-add"
+                   data-slug="${c.slug}" data-fid="${f.id}" data-name="${escapeHtml(f.name)}">Adaugă</button>`}
+          </div>`;
+      }).join("");
+      return `<div class="cx-box cx-drivecat">
+          <div class="cx-admin__head"><h3><span aria-hidden="true">${c.icon}</span> ${escapeHtml(c.title)} · ${mine.length}</h3></div>
+          <div class="cx-driverow">
+            <input class="cx-input" data-f="folder" data-slug="${c.slug}" value="${escapeHtml(folder)}"
+                   placeholder="lipește aici linkul folderului din Drive" />
+            <button type="button" class="btn-mini" data-action="drive-save-folder" data-slug="${c.slug}">Salvează folderul</button>
+            <button type="button" class="btn btn--primary btn--sm" data-action="drive-load" data-slug="${c.slug}"${folder && key ? "" : " disabled"}>
+              ${st.loading ? "Se încarcă…" : "Încarcă din Drive"}
+            </button>
+          </div>
+          ${st.error ? `<p class="cx-muted cx-driveerr">⚠ ${escapeHtml(st.error)}</p>` : ""}
+          ${found ? `<div class="cx-dlfoundlist">${found}</div>` : ""}
+          ${mine.map(dlRow).join("") || `<p class="cx-muted">Niciun fișier publicat la această categorie.</p>`}
+        </div>`;
+    }).join("");
+
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>🔑 Legătura cu Drive</h3></div>
+        <p class="cx-muted">Cheia se citește DOAR din contul tău de profesor — elevii n-o primesc niciodată. Folderele trebuie partajate în Drive ca „oricine are linkul".</p>
+        <div class="cx-driverow">
+          <input class="cx-input" id="cx-drive-key" value="${escapeHtml(key)}" placeholder="cheia din Google Cloud Console" />
+          <button type="button" class="btn-mini btn-mini--ok" data-action="drive-save-key">Salvează cheia</button>
+        </div>
+      </div>
+      ${blocks}`;
+  }
+
+  // One published file, editable.
+  function dlRow(d) {
+    return `
+      <div class="cx-dlrow" data-id="${d.id}" data-exam="${escapeHtml(d.exam || "")}">
         <input class="cx-input" data-f="year" value="${escapeHtml(d.year ?? "")}" placeholder="an" inputmode="numeric" maxlength="4" />
         <input class="cx-input" data-f="label" value="${escapeHtml(d.label || "")}" placeholder="ex. Simulare" maxlength="60" />
         <input class="cx-input" data-f="note" value="${escapeHtml(d.note || "")}" placeholder="ex. subiect și barem" maxlength="80" />
@@ -3276,19 +3326,6 @@ export function renderCommunity(basePath = "") {
         <button type="button" class="btn-mini btn-mini--ok" data-action="dl-save" data-id="${d.id}">Salvează</button>
         <button type="button" class="btn-mini btn-mini--no" data-action="dl-del" data-id="${d.id}">Șterge</button>
         <a class="cx-dlrow__test" href="${escapeHtml(directDownloadUrl(d.url))}" target="_blank" rel="noopener noreferrer">testează ↗</a>
-      </div>`).join("");
-    return `<div class="cx-box">
-        <div class="cx-admin__head"><h3>📄 Teste descărcabile · ${state.downloads.length}</h3></div>
-        <p class="cx-muted">Ține fișierele pe Drive și lipește aici linkul de partajare. <b>Fișierul trebuie partajat ca „oricine are linkul"</b>, altfel butonul îi va duce pe elevi la ecranul de autentificare Google. Folosește „testează" ca să verifici fiecare link înainte să-l lași activ.</p>
-        <div class="cx-dlrow cx-dlrow--new">
-          <input class="cx-input" id="cx-dl-year" placeholder="an" inputmode="numeric" maxlength="4" />
-          <input class="cx-input" id="cx-dl-label" placeholder="ex. Simulare" maxlength="60" />
-          <input class="cx-input" id="cx-dl-note" placeholder="ex. subiect și barem" maxlength="80" />
-          <input class="cx-input" id="cx-dl-kind" placeholder="PDF" maxlength="12" />
-          <input class="cx-input cx-dlrow__url" id="cx-dl-url" placeholder="linkul din Drive" />
-          <button type="button" class="btn btn--primary btn--sm" data-action="dl-add">Adaugă</button>
-        </div>
-        ${rows || `<p class="cx-muted">Încă niciun test încărcat.</p>`}
       </div>`;
   }
 
@@ -3593,7 +3630,8 @@ export function renderCommunity(basePath = "") {
           .filter((r) => r.targetType === "test_item").map((r) => r.targetId))]
           .map(async (id) => { const it = await adminFetchTestItem(id); if (it) state.reportItems[id] = it; }));
         state.bonusQs = await adminFetchBonusQuestions(); // with their answers (definer RPC)
-        state.downloads = await adminFetchTestDownloads();
+        state.downloads = await adminFetchTestDownloads(); // all categories
+        state.settings = await fetchAppSettings();         // Drive key + folders
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
@@ -4648,15 +4686,50 @@ export function renderCommunity(basePath = "") {
           : "Respinsă — explicația a plecat în mesageria elevului.");
         return render();
       }
-      case "dl-add": {
-        const v = (id) => (mount.querySelector(id)?.value || "").trim();
-        const label = v("#cx-dl-label"), url = v("#cx-dl-url");
-        if (!label || !url) { showToast("Scrie măcar eticheta și linkul."); return; }
+      case "drive-save-key": {
+        const v = (mount.querySelector("#cx-drive-key")?.value || "").trim();
+        saveAppSetting("drive_api_key", v).then((ok) => {
+          state.settings.drive_api_key = v;
+          showToast(ok ? "Cheie salvată." : "N-am putut salva cheia.");
+          render();
+        });
+        return;
+      }
+      case "drive-save-folder": {
+        const slug = btn.dataset.slug;
+        const v = (mount.querySelector(`[data-f="folder"][data-slug="${slug}"]`)?.value || "").trim();
+        saveAppSetting(`drive_folder_${slug}`, v).then((ok) => {
+          state.settings[`drive_folder_${slug}`] = v;
+          showToast(ok ? "Folder salvat." : "N-am putut salva folderul.");
+          render();
+        });
+        return;
+      }
+      case "drive-load": {
+        const slug = btn.dataset.slug;
+        state.driveFiles[slug] = { loading: true };
+        render();
+        listDriveFolder(state.settings[`drive_folder_${slug}`], state.settings.drive_api_key)
+          .then((res) => {
+            state.driveFiles[slug] = res.error ? { error: res.error } : { files: res.files };
+            render();
+          });
+        return;
+      }
+      // Adds one found file. The name gives the label, the year and the kind —
+      // all editable afterwards on the row itself.
+      case "drive-add": {
+        const slug = btn.dataset.slug;
+        const name = btn.dataset.name || "fișier";
         saveTestDownload({
-          year: v("#cx-dl-year"), label, note: v("#cx-dl-note"),
-          kind: v("#cx-dl-kind") || "PDF", url, active: true,
+          exam: slug,
+          year: (name.match(/(20\d{2})/) || [])[1] || "",
+          label: name.replace(/\.[a-z0-9]+$/i, ""),
+          kind: ((name.match(/\.([a-z0-9]+)$/i) || [])[1] || "pdf").toUpperCase(),
+          url: `https://drive.google.com/file/d/${btn.dataset.fid}/view`,
+          active: true,
         }).then(async (ok) => {
-          if (!ok) return showToast("N-am putut salva.");
+          if (!ok) return showToast("N-am putut adăuga fișierul.");
           state.downloads = await adminFetchTestDownloads();
           render();
         });
@@ -4669,7 +4742,8 @@ export function renderCommunity(basePath = "") {
         const label = f("label")?.value.trim() || "", url = f("url")?.value.trim() || "";
         if (!label || !url) { showToast("Eticheta și linkul nu pot fi goale."); return; }
         saveTestDownload({
-          id: btn.dataset.id, year: f("year")?.value.trim(), label,
+          id: btn.dataset.id, exam: row.dataset.exam, // keep it in ITS category
+          year: f("year")?.value.trim(), label,
           note: f("note")?.value.trim(), kind: f("kind")?.value.trim() || "PDF",
           url, active: !!f("active")?.checked,
         }).then(async (ok) => {

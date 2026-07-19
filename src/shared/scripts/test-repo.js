@@ -319,6 +319,56 @@ export function directDownloadUrl(raw) {
   return `https://drive.usercontent.google.com/download?id=${id}&export=download`;
 }
 
+/** A Drive FOLDER link (or a bare id) → the folder id. */
+export function driveFolderId(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  return s.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1]
+      || s.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1]
+      || (/^[a-zA-Z0-9_-]{20,}$/.test(s) ? s : "");
+}
+
+/** The file id inside a Drive link — used to spot files already added. */
+export function driveFileId(raw) {
+  const s = String(raw || "");
+  return s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1]
+      || s.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || "";
+}
+
+/** Ask Drive what's inside a public folder. Teacher-only: the key never
+ *  reaches a pupil's browser, and pupils don't need it — their download links
+ *  are plain URLs. Returns { files } or { error }. */
+export async function listDriveFolder(folderLinkOrId, apiKey) {
+  const id = driveFolderId(folderLinkOrId);
+  if (!id) return { error: "Linkul folderului nu pare valid." };
+  if (!apiKey) return { error: "Lipsește cheia Drive (o pui mai sus)." };
+  const q = encodeURIComponent(`'${id}' in parents and trashed = false`);
+  const fields = encodeURIComponent("files(id,name,mimeType,size,modifiedTime)");
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=name&key=${apiKey}`
+    );
+    const data = await res.json();
+    if (!res.ok) return { error: data?.error?.message || `Drive a răspuns ${res.status}.` };
+    return { files: (data.files || []).filter((f) => f.mimeType !== "application/vnd.google-apps.folder") };
+  } catch {
+    return { error: "N-am putut ajunge la Drive (rețea sau cheie blocată)." };
+  }
+}
+
+// ---- Private settings (Drive key + folder ids), teacher-only ----
+export async function fetchAppSettings() {
+  const { data, error } = await supabase.from("app_settings").select("key, value");
+  if (error) { console.warn("fetchAppSettings:", error.message); return {}; }
+  return Object.fromEntries((data || []).map((r) => [r.key, r.value || ""]));
+}
+export async function saveAppSetting(key, value) {
+  const { error } = await supabase.from("app_settings")
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) { console.warn("saveAppSetting:", error.message); return false; }
+  return true;
+}
+
 /** Published files for one category, newest year first. Guests included. */
 export async function fetchTestDownloads(exam = "admitere-drept") {
   const { data, error } = await supabase
@@ -330,13 +380,13 @@ export async function fetchTestDownloads(exam = "admitere-drept") {
   return (data || []).map((r) => ({ ...r, href: directDownloadUrl(r.url) }));
 }
 
-/** Admin: everything, including the ones switched off. */
-export async function adminFetchTestDownloads(exam = "admitere-drept") {
-  const { data, error } = await supabase
-    .from("test_downloads")
-    .select("id, exam, year, label, note, kind, url, sort, active")
-    .eq("exam", exam)
-    .order("year", { ascending: false }).order("sort");
+/** Admin: everything, including the ones switched off. `exam = null` → all. */
+export async function adminFetchTestDownloads(exam = null) {
+  let q = supabase.from("test_downloads")
+    .select("id, exam, year, label, note, kind, url, sort, active");
+  if (exam) q = q.eq("exam", exam);
+  const { data, error } = await q
+    .order("exam").order("year", { ascending: false }).order("sort");
   if (error) { console.warn("adminFetchTestDownloads:", error.message); return []; }
   return data || [];
 }
