@@ -589,27 +589,42 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tcat__title { margin: 0 0 0.2rem; font-size: 1.7rem; color: var(--cat-color); }
 .tcat__desc { margin: 0; color: var(--color-text-muted); line-height: 1.6; }
 
-/* The practice call-to-action: text left, button right, full width. */
-.tcat__hero-cta {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--space-lg); flex-wrap: wrap; margin-bottom: var(--space-lg);
+/* Archive left, practice right — two separate surfaces, neither inside the
+   other. The archive is first in the markup, so stacking on a phone puts the
+   files first, which is the order Marius asked for. */
+.tcat__split {
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: var(--space-lg); align-items: start;
 }
-.tcat__cta-txt { min-width: 0; }
-.tcat__cta-txt .tcat__lead { margin: 0; }
-.tcat__files { margin-bottom: var(--space-lg); }
+.tcat__files { min-width: 0; }
 .tcat__files .tcat__ph { margin-bottom: var(--space-md); }
 
-.tcat__panel {
-  border: 1.5px solid var(--color-border); border-radius: 18px;
-  padding: var(--space-lg); background: var(--color-bg);
+/* The dark card: the only piece of console left on this page. */
+.tcat__gamecard {
+  min-width: 0;
+  background: color-mix(in srgb, var(--cat-color) 14%, #201d2b);
+  border: 1.5px solid color-mix(in srgb, var(--cat-color) 32%, transparent);
+  border-radius: 20px; padding: var(--space-lg);
+  color: #f5f3ff;
+  /* stays in view while the archive scrolls past it */
+  position: sticky; top: var(--sticky-top, 104px);
 }
-.tcat__panel--play {
-  border-color: color-mix(in srgb, var(--cat-color) 35%, transparent);
-  background: color-mix(in srgb, var(--cat-color) 5%, var(--color-bg));
+.tcat__gamecard__ic { font-size: 2.2rem; line-height: 1; display: block; margin-bottom: 0.6rem; }
+.tcat__gamecard__t {
+  margin: 0 0 0.4rem; font-size: 1.15rem;
+  color: color-mix(in srgb, var(--cat-color) 55%, #ffffff);
 }
+.tcat__gamecard__lead { margin: 0 0 var(--space-md); font-size: 0.9rem; line-height: 1.65; color: #ada7c8; }
+.tcat__gamecard .tcat__play { width: 100%; justify-content: center; }
+.tcat__gamecard .tcat__soon { color: #ada7c8; }
+
+@media (max-width: 860px) {
+  .tcat__split { grid-template-columns: 1fr; }
+  .tcat__gamecard { position: static; }
+}
+
 .tcat__ph { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; font-size: 1.05rem; }
 .tcat__soon { margin: 0; color: var(--color-text-muted); font-style: italic; }
-.tcat__lead { margin: 0 0 var(--space-md); color: var(--color-text-muted); line-height: 1.6; }
 
 .tcat__play {
   display: inline-flex; align-items: center; gap: 0.6rem;
@@ -1248,7 +1263,7 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
    The admin item grid (.tg-mode) is deliberately excluded — it's a data
    editor, not a game, and Marius wants it untouched.
    ========================================================= */
-body.tcat-page:not(.tg-mode) main.container {
+body.tcat-page.tgame-active:not(.tg-mode) main.container {
   --tc-deep: color-mix(in srgb, var(--cat-color) 9%, #15131e);
   --tc-panel: color-mix(in srgb, var(--cat-color) 11%, #201d2b);
   --tc-row: color-mix(in srgb, var(--cat-color) 13%, #2a2637);
@@ -1275,72 +1290,67 @@ body.tcat-page:not(.tg-mode) main.container {
      the console's padding, so these pages get a wider shell. */
   max-width: calc(1280px + 2 * var(--space-lg));
 }
-body.tcat-page:not(.tg-mode) .page-crumbs,
-body.tcat-page:not(.tg-mode) .page-crumbs a { color: var(--color-text-muted); }
+body.tcat-page.tgame-active:not(.tg-mode) .page-crumbs,
+body.tcat-page.tgame-active:not(.tg-mode) .page-crumbs a { color: var(--color-text-muted); }
 
 /* anything sitting ON the bright accent needs dark ink, not white */
-body.tcat-page:not(.tg-mode) .tgame-chip.on,
-body.tcat-page:not(.tg-mode) .tgame-btn--primary,
-body.tcat-page:not(.tg-mode) .tcat__play,
-body.tcat-page:not(.tg-mode) .tgame-tl__row.on .tgame-tl__ord { color: var(--tc-ink); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-chip.on,
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-btn--primary,
+body.tcat-page.tgame-active:not(.tg-mode) .tcat__play,
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__row.on .tgame-tl__ord { color: var(--tc-ink); }
 
 /* ---- presentation panels ---- */
-body.tcat-page:not(.tg-mode) .tcat__hero {
+body.tcat-page.tgame-active:not(.tg-mode) .tcat__hero {
   background: color-mix(in srgb, var(--cat-color) 18%, transparent);
   border-color: color-mix(in srgb, var(--cat-color) 36%, transparent);
 }
-body.tcat-page:not(.tg-mode) .tcat__title { color: var(--tc-accent); }
-body.tcat-page:not(.tg-mode) .tcat__panel { background: var(--tc-panel); border-color: var(--color-border); }
-body.tcat-page:not(.tg-mode) .tcat__panel--play {
-  background: color-mix(in srgb, var(--cat-color) 15%, var(--tc-panel));
-  border-color: color-mix(in srgb, var(--cat-color) 42%, transparent);
-}
-body.tcat-page:not(.tg-mode) .tcat__play { background: var(--tc-accent); box-shadow: none; }
+body.tcat-page.tgame-active:not(.tg-mode) .tcat__title { color: var(--tc-accent); }
+body.tcat-page.tgame-active:not(.tg-mode) .tcat__play { background: var(--tc-accent); box-shadow: none; }
 
 /* ---- the drag list, console style: slot, name, strength bar ---- */
-body.tcat-page:not(.tg-mode) .tgame-tl__row {
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__row {
   background: var(--tc-row); border-color: transparent; border-radius: 10px;
 }
-body.tcat-page:not(.tg-mode) .tgame-tl__row.on {
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__row.on {
   background: color-mix(in srgb, var(--cat-color) 24%, var(--tc-row));
   border-color: color-mix(in srgb, var(--cat-color) 45%, transparent);
 }
-body.tcat-page:not(.tg-mode) .tgame-tl__ord { background: var(--tc-deep); }
-body.tcat-page:not(.tg-mode) .tgame-tl__bar { background: var(--tc-deep); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__ord { background: var(--tc-deep); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__bar { background: var(--tc-deep); }
 
 /* ---- answers: the light green/red tints would blind a dark card ---- */
-body.tcat-page:not(.tg-mode) .tgame-opt.opt-correct {
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-opt.opt-correct {
   background: color-mix(in srgb, #16a34a 22%, var(--tc-row)); border-color: var(--tc-ok);
 }
-body.tcat-page:not(.tg-mode) .tgame-opt.opt-wrong {
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-opt.opt-wrong {
   background: color-mix(in srgb, #dc2626 20%, var(--tc-row)); border-color: var(--tc-no);
 }
-body.tcat-page:not(.tg-mode) .tgame-verdict.ok { color: var(--tc-ok); }
-body.tcat-page:not(.tg-mode) .tgame-verdict.no { color: var(--tc-no); }
-body.tcat-page:not(.tg-mode) .tgame-obs {
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-verdict.ok { color: var(--tc-ok); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-verdict.no { color: var(--tc-no); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-obs {
   background: var(--tc-panel); color: var(--color-text);
 }
-body.tcat-page:not(.tg-mode) .tgame-obs__lab { color: var(--tc-ok); background: none; }
-body.tcat-page:not(.tg-mode) .tgame-hist { color: var(--color-text-muted); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-obs__lab { color: var(--tc-ok); background: none; }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-hist { color: var(--color-text-muted); }
 
 /* ---- live counters ---- */
-body.tcat-page:not(.tg-mode) .tgame-stat.ok b,
-body.tcat-page:not(.tg-mode) .tgame-done__stats .ok { color: var(--tc-ok); }
-body.tcat-page:not(.tg-mode) .tgame-stat.no b,
-body.tcat-page:not(.tg-mode) .tgame-done__stats .no { color: var(--tc-no); }
-body.tcat-page:not(.tg-mode) .tgame-stat.pts b,
-body.tcat-page:not(.tg-mode) .tgame-done__stats .pts { color: var(--tc-pts); }
-body.tcat-page:not(.tg-mode) .tgame-report:hover {
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-stat.ok b,
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-done__stats .ok { color: var(--tc-ok); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-stat.no b,
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-done__stats .no { color: var(--tc-no); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-stat.pts b,
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-done__stats .pts { color: var(--tc-pts); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-report:hover {
   color: var(--tc-accent); background: color-mix(in srgb, var(--cat-color) 18%, transparent);
 }
-body.tcat-page:not(.tg-mode) .tgame-scard__x:hover { color: var(--tc-no); }
-body.tcat-page:not(.tg-mode) .tgame-config__badge,
-body.tcat-page:not(.tg-mode) .tgame-done__badge {
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-scard__x:hover { color: var(--tc-no); }
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-config__badge,
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-done__badge {
   background: color-mix(in srgb, var(--cat-color) 26%, var(--tc-panel)); color: var(--tc-accent);
 }
 
 @media (max-width: 560px) {
-  body.tcat-page:not(.tg-mode) main.container { border-radius: 16px; padding: var(--space-md); }
+  body.tcat-page.tgame-active:not(.tg-mode) main.container { border-radius: 16px; padding: var(--space-md); }
 }
 
 /* ---- game: top bar (discreet) ---- */

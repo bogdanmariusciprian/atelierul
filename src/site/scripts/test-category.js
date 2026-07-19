@@ -112,29 +112,28 @@ function renderIntro() {
       </div>
     </section>
 
-    <!-- The practice is the point of the page, so it gets the full width and
-         sits first. The file list is a section of its own underneath: it grows
-         with every exam session, and it used to stretch its column into an
-         ugly tower beside a short one. -->
-    <section class="tcat__panel tcat__panel--play tcat__hero-cta">
-      <div class="tcat__cta-txt">
-        <h2 class="tcat__ph"><span aria-hidden="true">🎮</span> Antrenament interactiv</h2>
-        ${cat.live
-          ? `<p class="tcat__lead">Rezolvi câte un item pe rând, cu explicație imediată. Cei greșiți revin până îi nimerești.</p>`
-          : `<p class="tcat__lead">Banca de itemi pentru această categorie se pregătește.</p>`}
-      </div>
-      ${cat.live
-        ? `<a class="tcat__play" href="#joc">
-             <span class="tcat__play__ic" aria-hidden="true">${adminMode ? "🛠️" : "▸"}</span>
-             ${adminMode ? "Deschide grila de itemi" : "Începe antrenamentul"}
-           </a>`
-        : `<span class="tcat__soon">Va urma.</span>`}
-    </section>
+    <!-- Two worlds side by side, neither nested in the other: the archive on
+         its own light surface, the practice on its own dark card. The archive
+         comes FIRST in the markup, so on a narrow screen it also comes first. -->
+    <div class="tcat__split">
+      <!-- Not gated on cat.live: a category can have papers to download long
+           before it has an item bank to play with. -->
+      <section class="tcat__files">
+        <h2 class="tcat__ph"><span aria-hidden="true">📄</span> Teste descărcabile</h2>
+        ${downloadList()}
+      </section>
 
-    <!-- Not gated on cat.live: a category can have papers to download long
-         before it has an item bank to play with. -->
-    <section class="tcat__files">
-      <h2 class="tcat__ph"><span aria-hidden="true">📄</span> Teste descărcabile</h2>
-      ${downloadList()}
-    </section>`;
+      <aside class="tcat__gamecard">
+        <span class="tcat__gamecard__ic" aria-hidden="true">${cat.icon}</span>
+        <h2 class="tcat__gamecard__t">Antrenament interactiv</h2>
+        ${cat.live
+          ? `<p class="tcat__gamecard__lead">Rezolvi câte un item pe rând, cu explicație imediată. Cei greșiți revin până îi nimerești.</p>
+             <a class="tcat__play" href="#joc">
+               <span class="tcat__play__ic" aria-hidden="true">${adminMode ? "🛠️" : "▸"}</span>
+               ${adminMode ? "Deschide grila de itemi" : "Începe antrenamentul"}
+             </a>`
+          : `<p class="tcat__gamecard__lead">Banca de itemi pentru această categorie se pregătește.</p>
+             <span class="tcat__soon">Va urma.</span>`}
+      </aside>
+    </div>`;
 }
