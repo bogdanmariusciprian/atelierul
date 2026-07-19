@@ -589,7 +589,16 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tcat__title { margin: 0 0 0.2rem; font-size: 1.7rem; color: var(--cat-color); }
 .tcat__desc { margin: 0; color: var(--color-text-muted); line-height: 1.6; }
 
-.tcat__panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-lg); }
+/* The practice call-to-action: text left, button right, full width. */
+.tcat__hero-cta {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-lg); flex-wrap: wrap; margin-bottom: var(--space-lg);
+}
+.tcat__cta-txt { min-width: 0; }
+.tcat__cta-txt .tcat__lead { margin: 0; }
+.tcat__files { margin-bottom: var(--space-lg); }
+.tcat__files .tcat__ph { margin-bottom: var(--space-md); }
+
 .tcat__panel {
   border: 1.5px solid var(--color-border); border-radius: 18px;
   padding: var(--space-lg); background: var(--color-bg);
@@ -621,10 +630,11 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   margin: 0 0 0.5rem; font-size: 0.78rem; font-weight: 800;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--cat-color);
 }
+.tdl__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.5rem; }
 .tdl__item {
   display: flex; align-items: center; gap: 0.75rem;
   text-decoration: none; color: inherit;
-  padding: 0.65rem 0.9rem; margin-bottom: 0.45rem;
+  padding: 0.65rem 0.9rem;
   border: 1.5px solid var(--color-border); border-radius: 12px;
   transition: border-color 0.12s ease, transform 0.08s ease;
 }

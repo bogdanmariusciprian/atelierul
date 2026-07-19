@@ -80,17 +80,21 @@ function downloadList() {
     if (!byYear.has(y)) byYear.set(y, []);
     byYear.get(y).push(d);
   }
+  // Files sit in a grid inside each year, so twenty sessions read as a compact
+  // block instead of a twenty-storey tower.
   const groups = [...byYear.entries()].map(([year, files]) => `
     <div class="tdl__group">
       <h3 class="tdl__year">${esc(year)}</h3>
-      ${files.map((f) => `
-        <a class="tdl__item" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer">
-          <span class="tdl__ic" aria-hidden="true">⬇</span>
-          <span class="tdl__body">
-            <b class="tdl__label">${esc(f.label)}</b>
-            <span class="tdl__meta">${f.note ? `${esc(f.note)} · ` : ""}${esc(f.kind || "PDF")}</span>
-          </span>
-        </a>`).join("")}
+      <div class="tdl__grid">
+        ${files.map((f) => `
+          <a class="tdl__item" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer">
+            <span class="tdl__ic" aria-hidden="true">⬇</span>
+            <span class="tdl__body">
+              <b class="tdl__label">${esc(f.label)}</b>
+              <span class="tdl__meta">${f.note ? `${esc(f.note)} · ` : ""}${esc(f.kind || "PDF")}</span>
+            </span>
+          </a>`).join("")}
+      </div>
     </div>`).join("");
   return `<div class="tdl">${groups}</div>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
@@ -108,23 +112,29 @@ function renderIntro() {
       </div>
     </section>
 
-    <div class="tcat__panels">
-      <section class="tcat__panel">
-        <h2 class="tcat__ph"><span aria-hidden="true">📄</span> Teste descărcabile</h2>
-        <!-- Deliberately NOT gated on cat.live: a category can have papers to
-             download long before it has an item bank to play with. -->
-        ${downloadList()}
-      </section>
-
-      <section class="tcat__panel tcat__panel--play">
+    <!-- The practice is the point of the page, so it gets the full width and
+         sits first. The file list is a section of its own underneath: it grows
+         with every exam session, and it used to stretch its column into an
+         ugly tower beside a short one. -->
+    <section class="tcat__panel tcat__panel--play tcat__hero-cta">
+      <div class="tcat__cta-txt">
         <h2 class="tcat__ph"><span aria-hidden="true">🎮</span> Antrenament interactiv</h2>
         ${cat.live
-          ? `<p class="tcat__lead">Rezolvi câte un item pe rând, cu explicație imediată. Cei greșiți revin până îi nimerești.</p>
-             <a class="tcat__play" href="#joc">
-               <span class="tcat__play__ic" aria-hidden="true">${adminMode ? "🛠️" : "▸"}</span>
-               ${adminMode ? "Deschide grila de itemi" : "Începe antrenamentul"}
-             </a>`
-          : soon}
-      </section>
-    </div>`;
+          ? `<p class="tcat__lead">Rezolvi câte un item pe rând, cu explicație imediată. Cei greșiți revin până îi nimerești.</p>`
+          : `<p class="tcat__lead">Banca de itemi pentru această categorie se pregătește.</p>`}
+      </div>
+      ${cat.live
+        ? `<a class="tcat__play" href="#joc">
+             <span class="tcat__play__ic" aria-hidden="true">${adminMode ? "🛠️" : "▸"}</span>
+             ${adminMode ? "Deschide grila de itemi" : "Începe antrenamentul"}
+           </a>`
+        : `<span class="tcat__soon">Va urma.</span>`}
+    </section>
+
+    <!-- Not gated on cat.live: a category can have papers to download long
+         before it has an item bank to play with. -->
+    <section class="tcat__files">
+      <h2 class="tcat__ph"><span aria-hidden="true">📄</span> Teste descărcabile</h2>
+      ${downloadList()}
+    </section>`;
 }
