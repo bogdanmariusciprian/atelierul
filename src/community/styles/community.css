@@ -1030,6 +1030,16 @@
 .cx-driverow .cx-input { flex: 1 1 18rem; min-width: 0; }
 .cx-driveerr { color: #b91c1c; margin: 0 0 0.6rem; }
 .cx-drivecat { margin-bottom: 0.8rem; }
+/* Sync on the right of the title, the folder tucked behind a button next to
+   it — the panel's everyday state is one line and a verdict. */
+.cx-drivecat__acts { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; }
+.cx-drivecat__more {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: none; border: 0; padding: 0.2rem 0; cursor: pointer;
+  font: inherit; font-size: 0.82rem; font-weight: 700;
+  color: var(--color-text-muted); user-select: none;
+}
+.cx-drivecat__more:hover { color: var(--color-primary); }
 .cx-dlsync { margin: 0 0 0.7rem; font-size: 0.84rem; color: var(--color-text-muted); }
 .cx-dlsync__warn { color: #b45309; }
 @media (max-width: 900px) {

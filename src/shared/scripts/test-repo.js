@@ -459,7 +459,10 @@ export async function updateTestDownloads(rows) {
  *  „Simulare_2025.pdf" → { label: "Simulare 2025", year: 2025, kind: "PDF" } */
 export function guessFromFileName(name = "") {
   const ext = (name.match(/\.([a-z0-9]+)$/i) || [])[1] || "pdf";
-  const base = name.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  // Underscores become spaces; HYPHENS STAY. „2024 - Iul - G1.pdf" is a
+  // deliberate naming scheme, and flattening its dashes turned it into
+  // „2024 Iul G1" — the label lost the structure the teacher put there.
+  const base = name.replace(/\.[a-z0-9]+$/i, "").replace(/_+/g, " ").replace(/\s+/g, " ").trim();
   return {
     label: base || "Fișier",
     year: (base.match(/(20\d{2})/) || [])[1] || null,

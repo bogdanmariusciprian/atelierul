@@ -287,6 +287,7 @@ export function renderCommunity(basePath = "") {
     downloads: [],      // downloadable tests (files on the teacher's Drive)
     settings: {},       // private settings: Drive key + folder per category
     driveFiles: {},     // slug → { loading, error, files } after a „Încarcă"
+    driveUI: {},        // slug → { folder, files } — what's unfolded right now
     profanityTerms: [], // admin-managed custom filtered words
     heldContent: [], // posts/comments held by the profanity filter (admin review)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
@@ -3282,19 +3283,36 @@ export function renderCommunity(basePath = "") {
             ? `<b class="cx-dlsync__warn">Folderul pare gol — n-am șters nimic.</b> Verifică linkul folderului.`
             : `${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.updated ? ` · <b>${st.updated}</b> redenumite` : ""}${st.kept ? ` · ${st.kept} erau deja` : ""}${st.removed ? ` · <b>${st.removed}</b> eliminate (șterse din Drive)` : ""}`}
         </p>`;
+      // Day to day this panel has exactly one job: press Sincronizează. The
+      // folder link is set once a year and the file rows are for the rare
+      // correction, so both start folded away — one button each brings them
+      // back. Folding beats removing: nothing is lost, only quiet.
+      const ui = state.driveUI[c.slug] || {};
       return `<div class="cx-box cx-drivecat">
-          <div class="cx-admin__head"><h3><span aria-hidden="true">${c.icon}</span> ${escapeHtml(c.title)} · ${mine.length}</h3></div>
-          <div class="cx-driverow">
+          <div class="cx-admin__head">
+            <h3><span aria-hidden="true">${c.icon}</span> ${escapeHtml(c.title)} · ${mine.length}</h3>
+            <div class="cx-drivecat__acts">
+              <button type="button" class="btn-mini" data-action="drive-toggle-folder" data-slug="${c.slug}"
+                      aria-expanded="${ui.folder ? "true" : "false"}">
+                ${ui.folder ? "Ascunde folderul" : "Schimbă folderul"}
+              </button>
+              <button type="button" class="btn btn--primary btn--sm" data-action="drive-load" data-slug="${c.slug}"${folder && key ? "" : " disabled"}>
+                ${st.loading ? "Se sincronizează…" : "Sincronizează din Drive"}
+              </button>
+            </div>
+          </div>
+          ${ui.folder ? `<div class="cx-driverow">
             <input class="cx-input" data-f="folder" data-slug="${c.slug}" value="${escapeHtml(folder)}"
                    placeholder="lipește aici linkul folderului din Drive" />
-            <button type="button" class="btn-mini" data-action="drive-save-folder" data-slug="${c.slug}">Salvează folderul</button>
-            <button type="button" class="btn btn--primary btn--sm" data-action="drive-load" data-slug="${c.slug}"${folder && key ? "" : " disabled"}>
-              ${st.loading ? "Se sincronizează…" : "Sincronizează din Drive"}
-            </button>
-          </div>
+            <button type="button" class="btn-mini btn-mini--ok" data-action="drive-save-folder" data-slug="${c.slug}">Salvează folderul</button>
+          </div>` : ""}
           ${st.error ? `<p class="cx-muted cx-driveerr">⚠ ${escapeHtml(st.error)}</p>` : ""}
           ${summary}
-          ${mine.map(dlRow).join("") || `<p class="cx-muted">Niciun fișier publicat la această categorie.</p>`}
+          ${mine.length ? `<button type="button" class="cx-drivecat__more" data-action="drive-toggle-files" data-slug="${c.slug}"
+                    aria-expanded="${ui.files ? "true" : "false"}">
+              ${ui.files ? "▾ Ascunde fișierele" : `▸ Vezi și editează fișierele (${mine.length})`}
+            </button>` : `<p class="cx-muted">Niciun fișier publicat la această categorie.</p>`}
+          ${ui.files ? mine.map(dlRow).join("") : ""}
         </div>`;
     }).join("");
 
@@ -4689,6 +4707,15 @@ export function renderCommunity(basePath = "") {
           showToast(ok ? "Cheie salvată." : "N-am putut salva cheia.");
           render();
         });
+        return;
+      }
+      case "drive-toggle-folder":
+      case "drive-toggle-files": {
+        const slug = btn.dataset.slug;
+        const which = action === "drive-toggle-folder" ? "folder" : "files";
+        const ui = state.driveUI[slug] || (state.driveUI[slug] = {});
+        ui[which] = !ui[which];
+        render();
         return;
       }
       case "drive-save-folder": {
