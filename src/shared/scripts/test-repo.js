@@ -299,6 +299,68 @@ export async function fetchBoosters(sessionId) {
   return Object.fromEntries((data || []).filter((r) => r.qty > 0).map((r) => [r.kind, r.qty]));
 }
 
+// ---- Downloadable tests (files live on the teacher's Drive) ----
+
+/** A Drive share link → a link that downloads the file straight away.
+ *  Handles the formats Drive actually hands you:
+ *    …/file/d/<ID>/view?usp=sharing · …/open?id=<ID> · …/uc?id=<ID>
+ *  `drive.usercontent.google.com/download` is the endpoint that serves the
+ *  bytes; the older `uc?export=download` now often answers with a confirmation
+ *  page instead. Anything that isn't a Drive link passes through untouched, so
+ *  a file hosted elsewhere still works. */
+export function directDownloadUrl(raw) {
+  const url = String(raw || "").trim();
+  if (!url) return "";
+  if (!/drive\.google\.com/i.test(url)) return url; // not Drive — leave it alone
+  const id =
+    url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] ||
+    url.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || "";
+  if (!id) return url;
+  return `https://drive.usercontent.google.com/download?id=${id}&export=download`;
+}
+
+/** Published files for one category, newest year first. Guests included. */
+export async function fetchTestDownloads(exam = "admitere-drept") {
+  const { data, error } = await supabase
+    .from("test_downloads")
+    .select("id, year, label, note, kind, url, sort, active")
+    .eq("exam", exam).eq("active", true)
+    .order("year", { ascending: false }).order("sort");
+  if (error) { console.warn("fetchTestDownloads:", error.message); return []; }
+  return (data || []).map((r) => ({ ...r, href: directDownloadUrl(r.url) }));
+}
+
+/** Admin: everything, including the ones switched off. */
+export async function adminFetchTestDownloads(exam = "admitere-drept") {
+  const { data, error } = await supabase
+    .from("test_downloads")
+    .select("id, exam, year, label, note, kind, url, sort, active")
+    .eq("exam", exam)
+    .order("year", { ascending: false }).order("sort");
+  if (error) { console.warn("adminFetchTestDownloads:", error.message); return []; }
+  return data || [];
+}
+
+export async function saveTestDownload(row) {
+  const body = {
+    exam: row.exam || "admitere-drept",
+    year: row.year ? Number(row.year) : null,
+    label: row.label, note: row.note || null,
+    kind: row.kind || "PDF", url: row.url,
+    sort: Number(row.sort) || 0, active: row.active !== false,
+  };
+  const { error } = row.id
+    ? await supabase.from("test_downloads").update(body).eq("id", row.id)
+    : await supabase.from("test_downloads").insert(body);
+  if (error) { console.warn("saveTestDownload:", error.message); return false; }
+  return true;
+}
+
+export async function deleteTestDownload(id) {
+  const { error } = await supabase.from("test_downloads").delete().eq("id", id);
+  if (error) console.warn("deleteTestDownload:", error.message);
+}
+
 // ---- Teacher: authoring the bonus questions ----
 export async function adminFetchBonusQuestions() {
   const { data, error } = await supabase.rpc("admin_bonus_questions");

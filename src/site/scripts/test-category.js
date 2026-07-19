@@ -13,6 +13,7 @@ import { TEST_CAT_BY_SLUG } from "./test-categories.js";
 import { initTestGame } from "./tests-game.js";
 import { initTestAdminGrid } from "./tests-admin-grid.js";
 import { isAdmin } from "../../shared/scripts/session.js";
+import { fetchTestDownloads } from "../../shared/scripts/test-repo.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -20,6 +21,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 let root = null;
 let cat = null;
 let adminMode = false;
+let downloads = []; // published files for this category, newest year first
 
 export function initTestCategory(mountEl, slug) {
   cat = TEST_CAT_BY_SLUG[slug];
@@ -36,6 +38,12 @@ export function initTestCategory(mountEl, slug) {
     if (a !== adminMode) { adminMode = a; route(); }
   });
   route();
+  // The files live on the teacher's Drive; the list of them lives in the DB.
+  // Fetched after the first paint so the page never waits on it.
+  fetchTestDownloads(cat.slug).then((rows) => {
+    downloads = rows;
+    if (!wantsPractice()) renderIntro();
+  });
 }
 
 // Leaving the admin grid: drop its full-screen look AND unlock the page scroll
@@ -59,6 +67,35 @@ function route() {
   initTestGame(root, cat.slug);                  // pupil / guest → mini-game
 }
 
+// Grouped by year, and every button says plainly WHAT it hands you: the
+// session, a short note, and the file kind. Nobody should have to click to
+// find out what they're downloading.
+function downloadList() {
+  if (!downloads.length) {
+    return `<p class="tcat__soon">Testele în format descărcabil vor fi disponibile în curând.</p>`;
+  }
+  const byYear = new Map();
+  for (const d of downloads) {
+    const y = d.year || "Fără an";
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(d);
+  }
+  const groups = [...byYear.entries()].map(([year, files]) => `
+    <div class="tdl__group">
+      <h3 class="tdl__year">${esc(year)}</h3>
+      ${files.map((f) => `
+        <a class="tdl__item" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer">
+          <span class="tdl__ic" aria-hidden="true">⬇</span>
+          <span class="tdl__body">
+            <b class="tdl__label">${esc(f.label)}</b>
+            <span class="tdl__meta">${f.note ? `${esc(f.note)} · ` : ""}${esc(f.kind || "PDF")}</span>
+          </span>
+        </a>`).join("")}
+    </div>`).join("");
+  return `<div class="tdl">${groups}</div>
+    <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
+}
+
 function renderIntro() {
   root.className = "tcat";
   const soon = `<p class="tcat__soon">Va urma.</p>`;
@@ -74,9 +111,7 @@ function renderIntro() {
     <div class="tcat__panels">
       <section class="tcat__panel">
         <h2 class="tcat__ph"><span aria-hidden="true">📄</span> Teste descărcabile</h2>
-        ${cat.live
-          ? `<p class="tcat__soon">Testele în format descărcabil vor fi disponibile în curând.</p>`
-          : soon}
+        ${cat.live ? downloadList() : soon}
       </section>
 
       <section class="tcat__panel tcat__panel--play">

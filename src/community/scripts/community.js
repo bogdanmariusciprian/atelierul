@@ -30,6 +30,7 @@ import {
 } from "../../shared/scripts/moderation.js";
 import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
+  adminFetchTestDownloads, saveTestDownload, deleteTestDownload, directDownloadUrl,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 // Shared with the Teste pages: one source for the category colours.
@@ -281,6 +282,7 @@ export function renderCommunity(basePath = "") {
     contentReports: [], // REAL open reports (posts/comments/test items/exercises)
     reportItems: {},    // id → full test item behind a flagged-item report
     bonusQs: [],        // flying bonus questions (teacher-authored)
+    downloads: [],      // downloadable tests (files on the teacher's Drive)
     profanityTerms: [], // admin-managed custom filtered words
     heldContent: [], // posts/comments held by the profanity filter (admin review)
     gateOff: false, // pre-launch gate kill-switch (app_flags.gate_off)
@@ -313,7 +315,7 @@ export function renderCommunity(basePath = "") {
   const unreadMsgCount = () => state.conversations.reduce((n, c) => n + (c.unread || 0), 0);
   // Deep links into a specific admin tab: #admin/moderare, #admin/utilizatori…
   // (used by the floating admin quick-panel, from any page of the site).
-  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification", bonus: "bonus" };
+  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification", bonus: "bonus", descarcabile: "downloads" };
   const ADMIN_SLUG_BY_TAB = Object.fromEntries(Object.entries(ADMIN_TAB_BY_SLUG).map(([s, t]) => [t, s]));
   function applyAdminHash() {
     const h = location.hash.slice(1);
@@ -3259,6 +3261,37 @@ export function renderCommunity(basePath = "") {
       </div>`;
   }
 
+  // Files stay on the teacher's Drive; only the link lives here. Paste the
+  // share link exactly as Drive gives it — the site turns it into a direct
+  // download by itself, so there's no URL surgery to learn.
+  function adminTabDownloads() {
+    const rows = state.downloads.map((d) => `
+      <div class="cx-dlrow" data-id="${d.id}">
+        <input class="cx-input" data-f="year" value="${escapeHtml(d.year ?? "")}" placeholder="an" inputmode="numeric" maxlength="4" />
+        <input class="cx-input" data-f="label" value="${escapeHtml(d.label || "")}" placeholder="ex. Simulare" maxlength="60" />
+        <input class="cx-input" data-f="note" value="${escapeHtml(d.note || "")}" placeholder="ex. subiect și barem" maxlength="80" />
+        <input class="cx-input" data-f="kind" value="${escapeHtml(d.kind || "PDF")}" placeholder="PDF" maxlength="12" />
+        <input class="cx-input cx-dlrow__url" data-f="url" value="${escapeHtml(d.url || "")}" placeholder="linkul din Drive" />
+        <label class="cx-bonusrow__on"><input type="checkbox" data-f="active"${d.active ? " checked" : ""} /> activ</label>
+        <button type="button" class="btn-mini btn-mini--ok" data-action="dl-save" data-id="${d.id}">Salvează</button>
+        <button type="button" class="btn-mini btn-mini--no" data-action="dl-del" data-id="${d.id}">Șterge</button>
+        <a class="cx-dlrow__test" href="${escapeHtml(directDownloadUrl(d.url))}" target="_blank" rel="noopener noreferrer">testează ↗</a>
+      </div>`).join("");
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>📄 Teste descărcabile · ${state.downloads.length}</h3></div>
+        <p class="cx-muted">Ține fișierele pe Drive și lipește aici linkul de partajare. <b>Fișierul trebuie partajat ca „oricine are linkul"</b>, altfel butonul îi va duce pe elevi la ecranul de autentificare Google. Folosește „testează" ca să verifici fiecare link înainte să-l lași activ.</p>
+        <div class="cx-dlrow cx-dlrow--new">
+          <input class="cx-input" id="cx-dl-year" placeholder="an" inputmode="numeric" maxlength="4" />
+          <input class="cx-input" id="cx-dl-label" placeholder="ex. Simulare" maxlength="60" />
+          <input class="cx-input" id="cx-dl-note" placeholder="ex. subiect și barem" maxlength="80" />
+          <input class="cx-input" id="cx-dl-kind" placeholder="PDF" maxlength="12" />
+          <input class="cx-input cx-dlrow__url" id="cx-dl-url" placeholder="linkul din Drive" />
+          <button type="button" class="btn btn--primary btn--sm" data-action="dl-add">Adaugă</button>
+        </div>
+        ${rows || `<p class="cx-muted">Încă niciun test încărcat.</p>`}
+      </div>`;
+  }
+
   function adminTabGamification() {
     return `
       <div class="cx-box">
@@ -3297,6 +3330,7 @@ export function renderCommunity(basePath = "") {
       { id: "challenges", label: "Provocări" },
       { id: "gamification", label: "Gamificare" },
       { id: "bonus", label: "Întrebări bonus" },
+      { id: "downloads", label: "Descărcabile" },
     ];
     const tabBar = `<div class="cx-tabs cx-tabs--admin">${TABS.map(
       (t) => `<button class="cx-tabbtn${state.adminTab === t.id ? " on" : ""}" data-action="admin-tab" data-id="${t.id}">
@@ -3311,6 +3345,7 @@ export function renderCommunity(basePath = "") {
       challenges: adminTabChallenges,
       gamification: adminTabGamification,
       bonus: adminTabBonus,
+      downloads: adminTabDownloads,
     };
     return `
       ${sectionHead("Panou de administrare", "Vizibil doar pentru tine. Tot ce ține de administrarea comunității, organizat pe file.")}
@@ -3558,6 +3593,7 @@ export function renderCommunity(basePath = "") {
           .filter((r) => r.targetType === "test_item").map((r) => r.targetId))]
           .map(async (id) => { const it = await adminFetchTestItem(id); if (it) state.reportItems[id] = it; }));
         state.bonusQs = await adminFetchBonusQuestions(); // with their answers (definer RPC)
+        state.downloads = await adminFetchTestDownloads();
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
@@ -4610,6 +4646,43 @@ export function renderCommunity(basePath = "") {
         showToast(founded
           ? "✓ Întemeiată — elevul a fost anunțat și premiat."
           : "Respinsă — explicația a plecat în mesageria elevului.");
+        return render();
+      }
+      case "dl-add": {
+        const v = (id) => (mount.querySelector(id)?.value || "").trim();
+        const label = v("#cx-dl-label"), url = v("#cx-dl-url");
+        if (!label || !url) { showToast("Scrie măcar eticheta și linkul."); return; }
+        saveTestDownload({
+          year: v("#cx-dl-year"), label, note: v("#cx-dl-note"),
+          kind: v("#cx-dl-kind") || "PDF", url, active: true,
+        }).then(async (ok) => {
+          if (!ok) return showToast("N-am putut salva.");
+          state.downloads = await adminFetchTestDownloads();
+          render();
+        });
+        return;
+      }
+      case "dl-save": {
+        const row = btn.closest(".cx-dlrow");
+        if (!row) return;
+        const f = (name) => row.querySelector(`[data-f="${name}"]`);
+        const label = f("label")?.value.trim() || "", url = f("url")?.value.trim() || "";
+        if (!label || !url) { showToast("Eticheta și linkul nu pot fi goale."); return; }
+        saveTestDownload({
+          id: btn.dataset.id, year: f("year")?.value.trim(), label,
+          note: f("note")?.value.trim(), kind: f("kind")?.value.trim() || "PDF",
+          url, active: !!f("active")?.checked,
+        }).then(async (ok) => {
+          if (!ok) return showToast("N-am putut salva.");
+          state.downloads = await adminFetchTestDownloads();
+          render();
+        });
+        return;
+      }
+      case "dl-del": {
+        const did = btn.dataset.id;
+        deleteTestDownload(did);
+        state.downloads = state.downloads.filter((d) => d.id !== did);
         return render();
       }
       case "bonus-add": {
