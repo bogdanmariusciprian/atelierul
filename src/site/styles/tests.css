@@ -913,6 +913,13 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   color: var(--color-text-muted); font-style: italic;
 }
 .tgame-side .tgame-obsbtn { align-self: center; }
+/* Reference text, not headline text: the explanation always reads a size
+   smaller than the verdict — the SAME size whether it's two lines or twenty,
+   so no item ever looks typographically different from another. */
+.tgame-side .tgame-obs {
+  font-size: 0.84rem; line-height: 1.65; padding: 0.75rem 0.9rem;
+}
+.tgame-side .tgame-obs__lab { font-size: 0.66rem; }
 
 /* The frame is EXACTLY 1280×960, so it only switches on once the viewport can
    actually hold it (stage + the console's padding). Narrower than that and the
@@ -986,7 +993,17 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   .tstage--play .tgame-opt { min-height: 0; overflow: hidden; align-items: center; }
   .tstage--play .tgame-opt__t { font-size: 0.97rem; line-height: 1.5; }
   .tstage--play .tgame-side { min-height: 0; overflow: hidden; }
-  .tstage--play .tgame-fb { flex: 1 1 auto; min-height: 0; overflow: hidden; margin: 0; }
+  /* The ONLY scrollable region in the game. Explanations vary wildly in length
+     and some are very long; letting this one panel scroll keeps the type size
+     constant everywhere else instead of shrinking text item by item. */
+  .tstage--play .tgame-fb { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; }
+  /* a slim, quiet scrollbar — nothing like the chunky arrows a default one adds */
+  .tstage--play .tgame-fb { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+  .tstage--play .tgame-fb::-webkit-scrollbar { width: 6px; }
+  .tstage--play .tgame-fb::-webkit-scrollbar-track { background: transparent; }
+  .tstage--play .tgame-fb::-webkit-scrollbar-thumb {
+    background: var(--color-border); border-radius: 3px;
+  }
   .tgame-cardfoot {
     display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
   }
