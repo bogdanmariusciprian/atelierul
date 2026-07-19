@@ -441,6 +441,20 @@ export async function addTestDownloads(rows) {
   return rows.length;
 }
 
+/** Refresh the name-derived fields of rows we already have — for files that
+ *  were renamed on Drive. Only label / year / kind travel: `note`, `sort` and
+ *  `active` are the teacher's own and Drive knows nothing about them.
+ *  Returns how many rows actually changed. */
+export async function updateTestDownloads(rows) {
+  if (!rows?.length) return 0;
+  const results = await Promise.all(rows.map(({ id, label, year, kind }) =>
+    supabase.from("test_downloads").update({ label, year, kind }).eq("id", id)
+  ));
+  const failed = results.filter((r) => r.error);
+  if (failed.length) console.warn("updateTestDownloads:", failed[0].error.message);
+  return rows.length - failed.length;
+}
+
 /** A Drive file name → the fields we can honestly guess from it.
  *  „Simulare_2025.pdf" → { label: "Simulare 2025", year: 2025, kind: "PDF" } */
 export function guessFromFileName(name = "") {

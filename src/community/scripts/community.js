@@ -32,7 +32,7 @@ import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
   adminFetchTestDownloads, saveTestDownload, deleteTestDownload, directDownloadUrl,
   listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
-  addTestDownloads, deleteTestDownloads, guessFromFileName,
+  addTestDownloads, updateTestDownloads, deleteTestDownloads, guessFromFileName,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 // Shared with the Teste pages: one source for the category colours.
@@ -3280,7 +3280,7 @@ export function renderCommunity(basePath = "") {
         <p class="cx-dlsync">
           ${st.blocked
             ? `<b class="cx-dlsync__warn">Folderul pare gol — n-am șters nimic.</b> Verifică linkul folderului.`
-            : `${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.kept ? ` · ${st.kept} erau deja` : ""}${st.removed ? ` · <b>${st.removed}</b> eliminate (șterse din Drive)` : ""}`}
+            : `${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.updated ? ` · <b>${st.updated}</b> redenumite` : ""}${st.kept ? ` · ${st.kept} erau deja` : ""}${st.removed ? ` · <b>${st.removed}</b> eliminate (șterse din Drive)` : ""}`}
         </p>`;
       return `<div class="cx-box cx-drivecat">
           <div class="cx-admin__head"><h3><span aria-hidden="true">${c.icon}</span> ${escapeHtml(c.title)} · ${mine.length}</h3></div>
@@ -4726,6 +4726,23 @@ export function renderCommunity(basePath = "") {
             });
             const added = await addTestDownloads(rows);
 
+            // Renamed on Drive → renamed here. A rename keeps the file's id, so
+            // without this the file counts as „already known" and the old label
+            // sticks forever. Only the name-derived fields are refreshed; the
+            // teacher's own note and ordering survive untouched.
+            const byId = new Map(res.files.map((f) => [f.id, f]));
+            const renamed = [];
+            for (const d of mine) {
+              const f = byId.get(driveFileId(d.url));
+              if (!f) continue;
+              const g = guessFromFileName(f.name);
+              const year = g.year ? Number(g.year) : null;
+              if (d.label !== g.label || d.year !== year || d.kind !== g.kind) {
+                renamed.push({ id: d.id, label: g.label, year, kind: g.kind });
+              }
+            }
+            const updated = await updateTestDownloads(renamed);
+
             // Gone from Drive → gone from the site. Only the files WE put there
             // are candidates (a hand-pasted link has no Drive id, so it's left
             // alone). One guard: if the listing came back EMPTY while we still
@@ -4739,11 +4756,12 @@ export function renderCommunity(basePath = "") {
             else if (orphans.length) removed = await deleteTestDownloads(orphans.map((d) => d.id));
 
             state.downloads = await adminFetchTestDownloads();
-            state.driveFiles[slug] = { added, removed, blocked, kept: res.files.length - fresh.length };
+            state.driveFiles[slug] = { added, updated, removed, blocked, kept: res.files.length - fresh.length - updated };
             render();
             if (blocked) showToast("Folderul pare gol — n-am șters nimic. Verifică linkul folderului.");
-            else if (added || removed) showToast(`✓ ${added} adăugate, ${removed} eliminate.`, { kind: "success" });
-            else showToast("Lista era deja la zi.");
+            else if (added || updated || removed) {
+              showToast(`✓ ${added} adăugate, ${updated} redenumite, ${removed} eliminate.`, { kind: "success" });
+            } else showToast("Lista era deja la zi.");
           });
         return;
       }
