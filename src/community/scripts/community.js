@@ -3281,7 +3281,7 @@ export function renderCommunity(basePath = "") {
         <p class="cx-dlsync">
           ${st.blocked
             ? `<b class="cx-dlsync__warn">Folderul pare gol — n-am șters nimic.</b> Verifică linkul folderului.`
-            : `${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.updated ? ` · <b>${st.updated}</b> redenumite` : ""}${st.kept ? ` · ${st.kept} erau deja` : ""}${st.removed ? ` · <b>${st.removed}</b> eliminate (șterse din Drive)` : ""}`}
+            : `${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.updated ? ` · <b>${st.updated}</b> actualizate` : ""}${st.kept ? ` · ${st.kept} erau deja` : ""}${st.removed ? ` · <b>${st.removed}</b> eliminate (șterse din Drive)` : ""}`}
         </p>`;
       // Day to day this panel has exactly one job: press Sincronizează. The
       // folder link is set once a year and the file rows are for the rare
@@ -4742,30 +4742,38 @@ export function renderCommunity(basePath = "") {
             const mine = state.downloads.filter((d) => d.exam === slug);
             const known = new Set(mine.map((d) => driveFileId(d.url)).filter(Boolean));
             const fresh = res.files.filter((f) => !known.has(f.id));
-            const rows = fresh.map((f, i) => {
+            // Drive hands the folder back ordered by name, and the names start
+            // with the year — so the listing's own order IS the order we want
+            // on the page. `sort` is that position, for new and old rows alike.
+            const orderById = new Map(res.files.map((f, i) => [f.id, i]));
+            const rows = fresh.map((f) => {
               const g = guessFromFileName(f.name);
               return {
                 exam: slug, year: g.year ? Number(g.year) : null,
                 label: g.label, kind: g.kind,
                 url: `https://drive.google.com/file/d/${f.id}/view`,
-                sort: i, active: true,
+                sort: orderById.get(f.id) ?? 0, active: true,
               };
             });
             const added = await addTestDownloads(rows);
 
             // Renamed on Drive → renamed here. A rename keeps the file's id, so
             // without this the file counts as „already known" and the old label
-            // sticks forever. Only the name-derived fields are refreshed; the
-            // teacher's own note and ordering survive untouched.
+            // sticks forever. `sort` comes along: it was frozen at the position
+            // the file had under its OLD name, which is why 2022 listed its
+            // „Simulare" first while every other year listed „Iulie" first.
+            // The teacher's own note and „activ" are never touched.
             const byId = new Map(res.files.map((f) => [f.id, f]));
             const renamed = [];
             for (const d of mine) {
-              const f = byId.get(driveFileId(d.url));
+              const fid = driveFileId(d.url);
+              const f = byId.get(fid);
               if (!f) continue;
               const g = guessFromFileName(f.name);
               const year = g.year ? Number(g.year) : null;
-              if (d.label !== g.label || d.year !== year || d.kind !== g.kind) {
-                renamed.push({ id: d.id, label: g.label, year, kind: g.kind });
+              const sort = orderById.get(fid) ?? d.sort;
+              if (d.label !== g.label || d.year !== year || d.kind !== g.kind || d.sort !== sort) {
+                renamed.push({ id: d.id, label: g.label, year, kind: g.kind, sort });
               }
             }
             const updated = await updateTestDownloads(renamed);
@@ -4787,7 +4795,7 @@ export function renderCommunity(basePath = "") {
             render();
             if (blocked) showToast("Folderul pare gol — n-am șters nimic. Verifică linkul folderului.");
             else if (added || updated || removed) {
-              showToast(`✓ ${added} adăugate, ${updated} redenumite, ${removed} eliminate.`, { kind: "success" });
+              showToast(`✓ ${added} adăugate, ${updated} actualizate, ${removed} eliminate.`, { kind: "success" });
             } else showToast("Lista era deja la zi.");
           });
         return;

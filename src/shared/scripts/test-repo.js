@@ -441,14 +441,15 @@ export async function addTestDownloads(rows) {
   return rows.length;
 }
 
-/** Refresh the name-derived fields of rows we already have — for files that
- *  were renamed on Drive. Only label / year / kind travel: `note`, `sort` and
- *  `active` are the teacher's own and Drive knows nothing about them.
+/** Refresh the Drive-derived fields of rows we already have — for files that
+ *  were renamed or that moved in the folder's alphabetical order. `note` and
+ *  `active` are the teacher's own and never travel; `sort` does, because it
+ *  isn't editable by hand anywhere — it only ever mirrors Drive.
  *  Returns how many rows actually changed. */
 export async function updateTestDownloads(rows) {
   if (!rows?.length) return 0;
-  const results = await Promise.all(rows.map(({ id, label, year, kind }) =>
-    supabase.from("test_downloads").update({ label, year, kind }).eq("id", id)
+  const results = await Promise.all(rows.map(({ id, label, year, kind, sort }) =>
+    supabase.from("test_downloads").update({ label, year, kind, sort }).eq("id", id)
   ));
   const failed = results.filter((r) => r.error);
   if (failed.length) console.warn("updateTestDownloads:", failed[0].error.message);

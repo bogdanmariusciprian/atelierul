@@ -90,19 +90,44 @@ function downloadList() {
   // widest cell across ALL rows. (A CSS grid can't: every row is its own grid,
   // so `max-content` measures that row alone and the columns drift apart.)
   // The lines are simply not drawn.
-  const cols = Math.max(1, ...[...byYear.values()].map((f) => f.length));
+
+  // The year already labels the row — drop it from the session name so
+  // „2024 - Iulie - G1" reads simply „Iulie - G1".
+  const sessionName = (f, year) =>
+    String(f.label || "").replace(new RegExp(`^\\s*${year}\\s*[-–·]?\\s*`), "").trim() || String(f.label || "");
+  // What kind of session it is, ignoring the group: „Iulie - G1" and the older
+  // bare „Iulie" both answer „Iulie", so they share a column instead of
+  // opening two that mean the same thing.
+  const sessionKind = (name) => name.split(/\s+[-–]\s+/)[0].trim() || name;
+
+  // A COLUMN IS A SESSION, not a position. 2026 has only its „Simulare mai",
+  // and it belongs under the other years' „Simulare mai" — not in the first
+  // free slot. Columns are the distinct sessions, in alphabetical order.
+  const kinds = [...new Set(
+    [...byYear.entries()].flatMap(([y, files]) => files.map((f) => sessionKind(sessionName(f, y))))
+  )].sort((a, b) => a.localeCompare(b, "ro"));
+
+  // Safety valve: past a handful of distinct sessions the table would grow
+  // wider than the panel, so we fall back to filling cells left to right.
+  const columnar = kinds.length <= 5;
+  const cols = columnar ? kinds.length : Math.max(1, ...[...byYear.values()].map((f) => f.length));
+
   const rows = [...byYear.entries()].map(([year, files]) => {
-    const cells = files.map((f) => {
-      // The year already labels the row — drop it from the session name so
-      // „2024 - Iul - G1" reads simply „Iul - G1".
-      const name = String(f.label || "").replace(new RegExp(`^\\s*${year}\\s*[-–·]?\\s*`), "").trim() || f.label;
+    const cells = new Array(cols).fill("");
+    for (const f of files) {
+      const name = sessionName(f, year);
       const tip = [f.note, f.kind || "PDF"].filter(Boolean).join(" · ");
-      return `<td><a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
-                 title="Descarcă — ${esc(tip)}">${esc(name)}</a></td>`;
-    });
-    // Pad the short years so every row has the same number of cells.
-    while (cells.length < cols) cells.push("<td></td>");
-    return `<tr><th scope="row" class="tdl__year">${esc(year)}</th>${cells.join("")}</tr>`;
+      const cell = `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
+                 title="Descarcă — ${esc(tip)}">${esc(name)}</a>`;
+      // Its own column; if that one is taken (two „Iulie" in one year), the
+      // next free one, so nothing is ever dropped.
+      let at = columnar ? kinds.indexOf(sessionKind(name)) : -1;
+      if (at < 0 || cells[at]) at = cells.findIndex((c) => !c);
+      if (at < 0) { cells.push(cell); continue; }
+      cells[at] = cell;
+    }
+    return `<tr><th scope="row" class="tdl__year">${esc(year)}</th>${
+      cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
   }).join("");
   return `<table class="tdl"><tbody>${rows}</tbody></table>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
