@@ -140,15 +140,6 @@ const fmtMins = (ms) => {
   const m = Math.round(ms / 60000);
   return m < 1 ? "sub un minut" : `≈ ${m} ${m === 1 ? "minut" : "minute"}`;
 };
-const plain = (s) => String(s ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-// Same, but keeps the line breaks the teacher wrote (posts render pre-wrap).
-const plainLines = (s) => String(s ?? "")
-  .replace(/<br\s*\/?>/gi, "\n")
-  .replace(/<\/(p|div|li)\s*>/gi, "\n")
-  .replace(/<[^>]*>/g, "")
-  .replace(/[ \t]+/g, " ")
-  .replace(/\n{3,}/g, "\n\n")
-  .trim();
 
 // ---------- entry ----------
 export async function initTestGame(mountEl, exam) {
@@ -1110,29 +1101,28 @@ const AUDIENCES = [
   ["private", "🔒 Doar eu", "însemnare personală"],
 ];
 
-// Posts store plain text (escaped at render), so the item's rich markup is
-// flattened here rather than shipped as tags.
-// Laid out in clear blocks rather than one paragraph: heading, coordinates,
-// the question, the options one per line, the answer, then the explanation.
+// Laid out in blocks, and the item's own formatting is CARRIED OVER: bold,
+// italics and underline survive, because post bodies are now sanitised on read
+// rather than flattened. Line breaks are plain „\n" — posts render pre-wrap.
 function itemPostText(e) {
   const it = G.byId.get(e.id) || { options: {} };
   const coords = [it.year, it.session, it.itemNo != null ? `itemul ${it.itemNo}` : null]
     .filter(Boolean).join(" · ");
   const opts = OPTS
     .filter((k) => it.options?.[k] != null && it.options[k] !== "")
-    .map((k) => `${k})  ${plain(it.options[k])}`).join("\n");
+    .map((k) => `${k})  ${sanitizeRich(it.options[k])}`).join("\n");
   const parts = [
     "🏅 Item de admitere · Drept",
     coords,
     "",
-    plainLines(it.question),
+    sanitizeRich(it.question),
     "",
     opts,
     "",
     `✅ Răspuns corect: ${e.correctAnswer}`,
   ];
-  if (e.observation) parts.push("", "💡 Explicație", plainLines(e.observation));
-  return parts.filter((p) => p !== null && p !== undefined).join("\n");
+  if (e.observation) parts.push("", "💡 Explicație", sanitizeRich(e.observation));
+  return parts.join("\n");
 }
 
 function askAudience(onPick) {

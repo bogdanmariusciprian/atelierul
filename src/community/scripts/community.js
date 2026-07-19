@@ -1108,7 +1108,7 @@ export function renderCommunity(basePath = "") {
       : `${post.time}${edited} · ${audienceBadge(post.audience)}`;
 
     return `
-      <article class="post ${post.bg !== "none" ? "post--tinted" : ""}${isShare ? " post--share" : ""}" data-post-id="${post.id}" ${tintStyle}>
+      <article class="post ${post.bg !== "none" ? "post--tinted" : ""}${isShare ? " post--share" : ""}${post.type === "reusita" ? " post--framed" : ""}" data-post-id="${post.id}" ${tintStyle}>
         <header class="post__head">
           ${avatarLink(post.authorId)}
           <div class="post__id">

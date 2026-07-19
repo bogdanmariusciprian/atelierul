@@ -9,6 +9,7 @@
 // =========================================================
 import { supabase } from "./supabase-client.js";
 import { CURRENT_USER } from "./session.js";
+import { sanitizeRich } from "./rich-text.js";
 import { registerRealUser, initials as initialsOf } from "./community-data.js";
 import { relTime } from "./forum-data.js";
 
@@ -119,7 +120,11 @@ function mapPost(row) {
     bg: row.background || "none",
     audience: row.audience || "public",
     surface: row.surface || "forum",
-    text: esc(row.body || ""),
+    // sanitizeRich, not a blanket escape: it escapes every text node and drops
+    // ALL attributes, rebuilding only a whitelist of inline tags (b/i/u/s/sup/
+    // mark/br). Same XSS guarantee as before, but bold and italics survive —
+    // which is what makes a posted test item readable.
+    text: sanitizeRich(row.body || ""),
     media: row.media || null,
     edited: !!row.edited_at,
     pinned: !!row.pinned,
