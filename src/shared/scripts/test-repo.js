@@ -406,6 +406,26 @@ export async function saveTestDownload(row) {
   return true;
 }
 
+/** Add several at once — one round trip instead of one per file. */
+export async function addTestDownloads(rows) {
+  if (!rows?.length) return 0;
+  const { error } = await supabase.from("test_downloads").insert(rows);
+  if (error) { console.warn("addTestDownloads:", error.message); return 0; }
+  return rows.length;
+}
+
+/** A Drive file name → the fields we can honestly guess from it.
+ *  „Simulare_2025.pdf" → { label: "Simulare 2025", year: 2025, kind: "PDF" } */
+export function guessFromFileName(name = "") {
+  const ext = (name.match(/\.([a-z0-9]+)$/i) || [])[1] || "pdf";
+  const base = name.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  return {
+    label: base || "Fișier",
+    year: (base.match(/(20\d{2})/) || [])[1] || null,
+    kind: ext.toUpperCase(),
+  };
+}
+
 export async function deleteTestDownload(id) {
   const { error } = await supabase.from("test_downloads").delete().eq("id", id);
   if (error) console.warn("deleteTestDownload:", error.message);

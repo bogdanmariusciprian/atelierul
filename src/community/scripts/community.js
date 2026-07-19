@@ -32,6 +32,7 @@ import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
   adminFetchTestDownloads, saveTestDownload, deleteTestDownload, directDownloadUrl,
   listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
+  addTestDownloads, guessFromFileName,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 // Shared with the Teste pages: one source for the category colours.
@@ -3275,17 +3276,12 @@ export function renderCommunity(basePath = "") {
       const folder = state.settings[`drive_folder_${c.slug}`] || "";
       const st = state.driveFiles[c.slug] || {};
       const mine = state.downloads.filter((d) => d.exam === c.slug);
-      const known = new Set(mine.map((d) => driveFileId(d.url)).filter(Boolean));
-      const found = (st.files || []).map((f) => {
-        const already = known.has(f.id);
-        return `<div class="cx-dlfound${already ? " is-known" : ""}">
-            <span class="cx-dlfound__n">${escapeHtml(f.name)}</span>
-            ${already
-              ? `<span class="cx-muted">deja adăugat</span>`
-              : `<button type="button" class="btn-mini btn-mini--ok" data-action="drive-add"
-                   data-slug="${c.slug}" data-fid="${f.id}" data-name="${escapeHtml(f.name)}">Adaugă</button>`}
-          </div>`;
-      }).join("");
+      const missing = new Set(st.missing || []);
+      const summary = st.added === undefined ? "" : `
+        <p class="cx-dlsync">
+          ${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.kept ? ` · ${st.kept} erau deja` : ""}
+          ${missing.size ? ` · <b class="cx-dlsync__warn">${missing.size}</b> nu mai sunt în Drive` : ""}
+        </p>`;
       return `<div class="cx-box cx-drivecat">
           <div class="cx-admin__head"><h3><span aria-hidden="true">${c.icon}</span> ${escapeHtml(c.title)} · ${mine.length}</h3></div>
           <div class="cx-driverow">
@@ -3293,12 +3289,12 @@ export function renderCommunity(basePath = "") {
                    placeholder="lipește aici linkul folderului din Drive" />
             <button type="button" class="btn-mini" data-action="drive-save-folder" data-slug="${c.slug}">Salvează folderul</button>
             <button type="button" class="btn btn--primary btn--sm" data-action="drive-load" data-slug="${c.slug}"${folder && key ? "" : " disabled"}>
-              ${st.loading ? "Se încarcă…" : "Încarcă din Drive"}
+              ${st.loading ? "Se sincronizează…" : "Sincronizează din Drive"}
             </button>
           </div>
           ${st.error ? `<p class="cx-muted cx-driveerr">⚠ ${escapeHtml(st.error)}</p>` : ""}
-          ${found ? `<div class="cx-dlfoundlist">${found}</div>` : ""}
-          ${mine.map(dlRow).join("") || `<p class="cx-muted">Niciun fișier publicat la această categorie.</p>`}
+          ${summary}
+          ${mine.map((d) => dlRow(d, missing.has(d.id))).join("") || `<p class="cx-muted">Niciun fișier publicat la această categorie.</p>`}
         </div>`;
     }).join("");
 
@@ -3313,10 +3309,11 @@ export function renderCommunity(basePath = "") {
       ${blocks}`;
   }
 
-  // One published file, editable.
-  function dlRow(d) {
+  // One published file, editable. `gone` = the last sync didn't find it in Drive.
+  function dlRow(d, gone) {
     return `
-      <div class="cx-dlrow" data-id="${d.id}" data-exam="${escapeHtml(d.exam || "")}">
+      <div class="cx-dlrow${gone ? " is-gone" : ""}" data-id="${d.id}" data-exam="${escapeHtml(d.exam || "")}"
+           ${gone ? `title="Fișierul nu mai e în folderul din Drive — linkul probabil nu mai merge."` : ""}>
         <input class="cx-input" data-f="year" value="${escapeHtml(d.year ?? "")}" placeholder="an" inputmode="numeric" maxlength="4" />
         <input class="cx-input" data-f="label" value="${escapeHtml(d.label || "")}" placeholder="ex. Simulare" maxlength="60" />
         <input class="cx-input" data-f="note" value="${escapeHtml(d.note || "")}" placeholder="ex. subiect și barem" maxlength="80" />
@@ -4705,34 +4702,40 @@ export function renderCommunity(basePath = "") {
         });
         return;
       }
+      // One press does the whole job: ask Drive what's there, publish everything
+      // new, and flag anything that has since disappeared from the folder.
+      // Nothing is deleted automatically — a network hiccup must never wipe the
+      // list; the teacher decides what goes.
       case "drive-load": {
         const slug = btn.dataset.slug;
         state.driveFiles[slug] = { loading: true };
         render();
         listDriveFolder(state.settings[`drive_folder_${slug}`], state.settings.drive_api_key)
-          .then((res) => {
-            state.driveFiles[slug] = res.error ? { error: res.error } : { files: res.files };
+          .then(async (res) => {
+            if (res.error) { state.driveFiles[slug] = { error: res.error }; return render(); }
+            const mine = state.downloads.filter((d) => d.exam === slug);
+            const known = new Set(mine.map((d) => driveFileId(d.url)).filter(Boolean));
+            const fresh = res.files.filter((f) => !known.has(f.id));
+            const rows = fresh.map((f, i) => {
+              const g = guessFromFileName(f.name);
+              return {
+                exam: slug, year: g.year ? Number(g.year) : null,
+                label: g.label, kind: g.kind,
+                url: `https://drive.google.com/file/d/${f.id}/view`,
+                sort: i, active: true,
+              };
+            });
+            const added = await addTestDownloads(rows);
+            // Present on the site but no longer in the Drive folder.
+            const there = new Set(res.files.map((f) => f.id));
+            const missing = mine.filter((d) => { const fid = driveFileId(d.url); return fid && !there.has(fid); })
+                                .map((d) => d.id);
+            state.downloads = await adminFetchTestDownloads();
+            state.driveFiles[slug] = { added, kept: res.files.length - fresh.length, missing };
             render();
+            if (added) showToast(`✓ ${added} ${added === 1 ? "fișier adăugat" : "fișiere adăugate"}.`, { kind: "success" });
+            else showToast("Nimic nou în folder.");
           });
-        return;
-      }
-      // Adds one found file. The name gives the label, the year and the kind —
-      // all editable afterwards on the row itself.
-      case "drive-add": {
-        const slug = btn.dataset.slug;
-        const name = btn.dataset.name || "fișier";
-        saveTestDownload({
-          exam: slug,
-          year: (name.match(/(20\d{2})/) || [])[1] || "",
-          label: name.replace(/\.[a-z0-9]+$/i, ""),
-          kind: ((name.match(/\.([a-z0-9]+)$/i) || [])[1] || "pdf").toUpperCase(),
-          url: `https://drive.google.com/file/d/${btn.dataset.fid}/view`,
-          active: true,
-        }).then(async (ok) => {
-          if (!ok) return showToast("N-am putut adăuga fișierul.");
-          state.downloads = await adminFetchTestDownloads();
-          render();
-        });
         return;
       }
       case "dl-save": {

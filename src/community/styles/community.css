@@ -1030,14 +1030,10 @@
 .cx-driverow .cx-input { flex: 1 1 18rem; min-width: 0; }
 .cx-driveerr { color: #b91c1c; margin: 0 0 0.6rem; }
 .cx-drivecat { margin-bottom: 0.8rem; }
-.cx-dlfoundlist {
-  display: flex; flex-direction: column; gap: 0.3rem;
-  margin-bottom: 0.8rem; padding: 0.6rem;
-  border: 1px dashed var(--color-border); border-radius: 12px;
-}
-.cx-dlfound { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; font-size: 0.86rem; }
-.cx-dlfound.is-known { opacity: 0.55; }
-.cx-dlfound__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-dlsync { margin: 0 0 0.7rem; font-size: 0.84rem; color: var(--color-text-muted); }
+.cx-dlsync__warn { color: #b45309; }
+/* still published here, but gone from the Drive folder — the link is likely dead */
+.cx-dlrow.is-gone { outline: 1.5px dashed #b45309; outline-offset: 3px; border-radius: 8px; }
 @media (max-width: 900px) {
   .cx-dlrow { grid-template-columns: 1fr 1fr; }
   .cx-dlrow__url { grid-column: 1 / -1; }

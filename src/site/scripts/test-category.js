@@ -111,7 +111,9 @@ function renderIntro() {
     <div class="tcat__panels">
       <section class="tcat__panel">
         <h2 class="tcat__ph"><span aria-hidden="true">📄</span> Teste descărcabile</h2>
-        ${cat.live ? downloadList() : soon}
+        <!-- Deliberately NOT gated on cat.live: a category can have papers to
+             download long before it has an item bank to play with. -->
+        ${downloadList()}
       </section>
 
       <section class="tcat__panel tcat__panel--play">
