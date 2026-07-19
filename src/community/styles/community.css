@@ -1032,8 +1032,6 @@
 .cx-drivecat { margin-bottom: 0.8rem; }
 .cx-dlsync { margin: 0 0 0.7rem; font-size: 0.84rem; color: var(--color-text-muted); }
 .cx-dlsync__warn { color: #b45309; }
-/* still published here, but gone from the Drive folder — the link is likely dead */
-.cx-dlrow.is-gone { outline: 1.5px dashed #b45309; outline-offset: 3px; border-radius: 8px; }
 @media (max-width: 900px) {
   .cx-dlrow { grid-template-columns: 1fr 1fr; }
   .cx-dlrow__url { grid-column: 1 / -1; }

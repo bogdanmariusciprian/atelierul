@@ -343,14 +343,24 @@ export async function listDriveFolder(folderLinkOrId, apiKey) {
   if (!id) return { error: "Linkul folderului nu pare valid." };
   if (!apiKey) return { error: "Lipsește cheia Drive (o pui mai sus)." };
   const q = encodeURIComponent(`'${id}' in parents and trashed = false`);
-  const fields = encodeURIComponent("files(id,name,mimeType,size,modifiedTime)");
+  const fields = encodeURIComponent("nextPageToken,files(id,name,mimeType,size,modifiedTime)");
+  const out = [];
+  let token = "";
   try {
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=name&key=${apiKey}`
-    );
-    const data = await res.json();
-    if (!res.ok) return { error: data?.error?.message || `Drive a răspuns ${res.status}.` };
-    return { files: (data.files || []).filter((f) => f.mimeType !== "application/vnd.google-apps.folder") };
+    // Follow the pages. Without this, file 201 onwards would look „missing"
+    // to the sync — and missing means deleted.
+    for (let page = 0; page < 10; page++) {
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&orderBy=name&key=${apiKey}`
+        + (token ? `&pageToken=${encodeURIComponent(token)}` : "")
+      );
+      const data = await res.json();
+      if (!res.ok) return { error: data?.error?.message || `Drive a răspuns ${res.status}.` };
+      out.push(...(data.files || []));
+      token = data.nextPageToken || "";
+      if (!token) break;
+    }
+    return { files: out.filter((f) => f.mimeType !== "application/vnd.google-apps.folder"), complete: !token };
   } catch {
     return { error: "N-am putut ajunge la Drive (rețea sau cheie blocată)." };
   }
@@ -429,6 +439,14 @@ export function guessFromFileName(name = "") {
 export async function deleteTestDownload(id) {
   const { error } = await supabase.from("test_downloads").delete().eq("id", id);
   if (error) console.warn("deleteTestDownload:", error.message);
+}
+
+/** Remove several at once (files that vanished from the Drive folder). */
+export async function deleteTestDownloads(ids) {
+  if (!ids?.length) return 0;
+  const { error } = await supabase.from("test_downloads").delete().in("id", ids);
+  if (error) { console.warn("deleteTestDownloads:", error.message); return 0; }
+  return ids.length;
 }
 
 // ---- Teacher: authoring the bonus questions ----

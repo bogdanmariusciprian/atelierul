@@ -32,7 +32,7 @@ import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
   adminFetchTestDownloads, saveTestDownload, deleteTestDownload, directDownloadUrl,
   listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
-  addTestDownloads, guessFromFileName,
+  addTestDownloads, deleteTestDownloads, guessFromFileName,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 // Shared with the Teste pages: one source for the category colours.
@@ -3276,11 +3276,11 @@ export function renderCommunity(basePath = "") {
       const folder = state.settings[`drive_folder_${c.slug}`] || "";
       const st = state.driveFiles[c.slug] || {};
       const mine = state.downloads.filter((d) => d.exam === c.slug);
-      const missing = new Set(st.missing || []);
       const summary = st.added === undefined ? "" : `
         <p class="cx-dlsync">
-          ${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.kept ? ` · ${st.kept} erau deja` : ""}
-          ${missing.size ? ` · <b class="cx-dlsync__warn">${missing.size}</b> nu mai sunt în Drive` : ""}
+          ${st.blocked
+            ? `<b class="cx-dlsync__warn">Folderul pare gol — n-am șters nimic.</b> Verifică linkul folderului.`
+            : `${st.added ? `<b>${st.added}</b> adăugate` : "nimic nou"}${st.kept ? ` · ${st.kept} erau deja` : ""}${st.removed ? ` · <b>${st.removed}</b> eliminate (șterse din Drive)` : ""}`}
         </p>`;
       return `<div class="cx-box cx-drivecat">
           <div class="cx-admin__head"><h3><span aria-hidden="true">${c.icon}</span> ${escapeHtml(c.title)} · ${mine.length}</h3></div>
@@ -3294,7 +3294,7 @@ export function renderCommunity(basePath = "") {
           </div>
           ${st.error ? `<p class="cx-muted cx-driveerr">⚠ ${escapeHtml(st.error)}</p>` : ""}
           ${summary}
-          ${mine.map((d) => dlRow(d, missing.has(d.id))).join("") || `<p class="cx-muted">Niciun fișier publicat la această categorie.</p>`}
+          ${mine.map(dlRow).join("") || `<p class="cx-muted">Niciun fișier publicat la această categorie.</p>`}
         </div>`;
     }).join("");
 
@@ -3309,11 +3309,10 @@ export function renderCommunity(basePath = "") {
       ${blocks}`;
   }
 
-  // One published file, editable. `gone` = the last sync didn't find it in Drive.
-  function dlRow(d, gone) {
+  // One published file, editable.
+  function dlRow(d) {
     return `
-      <div class="cx-dlrow${gone ? " is-gone" : ""}" data-id="${d.id}" data-exam="${escapeHtml(d.exam || "")}"
-           ${gone ? `title="Fișierul nu mai e în folderul din Drive — linkul probabil nu mai merge."` : ""}>
+      <div class="cx-dlrow" data-id="${d.id}" data-exam="${escapeHtml(d.exam || "")}">
         <input class="cx-input" data-f="year" value="${escapeHtml(d.year ?? "")}" placeholder="an" inputmode="numeric" maxlength="4" />
         <input class="cx-input" data-f="label" value="${escapeHtml(d.label || "")}" placeholder="ex. Simulare" maxlength="60" />
         <input class="cx-input" data-f="note" value="${escapeHtml(d.note || "")}" placeholder="ex. subiect și barem" maxlength="80" />
@@ -4726,15 +4725,25 @@ export function renderCommunity(basePath = "") {
               };
             });
             const added = await addTestDownloads(rows);
-            // Present on the site but no longer in the Drive folder.
+
+            // Gone from Drive → gone from the site. Only the files WE put there
+            // are candidates (a hand-pasted link has no Drive id, so it's left
+            // alone). One guard: if the listing came back EMPTY while we still
+            // have rows, that's far more likely a wrong folder link than a
+            // folder someone truly emptied — so we stop and say so instead of
+            // wiping the category.
             const there = new Set(res.files.map((f) => f.id));
-            const missing = mine.filter((d) => { const fid = driveFileId(d.url); return fid && !there.has(fid); })
-                                .map((d) => d.id);
+            const orphans = mine.filter((d) => { const fid = driveFileId(d.url); return fid && !there.has(fid); });
+            let removed = 0, blocked = false;
+            if (orphans.length && !res.files.length) blocked = true;
+            else if (orphans.length) removed = await deleteTestDownloads(orphans.map((d) => d.id));
+
             state.downloads = await adminFetchTestDownloads();
-            state.driveFiles[slug] = { added, kept: res.files.length - fresh.length, missing };
+            state.driveFiles[slug] = { added, removed, blocked, kept: res.files.length - fresh.length };
             render();
-            if (added) showToast(`✓ ${added} ${added === 1 ? "fișier adăugat" : "fișiere adăugate"}.`, { kind: "success" });
-            else showToast("Nimic nou în folder.");
+            if (blocked) showToast("Folderul pare gol — n-am șters nimic. Verifică linkul folderului.");
+            else if (added || removed) showToast(`✓ ${added} adăugate, ${removed} eliminate.`, { kind: "success" });
+            else showToast("Lista era deja la zi.");
           });
         return;
       }
