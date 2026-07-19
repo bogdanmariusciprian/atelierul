@@ -1159,7 +1159,8 @@ function postItem(i) {
     // „Reușită", not „Resursă": the pupil is sharing something they solved.
     // `generated` locks the body — this is a capture, not a draft.
     const row = await createPost({
-      type: "reusita", audience, text: itemPostText(e), surface: "wall", generated: true,
+      type: "reusita", audience, text: itemPostText(e), surface: "wall",
+      generated: true, generatedFrom: G.exam, // frames it in this game's colour
     });
     if (!row) { showToast("N-am putut posta acum. Încearcă din nou."); return; }
     e.posted = true;

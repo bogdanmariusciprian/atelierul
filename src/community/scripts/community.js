@@ -32,6 +32,8 @@ import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
+// Shared with the Teste pages: one source for the category colours.
+import { TEST_CAT_BY_SLUG } from "../../site/scripts/test-categories.js";
 import {
   wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
 } from "../../shared/scripts/discover-data.js";
@@ -995,8 +997,16 @@ export function renderCommunity(basePath = "") {
   function postCard(post) {
     const t = postType(post.type);
     const bg = postBackground(post.bg);
-    const tintStyle =
-      post.bg === "none" ? "" : `style="--postfrom:${bg.from};--postto:${bg.to}"`;
+    // A game capture is framed in ITS game's colour (amber for Drept, and so on
+    // as the other categories go live).
+    const frameCol = post.generated
+      ? (TEST_CAT_BY_SLUG[post.generatedFrom]?.color || "#b45309")
+      : null;
+    const styleBits = [
+      post.bg === "none" ? null : `--postfrom:${bg.from};--postto:${bg.to}`,
+      frameCol ? `--post-frame:${frameCol}` : null,
+    ].filter(Boolean).join(";");
+    const tintStyle = styleBits ? `style="${styleBits}"` : "";
     const isMine = isLoggedIn() && post.authorId === CURRENT_USER.id;
     const isShare = !!post.shareOf;
     // Own posts: no like BUTTON (you can't like yourself), but the count of

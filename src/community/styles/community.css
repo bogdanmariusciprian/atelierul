@@ -485,11 +485,11 @@
 /* Game-made captures read as a self-contained card: a framed block instead of
    loose text on the wall. Hand-written posts are untouched. */
 .post--framed .post__text {
-  border: 1.5px solid var(--color-border);
-  border-left: 3px solid #f59e0b;
+  border: 1.5px solid color-mix(in srgb, var(--post-frame, #b45309) 35%, transparent);
+  border-left: 4px solid var(--post-frame, #b45309);
   border-radius: 12px;
   padding: 0.85rem 1rem;
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--post-frame, #b45309) 5%, var(--color-surface));
 }
 
 /* Images */
