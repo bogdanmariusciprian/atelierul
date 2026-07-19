@@ -84,23 +84,26 @@ function downloadList() {
     if (!byYear.has(y)) byYear.set(y, []);
     byYear.get(y).push(d);
   }
-  // One line per year: the year on the left, its sessions inline on the right.
-  // Twenty years read as twenty short lines instead of sixty cards.
+  // One line per year, in columns: the year on the left, then one slot per
+  // session. Every row uses the SAME grid template, so the sessions line up
+  // vertically down the whole list even when 2009 has one paper and 2010 has
+  // three — a table, without a single ruled line. The widest year decides how
+  // many slots there are; shorter years simply leave the tail empty.
+  const cols = Math.max(1, ...[...byYear.values()].map((f) => f.length));
   const groups = [...byYear.entries()].map(([year, files]) => {
-    const links = files.map((f) => {
+    const cells = files.map((f) => {
       // The year already labels the row — drop it from the session name so
       // „2024 - Iul - G1" reads simply „Iul - G1".
       const name = String(f.label || "").replace(new RegExp(`^\\s*${year}\\s*[-–·]?\\s*`), "").trim() || f.label;
       const tip = [f.note, f.kind || "PDF"].filter(Boolean).join(" · ");
       return `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
                  title="Descarcă — ${esc(tip)}">${esc(name)}</a>`;
-    }).join(`<span class="tdl__sep" aria-hidden="true">·</span>`);
+    }).join("");
     return `<div class="tdl__row">
-        <span class="tdl__year">${esc(year)}</span>
-        <span class="tdl__files">${links}</span>
+        <span class="tdl__year">${esc(year)}</span>${cells}
       </div>`;
   }).join("");
-  return `<div class="tdl">${groups}</div>
+  return `<div class="tdl" style="--tdl-cols: ${cols}">${groups}</div>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
 }
 

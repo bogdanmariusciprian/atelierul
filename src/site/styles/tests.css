@@ -639,22 +639,26 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tcat__play__ic { font-size: 1.1rem; }
 .tcat__hint { margin: 0.8rem 0 0; font-size: 0.78rem; color: var(--color-text-muted); font-style: italic; }
 
-/* ---- downloadable tests: one line per year ---- */
-.tdl { border: 1.5px solid var(--color-border); border-radius: 16px; overflow: hidden; }
+/* ---- downloadable tests: a table with no ruled lines ----
+   Alignment does the work the borders were doing. Every row repeats the SAME
+   template — the year, then --tdl-cols equal slots — so the sessions form real
+   columns down the page even when 2009 has one paper and 2010 has three.
+   Shorter years just leave the tail of the row empty. */
+.tdl { --tdl-cols: 3; }
 .tdl__row {
-  display: flex; align-items: baseline; gap: 1rem;
-  padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: 3.4rem repeat(var(--tdl-cols), minmax(0, 1fr));
+  align-items: baseline; gap: 0.3rem 1rem;
+  padding: 0.55rem 0.75rem; border-radius: 10px;
 }
-.tdl__row:last-child { border-bottom: 0; }
 .tdl__row:hover { background: var(--color-surface); }
 .tdl__year {
-  flex: 0 0 3.4rem; font-weight: 800; font-size: 0.95rem;
+  font-weight: 800; font-size: 0.95rem;
   color: var(--cat-color); font-variant-numeric: tabular-nums;
 }
-.tdl__files { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.4rem; min-width: 0; }
 .tdl__file {
   font-weight: 700; text-decoration: none; color: var(--color-text);
-  border-bottom: 1.5px solid transparent;
+  min-width: 0; overflow-wrap: break-word;
 }
 /* The Acrobat mark, in its own colours. Unlike the masked SVGs elsewhere on
    the site, this one is NOT tinted with --cat-color on purpose: „roșu = PDF"
@@ -666,9 +670,10 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   background: url("/assets/icons/pdf-file.png") center / contain no-repeat;
   opacity: 0.75; transition: opacity 0.15s ease;
 }
-.tdl__file:hover { color: var(--cat-color); border-bottom-color: var(--cat-color); }
+/* No underline, at rest or on hover: colour carries the affordance, and twenty
+   underlined rows would quietly rebuild the grid lines we just removed. */
+.tdl__file:hover { color: var(--cat-color); }
 .tdl__file:hover::before { opacity: 1; }
-.tdl__sep { color: var(--color-text-muted); user-select: none; }
 
 /* „Toate, pe Drive" — ieșirea de rezervă, pentru cine vrea tot dintr-o dată.
    Google face arhiva; noi doar deschidem folderul. Discret (contur, nu plin),
@@ -688,6 +693,14 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   background: url("/assets/icons/pdf-folder.png") center / contain no-repeat;
 }
 .tdl__all:hover { color: var(--cat-color); border-color: var(--cat-color); }
+
+/* On a phone three columns of „Iul - G1" would be three columns of hyphens.
+   The year keeps its column; the sessions all move into the second one and
+   stack. The table becomes a list, which is what a narrow screen wants. */
+@media (max-width: 620px) {
+  .tdl__row { grid-template-columns: 3.4rem minmax(0, 1fr); align-items: start; }
+  .tdl__file { grid-column: 2; }
+}
 
 @media (max-width: 560px) {
   .tcat__hero { flex-direction: column; text-align: center; }
