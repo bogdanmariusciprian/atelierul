@@ -80,22 +80,22 @@ function downloadList() {
     if (!byYear.has(y)) byYear.set(y, []);
     byYear.get(y).push(d);
   }
-  // Files sit in a grid inside each year, so twenty sessions read as a compact
-  // block instead of a twenty-storey tower.
-  const groups = [...byYear.entries()].map(([year, files]) => `
-    <div class="tdl__group">
-      <h3 class="tdl__year">${esc(year)}</h3>
-      <div class="tdl__grid">
-        ${files.map((f) => `
-          <a class="tdl__item" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer">
-            <span class="tdl__ic" aria-hidden="true">⬇</span>
-            <span class="tdl__body">
-              <b class="tdl__label">${esc(f.label)}</b>
-              <span class="tdl__meta">${f.note ? `${esc(f.note)} · ` : ""}${esc(f.kind || "PDF")}</span>
-            </span>
-          </a>`).join("")}
-      </div>
-    </div>`).join("");
+  // One line per year: the year on the left, its sessions inline on the right.
+  // Twenty years read as twenty short lines instead of sixty cards.
+  const groups = [...byYear.entries()].map(([year, files]) => {
+    const links = files.map((f) => {
+      // The year already labels the row — drop it from the session name so
+      // „2024 - Iul - G1" reads simply „Iul - G1".
+      const name = String(f.label || "").replace(new RegExp(`^\\s*${year}\\s*[-–·]?\\s*`), "").trim() || f.label;
+      const tip = [f.note, f.kind || "PDF"].filter(Boolean).join(" · ");
+      return `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
+                 title="Descarcă — ${esc(tip)}">${esc(name)}</a>`;
+    }).join(`<span class="tdl__sep" aria-hidden="true">·</span>`);
+    return `<div class="tdl__row">
+        <span class="tdl__year">${esc(year)}</span>
+        <span class="tdl__files">${links}</span>
+      </div>`;
+  }).join("");
   return `<div class="tdl">${groups}</div>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
 }

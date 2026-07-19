@@ -639,29 +639,25 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tcat__play__ic { font-size: 1.1rem; }
 .tcat__hint { margin: 0.8rem 0 0; font-size: 0.78rem; color: var(--color-text-muted); font-style: italic; }
 
-/* ---- downloadable tests, grouped by year ---- */
-.tdl { display: flex; flex-direction: column; gap: 1.1rem; }
+/* ---- downloadable tests: one line per year ---- */
+.tdl { border: 1.5px solid var(--color-border); border-radius: 16px; overflow: hidden; }
+.tdl__row {
+  display: flex; align-items: baseline; gap: 1rem;
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-border);
+}
+.tdl__row:last-child { border-bottom: 0; }
+.tdl__row:hover { background: var(--color-surface); }
 .tdl__year {
-  margin: 0 0 0.5rem; font-size: 0.78rem; font-weight: 800;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--cat-color);
+  flex: 0 0 3.4rem; font-weight: 800; font-size: 0.95rem;
+  color: var(--cat-color); font-variant-numeric: tabular-nums;
 }
-.tdl__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.5rem; }
-.tdl__item {
-  display: flex; align-items: center; gap: 0.75rem;
-  text-decoration: none; color: inherit;
-  padding: 0.65rem 0.9rem;
-  border: 1.5px solid var(--color-border); border-radius: 12px;
-  transition: border-color 0.12s ease, transform 0.08s ease;
+.tdl__files { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.4rem; min-width: 0; }
+.tdl__file {
+  font-weight: 700; text-decoration: none; color: var(--color-text);
+  border-bottom: 1.5px solid transparent;
 }
-.tdl__item:hover { border-color: var(--cat-color); transform: translateX(2px); }
-.tdl__ic {
-  flex: 0 0 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%;
-  background: color-mix(in srgb, var(--cat-color) 20%, transparent);
-  color: var(--cat-color); font-size: 0.95rem;
-}
-.tdl__body { display: flex; flex-direction: column; min-width: 0; }
-.tdl__label { font-size: 0.98rem; }
-.tdl__meta { font-size: 0.78rem; color: var(--color-text-muted); }
+.tdl__file:hover { color: var(--cat-color); border-bottom-color: var(--cat-color); }
+.tdl__sep { color: var(--color-text-muted); user-select: none; }
 
 @media (max-width: 560px) {
   .tcat__hero { flex-direction: column; text-align: center; }
