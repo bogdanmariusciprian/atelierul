@@ -84,26 +84,27 @@ function downloadList() {
     if (!byYear.has(y)) byYear.set(y, []);
     byYear.get(y).push(d);
   }
-  // One line per year, in columns: the year on the left, then one slot per
-  // session. Every row uses the SAME grid template, so the sessions line up
-  // vertically down the whole list even when 2009 has one paper and 2010 has
-  // three — a table, without a single ruled line. The widest year decides how
-  // many slots there are; shorter years simply leave the tail empty.
+  // A real <table>. Year down the side, one session per cell — which is what
+  // this data actually is, so the element that describes it is the honest one.
+  // It also solves the alignment for free: a table sizes each column to its
+  // widest cell across ALL rows. (A CSS grid can't: every row is its own grid,
+  // so `max-content` measures that row alone and the columns drift apart.)
+  // The lines are simply not drawn.
   const cols = Math.max(1, ...[...byYear.values()].map((f) => f.length));
-  const groups = [...byYear.entries()].map(([year, files]) => {
+  const rows = [...byYear.entries()].map(([year, files]) => {
     const cells = files.map((f) => {
       // The year already labels the row — drop it from the session name so
       // „2024 - Iul - G1" reads simply „Iul - G1".
       const name = String(f.label || "").replace(new RegExp(`^\\s*${year}\\s*[-–·]?\\s*`), "").trim() || f.label;
       const tip = [f.note, f.kind || "PDF"].filter(Boolean).join(" · ");
-      return `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
-                 title="Descarcă — ${esc(tip)}">${esc(name)}</a>`;
-    }).join("");
-    return `<div class="tdl__row">
-        <span class="tdl__year">${esc(year)}</span>${cells}
-      </div>`;
+      return `<td><a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
+                 title="Descarcă — ${esc(tip)}">${esc(name)}</a></td>`;
+    });
+    // Pad the short years so every row has the same number of cells.
+    while (cells.length < cols) cells.push("<td></td>");
+    return `<tr><th scope="row" class="tdl__year">${esc(year)}</th>${cells.join("")}</tr>`;
   }).join("");
-  return `<div class="tdl" style="--tdl-cols: ${cols}">${groups}</div>
+  return `<table class="tdl"><tbody>${rows}</tbody></table>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
 }
 

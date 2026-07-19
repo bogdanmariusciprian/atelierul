@@ -645,30 +645,23 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tcat__play__ic { font-size: 1.1rem; }
 .tcat__hint { margin: 0.8rem 0 0; font-size: 0.78rem; color: var(--color-text-muted); font-style: italic; }
 
-/* ---- downloadable tests: a table with no ruled lines ----
-   Alignment does the work the borders were doing. Every row repeats the SAME
-   template — the year, then --tdl-cols equal slots — so the sessions form real
-   columns down the page even when 2009 has one paper and 2010 has three.
-   Shorter years just leave the tail of the row empty. */
-.tdl { --tdl-cols: 3; }
-.tdl__row {
-  display: grid;
-  /* max-content, not 1fr: a column is exactly as wide as its widest session
-     name across ALL years, so nothing ever wraps to a second line and the
-     columns still line up perfectly. */
-  grid-template-columns: 3.4rem repeat(var(--tdl-cols), max-content);
-  align-items: baseline; gap: 0.3rem 1.25rem;
-  padding: 0.55rem 0.75rem; border-radius: 10px;
+/* ---- downloadable tests: a real table, with the lines left undrawn ----
+   The table element is doing the one thing CSS grid couldn't: sizing every
+   column to its widest cell across ALL rows. Each .tdl__row used to be its own
+   grid, so `max-content` measured one row at a time and the columns drifted.
+   Here alignment is the element's own job — we only remove the borders. */
+.tdl { border-collapse: collapse; width: auto; }
+.tdl td, .tdl th {
+  border: 0; text-align: left; vertical-align: baseline;
+  padding: 0.4rem 1.5rem 0.4rem 0; white-space: nowrap;
 }
-.tdl__row:hover { background: var(--color-surface); }
+.tdl td:last-child, .tdl th:last-child { padding-right: 0; }
+.tdl tbody tr:hover { background: var(--color-surface); }
 .tdl__year {
-  font-weight: 800; font-size: 0.95rem;
+  width: 3.4rem; font-weight: 800; font-size: 0.95rem;
   color: var(--cat-color); font-variant-numeric: tabular-nums;
 }
-.tdl__file {
-  font-weight: 700; text-decoration: none; color: var(--color-text);
-  white-space: nowrap;
-}
+.tdl__file { font-weight: 700; text-decoration: none; color: var(--color-text); }
 /* The Acrobat mark, in its own colours. Unlike the masked SVGs elsewhere on
    the site, this one is NOT tinted with --cat-color on purpose: „roșu = PDF"
    is a convention people already read, and it stays the same on every
@@ -706,10 +699,15 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 /* On a phone three columns of „Iul - G1" would be three columns of hyphens.
    The year keeps its column; the sessions all move into the second one and
    stack. The table becomes a list, which is what a narrow screen wants. */
+/* On a phone a three-column table would need sideways scrolling, which we
+   don't do. The table stops being a table: the year becomes a small heading
+   and its sessions list underneath it. The padding cells vanish. */
 @media (max-width: 620px) {
-  .tdl__row { grid-template-columns: 3.4rem minmax(0, 1fr); align-items: start; }
-  /* Here wrapping is welcome again — one column, all the width it wants. */
-  .tdl__file { grid-column: 2; white-space: normal; }
+  .tdl, .tdl tbody, .tdl tr, .tdl th, .tdl td { display: block; }
+  .tdl tbody tr { padding: 0.45rem 0; }
+  .tdl th.tdl__year { width: auto; padding: 0 0 0.15rem; }
+  .tdl td { padding: 0.12rem 0 0.12rem 0.9rem; white-space: normal; }
+  .tdl td:empty { display: none; }
 }
 
 @media (max-width: 560px) {
