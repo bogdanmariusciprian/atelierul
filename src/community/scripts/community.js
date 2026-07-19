@@ -30,7 +30,7 @@ import {
 } from "../../shared/scripts/moderation.js";
 import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
-  adminFetchTestDownloads, saveTestDownload, deleteTestDownload, directDownloadUrl,
+  adminFetchTestDownloads, directDownloadUrl,
   listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
   addTestDownloads, updateTestDownloads, deleteTestDownloads, guessFromFileName,
 } from "../../shared/scripts/test-repo.js";
@@ -3327,20 +3327,23 @@ export function renderCommunity(basePath = "") {
       ${blocks}`;
   }
 
-  // One published file, editable.
+  // One published file — just its name, exactly as it reads in Drive, and a
+  // click that copies the download link.
+  //
+  // Everything else that used to live here (year, label, kind, url, „activ",
+  // Salvează, Șterge) is gone on purpose: Drive is the source of truth now, so
+  // editing those fields promised the teacher a change that the next sync
+  // would silently undo. A file leaves the site by leaving the folder.
   function dlRow(d) {
+    const fileName = `${d.label || "fișier"}.${String(d.kind || "PDF").toLowerCase()}`;
     return `
-      <div class="cx-dlrow" data-id="${d.id}" data-exam="${escapeHtml(d.exam || "")}">
-        <input class="cx-input" data-f="year" value="${escapeHtml(d.year ?? "")}" placeholder="an" inputmode="numeric" maxlength="4" />
-        <input class="cx-input" data-f="label" value="${escapeHtml(d.label || "")}" placeholder="ex. Simulare" maxlength="60" />
-        <input class="cx-input" data-f="note" value="${escapeHtml(d.note || "")}" placeholder="ex. subiect și barem" maxlength="80" />
-        <input class="cx-input" data-f="kind" value="${escapeHtml(d.kind || "PDF")}" placeholder="PDF" maxlength="12" />
-        <input class="cx-input cx-dlrow__url" data-f="url" value="${escapeHtml(d.url || "")}" placeholder="linkul din Drive" />
-        <label class="cx-bonusrow__on"><input type="checkbox" data-f="active"${d.active ? " checked" : ""} /> activ</label>
-        <button type="button" class="btn-mini btn-mini--ok" data-action="dl-save" data-id="${d.id}">Salvează</button>
-        <button type="button" class="btn-mini btn-mini--no" data-action="dl-del" data-id="${d.id}">Șterge</button>
-        <a class="cx-dlrow__test" href="${escapeHtml(directDownloadUrl(d.url))}" target="_blank" rel="noopener noreferrer">testează ↗</a>
-      </div>`;
+      <button type="button" class="cx-dlfile" data-action="dl-copy"
+              data-url="${escapeHtml(directDownloadUrl(d.url))}"
+              title="Click pentru a copia linkul de descărcare">
+        <span class="cx-dlfile__ic" aria-hidden="true"></span>
+        <span class="cx-dlfile__name">${escapeHtml(fileName)}</span>
+        <span class="cx-dlfile__hint" aria-hidden="true">copiază linkul</span>
+      </button>`;
   }
 
   function adminTabGamification() {
@@ -4800,29 +4803,17 @@ export function renderCommunity(basePath = "") {
           });
         return;
       }
-      case "dl-save": {
-        const row = btn.closest(".cx-dlrow");
-        if (!row) return;
-        const f = (name) => row.querySelector(`[data-f="${name}"]`);
-        const label = f("label")?.value.trim() || "", url = f("url")?.value.trim() || "";
-        if (!label || !url) { showToast("Eticheta și linkul nu pot fi goale."); return; }
-        saveTestDownload({
-          id: btn.dataset.id, exam: row.dataset.exam, // keep it in ITS category
-          year: f("year")?.value.trim(), label,
-          note: f("note")?.value.trim(), kind: f("kind")?.value.trim() || "PDF",
-          url, active: !!f("active")?.checked,
-        }).then(async (ok) => {
-          if (!ok) return showToast("N-am putut salva.");
-          state.downloads = await adminFetchTestDownloads();
-          render();
-        });
+      case "dl-copy": {
+        const url = btn.dataset.url || "";
+        if (!url) { showToast("Fișierul n-are link."); return; }
+        // clipboard.writeText needs a secure context; the site is HTTPS, but a
+        // denied permission or an old browser still has to say so out loud
+        // rather than look like a click that did nothing.
+        navigator.clipboard?.writeText(url).then(
+          () => showToast("✓ Link copiat.", { kind: "success" }),
+          () => showToast("N-am putut copia linkul.")
+        ) ?? showToast("Browserul nu permite copierea automată.");
         return;
-      }
-      case "dl-del": {
-        const did = btn.dataset.id;
-        deleteTestDownload(did);
-        state.downloads = state.downloads.filter((d) => d.id !== did);
-        return render();
       }
       case "bonus-add": {
         const p = (mount.querySelector("#cx-bonus-prompt")?.value || "").trim();

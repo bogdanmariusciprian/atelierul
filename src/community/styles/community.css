@@ -1018,12 +1018,27 @@
 .cx-bonusrow__on { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: var(--color-text-muted); white-space: nowrap; }
 
 /* ---- downloadable tests (links to the teacher's Drive) ---- */
-.cx-dlrow {
-  display: grid; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem;
-  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1.2fr) 4.5rem minmax(0, 2fr) auto auto auto auto;
+
+/* One published file in the teacher's panel: the Drive file name, and a click
+   that copies its download link. The hint only shows on hover, so a list of
+   thirty reads as thirty file names and nothing else. */
+.cx-dlfile {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  padding: 0.4rem 0.6rem; border: 0; border-radius: 8px;
+  background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 0.86rem; color: var(--color-text);
 }
-.cx-dlrow--new { padding-bottom: 0.6rem; border-bottom: 1px solid var(--color-border); margin-bottom: 0.8rem; }
-.cx-dlrow__test { font-size: 0.76rem; white-space: nowrap; }
+.cx-dlfile:hover { background: var(--color-surface); }
+.cx-dlfile__ic {
+  flex: none; width: 1.1em; height: 1.1em;
+  background: url("/assets/icons/pdf-file.png") center / contain no-repeat;
+}
+.cx-dlfile__name { font-weight: 700; }
+.cx-dlfile__hint {
+  margin-left: auto; font-size: 0.74rem; color: var(--color-text-muted);
+  opacity: 0; transition: opacity 0.15s ease;
+}
+.cx-dlfile:hover .cx-dlfile__hint, .cx-dlfile:focus-visible .cx-dlfile__hint { opacity: 1; }
 
 /* Drive: key, folder per category, and what a „Încarcă" turned up */
 .cx-driverow { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-bottom: 0.6rem; }
@@ -1042,10 +1057,6 @@
 .cx-drivecat__more:hover { color: var(--color-primary); }
 .cx-dlsync { margin: 0 0 0.7rem; font-size: 0.84rem; color: var(--color-text-muted); }
 .cx-dlsync__warn { color: #b45309; }
-@media (max-width: 900px) {
-  .cx-dlrow { grid-template-columns: 1fr 1fr; }
-  .cx-dlrow__url { grid-column: 1 / -1; }
-}
 @media (max-width: 700px) {
   .cx-bonusrow { grid-template-columns: 1fr 1fr; }
 }
