@@ -914,10 +914,14 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
 }
 .tgame-side .tgame-obsbtn { align-self: center; }
 
-@media (min-width: 1000px) {
+/* The frame is EXACTLY 1280×960, so it only switches on once the viewport can
+   actually hold it (stage + the console's padding). Narrower than that and the
+   flowing layout stays — a fixed 1280 frame in a 1200px window would mean
+   horizontal scrolling, which is worse than reflowing. */
+@media (min-width: 1340px) {
   .tstage {
-    width: min(1280px, 100%);
-    height: min(920px, calc(100dvh - 7rem));
+    width: 1280px;
+    height: 960px;
     margin: 0 auto;
     display: flex; flex-direction: column; gap: 0.75rem;
     overflow: hidden;
@@ -1060,7 +1064,7 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
 /* the option you picked, shown WITHOUT saying whether it was right */
 .tgame-opt.opt-picked { border-color: var(--color-primary); }
 
-@media (max-width: 999px) {
+@media (max-width: 1339px) {
   .tgame-sum { position: static; } /* no sticky summary in the flowing layout */
 }
 
@@ -1216,6 +1220,9 @@ body.tcat-page:not(.tg-mode) main.container {
   border-radius: 24px;
   padding: var(--space-lg);
   margin-block: var(--space-lg);
+  /* The site container caps at 1120px; the stage needs a clean 1280 inside
+     the console's padding, so these pages get a wider shell. */
+  max-width: calc(1280px + 2 * var(--space-lg));
 }
 body.tcat-page:not(.tg-mode) .page-crumbs,
 body.tcat-page:not(.tg-mode) .page-crumbs a { color: var(--color-text-muted); }
