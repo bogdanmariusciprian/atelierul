@@ -13,7 +13,7 @@ import { TEST_CAT_BY_SLUG } from "./test-categories.js";
 import { initTestGame } from "./tests-game.js";
 import { initTestAdminGrid } from "./tests-admin-grid.js";
 import { isAdmin } from "../../shared/scripts/session.js";
-import { fetchTestDownloads } from "../../shared/scripts/test-repo.js";
+import { fetchTestDownloads, fetchDriveFolderUrl } from "../../shared/scripts/test-repo.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -22,6 +22,7 @@ let root = null;
 let cat = null;
 let adminMode = false;
 let downloads = []; // published files for this category, newest year first
+let folderUrl = ""; // the Drive folder behind them, for „descarcă tot"
 
 export function initTestCategory(mountEl, slug) {
   cat = TEST_CAT_BY_SLUG[slug];
@@ -39,11 +40,14 @@ export function initTestCategory(mountEl, slug) {
   });
   route();
   // The files live on the teacher's Drive; the list of them lives in the DB.
-  // Fetched after the first paint so the page never waits on it.
-  fetchTestDownloads(cat.slug).then((rows) => {
-    downloads = rows;
-    if (!wantsPractice()) renderIntro();
-  });
+  // Fetched after the first paint so the page never waits on it — and both at
+  // once, so the panel doesn't redraw twice.
+  Promise.all([fetchTestDownloads(cat.slug), fetchDriveFolderUrl(cat.slug)])
+    .then(([rows, url]) => {
+      downloads = rows;
+      folderUrl = url;
+      if (!wantsPractice()) renderIntro();
+    });
 }
 
 // Leaving the admin grid: drop its full-screen look AND unlock the page scroll
@@ -119,7 +123,15 @@ function renderIntro() {
       <!-- Not gated on cat.live: a category can have papers to download long
            before it has an item bank to play with. -->
       <section class="tcat__files">
-        <h2 class="tcat__ph"><span aria-hidden="true">📄</span> Teste descărcabile</h2>
+        <h2 class="tcat__ph">
+          <span aria-hidden="true">📄</span> Teste descărcabile
+          ${folderUrl
+            ? `<a class="tdl__all" href="${esc(folderUrl)}" target="_blank" rel="noopener noreferrer"
+                  title="Deschide folderul cu toate testele. De acolo le poți descărca pe toate deodată.">
+                 <span class="tdl__all__ic" aria-hidden="true"></span> Toate, pe Drive
+               </a>`
+            : ""}
+        </h2>
         ${downloadList()}
       </section>
 

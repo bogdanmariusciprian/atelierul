@@ -656,8 +656,38 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   font-weight: 700; text-decoration: none; color: var(--color-text);
   border-bottom: 1.5px solid transparent;
 }
+/* The Acrobat mark, in its own colours. Unlike the masked SVGs elsewhere on
+   the site, this one is NOT tinted with --cat-color on purpose: „roșu = PDF"
+   is a convention people already read, and it stays the same on every
+   category page. Slightly dimmed at rest so the row reads as text first. */
+.tdl__file::before {
+  content: ""; display: inline-block;
+  width: 1.1em; height: 1.1em; margin-right: 0.3em; vertical-align: -0.2em;
+  background: url("/assets/icons/pdf-file.png") center / contain no-repeat;
+  opacity: 0.75; transition: opacity 0.15s ease;
+}
 .tdl__file:hover { color: var(--cat-color); border-bottom-color: var(--cat-color); }
+.tdl__file:hover::before { opacity: 1; }
 .tdl__sep { color: var(--color-text-muted); user-select: none; }
+
+/* „Toate, pe Drive" — ieșirea de rezervă, pentru cine vrea tot dintr-o dată.
+   Google face arhiva; noi doar deschidem folderul. Discret (contur, nu plin),
+   fiindcă drumul obișnuit rămâne linkul direct pe fiecare test.
+   `margin-inline-start: auto` îl împinge la capătul rândului cu titlul. */
+.tdl__all {
+  margin-inline-start: auto;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.75rem; border-radius: 999px;
+  border: 1.5px solid var(--color-border);
+  font-size: 0.8rem; font-weight: 700; text-decoration: none;
+  color: var(--color-text-muted); user-select: none;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.tdl__all__ic {
+  width: 1.15em; height: 1.15em;
+  background: url("/assets/icons/pdf-folder.png") center / contain no-repeat;
+}
+.tdl__all:hover { color: var(--cat-color); border-color: var(--cat-color); }
 
 @media (max-width: 560px) {
   .tcat__hero { flex-direction: column; text-align: center; }

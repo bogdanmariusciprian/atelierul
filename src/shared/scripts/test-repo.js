@@ -372,11 +372,28 @@ export async function fetchAppSettings() {
   if (error) { console.warn("fetchAppSettings:", error.message); return {}; }
   return Object.fromEntries((data || []).map((r) => [r.key, r.value || ""]));
 }
+/** Saving decides visibility on its own, so no caller can forget it: folder
+ *  links are public (the category page needs them), everything else — the API
+ *  key above all — stays the teacher's. The DB enforces the same list in a
+ *  CHECK constraint (migration 0050); this is only the polite half. */
 export async function saveAppSetting(key, value) {
+  const isPublic = /^(drive_folder_|public_)/.test(key);
   const { error } = await supabase.from("app_settings")
-    .upsert({ key, value, updated_at: new Date().toISOString() });
+    .upsert({ key, value, is_public: isPublic, updated_at: new Date().toISOString() });
   if (error) { console.warn("saveAppSetting:", error.message); return false; }
   return true;
+}
+
+/** The Drive folder of one category, as a clean folder URL — or "" if the
+ *  teacher hasn't set one. Readable by anyone, guests included.
+ *  Rebuilt from the id rather than echoed as saved, so a link pasted with
+ *  „?usp=sharing" and friends still opens the plain folder view. */
+export async function fetchDriveFolderUrl(exam = "admitere-drept") {
+  const { data, error } = await supabase.from("app_settings")
+    .select("value").eq("key", `drive_folder_${exam}`).maybeSingle();
+  if (error) { console.warn("fetchDriveFolderUrl:", error.message); return ""; }
+  const id = driveFolderId(data?.value || "");
+  return id ? `https://drive.google.com/drive/folders/${id}` : "";
 }
 
 /** Published files for one category, newest year first. Guests included. */
