@@ -482,8 +482,8 @@
    multi-paragraph post collapsed into one block of text. */
 .post__text { margin: 0; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
 
-/* „Reușită" posts (a solved item, a milestone) read as a self-contained
-   card: a framed block instead of loose text on the wall. */
+/* Game-made captures read as a self-contained card: a framed block instead of
+   loose text on the wall. Hand-written posts are untouched. */
 .post--framed .post__text {
   border: 1.5px solid var(--color-border);
   border-left: 3px solid #f59e0b;

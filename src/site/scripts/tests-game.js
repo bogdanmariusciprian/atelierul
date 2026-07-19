@@ -1120,6 +1120,8 @@ function itemPostText(e) {
     opts,
     "",
     `✅ Răspuns corect: ${e.correctAnswer}`,
+    `🙋 Ce am răspuns: ${e.chosen && e.chosen !== "-" ? `${e.chosen} — ${e.correct ? "corect" : "greșit"}` : "n-am apucat să răspund"}`,
+    `⭐ Puncte la acest item: ${e.points || 0}`,
   ];
   if (e.observation) parts.push("", "💡 Explicație", sanitizeRich(e.observation));
   return parts.join("\n");
@@ -1155,7 +1157,10 @@ function postItem(i) {
   if (!e || e.posted || !isLoggedIn()) return;
   askAudience(async (audience) => {
     // „Reușită", not „Resursă": the pupil is sharing something they solved.
-    const row = await createPost({ type: "reusita", audience, text: itemPostText(e), surface: "wall" });
+    // `generated` locks the body — this is a capture, not a draft.
+    const row = await createPost({
+      type: "reusita", audience, text: itemPostText(e), surface: "wall", generated: true,
+    });
     if (!row) { showToast("N-am putut posta acum. Încearcă din nou."); return; }
     e.posted = true;
     showToast("📌 Postat pe pagina ta.");

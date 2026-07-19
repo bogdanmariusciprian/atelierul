@@ -416,8 +416,12 @@ export function renderCommunity(basePath = "") {
   const canPinHere = () => state.section === "grupuri" && !!state.openGroup && isOpenGroupMine();
   // The author may EDIT only in the 5-minute typo window (then delete-only);
   // admin edits anytime. Same rule as comments (Marius's rule).
+  // A game-made capture is never editable — not even by the teacher. Its whole
+  // value is that it shows the item exactly as it was solved; an editable copy
+  // could be doctored and would still wear the „item" framing. Deleting it
+  // stays allowed, and the server enforces the same rule (migration 0046).
   const canEditPost = (p) =>
-    isAdmin() || (canManagePost(p) && Date.now() - (p.createdAt || 0) < EDIT_WINDOW_MS);
+    !p.generated && (isAdmin() || (canManagePost(p) && Date.now() - (p.createdAt || 0) < EDIT_WINDOW_MS));
 
   // Profanity gate for one text field: returns the offending words.
   const moderate = (text) => findProfanity(text || "");
@@ -1108,7 +1112,7 @@ export function renderCommunity(basePath = "") {
       : `${post.time}${edited} · ${audienceBadge(post.audience)}`;
 
     return `
-      <article class="post ${post.bg !== "none" ? "post--tinted" : ""}${isShare ? " post--share" : ""}${post.type === "reusita" ? " post--framed" : ""}" data-post-id="${post.id}" ${tintStyle}>
+      <article class="post ${post.bg !== "none" ? "post--tinted" : ""}${isShare ? " post--share" : ""}${post.generated ? " post--framed" : ""}" data-post-id="${post.id}" ${tintStyle}>
         <header class="post__head">
           ${avatarLink(post.authorId)}
           <div class="post__id">

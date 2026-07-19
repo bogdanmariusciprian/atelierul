@@ -128,6 +128,7 @@ function mapPost(row) {
     media: row.media || null,
     edited: !!row.edited_at,
     pinned: !!row.pinned,
+    generated: !!row.generated, // made by the game → text can't be edited
     likes: 0,
     likedByMe: false,
     shares: 0,
@@ -197,7 +198,7 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
   let sel = supabase
     .from("posts")
     .select(
-      "id, author_id, body, type, background, audience, share_of, surface, group_id, media, pinned, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, author_id, body, type, background, audience, share_of, surface, group_id, media, pinned, generated, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .eq("moderation_status", "visible")
     .is("share_of", null);
@@ -288,7 +289,7 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
 // Writes. All fire-and-forget from the hub (optimistic UI already updated).
 // supabase-js returns { error } instead of throwing, so no unhandled rejects.
 // ---------------------------------------------------------
-export async function createPost({ type, bg, audience, text, media, surface, groupId = null }) {
+export async function createPost({ type, bg, audience, text, media, surface, groupId = null, generated = false }) {
   const { data, error } = await supabase
     .from("posts")
     .insert({
@@ -300,6 +301,7 @@ export async function createPost({ type, bg, audience, text, media, surface, gro
       surface: surface === "wall" ? "wall" : "forum",
       media: media ?? null,
       group_id: groupId,
+      generated: !!generated, // a game-made capture: its body is locked server-side
     })
     .select("id")
     .single();
