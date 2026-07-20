@@ -659,16 +659,18 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tdl td, .tdl th { padding-left: 0.5rem; }
 
 /* Hovering a row lights up every cell in the shade of ITS kind of exam, so the
-   three columns say what they are without a header row. One hue per column:
-   the main July exam borrows the category's own colour, autumn takes a warm
-   one, the rehearsal a cool one. Anything past the third falls back to grey —
-   a fourth kind of exam would still hover, just without a voice of its own. */
+   three columns say what they are without a header row.
+   Three hues of their own, NOT --cat-color: „Admitere Drept" is itself a burnt
+   orange, so borrowing it for July made July and September the same colour.
+   Green for the exam that counts, amber for autumn, blue for the rehearsal —
+   far enough apart on the wheel to stay apart at 14% alpha. Past the third,
+   grey: a fourth kind of exam still hovers, just without a voice of its own. */
 .tdl td, .tdl th { --tdl-k: var(--color-text-muted); }
-.tdl td.tdl-k0 { --tdl-k: var(--cat-color); }
+.tdl td.tdl-k0 { --tdl-k: #15803d; }
 .tdl td.tdl-k1 { --tdl-k: #c2410c; }
 .tdl td.tdl-k2 { --tdl-k: #0369a1; }
 .tdl tbody tr:hover td, .tdl tbody tr:hover th {
-  background: color-mix(in srgb, var(--tdl-k) 13%, transparent);
+  background: color-mix(in srgb, var(--tdl-k) 14%, transparent);
 }
 .tdl tbody tr:hover th:first-child { border-radius: 8px 0 0 8px; }
 .tdl tbody tr:hover td:last-child { border-radius: 0 8px 8px 0; }
