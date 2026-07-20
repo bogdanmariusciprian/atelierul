@@ -20,7 +20,7 @@
 // =========================================================
 import { CURRENT_USER, isLoggedIn, isAdmin } from "../../shared/scripts/session.js";
 import { getGateOff, setGateOff } from "../../shared/scripts/site-gate.js";
-import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyEventsAccess, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser, fetchPointsHistory, fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress, pinGroupPost, reportPostBySurrogate, reportCommentBySurrogate, resolveTestReport } from "../../shared/scripts/forum-repo.js";
+import { fetchFeed, fetchMembers, adminFetchUsers, fetchPublicProfile, uuidForSurrogate, surrogateForPostUuid, createPost, createComment, mapComment, mapPostSurrogate, togglePostLike, toggleSave, updatePost, deletePost, updateComment, deleteComment, toggleCommentLike, toggleCommentReaction, markCommentCorrect, fetchMyFriends, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, fetchMyProfile, updateMyProfile, fetchConversations, sendTemplateMsg, sendTeacherMsg, sendTeacherReply, sendFreeMsg, reportMessage, markConversationReadReal, fetchConversationLabels, setConversationLabel, fetchEventAccessUsers, fetchContentReports, resolveReport, fetchProfanityTerms, addProfanityTerm, removeProfanityTerm, fetchHeldContent, moderateContent, fetchMyBlocks, blockUser, unblockUser, fetchPointsHistory, fetchFavorites, addFavorite, removeFavorite, fetchMyLessonProgress, pinGroupPost, reportPostBySurrogate, reportCommentBySurrogate, resolveTestReport } from "../../shared/scripts/forum-repo.js";
 import { confirmDialog } from "../../shared/scripts/confirm.js";
 import { isOnlineSince } from "../../shared/scripts/presence.js";
 import { MY_PROFILE, COMMUNITY_USERS, userById, avatarColor, publicProfileOf, slugForUser, userBySlug, awardPoints } from "../../shared/scripts/community-data.js";
@@ -38,12 +38,9 @@ import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 // Shared with the Teste pages: one source for the category colours.
 import { TEST_CATEGORIES, TEST_CAT_BY_SLUG } from "../../site/scripts/test-categories.js";
 import {
-  wordOfToday, GROUP_ICONS, groupIcon, groupColor, EVENT_KINDS, BADGES,
+  wordOfToday, GROUP_ICONS, groupIcon, groupColor, BADGES,
 } from "../../shared/scripts/discover-data.js";
-import {
-  listEvents, rsvpEvent, createEvent, updateEvent, deleteEvent,
-  grantEventAccess, revokeEventAccess,
-} from "../../shared/scripts/events-repo.js";
+import { grantEventAccess, revokeEventAccess } from "../../shared/scripts/events-repo.js";
 import {
   // aliased: a LOCAL function createGroup() (the composer handler) already
   // exists below — without the alias it would shadow this import and recurse.
@@ -104,7 +101,6 @@ const NAV_ICONS = {
   clasament: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>`,
   grupuri: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5.5M21 20a6 6 0 0 0-4-5.7"/></svg>`,
   membri: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M19 8v6M22 11h-6"/></svg>`,
-  evenimente: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>`,
   insigne: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M9 14l-1.5 7L12 18l4.5 3L15 14"/></svg>`,
   admin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>`,
 };
@@ -130,7 +126,6 @@ const NAV_GROUPS = [
       { id: "clasament", label: "Clasament" },
       { id: "membri", label: "Membri" },
       { id: "grupuri", label: "Grupuri de studiu" },
-      { id: "evenimente", label: "Evenimente" },
       { id: "insigne", label: "Insigne" },
     ],
   },
@@ -253,13 +248,10 @@ export function renderCommunity(basePath = "") {
     challengePending: false, // waiting for the server's verdict
     adminChallenges: [], // real challenges list (admin scheduling)
     groups: [], // real study groups (Supabase) — loaded (with posts) in loadFeed
-    events: [], // real events (Supabase) — loaded in loadFeed (RLS-gated by event_access)
     openGroup: null, // id of the group topic being viewed
     addMemberOpen: false,
     editingPost: null, // post id being edited (author or admin)
     editingGroup: false, // editing the open group's details (admin/creator)
-    editingEvent: null, // event id being edited (admin)
-    newEventOpen: false, // admin "create event" form
     simLevel: null, // admin: simulate a level to preview the bar/frame
     simPrestige: 0, // admin: simulate prestige stars
     editingProfile: false, // profile edit mode
@@ -316,7 +308,7 @@ export function renderCommunity(basePath = "") {
     pendingMsgUuid: null, // #msg/<uuid> deep link → open that conversation after load
     pendingPostUuid: null, // #post/<uuid> deep link → open that post after the feed loads
     convLabels: {}, // admin inbox: member UUID → 'curent'|'incheiat'|'amanat'
-    eventAccessUuids: new Set(), // members with Events access (auto "Evenimente")
+    eventAccessUuids: new Set(), // members the teacher marked for the PLANNER
     msgLabelFilter: "all", // admin inbox filter
   };
   const MSG_MAX_PARTS = 5;
@@ -773,8 +765,6 @@ export function renderCommunity(basePath = "") {
         // The teacher's sidebar hides the member-only, gamified sections;
         // a guest's shows only what guests may open.
         items: g.items.filter((i) => {
-          // "Evenimente" shows only for the teacher or members granted access.
-          if (i.id === "evenimente" && !isAdmin() && !MY_PROFILE.eventsAccess) return false;
           return guest ? GUEST_SECTIONS.has(i.id) && i.id !== "profil" : !isAdmin() || !ADMIN_HIDDEN_SECTIONS.has(i.id);
         }),
       })).filter((g) => g.items.length),
@@ -1714,7 +1704,7 @@ export function renderCommunity(basePath = "") {
       ${strip}`;
   }
 
-  // Teacher's inbox labels. "Evenimente" is auto (derived from event access);
+  // Teacher's inbox labels. „Meditații" is auto (derived from the planner mark);
   // the other three are set manually per member conversation.
   const CONV_LABELS = [
     { id: "curent", label: "Curent", color: "#2563eb" },
@@ -1736,7 +1726,7 @@ export function renderCommunity(basePath = "") {
           : state.conversations.filter((c) => convLabelId(c) === id).length;
     const chip = (id, label) =>
       `<button type="button" class="cx-fchip${state.msgLabelFilter === id ? " on" : ""}" data-action="msg-label-filter" data-id="${id}">${label} <span class="cx-muted">${count(id)}</span></button>`;
-    return `<div class="cx-histfilter cx-msglabelbar">${chip("all", "Toate")}${CONV_LABELS.map((l) => chip(l.id, l.label)).join("")}${chip("evenimente", "🎟️ Evenimente")}</div>`;
+    return `<div class="cx-histfilter cx-msglabelbar">${chip("all", "Toate")}${CONV_LABELS.map((l) => chip(l.id, l.label)).join("")}${chip("evenimente", "🧑‍🏫 Meditații")}</div>`;
   }
   function convLabelSetter(conv) {
     if (conv.partnerId == null) return "";
@@ -2738,79 +2728,14 @@ export function renderCommunity(basePath = "") {
       <div class="cx-feed">${posts}</div>`;
   }
 
-  // ---------- Section: events (admin-gated) ----------
-  function sectionEvents() {
-    const allowed = isAdmin() || MY_PROFILE.eventsAccess;
-    if (!allowed) {
-      return `
-        ${sectionHead("Evenimente", "Sesiuni live, quiz-uri și cluburi de lectură.")}
-        <div class="cx-lock">
-          <div class="cx-lock__ic" aria-hidden="true">🔒</div>
-          <b>Acces restricționat</b>
-          <p>Evenimentele sunt vizibile doar membrilor cărora un administrator le-a acordat acces. Cere-i profesorului să te adauge.</p>
-        </div>`;
-    }
-    const kindOptions = (sel) =>
-      Object.entries(EVENT_KINDS)
-        .map(([key, k]) => `<option value="${key}"${sel === key ? " selected" : ""}>${k.label}</option>`)
-        .join("");
-    const eventForm = (ev, isNew) => `<div class="cx-box cx-eventform">
-        <label class="cx-label">Titlu</label>
-        <input class="cx-input" id="cx-ev-title" value="${escapeHtml(ev.title || "")}" />
-        <div class="cx-eventform__row">
-          <div><label class="cx-label">Tip</label><select class="cx-input" id="cx-ev-kind">${kindOptions(ev.kind || "live")}</select></div>
-          <div><label class="cx-label">Când</label><input class="cx-input" id="cx-ev-when" value="${escapeHtml(ev.when || "")}" placeholder="ex: vineri, 19:00" /></div>
-        </div>
-        <label class="cx-label">Gazdă</label>
-        <input class="cx-input" id="cx-ev-host" value="${escapeHtml(ev.host || "")}" />
-        <div class="cx-excompose__actions">
-          <button type="button" class="btn btn--primary btn--sm" data-action="${isNew ? "admin-create-event" : "admin-save-event"}" data-id="${ev.id || 0}">${isNew ? "Creează evenimentul" : "Salvează"}</button>
-          <button type="button" class="btn-mini btn-mini--ghost" data-action="admin-event-cancel">Renunță</button>
-        </div>
-      </div>`;
-
-    const createUI = isAdmin()
-      ? state.newEventOpen
-        ? eventForm({ kind: "live" }, true)
-        : `<button type="button" class="cx-propose" data-action="admin-new-event">+ Creează un eveniment</button>`
-      : "";
-
-    const cards = state.events
-      .map((e) => {
-        if (isAdmin() && state.editingEvent === e.id) return eventForm(e, false);
-        const k = EVENT_KINDS[e.kind] || EVENT_KINDS.live; // 'other' kinds fall back
-
-        const adminBar = isAdmin()
-          ? `<span class="cx-event__admin">
-               <button type="button" class="post__adminbtn" data-action="admin-edit-event" data-id="${e.id}" title="Editează">✎</button>
-               <button type="button" class="post__adminbtn post__adminbtn--del" data-action="admin-del-event" data-id="${e.id}" title="Șterge">🗑</button>
-             </span>`
-          : "";
-        return `<div class="cx-event" style="--e:${k.color}">
-          <span class="cx-event__icon">${k.icon}</span>
-          <div class="cx-event__body">
-            <span class="cx-event__kind">${k.label}</span>
-            <b class="cx-event__title">${escapeHtml(e.title)}</b>
-            <span class="cx-muted">📅 ${escapeHtml(e.when)} · ${escapeHtml(e.host)}</span>
-          </div>
-          <button type="button" class="cx-event__go${e.going ? " on" : ""}" data-action="event-go" data-id="${e.id}">${e.going ? "Particip ✓" : "Particip"}</button>
-          ${adminBar}
-        </div>`;
-      })
-      .join("");
-    return `
-      ${sectionHead("Evenimente", "Sesiuni live, quiz-uri și cluburi de lectură. Nu rata nimic.")}
-      ${createUI}
-      <div class="cx-events">${cards}</div>`;
-  }
-
   // ---------- Section: admin dashboard (admin role only) ----------
   function adminUserRow(u, hasAccess, isMe) {
     const li = levelInfo(u.points || 0);
     return `<div class="cx-adminrow">
       <span class="cx-adminrow__u">${avatarLink(u.id)} ${userNameLink(u.id, u.name)}${u.email ? `<br><small class="cx-muted cx-adminrow__email">${escapeHtml(u.email)}</small>` : ""}${isMe ? ' <span class="cx-adminchip">tu</span>' : ""}</span>
       <span>${(u.points || 0).toLocaleString("ro-RO")} <span class="cx-levelchip">Nv ${li.level}${li.prestige ? ` ⭐${li.prestige}` : ""}</span></span>
-      <span><button type="button" class="cx-toggle${hasAccess ? " on" : ""}" data-action="grant-events" data-uid="${u.id}">${hasAccess ? "Acordat ✓" : "Acordă"}</button></span>
+      <span><button type="button" class="cx-toggle${hasAccess ? " on" : ""}" data-action="grant-events" data-uid="${u.id}"
+        title="${hasAccess ? "Are acces la planificatorul de meditații" : "Deschide-i planificatorul de meditații"}">${hasAccess ? "Meditații ✓" : "Acordă meditații"}</button></span>
       <span class="cx-crudbtns"><button type="button" class="btn-mini" data-action="admin-view" data-uid="${u.id}">Vezi profil</button></span>
     </div>`;
   }
@@ -3040,7 +2965,6 @@ export function renderCommunity(basePath = "") {
       { label: "Postări", section: "forum", hint: "editezi/ștergi pe fiecare postare, din feed" },
       { label: "Grupuri", section: "grupuri", hint: "editezi/ștergi în pagina fiecărui grup" },
       { label: "Exerciții", section: "exercitii", hint: "aprobi/respingi și din fila Moderare" },
-      { label: "Evenimente", section: "evenimente", hint: "creezi/editezi/ștergi evenimente" },
     ]
       .map(
         (c) => `<div class="cx-crudrow">
@@ -3099,7 +3023,7 @@ export function renderCommunity(basePath = "") {
           <span>${sortBtn("points", "După puncte")}${sortBtn("name", "După nume")}</span>
         </div>
         <div class="cx-admintable">
-          <div class="cx-adminrow cx-adminrow--head"><span>Utilizator</span><span>Puncte</span><span>Evenimente</span><span>Acțiuni</span></div>
+          <div class="cx-adminrow cx-adminrow--head"><span>Utilizator</span><span>Puncte</span><span>Meditații</span><span>Acțiuni</span></div>
           ${rows}
         </div>
         ${pager}
@@ -3446,7 +3370,6 @@ export function renderCommunity(basePath = "") {
     clasament: sectionLeaderboard,
     membri: sectionMembers,
     grupuri: sectionGroups,
-    evenimente: sectionEvents,
     insigne: sectionBadges,
     lectii: sectionLessons,
     mesaje: sectionMessages,
@@ -3518,11 +3441,6 @@ export function renderCommunity(basePath = "") {
     return await fetchChallengeAnswer(state.challenge.id);
   }
 
-  // Reload events after RSVP or an admin create/edit/delete.
-  async function reloadEvents() {
-    if (isLoggedIn()) state.events = await listEvents();
-    render();
-  }
 
   // Reload study groups (+ walls) after create/join/leave/post/edit/delete.
   async function reloadGroups() {
@@ -3595,7 +3513,6 @@ export function renderCommunity(basePath = "") {
         state.myCounts = await fetchMyContributionCounts();
         state.myLessons = await fetchMyLessonSlugs(); // real progress → badges
       }
-      if (isLoggedIn()) state.events = await listEvents(); // RLS returns [] without event_access
       // Real study groups + each group's wall (posts tagged with group_id).
       state.groups = await listGroups();
       await Promise.all(state.groups.map(async (g) => {
@@ -3633,7 +3550,6 @@ export function renderCommunity(basePath = "") {
         state.pendingMsgUuid = null;
       }
       state.saved = new Set(state.posts.filter((p) => p.savedByMe).map((p) => p.id));
-      MY_PROFILE.eventsAccess = await fetchMyEventsAccess(); // real events gating
       const fr = await fetchMyFriends(); // real friend graph
       MY_PROFILE.friendIds = fr.friendIds;
       MY_PROFILE.friendReqIncoming = fr.incoming;
@@ -4497,60 +4413,6 @@ export function renderCommunity(basePath = "") {
           deleteGroup(rawId).then(reloadGroups); // real delete (cascades group posts)
         });
         return;
-      }
-
-      // ---- events ----
-      case "event-go": {
-        const ev = state.events.find((x) => x.id === rawId);
-        if (ev) { ev.going = !ev.going; rsvpEvent(rawId, ev.going); } // persist RSVP (real)
-        return render();
-      }
-      case "admin-new-event":
-        if (!isAdmin()) return;
-        state.newEventOpen = true;
-        state.editingEvent = null;
-        return render();
-      case "admin-edit-event":
-        if (!isAdmin()) return;
-        state.editingEvent = rawId;
-        state.newEventOpen = false;
-        return render();
-      case "admin-event-cancel":
-        state.newEventOpen = false;
-        state.editingEvent = null;
-        return render();
-      case "admin-create-event": {
-        if (!isAdmin()) return;
-        const title = mount.querySelector("#cx-ev-title")?.value.trim();
-        if (!title) return;
-        // Store RAW (escaped at render); the teacher creates it (RLS admin-only).
-        createEvent({
-          title,
-          kind: mount.querySelector("#cx-ev-kind")?.value || "live",
-          whenText: mount.querySelector("#cx-ev-when")?.value.trim() || "curând",
-          host: mount.querySelector("#cx-ev-host")?.value.trim() || "Atelierul",
-        }).then(reloadEvents);
-        state.newEventOpen = false;
-        return render();
-      }
-      case "admin-save-event": {
-        if (!isAdmin()) return;
-        const title = mount.querySelector("#cx-ev-title")?.value.trim();
-        if (title) {
-          updateEvent(rawId, {
-            title,
-            kind: mount.querySelector("#cx-ev-kind")?.value || "live",
-            whenText: mount.querySelector("#cx-ev-when")?.value.trim() || "",
-            host: mount.querySelector("#cx-ev-host")?.value.trim() || "",
-          }).then(reloadEvents);
-        }
-        state.editingEvent = null;
-        return render();
-      }
-      case "admin-del-event": {
-        if (!isAdmin()) return;
-        deleteEvent(rawId).then(reloadEvents); // real delete
-        return render();
       }
 
       // ---- admin ----

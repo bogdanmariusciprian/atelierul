@@ -16,18 +16,34 @@
 }
 .pl-nav { display: flex; align-items: center; gap: 0.4rem; }
 .pl-navbtn {
-  width: 2rem; height: 2rem; border-radius: 50%;
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.45rem 0.9rem; border-radius: 999px;
   border: 1.5px solid var(--color-border); background: var(--color-bg);
-  cursor: pointer; font-size: 1.1rem; line-height: 1; color: var(--color-text);
+  cursor: pointer; font: inherit; font-size: 0.85rem; font-weight: 700;
+  color: var(--color-text);
 }
 .pl-navbtn:hover { border-color: var(--color-primary); color: var(--color-primary); }
-.pl-span { font-size: 1.05rem; min-width: 11rem; text-align: center; }
-.pl-today {
-  border: 0; background: none; cursor: pointer; font: inherit;
-  font-size: 0.8rem; font-weight: 700; color: var(--color-text-muted);
-  text-decoration: underline; text-underline-offset: 3px;
+.pl-span {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 0.1rem;
+  font-size: 1.05rem; min-width: 12rem; text-align: center;
 }
-.pl-today:hover { color: var(--color-primary); }
+.pl-span__now {
+  font-style: normal; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--color-primary);
+}
+/* Departe de azi, drumul înapoi e un buton adevărat, nu o subliniere timidă. */
+.pl-back {
+  border: 0; border-radius: 999px; padding: 0.15rem 0.6rem; cursor: pointer;
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  font: inherit; font-size: 0.72rem; font-weight: 800; color: var(--color-primary);
+}
+.pl-back:hover { background: color-mix(in srgb, var(--color-primary) 26%, transparent); }
+.pl-rec {
+  padding: 0.3rem 0.7rem; border-radius: 999px; cursor: pointer;
+  border: 1.5px dashed var(--color-border); background: var(--color-bg);
+  font: inherit; font-size: 0.8rem; font-weight: 700; color: var(--color-text-muted);
+}
+.pl-rec.on { border-style: solid; border-color: var(--color-primary); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 
 .pl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-left: auto; }
 .pl-dur__lab { font-size: 0.8rem; color: var(--color-text-muted); margin-right: 0.15rem; }
@@ -63,9 +79,36 @@
   font-style: normal; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.04em;
   padding: 0.05rem 0.4rem; border-radius: 999px; background: var(--color-primary); color: #fff;
 }
-.pl-col.is-today .pl-colhead { background: color-mix(in srgb, var(--color-primary) 14%, transparent); }
-.pl-col.is-today .pl-colhead__d { color: var(--color-primary); }
+.pl-col.is-today .pl-colhead {
+  background: var(--color-primary);
+}
+.pl-col.is-today .pl-colhead__d,
+.pl-col.is-today .pl-colhead__n { color: #fff; }
+.pl-col.is-today .pl-colhead__today { background: #fff; color: var(--color-primary); }
+.pl-col.is-today .pl-lane {
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-primary) 45%, transparent);
+}
 .pl-col.is-past .pl-colhead, .pl-col.is-past .pl-lane { opacity: 0.55; }
+.pl-col.is-vac .pl-lane {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 14px, color-mix(in srgb, #0891b2 6%, transparent) 14px 28px),
+    var(--color-surface);
+}
+.pl-colhead__vac {
+  font-style: normal; font-size: 0.62rem; font-weight: 800;
+  padding: 0.05rem 0.4rem; border-radius: 999px;
+  background: color-mix(in srgb, #0891b2 16%, transparent); color: #0e7490;
+}
+/* Firul roșu al lui „acum" — ziua de azi nu e doar colorată, e vie. */
+.pl-now {
+  position: absolute; left: 0; right: 0; height: 2px; background: #dc2626;
+  pointer-events: none; z-index: 2;
+}
+.pl-now::before {
+  content: ""; position: absolute; left: -3px; top: -3px;
+  width: 8px; height: 8px; border-radius: 50%; background: #dc2626;
+}
 
 .pl-lane {
   position: relative; border-radius: 0 0 12px 12px;
@@ -178,3 +221,79 @@
 }
 .pl-ghost em { font-style: normal; font-weight: 700; color: var(--color-primary); }
 .pl-ghost.is-bad em { color: #b91c1c; }
+
+/* ---- editorul de jeton (admin): nume, culoare, durată ---- */
+.pl-chipwrap { display: inline-flex; align-items: center; gap: 0.1rem; }
+.pl-chip__dur {
+  font-style: normal; font-weight: 800; font-size: 0.68rem;
+  padding: 0.05rem 0.35rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+}
+.pl-chip__cfg {
+  width: 1.5rem; height: 1.5rem; border: 0; border-radius: 50%;
+  background: none; cursor: pointer; font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.pl-chip__cfg:hover { background: var(--color-surface); color: var(--color-primary); }
+.pl-cfg {
+  width: 100%; margin-top: 0.6rem; padding: 0.7rem 0.8rem;
+  border: 1.5px solid var(--color-border); border-radius: 12px;
+  background: var(--color-bg);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem 1.2rem;
+}
+.pl-cfg__f { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; font-weight: 700; color: var(--color-text-muted); }
+.pl-cfg__name { font: inherit; padding: 0.3rem 0.6rem; border-radius: 8px; border: 1.5px solid var(--color-border); }
+.pl-cfg__sw { display: flex; gap: 0.25rem; }
+.pl-sw {
+  width: 1.35rem; height: 1.35rem; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; background: var(--c);
+}
+.pl-sw.on { border-color: var(--color-text); transform: scale(1.12); }
+.pl-cfg__acts { display: flex; gap: 0.4rem; margin-left: auto; }
+.pl-cfg__hint { width: 100%; margin: 0; font-size: 0.74rem; color: var(--color-text-muted); }
+
+/* ---- bara de vacanțe ---- */
+.pl-vacbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.7rem;
+  margin-bottom: 0.75rem; padding: 0.45rem 0.75rem;
+  border-radius: 12px; background: color-mix(in srgb, #0891b2 7%, var(--color-surface));
+  font-size: 0.8rem;
+}
+.pl-vacbar__t { font-weight: 800; color: #0e7490; }
+.pl-vac {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.2rem 0.55rem; border-radius: 999px; background: var(--color-bg);
+  border: 1px solid color-mix(in srgb, #0891b2 30%, transparent);
+}
+.pl-vac__x { border: 0; background: none; cursor: pointer; color: var(--color-text-muted); font-size: 0.9rem; }
+.pl-vac__x:hover { color: #b91c1c; }
+.pl-vacform { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.pl-vacform input { font: inherit; font-size: 0.78rem; padding: 0.25rem 0.45rem; border-radius: 8px; border: 1.5px solid var(--color-border); }
+.pl-vacbar__hint { flex-basis: 100%; font-size: 0.72rem; color: var(--color-text-muted); }
+
+/* ---- redimensionarea: mânerul de jos ---- */
+.pl-block__rsz {
+  position: absolute; left: 20%; right: 20%; bottom: 0; height: 10px;
+  cursor: ns-resize; touch-action: none;
+}
+.pl-block__rsz::after {
+  content: ""; position: absolute; left: 50%; bottom: 3px;
+  width: 26px; height: 3px; border-radius: 999px;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--c) 55%, transparent);
+  opacity: 0; transition: opacity 0.15s ease;
+}
+.pl-block:hover .pl-block__rsz::after { opacity: 1; }
+
+/* ---- confirmarea în loc, pe bloc ---- */
+.pl-block.is-confirm { background: #fef2f2; border-left-color: #dc2626; }
+.pl-block__confirm { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.pl-mini {
+  border: 1.5px solid var(--color-border); border-radius: 999px;
+  padding: 0.1rem 0.55rem; background: var(--color-bg); cursor: pointer;
+  font: inherit; font-size: 0.72rem; font-weight: 700;
+}
+.pl-mini--no { border-color: #fca5a5; color: #b91c1c; }
+.pl-mini--no:hover { background: #fee2e2; }
+.pl-block__rec { font-style: normal; font-size: 0.72rem; }
+.pl-ghost .is-vac { color: #0e7490; font-weight: 700; }

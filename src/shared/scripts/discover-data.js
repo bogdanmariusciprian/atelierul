@@ -4,7 +4,7 @@
 //   • Grupuri de studiu — each is a FORUM TOPIC (its own posts + members,
 //     created from the composer by choosing the "Grup" type; the creator
 //     picks one of 30 animated icons and manages membership)
-//   • Evenimente (admin-gated) + Insigne
+//   • Insigne
 // Content is Romanian; identifiers stay English. Replace with Supabase later.
 // =========================================================
 import { userById, initials, avatarColor } from "./community-data.js";
@@ -266,11 +266,6 @@ export const EVENTS = [
   { id: 3, title: "Club de lectură: «Enigma Otiliei»", kind: "reading", when: "vineri, 20:00", host: "Clubul de lectură", going: true },
   { id: 4, title: "Q&A: pregătirea pentru Evaluarea Națională", kind: "live", when: "duminică, 11:00", host: "prof. Radu", going: false },
 ];
-export const EVENT_KINDS = {
-  live: { label: "Live", color: "#db2777", icon: "🔴" },
-  quiz: { label: "Quiz", color: "#2563eb", icon: "❓" },
-  reading: { label: "Lectură", color: "#16a34a", icon: "📖" },
-};
 
 // ---------- Badges ----------
 export const BADGES = [

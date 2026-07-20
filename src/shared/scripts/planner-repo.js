@@ -51,7 +51,7 @@ export async function fetchWeek(from = weekStart()) {
   to.setDate(to.getDate() + 7);
   const { data, error } = await supabase
     .from("tutoring_slots")
-    .select("id, user_id, starts_at, ends_at, note, status, kind, title, profiles!tutoring_slots_user_id_fkey(display_name, avatar_color)")
+    .select("id, user_id, starts_at, ends_at, note, status, kind, title, recurrence_id, profiles!tutoring_slots_user_id_fkey(display_name, avatar_color)")
     .eq("status", "booked")
     .gte("starts_at", from.toISOString())
     .lt("starts_at", to.toISOString())
@@ -71,6 +71,7 @@ export async function fetchWeek(from = weekStart()) {
       id: r.id,
       userId: r.user_id,
       kind: r.kind || "lesson",
+      recurrenceId: r.recurrence_id || null,
       mine,
       name: label,
       color: personal
@@ -86,7 +87,7 @@ export async function fetchWeek(from = weekStart()) {
 
 /** Book. Returns { ok } or { ok:false, message } — never throws for a clash,
  *  because a clash isn't exceptional, it's Tuesday. */
-export async function bookSlot({ startMs, minutes, userId = null, note = "", kind = "lesson", title = "" }) {
+export async function bookSlot({ startMs, minutes, userId = null, note = "", kind = "lesson", title = "", recurrenceId = null }) {
   // A personal block belongs to whoever is placing it — the teacher.
   const uid = kind === "personal" ? CURRENT_USER.authId : (userId || CURRENT_USER.authId);
   if (!uid) return { ok: false, message: "Trebuie să fii autentificat." };
@@ -101,6 +102,7 @@ export async function bookSlot({ startMs, minutes, userId = null, note = "", kin
       note: note || null,
       kind,
       title: kind === "personal" ? (title || "Activitate personală") : null,
+      recurrence_id: recurrenceId,
       created_by: CURRENT_USER.authId,
     })
     .select("id")
@@ -152,16 +154,111 @@ export async function hasPlannerAccess() {
   return !!data;
 }
 
-/** The teacher needs the list of marked pupils to book on their behalf. */
+/** The teacher's pupils, with his own customisations layered over the profile:
+ *  the nickname he gave them, the colour he picked, their default duration.
+ *  Empty customisation falls back to the profile — so a freshly marked pupil
+ *  looks sensible before the teacher touches anything. */
 export async function fetchMarkedPupils() {
   if (!isAdmin()) return [];
   const { data, error } = await supabase
     .from("event_access")
-    .select("user_id, profiles!event_access_user_id_fkey(display_name, avatar_color)");
+    .select("user_id, planner_name, planner_color, planner_minutes, profiles!event_access_user_id_fkey(display_name, avatar_color)");
   if (error) { console.warn("fetchMarkedPupils:", error.message); return []; }
   return (data || []).map((r) => ({
     id: r.user_id,
-    name: r.profiles?.display_name || "Membru",
-    color: r.profiles?.avatar_color || "#7c3aed",
+    name: r.planner_name || r.profiles?.display_name || "Membru",
+    profileName: r.profiles?.display_name || "Membru",
+    color: r.planner_color || r.profiles?.avatar_color || "#7c3aed",
+    minutes: r.planner_minutes || DEFAULT_DURATION,
   })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
+}
+
+/** The teacher customises a pupil's chip. Nulls mean „back to the profile". */
+export async function savePupilPrefs(userId, { name, color, minutes }) {
+  const { error } = await supabase
+    .from("event_access")
+    .update({
+      planner_name: name?.trim() || null,
+      planner_color: color || null,
+      planner_minutes: DURATIONS.includes(minutes) ? minutes : DEFAULT_DURATION,
+    })
+    .eq("user_id", userId);
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+/** A pupil's own defaults: their duration and colour, as the teacher set them. */
+export async function fetchMyPlannerPrefs() {
+  if (!CURRENT_USER.authId) return { minutes: DEFAULT_DURATION, color: null };
+  const { data } = await supabase
+    .from("event_access")
+    .select("planner_minutes, planner_color")
+    .eq("user_id", CURRENT_USER.authId).maybeSingle();
+  return {
+    minutes: data?.planner_minutes || DEFAULT_DURATION,
+    color: data?.planner_color || null,
+  };
+}
+
+// ---- vacations ----
+// Informative, not blocking: recurring series skip them, manual bookings during
+// one are allowed — that's the „unii vor, alții nu" split, resolved.
+export async function fetchVacations() {
+  const { data, error } = await supabase
+    .from("planner_vacations")
+    .select("id, starts_on, ends_on, label")
+    .order("starts_on");
+  if (error) { console.warn("fetchVacations:", error.message); return []; }
+  return (data || []).map((v) => ({
+    id: v.id, from: v.starts_on, to: v.ends_on, label: v.label || "Vacanță",
+  }));
+}
+
+export async function saveVacation({ from, to, label }) {
+  const { error } = await supabase
+    .from("planner_vacations")
+    .insert({ starts_on: from, ends_on: to, label: label?.trim() || null });
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+export async function deleteVacation(id) {
+  const { error } = await supabase.from("planner_vacations").delete().eq("id", id);
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+// ---- recurring series ----
+
+/** Book the same hour weekly, `weeks` times, as REAL rows sharing one
+ *  recurrence_id. Materialised on purpose: each occurrence can then be moved or
+ *  cancelled on its own, and the exclusion constraint guards each one with no
+ *  new machinery. Occurrences that fall in a vacation are skipped by design
+ *  (the weekly rhythm pauses); occurrences that clash are skipped because the
+ *  database refuses them. Both are counted and reported, not hidden. */
+export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vacations = [] }) {
+  const recurrenceId = crypto.randomUUID();
+  const WEEK = 7 * 86400000;
+  let created = 0, inVacation = 0, clashed = 0;
+  for (let w = 0; w < weeks; w++) {
+    const at = startMs + w * WEEK;
+    const dayIso = new Date(at).toISOString().slice(0, 10);
+    if (vacations.some((v) => dayIso >= v.from && dayIso <= v.to)) { inVacation++; continue; }
+    const r = await bookSlot({ startMs: at, minutes, userId, recurrenceId });
+    if (r.ok) created++;
+    else if (r.code === "23P01") clashed++;
+    else return { ok: false, message: r.message, created, inVacation, clashed };
+  }
+  return { ok: created > 0, created, inVacation, clashed, recurrenceId };
+}
+
+/** Cancel every FUTURE occurrence of a series. The past stays — it happened. */
+export async function cancelSeries(recurrenceId) {
+  const { error } = await supabase
+    .from("tutoring_slots")
+    .update({ status: "cancelled" })
+    .eq("recurrence_id", recurrenceId)
+    .gte("starts_at", new Date().toISOString());
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
 }
