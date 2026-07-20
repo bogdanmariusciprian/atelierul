@@ -53,7 +53,8 @@ const S = {
   slots: [],
   pupils: [],
   minutes: DEFAULT_DURATION,
-  who: null,          // teacher only: whose block is being placed
+  source: null,       // the tray chip picked up: { kind, userId, name, color }
+  personalTitle: "",  // what a personal block is called, typed in the tray
   drag: null,         // { id?, dayIdx, startMs, minutes, ghost }
   unwatch: null,
   loading: true,
@@ -109,12 +110,6 @@ function headerHtml() {
     <button type="button" class="pl-dur${S.minutes === m ? " on" : ""}" data-act="dur" data-m="${m}">
       ${esc(durLabel(m))}
     </button>`).join("");
-  const whoPicker = isAdmin() && S.pupils.length ? `
-    <label class="pl-who">Pentru
-      <select data-act="who">
-        ${S.pupils.map((p) => `<option value="${esc(p.id)}"${S.who === p.id ? " selected" : ""}>${esc(p.name)}</option>`).join("")}
-      </select>
-    </label>` : "";
   return `
     <div class="pl-bar">
       <div class="pl-nav">
@@ -124,8 +119,38 @@ function headerHtml() {
         <button type="button" class="pl-today" data-act="today">Săptămâna asta</button>
       </div>
       <div class="pl-tools">
-        <span class="pl-dur__lab">Durata</span>${durs}${whoPicker}
+        <span class="pl-dur__lab">Durata</span>${durs}
       </div>
+    </div>
+    ${trayHtml()}`;
+}
+
+/** THE TRAY — where blocks come from.
+ *  A block is either a lesson with one pupil, or the teacher's own time. Two
+ *  different things, so two different things to pick up: the tray makes that
+ *  visible instead of hiding it behind a dropdown you have to remember to set.
+ *  A pupil sees a single chip — their own — which also makes the gesture
+ *  self-explanatory: this is the thing you drag. */
+function trayHtml() {
+  const chips = isAdmin()
+    ? S.pupils.map((p) => `
+        <button type="button" class="pl-chip" data-act="pick" data-kind="lesson"
+                data-uid="${esc(p.id)}" style="--c:${esc(p.color)}">
+          <i class="pl-chip__dot"></i>${esc(p.name)}
+        </button>`).join("")
+      + `<span class="pl-tray__sep" aria-hidden="true"></span>
+         <button type="button" class="pl-chip pl-chip--personal" data-act="pick" data-kind="personal" style="--c:#475569">
+           <i class="pl-chip__dot"></i>${esc(S.personalTitle || "Activitate personală")}
+         </button>
+         <input class="pl-tray__name" data-act="ptitle" maxlength="40"
+                placeholder="denumește activitatea" value="${esc(S.personalTitle)}" />`
+    : `<button type="button" class="pl-chip" data-act="pick" data-kind="lesson"
+               data-uid="${esc(CURRENT_USER.authId || "")}" style="--c:${esc(CURRENT_USER.color || "#7c3aed")}">
+         <i class="pl-chip__dot"></i>Ora mea
+       </button>`;
+  return `<div class="pl-tray">
+      <b class="pl-tray__t">${isAdmin() ? "Trage un bloc în calendar" : "Trage-ți ora în ziua care îți convine"}</b>
+      <div class="pl-tray__row">${chips}</div>
     </div>`;
 }
 
@@ -146,7 +171,7 @@ function gridHtml() {
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
-      return `<div class="pl-block${s.mine ? " is-mine" : ""}${s.canEdit ? " can-edit" : ""}${over ? " is-past" : ""}"
+      return `<div class="pl-block${s.mine ? " is-mine" : ""}${s.canEdit ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}"
         style="--c:${esc(s.color)}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
         data-id="${esc(s.id)}" data-day="${i}" ${s.canEdit ? 'data-act="grab"' : ""}>
         <b class="pl-block__who">${esc(s.name)}</b>
@@ -200,8 +225,9 @@ function updateGhost() {
   g.style.transform = `translateY(${msToRow(startMs) * ROW_PX}px)`;
   g.style.height = `${(minutes / SNAP_MIN) * ROW_PX - 3}px`;
   g.classList.toggle("is-bad", !!bad);
+  const who = S.drag.id ? "" : sourceLabel();
   g.innerHTML = `<b>${esc(DAYS[dayIdx])}</b><span>${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}</span>
-    ${bad ? `<i>ocupat</i>` : ""}`;
+    ${who ? `<em>${esc(who)}</em>` : ""}${bad ? `<i>ocupat</i>` : ""}`;
   const live = S.root.querySelector('[data-role="live"]');
   if (live) {
     live.hidden = false;
@@ -209,6 +235,16 @@ function updateGhost() {
       ? `${DAYS[dayIdx]} ${hhmm(startMs)} — ocupat`
       : `${DAYS[dayIdx]}, ${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}`;
   }
+}
+
+/** Whose block is being placed — shown on the ghost, so you never drop the
+ *  wrong person's hour into the wrong day and find out afterwards. */
+function sourceLabel() {
+  const s = S.source;
+  if (!s) return "";
+  if (s.kind === "personal") return s.title || "Activitate personală";
+  if (!isAdmin()) return "Ora mea";
+  return S.pupils.find((p) => p.id === s.userId)?.name || "Elev";
 }
 
 function placeGhost(lane) {
@@ -238,34 +274,53 @@ function pointToSlot(clientX, clientY) {
 
 function onDown(e) {
   if (!isLoggedIn()) return;
+  const chip = e.target.closest('[data-act="pick"]');
   const grab = e.target.closest('[data-act="grab"]');
   const lane = e.target.closest(".pl-lane");
-  if (!lane && !grab) return;
+  if (!chip && !lane && !grab) return;
   if (e.target.closest('[data-act="cancel"]')) return;   // the × is not a handle
 
   const existing = grab ? S.slots.find((s) => s.id === grab.dataset.id) : null;
   if (grab && !existing?.canEdit) return;
 
+  // Picked up from the tray: remember WHAT is being placed. Everything after
+  // this point is the same drag, whether it started on a chip or in the grid.
+  if (chip) {
+    S.source = {
+      kind: chip.dataset.kind || "lesson",
+      userId: chip.dataset.uid || null,
+      title: chip.dataset.kind === "personal" ? (S.personalTitle || "Activitate personală") : "",
+    };
+    chip.classList.add("is-held");
+  } else if (!existing) {
+    // Dragging in empty space still works, using whatever the tray last held —
+    // or, for a pupil, simply their own hour.
+    S.source = S.source || { kind: "lesson", userId: isAdmin() ? S.pupils[0]?.id || null : null, title: "" };
+  }
+
   const minutes = existing ? Math.round((existing.end - existing.start) / 60000) : S.minutes;
+  // A drag that begins on a chip has no lane under it yet; the ghost is born on
+  // the first move that reaches the grid.
   const host = grab ? grab.closest(".pl-lane") : lane;
-  const { dayIdx, row } = pointToSlot(e.clientX, e.clientY);
+  const { dayIdx, row } = chip ? { dayIdx: 0, row: 0 } : pointToSlot(e.clientX, e.clientY);
   // Grabbing an existing block keeps the offset under the finger, so it doesn't
   // jump so its top edge snaps to the cursor.
   const offsetRows = existing ? msToRow(existing.start) - pointToSlot(e.clientX, e.clientY).row : 0;
 
   S.drag = {
     id: existing?.id || null,
+    fromTray: !!chip,
     minutes,
     dayIdx,
     offsetRows,
     startMs: rowToMs(dayIdx, Math.max(0, row + offsetRows)),
-    ghost: placeGhost(host),
+    ghost: host ? placeGhost(host) : null,
     moved: false,
   };
   if (existing) grab.classList.add("is-dragging");
   S.root.classList.add("is-dragging");
   e.preventDefault();
-  moveDrag(e.clientX, e.clientY);
+  if (host) moveDrag(e.clientX, e.clientY);
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp, { once: true });
   window.addEventListener("pointercancel", onUp, { once: true });
@@ -274,6 +329,7 @@ function onDown(e) {
 function moveDrag(x, y) {
   const { dayIdx, lane, row } = pointToSlot(x, y);
   const d = S.drag;
+  if (!d.ghost) { d.ghost = placeGhost(lane); d.dayIdx = dayIdx; } // came from the tray
   const maxRow = ROWS - d.minutes / SNAP_MIN;
   const r = Math.max(0, Math.min(maxRow, row + d.offsetRows));
   const startMs = rowToMs(dayIdx, r);
@@ -293,6 +349,7 @@ async function onUp() {
   S.drag = null;
   S.root.classList.remove("is-dragging");
   S.root.querySelector(".pl-block.is-dragging")?.classList.remove("is-dragging");
+  S.root.querySelector(".pl-chip.is-held")?.classList.remove("is-held");
   d?.ghost?.remove();
   const live = S.root.querySelector('[data-role="live"]');
   if (live) live.hidden = true;
@@ -303,7 +360,12 @@ async function onUp() {
   const label = `${DAYS[d.dayIdx]}, ${hhmm(d.startMs)}–${hhmm(d.startMs + d.minutes * 60000)}`;
   const res = d.id
     ? await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes })
-    : await bookSlot({ startMs: d.startMs, minutes: d.minutes, userId: isAdmin() ? S.who : null });
+    : await bookSlot({
+        startMs: d.startMs, minutes: d.minutes,
+        userId: isAdmin() ? S.source?.userId : null,
+        kind: S.source?.kind || "lesson",
+        title: S.source?.title || "",
+      });
 
   if (!res.ok) { showToast(res.message); await refresh(); return; }
   showToast(d.id ? `Mutat: ${label}` : `Rezervat: ${label}`, { kind: "success" });
@@ -339,8 +401,13 @@ function onClick(e) {
   }
 }
 
-function onChangeSel(e) {
-  if (e.target.matches('[data-act="who"]')) S.who = e.target.value;
+function onTypeTitle(e) {
+  if (!e.target.matches('[data-act="ptitle"]')) return;
+  S.personalTitle = e.target.value.trim();
+  // Only the chip's label needs to follow along; re-rendering the whole panel
+  // would take the focus out of the field mid-word.
+  const chip = S.root.querySelector(".pl-chip--personal");
+  if (chip) chip.lastChild.textContent = S.personalTitle || "Activitate personală";
 }
 
 /** Mount the planner into `mount`. Returns a teardown. */
@@ -360,16 +427,13 @@ export async function initPlanner(mount) {
     return () => {};
   }
 
-  if (isAdmin()) {
-    S.pupils = await fetchMarkedPupils();
-    S.who = S.pupils[0]?.id || null;
-  }
+  if (isAdmin()) S.pupils = await fetchMarkedPupils();
   render();
   await refresh();
 
   mount.addEventListener("pointerdown", onDown);
   mount.addEventListener("click", onClick);
-  mount.addEventListener("change", onChangeSel);
+  mount.addEventListener("input", onTypeTitle);
   // Someone else's booking lands on screen without a reload — which is how most
   // collisions are avoided rather than merely handled.
   S.unwatch = watchSlots(() => { if (!S.drag) refresh(); });
@@ -378,7 +442,7 @@ export async function initPlanner(mount) {
     S.unwatch?.();
     mount.removeEventListener("pointerdown", onDown);
     mount.removeEventListener("click", onClick);
-    mount.removeEventListener("change", onChangeSel);
+    mount.removeEventListener("input", onTypeTitle);
     window.removeEventListener("pointermove", onMove);
   };
 }

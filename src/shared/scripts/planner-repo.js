@@ -51,7 +51,7 @@ export async function fetchWeek(from = weekStart()) {
   to.setDate(to.getDate() + 7);
   const { data, error } = await supabase
     .from("tutoring_slots")
-    .select("id, user_id, starts_at, ends_at, note, status, profiles!tutoring_slots_user_id_fkey(display_name, avatar_color)")
+    .select("id, user_id, starts_at, ends_at, note, status, kind, title, profiles!tutoring_slots_user_id_fkey(display_name, avatar_color)")
     .eq("status", "booked")
     .gte("starts_at", from.toISOString())
     .lt("starts_at", to.toISOString())
@@ -61,13 +61,21 @@ export async function fetchWeek(from = weekStart()) {
   const admin = isAdmin();
   return (data || []).map((r) => {
     const mine = r.user_id === CURRENT_USER.authId;
+    const personal = r.kind === "personal";
+    // A personal block is the teacher's own time. To a pupil it is simply an
+    // hour that isn't available — they have no business knowing what it holds.
+    const label = personal
+      ? (admin ? (r.title || "Activitate personală") : "Ocupat")
+      : mine ? "Tu" : admin ? (r.profiles?.display_name || "Membru") : "Ocupat";
     return {
       id: r.id,
       userId: r.user_id,
+      kind: r.kind || "lesson",
       mine,
-      // Only the teacher sees other people's names.
-      name: mine ? "Tu" : admin ? (r.profiles?.display_name || "Membru") : "Ocupat",
-      color: mine || admin ? (r.profiles?.avatar_color || "#7c3aed") : "#94a3b8",
+      name: label,
+      color: personal
+        ? (admin ? "#475569" : "#94a3b8")
+        : mine || admin ? (r.profiles?.avatar_color || "#7c3aed") : "#94a3b8",
       start: new Date(r.starts_at).getTime(),
       end: new Date(r.ends_at).getTime(),
       note: mine || admin ? (r.note || "") : "",
@@ -78,8 +86,9 @@ export async function fetchWeek(from = weekStart()) {
 
 /** Book. Returns { ok } or { ok:false, message } — never throws for a clash,
  *  because a clash isn't exceptional, it's Tuesday. */
-export async function bookSlot({ startMs, minutes, userId = null, note = "" }) {
-  const uid = userId || CURRENT_USER.authId;
+export async function bookSlot({ startMs, minutes, userId = null, note = "", kind = "lesson", title = "" }) {
+  // A personal block belongs to whoever is placing it — the teacher.
+  const uid = kind === "personal" ? CURRENT_USER.authId : (userId || CURRENT_USER.authId);
   if (!uid) return { ok: false, message: "Trebuie să fii autentificat." };
   const starts = new Date(startMs);
   const ends = new Date(startMs + minutes * 60000);
@@ -90,6 +99,8 @@ export async function bookSlot({ startMs, minutes, userId = null, note = "" }) {
       starts_at: starts.toISOString(),
       ends_at: ends.toISOString(),
       note: note || null,
+      kind,
+      title: kind === "personal" ? (title || "Activitate personală") : null,
       created_by: CURRENT_USER.authId,
     })
     .select("id")

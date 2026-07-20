@@ -18,9 +18,3 @@
    resolves, so the real site never flashes. Fail-closed: with JS disabled the
    page stays blank. Remove this rule (and the gate) at public launch. */
 html:not(.gate-ready) body { visibility: hidden; }
-
-/* „Meditații" în meniu: ascuns până când știm că are acces (site-chrome.js pune
-   .has-planner pe body). Ascunderea prin CSS, nu prin re-randare, ține meniul
-   în pas cu schimbarea de rol fără să redesenăm nimic. */
-.nav-planner-only { display: none; }
-body.has-planner .nav-planner-only { display: revert; }

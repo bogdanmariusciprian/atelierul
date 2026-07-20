@@ -45,10 +45,6 @@ const NAV_LINKS = [
   { label: "Atelier", href: "comunitate/#forum", title: "Forumul și comunitatea" },
   // The community LANDING is a sales pitch — pointless once you're in.
   { label: "Comunitate", href: "comunitate/descopera/", title: "Ce primești ca membru", guestOnly: true },
-  // The tutoring planner is invitation-only: the teacher, and the pupils he has
-  // marked. Hidden from everyone else — a link that leads to „nu ai acces" is
-  // worse than no link. `plannerOnly` is resolved in renderNav.
-  { label: "Meditații", href: "meditatii/", title: "Îți alegi ora de meditație", plannerOnly: true },
   // The account slot at the end is ROLE-AWARE (initNavUser): guests get the
   // "Intră în cont" button, members get their identity chip (name + XP).
 ];
@@ -92,7 +88,7 @@ export async function renderChrome(basePath = "") {
   safe(() => initMessenger(basePath), "messenger"); // floating 💬 Messenger + guest contact
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
-  safe(revealPlannerLink, "plannerLink"); // show „Meditații" to those who have it
+  safe(addPlannerLink, "plannerLink"); // „Meditații" — added only if allowed
   if (!window.__identityCacheOn) {
     window.__identityCacheOn = true;
     window.addEventListener("atelier:role", cacheIdentity);
@@ -199,14 +195,34 @@ function initGuestOneTap() {
   });
 }
 
-// „Meditații" is invitation-only. The nav renders it hidden and this switches
-// it on once we know the account is either the teacher or a marked pupil — one
-// small query, after the chrome is already on screen, so nothing waits for it.
-async function revealPlannerLink() {
+// „Meditații" is invitation-only, and the link is not merely HIDDEN — it is
+// never written into the page unless the account has access. Hiding it with CSS
+// would have left it sitting in the markup for anyone who opened the inspector,
+// and a class on <body> is one line away from being switched on by hand.
+//
+// To be clear about what this does and doesn't buy: not rendering the link
+// stops it being FOUND. It does not stop anyone typing /meditatii/ into the
+// address bar, and it never could — that's a static page, servable to anyone.
+// The actual guarantee is elsewhere and is not cosmetic: every policy on
+// tutoring_slots is gated by has_planner_access(), so an uninvited account
+// loading that page gets an empty grid and cannot write a row. The link is
+// tidiness; the database is the boundary.
+async function addPlannerLink() {
   if (!isLoggedIn()) return;
   try {
     const { hasPlannerAccess } = await import("../scripts/planner-repo.js");
-    if (await hasPlannerAccess()) document.body.classList.add("has-planner");
+    if (!(await hasPlannerAccess())) return;
+    const nav = document.querySelector(".main-nav");
+    if (!nav || nav.querySelector('[data-label="Meditații"]')) return;
+    const a = document.createElement("a");
+    a.href = "/meditatii/";
+    a.textContent = "Meditații";
+    a.title = "Îți alegi ora de meditație";
+    a.dataset.label = "Meditații";
+    if (canonicalPath("/meditatii/") === canonicalPath(window.location.pathname)) {
+      a.setAttribute("aria-current", "page");
+    }
+    nav.appendChild(a);
   } catch (e) {
     console.warn("[chrome] planner link:", e);
   }
@@ -574,11 +590,7 @@ function renderHeader(basePath) {
   const links = NAV_LINKS.map((link) => {
     // guest-only links are hidden via CSS once body.is-logged is set —
     // so the nav reacts live to the 🎭 role switch, no re-render needed.
-    // Same trick for the planner: rendered hidden, revealed by a body class the
-    // moment we know the account has access. Doing it in CSS rather than by
-    // re-rendering keeps the nav in step with the 🎭 role switch for free.
-    const cls = link.guestOnly ? ' class="nav-guest-only"'
-      : link.plannerOnly ? ' class="nav-planner-only"' : "";
+    const cls = link.guestOnly ? ' class="nav-guest-only"' : "";
     // Absolute paths from the domain root — robust with clean URLs and no
     // longer dependent on how deep the current page is (basePath).
     const href = "/" + link.href; // "Acasă" → "/", "despre/" → "/despre/", …
