@@ -58,7 +58,7 @@
 // so each hop was a fraction of the last and it looked like it was landing in
 // treacle. Thin the air and the same restitution suddenly gives a long, even
 // run of bounces — 260, 142, 80, 46, 27… — which is what a real ball does.
-const G = 1250;          // px/s² — it falls, it doesn't sink
+const G = 950;           // px/s² — it falls, it doesn't sink
 const WALL_REST = 0.86;
 const FLOOR_REST = 0.80; // a real football returns about 60% of drop height
 // Air resistance, both regimes of it. Real drag is a·v + b·v²: the linear term
@@ -67,7 +67,7 @@ const FLOOR_REST = 0.80; // a real football returns about 60% of drop height
 // decay — what was here before — is only ever the first, so it braked the slow
 // ball too hard and the fast one not nearly enough.
 const AIR_LIN = 0.10;    // 1/s
-const AIR_SQ = 1.2e-3;   // 1/px — terminal speed √(G/AIR_SQ) ≈ 1020px/s
+const AIR_SQ = 1.2e-3;   // 1/px — terminal speed √(G/AIR_SQ) ≈ 890px/s
 // Rolling resistance is NOT drag. It comes from the skin flexing at the contact
 // patch, so it's proportional to the weight pressing down, not to speed: a
 // constant deceleration that brings the ball to a real stop instead of an
@@ -167,9 +167,9 @@ const WAKE_EASE = 3.2;   // how fast the breathing fades in and out, per second
 // along the ground toward you. That threshold is the honest version of what
 // used to be a fudge, and it reads better: the ball is visibly deciding.
 const MAG_R = 320;       // px — the field's reach
-const MAG_A = 3.2e7;     // px³/s² — strength; a = A/(d²+s²). Raised with the
-                         // ball's weight: the field still has to beat gravity,
-                         // and gravity nearly tripled.
+const MAG_A = 3.2e7;     // px³/s² — strength; a = A/(d²+s²). Sized against the
+                         // ball's weight: the field has to beat gravity, and
+                         // wins from about 175px out.
 const MAG_SOFT = 42;     // px — softening, so the centre isn't a singularity
 const MAG_MAX = 7000;    // px/s² — cap, roughly six times gravity
 const MAG_EDDY = 2.2;    // 1/s of drag near the field, like eddy currents
@@ -181,7 +181,7 @@ const MAG_EDDY = 2.2;    // 1/s of drag near the field, like eddy currents
 // below the pointer — exactly where the hold balances gravity, which is the
 // sag a real hanging magnet has.
 const MAG_GRAB = 34;     // px
-const MAG_GRAB_K = 78;   // 1/s² of centring — same ~16px sag under a heavier ball
+const MAG_GRAB_K = 78;   // 1/s² of centring — the ball hangs ~12px below the cursor
 const MAG_GRAB_C = 22;   // 1/s of damping while held
 
 const reduceMotion = () =>
