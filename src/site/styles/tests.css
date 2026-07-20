@@ -625,31 +625,78 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   width: 124px; height: 124px; border-radius: 50%;
   display: grid; place-items: center;
   padding: 0; overflow: hidden;
-  background:
-    radial-gradient(circle at 34% 28%, color-mix(in srgb, #fff 38%, transparent), transparent 58%),
-    var(--cat-color);
+  background: var(--cat-color);
   color: #fff; text-decoration: none; text-align: center;
   font-weight: 800; user-select: none;
   box-shadow: 0 12px 26px -10px var(--cat-color), inset 0 -8px 18px -10px rgba(0, 0, 0, 0.45);
   will-change: transform;
   /* Depth for the roll. Without it, rotateY is an affine squeeze; with it, the
      near edge grows and the far edge shrinks, and the surface curves. */
-  perspective: 460px;
+  perspective: 340px;
   /* Size and shape are CSS transitions; travel and squash are JS. Keeping them
      on separate properties means they can never fight each other. */
   transition: width 0.3s cubic-bezier(0.34, 1.3, 0.64, 1),
               height 0.3s cubic-bezier(0.34, 1.3, 0.64, 1),
               border-radius 0.3s ease, box-shadow 0.3s ease;
 }
-/* Carries only the spin, so the squash above stays on world axes.
-   `backface-visibility: hidden` is what makes the label disappear round the
-   back of the ball instead of showing through mirror-imaged — the whole point
-   of rolling in 3D rather than just turning a flat disc. */
+/* THE GLOBE. Its children are letters standing on the sphere's surface, so it
+   has to keep them in the same 3D space — `preserve-3d`. Drop that and the
+   browser flattens every child into the parent's plane and the ball collapses
+   into a smear. JS spins this element; nothing else may write to its transform. */
+.tcat__ball__globe {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+/* One letter, lying flat ON the sphere at azimuth --th and latitude --ph.
+   rotateY→rotateX→translateZ, in that order: turn to face the right way round,
+   tip to the right height, then push out to the surface. Reverse the order and
+   the letter ends up in the right place but facing the wrong way.
+   `backface-visibility: hidden` retires it while it's round the back — without
+   it you'd read the word mirror-imaged through the ball. */
+.tcat__ball__l {
+  position: absolute;
+  transform: rotateY(var(--th, 0deg)) rotateX(var(--ph, 0deg)) translateZ(54px);
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  font-size: 0.82rem; letter-spacing: 0.01em;
+  transition: transform 0.35s ease, opacity 0.25s ease;
+}
+.tcat__ball__l.is-sep { opacity: 0.45; }
+
+/* The lighting, laid over the letters rather than under them — that's what
+   makes type at the silhouette darken as it curves away, which is most of what
+   sells a sphere. A highlight up and left, shadow round the rim. */
+.tcat__ball__shade {
+  position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background:
+    radial-gradient(circle at 34% 27%, rgba(255, 255, 255, 0.42), transparent 46%),
+    radial-gradient(circle at 50% 50%, transparent 52%, rgba(0, 0, 0, 0.34) 100%);
+  transition: opacity 0.3s ease;
+}
+
+/* The flat face: nothing while it's a ball, everything once it opens. */
 .tcat__ball__in {
+  position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 0.45rem;
   padding: 0 0.9rem;
-  backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.tcat__tank.is-open .tcat__ball__in,
+.tcat__tank.is-still .tcat__ball__in { opacity: 1; pointer-events: auto; }
+/* Open, the sphere flattens: the decorative second lap and the separators go
+   away, and the one real copy of the word lies down as ordinary type. */
+.tcat__tank.is-open .tcat__ball__shade,
+.tcat__tank.is-still .tcat__ball__shade { opacity: 0; }
+.tcat__tank.is-open .tcat__ball__l.is-sep,
+.tcat__tank.is-open .tcat__ball__l[data-r="1"],
+.tcat__tank.is-still .tcat__ball__globe { display: none; }
+.tcat__tank.is-open .tcat__ball__globe { align-content: start; padding-top: 1.15rem; }
+.tcat__tank.is-open .tcat__ball__l {
+  position: relative;
+  transform: none;
+  font-size: 1.05rem;
 }
 /* The cast shadow. A sibling, not a child: it must stay flat on the floor
    while the ball above it squashes, spins and flies. JS moves it and fades it
@@ -662,28 +709,7 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 }
 .tcat__tank.is-still .tcat__shadow { display: none; }
 
-.tcat__ball__face { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
 .tcat__ball__ic { font-size: 1.6rem; line-height: 1; }
-/* The word lives ON the surface. Each letter is pushed out along the radius
-   and turned to face along the curve (its --a comes from test-category.js), so
-   the row of letters bends like paint on a sphere instead of sitting flat in
-   front of it. `preserve-3d` is what keeps the children in the same 3D space
-   as the ball; without it the browser flattens them and the effect dies. */
-.tcat__ball__t {
-  display: flex; justify-content: center;
-  font-size: 0.95rem; white-space: nowrap;
-  transform-style: preserve-3d;
-}
-.tcat__ball__l {
-  display: inline-block;
-  transform: rotateY(var(--a, 0deg)) translateZ(30px);
-  backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  transition: transform 0.35s ease;
-}
-/* Pointed at, the word peels off the sphere and lies flat, so it reads as
-   ordinary type exactly when you want to read it. */
-.tcat__tank.is-open .tcat__ball__l,
-.tcat__tank.is-still .tcat__ball__l { transform: none; }
 /* Folded away while it's a ball. */
 .tcat__ball__more {
   max-height: 0; opacity: 0; overflow: hidden;

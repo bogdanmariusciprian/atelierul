@@ -62,6 +62,12 @@ const V_REF = 420;       // the speed that produces the FULL squash
 const V_DENT = 52;       // …and the speed under which it doesn't dent at all
 const BULGE = 0.8;
 const IDLE_HZ = 0.45, IDLE_AMP = 0.026;
+
+// The globe is tipped a few degrees toward the viewer, which turns the band of
+// letters from a straight ring into an ellipse on screen. That ellipse is the
+// clearest signal the eye gets that it is looking at a sphere. Pointed at, the
+// tilt eases to zero and the word comes level to be read.
+const GLOBE_TILT = -14;
 const WAKE_EASE = 3.2;   // how fast the breathing fades in and out, per second
 
 // The magnet. Not a constant pull but a spring whose stiffness rises as the
@@ -79,9 +85,9 @@ const reduceMotion = () =>
 /** Start the float. Returns a stop() that undoes everything it hooked up. */
 export function initFloatingPlay(tank) {
   const ball = tank?.querySelector(".tcat__ball");
-  const inner = tank?.querySelector(".tcat__ball__in");
+  const globe = tank?.querySelector(".tcat__ball__globe");
   const shadow = tank?.querySelector(".tcat__shadow");
-  if (!tank || !ball || !inner) return () => {};
+  if (!tank || !ball || !globe) return () => {};
 
   if (reduceMotion() || !window.matchMedia("(min-width: 981px)").matches) {
     tank.classList.add("is-still");
@@ -93,6 +99,7 @@ export function initFloatingPlay(tank) {
     vx: 190 * (Math.random() < 0.5 ? -1 : 1),
     vy: 0,
     spin: 0,                // degrees turned about the vertical axis
+    tilt: GLOBE_TILT,       // how far the globe is tipped, eased to 0 on hover
     d: 0, dv: 0, axis: "y", // jelly: deformation, its velocity, which way
     t: Math.random() * 10,
     grounded: false,
@@ -142,7 +149,10 @@ export function initFloatingPlay(tank) {
     const sy = S.axis === "x" ? 1 + d * BULGE : 1 - d;
     ball.style.transform =
       `translate3d(${S.x.toFixed(1)}px, ${S.y.toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
-    inner.style.transform = `rotateY(${S.spin.toFixed(2)}deg)`;
+    // Tilt first, then spin: the letters turn about the sphere's own axis,
+    // and that axis is what leans toward the viewer. The other order would
+    // wobble the axis itself, like a top about to fall.
+    globe.style.transform = `rotateX(${S.tilt.toFixed(2)}deg) rotateY(${S.spin.toFixed(2)}deg)`;
 
     // The cast shadow is the other half of „weight": it tightens and darkens as
     // the ball nears the floor, spreads and fades as it rises. Without it, a
@@ -237,6 +247,7 @@ export function initFloatingPlay(tank) {
 
     // Rolling without slipping: turn = distance ÷ radius. Pointed at, the spin
     // eases to zero by the shortest way round, so the word comes to face you.
+    S.tilt += ((S.hot ? 0 : GLOBE_TILT) - S.tilt) * Math.min(1, SPIN_HOVER * dt);
     if (S.hot) {
       const target = Math.round(S.spin / 360) * 360;
       S.spin += (target - S.spin) * Math.min(1, SPIN_HOVER * dt);

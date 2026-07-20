@@ -159,18 +159,43 @@ function downloadList() {
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
 }
 
-// „Exersează", painted onto the ball instead of laid in front of it: every
-// letter is pushed out to the surface (translateZ) and turned to face along it
-// (rotateY), so the word curves with the sphere. The spin then carries the
-// outer letters past the edge, where backface-visibility hides them — the word
-// wraps around the back and comes round again, which is the whole 3D illusion.
-// Hovering flattens all of it back to ordinary text; see tests.css.
-function ballWord(word) {
-  const ch = [...word];
-  const STEP = 13; // degrees between neighbours — the curvature of the word
-  return ch.map((c, i) => {
-    const a = (i - (ch.length - 1) / 2) * STEP;
-    return `<span class="tcat__ball__l" style="--a:${a.toFixed(1)}deg">${esc(c)}</span>`;
+// „Exersează" printed onto a sphere, the way it would be printed on a real
+// ball: around the equator, twice, so there is always some of it facing you.
+//
+// THE MATH. A point on a sphere of radius R, at azimuth θ (around) and
+// latitude φ (up/down):
+//
+//     x = R·cos φ·sin θ      y = R·sin φ      z = R·cos φ·cos θ
+//
+// CSS can't take that triple directly, but `rotateY(θ) rotateX(−φ)
+// translateZ(R)` lands on exactly the same point — and, unlike a raw
+// translate3d, it also turns the glyph to lie FLAT ON the surface, tangent to
+// it, facing outward. That difference is everything: a translated letter stays
+// parallel to the screen and looks stuck on with tape; a rotated one belongs to
+// the curve.
+//
+// The word sits on the equator (φ = 0) with a gentle rise toward the middle of
+// each copy, so the line of type arcs like lettering on a beach ball instead of
+// running dead straight. The globe as a whole is then tilted a few degrees in
+// tests-float.js, which turns that equator into an ellipse on screen — the
+// single strongest cue that this is a sphere and not a ring.
+function ballGlobe(word, reps = 2) {
+  const chars = [];
+  for (let r = 0; r < reps; r++) {
+    for (const c of word) chars.push({ c, r });
+    chars.push({ c: "·", r, sep: true });
+  }
+  const n = chars.length;
+  const STEP = 360 / n; // evenly all the way round — no seam, no gap
+  return chars.map((it, i) => {
+    const theta = i * STEP;
+    // A shallow arc: highest in the middle of each copy of the word, level at
+    // the separators. ±5° of latitude is enough to read as curvature.
+    const phase = ((i * STEP) % (360 / reps)) / (360 / reps); // 0…1 within a copy
+    const phi = Math.sin(phase * Math.PI) * 5;
+    return `<span class="tcat__ball__l${it.sep ? " is-sep" : ""}" data-r="${it.r}"
+                  style="--th:${theta.toFixed(2)}deg; --ph:${phi.toFixed(2)}deg"
+                  ${it.r > 0 || it.sep ? 'aria-hidden="true"' : ""}>${esc(it.c)}</span>`;
   }).join("");
 }
 
@@ -210,12 +235,11 @@ function renderIntro() {
       <aside class="tcat__tank">
         ${cat.live
           ? `<span class="tcat__shadow" aria-hidden="true"></span>
-             <a class="tcat__ball" href="#joc">
+             <a class="tcat__ball" href="#joc" aria-label="Exersează — antrenament interactiv">
+               <span class="tcat__ball__globe">${ballGlobe("Exersează")}</span>
+               <span class="tcat__ball__shade" aria-hidden="true"></span>
                <span class="tcat__ball__in">
-                 <span class="tcat__ball__face">
-                   <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
-                   <span class="tcat__ball__t" aria-label="Exersează">${ballWord("Exersează")}</span>
-                 </span>
+                 <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
                  <span class="tcat__ball__more">
                    <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
                    explicație imediată. Cei greșiți revin până îi nimerești.
