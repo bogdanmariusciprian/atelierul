@@ -86,6 +86,8 @@ import { userMeta, badgeHtml } from "../../shared/scripts/badges.js";
 import { lessonHrefBySlug, lessonBySlug, LESSONS } from "../../shared/scripts/lessons-index.js";
 import { countNoun, plural } from "../../shared/scripts/format.js";
 
+import { fetchDashboard } from "../../shared/scripts/dashboard-repo.js";
+import { dashboardHtml } from "./admin-dashboard.js";
 // --- Small inline icons for the sidebar (single source, DRY) ----------
 const NAV_ICONS = {
   forum: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 20l1.4-4.2A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg>`,
@@ -277,6 +279,8 @@ export function renderCommunity(basePath = "") {
     profileWarn: null, // in the profile edit form
     // Admin dashboard.
     adminTab: "overview", // "overview" | "users" | "moderation" | "challenges" | "gamification"
+    dash: null,           // dashboard aggregates (server-side), null until loaded
+    dashSort: "-joined",  // members table: field, „-" prefix = descending
     adminUserQuery: "",
     adminUserSort: "points", // "points" | "name"
     adminUserPage: 1, // 10 per page
@@ -320,7 +324,10 @@ export function renderCommunity(basePath = "") {
   const unreadMsgCount = () => state.conversations.reduce((n, c) => n + (c.unread || 0), 0);
   // Deep links into a specific admin tab: #admin/moderare, #admin/utilizatori…
   // (used by the floating admin quick-panel, from any page of the site).
-  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification", bonus: "bonus", descarcabile: "downloads" };
+  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", dashboard: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification", bonus: "bonus", descarcabile: "downloads" };
+  // Reverse map for building links. „prezentare" is kept as an inbound alias so
+  // old bookmarks still land, but „dashboard" is listed after it and therefore
+  // wins here — outgoing links say the new name.
   const ADMIN_SLUG_BY_TAB = Object.fromEntries(Object.entries(ADMIN_TAB_BY_SLUG).map(([s, t]) => [t, s]));
   function applyAdminHash() {
     const h = location.hash.slice(1);
@@ -3026,59 +3033,9 @@ export function renderCommunity(basePath = "") {
       </div>`;
   }
 
+  // The dashboard. Everything above the gate comes from server-side aggregates
+  // (see dashboard-repo.js); the two boxes below it are controls, and stay.
   function adminTabOverview() {
-    const totalPosts = state.posts.length + state.groups.reduce((n, g) => n + g.posts.length, 0);
-
-    // The community's pulse: what happened TODAY + your last actions.
-    const dayStart = new Date().setHours(0, 0, 0, 0);
-    const postsToday = allPosts().filter((p) => (p.createdAt || 0) >= dayStart).length;
-    const proposalsToday = state.proposed.filter((e) => (e.createdAt || 0) >= dayStart).length;
-    const log = store.get("atelier_admin_log", []).slice(0, 8);
-    const pulse = `
-      <div class="cx-box">
-        <div class="cx-admin__head"><h3>Pulsul de azi</h3></div>
-        <div class="cx-pulse">
-          <span class="cx-pulse__stat"><b>${postsToday}</b> postări noi</span>
-          <span class="cx-pulse__stat"><b>${proposalsToday}</b> exerciții propuse</span>
-          <span class="cx-pulse__stat"><b>${state.heldContent.length}</b> de moderat</span>
-          <span class="cx-pulse__stat"><b>${state.contentReports.length}</b> rapoarte</span>
-          <span class="cx-pulse__stat"><b>${unreadMsgCount()}</b> mesaje necitite</span>
-        </div>
-        ${log.length
-          ? `<p class="cx-muted cx-pulse__logtitle">Ultimele tale acțiuni:</p>
-             <ul class="cx-pulse__log">${log
-               .map((l) => `<li><span class="cx-muted">${relTime(Math.max(0, Date.now() - l.t))}</span> ${escapeHtml(l.text)}</li>`)
-               .join("")}</ul>`
-          : ""}
-      </div>`;
-    const attention = [
-      { n: state.contentReports.length + state.heldContent.length, label: "de moderat", tab: "moderation" },
-      { n: state.proposed.filter((e) => e.status === "pending").length, label: "exerciții în așteptare", tab: "moderation" },
-    ].filter((a) => a.n > 0);
-    const attentionBox = attention.length
-      ? `<div class="cx-attention">
-           <b>⚠️ Necesită atenție</b>
-           ${attention
-             .map((a) => `<button type="button" class="cx-attention__item" data-action="admin-tab" data-id="${a.tab}"><b>${a.n}</b> ${a.label} →</button>`)
-             .join("")}
-         </div>`
-      : `<div class="cx-attention cx-attention--clear"><b>✅ Totul e în regulă</b> <span class="cx-muted">— nimic în așteptare.</span></div>`;
-
-    // Every number is a real door: it opens the place where you act on it.
-    const stats = [
-      { n: state.adminUsers.length, l: "utilizatori", tab: "users" },
-      { n: totalPosts, l: "postări", go: "forum" },
-      { n: state.groups.length, l: "grupuri", go: "grupuri" },
-      { n: state.proposed.length, l: "exerciții", go: "exercitii" },
-      { n: state.events.length, l: "evenimente", go: "evenimente" },
-    ]
-      .map(
-        (s) => `<button type="button" class="cx-adminstat" data-action="${s.tab ? "admin-tab" : "go"}" data-id="${s.tab || s.go}">
-          <b>${s.n}</b><span>${s.l}</span>
-        </button>`
-      )
-      .join("");
-
     const crud = [
       { label: "Postări", section: "forum", hint: "editezi/ștergi pe fiecare postare, din feed" },
       { label: "Grupuri", section: "grupuri", hint: "editezi/ștergi în pagina fiecărui grup" },
@@ -3095,9 +3052,7 @@ export function renderCommunity(basePath = "") {
       .join("");
 
     return `
-      ${attentionBox}
-      <div class="cx-adminstats">${stats}</div>
-      ${pulse}
+      ${dashboardHtml(state.dash, state.dashSort)}
       <div class="cx-box">
         <div class="cx-admin__head"><h3>Poartă pre-lansare</h3></div>
         <p class="cx-muted">Când e <b>oprită</b>, tot site-ul e public. Când e <b>pornită</b>, doar conturile permise intră; restul văd „în curând".</p>
@@ -3390,7 +3345,7 @@ export function renderCommunity(basePath = "") {
     if (!isAdmin()) return sectionForum();
     const modCount = state.contentReports.length + state.heldContent.length + state.proposed.filter((e) => e.status === "pending").length;
     const TABS = [
-      { id: "overview", label: "Prezentare" },
+      { id: "overview", label: "Dashboard" },
       { id: "users", label: "Utilizatori" },
       { id: "moderation", label: "Moderare", badge: modCount },
       { id: "challenges", label: "Provocări" },
@@ -3664,6 +3619,10 @@ export function renderCommunity(basePath = "") {
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
+        // The dashboard's aggregates. Fetched last and not awaited alongside the
+        // rest: the panel must open even if the migration behind it isn't applied
+        // yet, in which case `dash` stays null and the tab says so.
+        fetchDashboard(30).then((d) => { state.dash = d; if (state.section === "admin") render(); });
       }
       // A #msg/<uuid> notification link → open that person's conversation.
       if (state.pendingMsgUuid) {
@@ -4724,6 +4683,9 @@ export function renderCommunity(basePath = "") {
         });
         return;
       }
+      case "dash-sort":
+        state.dashSort = btn.dataset.id;
+        return render();
       case "drive-toggle-folder":
       case "drive-toggle-files": {
         const slug = btn.dataset.slug;
