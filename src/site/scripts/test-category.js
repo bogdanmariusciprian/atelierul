@@ -193,10 +193,38 @@ function ballGlobe(word, reps = 2) {
     // the separators. ±5° of latitude is enough to read as curvature.
     const phase = ((i * STEP) % (360 / reps)) / (360 / reps); // 0…1 within a copy
     const phi = Math.sin(phase * Math.PI) * 5;
+    // A word gap still needs its slot on the equator, but an ordinary space in
+    // an absolutely-positioned box collapses to nothing — hence the hard space.
+    const glyph = it.c === " " ? "&nbsp;" : esc(it.c);
     return `<span class="tcat__ball__l${it.sep ? " is-sep" : ""}" data-r="${it.r}"
                   style="--th:${theta.toFixed(2)}deg; --ph:${phi.toFixed(2)}deg"
-                  ${it.r > 0 || it.sep ? 'aria-hidden="true"' : ""}>${esc(it.c)}</span>`;
+                  ${it.r > 0 || it.sep ? 'aria-hidden="true"' : ""}>${glyph}</span>`;
   }).join("");
+}
+
+// The ball itself. An <a> when there is somewhere to go, a plain <span> when
+// there isn't — rather than a link that's disabled, which still invites the
+// click and then refuses it.
+function ballHtml() {
+  const word = cat.live ? "Exersează" : "În curând";
+  const tag = cat.live ? "a" : "span";
+  const attrs = cat.live
+    ? ` href="#joc" aria-label="Exersează — antrenament interactiv"`
+    : ` role="note" aria-label="${esc(word)} — banca de itemi se pregătește"`;
+  const body = cat.live
+    ? `<b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
+       explicație imediată. Cei greșiți revin până îi nimerești.`
+    : `<b>Se pregătește.</b> Strângem itemii pentru această categorie și îi
+       verificăm unul câte unul. Între timp, subiectele se pot descărca.`;
+  return `<${tag} class="tcat__ball"${attrs}>
+      <span class="tcat__ball__globe">${ballGlobe(word)}</span>
+      <span class="tcat__ball__shade" aria-hidden="true"></span>
+      <span class="tcat__ball__in">
+        <span class="tcat__ball__ic" aria-hidden="true">${adminMode && cat.live ? "🛠️" : cat.icon}</span>
+        <span class="tcat__ball__title" aria-hidden="true">${esc(word)}</span>
+        <span class="tcat__ball__more">${body}</span>
+      </span>
+    </${tag}>`;
 }
 
 function renderIntro() {
@@ -232,26 +260,15 @@ function renderIntro() {
 
       <!-- The tank. Sticky, so it holds still while the archive scrolls past —
            which is what makes scrolling feel like shaking it. -->
-      <aside class="tcat__tank">
-        ${cat.live
-          ? `<span class="tcat__shadow" aria-hidden="true"></span>
-             <a class="tcat__ball" href="#joc" aria-label="Exersează — antrenament interactiv">
-               <span class="tcat__ball__globe">${ballGlobe("Exersează")}</span>
-               <span class="tcat__ball__shade" aria-hidden="true"></span>
-               <span class="tcat__ball__in">
-                 <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
-                 <span class="tcat__ball__title" aria-hidden="true">Exersează</span>
-                 <span class="tcat__ball__more">
-                   <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
-                   explicație imediată. Cei greșiți revin până îi nimerești.
-                 </span>
-               </span>
-             </a>`
-          : `<div class="tcat__tank__soon">
-               <span aria-hidden="true">${cat.icon}</span>
-               <p>Banca de itemi pentru această categorie se pregătește.</p>
-               <span class="tcat__soon">Va urma.</span>
-             </div>`}
+      <!-- Every category gets the ball, live or not. A category still being
+           built is a page a pupil will visit exactly once unless something
+           there is alive; a dead panel saying „va urma" guarantees they don't
+           come back. What changes is only what it says and whether it leads
+           anywhere — a ball that isn't a link can't promise a game that
+           doesn't exist yet. -->
+      <aside class="tcat__tank${cat.live ? "" : " is-soon"}">
+        <span class="tcat__shadow" aria-hidden="true"></span>
+        ${ballHtml()}
       </aside>
     </div>`;
 

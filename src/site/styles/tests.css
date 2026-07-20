@@ -698,6 +698,18 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tcat__ball__title {
   font-size: 1.15rem; font-weight: 800; line-height: 1.2;
 }
+
+/* A category still being built gets the same ball, greyed toward neutral and
+   without a pointer cursor — it moves, it explains itself, it just doesn't
+   pretend to lead anywhere. Mixed into the background rather than applied as a
+   `filter`: a filter would create a new containing block and flatten the
+   preserve-3d underneath it, and the sphere would collapse. */
+.tcat__tank.is-soon .tcat__ball {
+  background: color-mix(in srgb, var(--cat-color) 62%, #64748b);
+  box-shadow: 0 12px 26px -12px #64748b, inset 0 -8px 18px -10px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+.tcat__tank.is-soon { border-style: dotted; }
 /* The cast shadow. A sibling, not a child: it must stay flat on the floor
    while the ball above it squashes, spins and flies. JS moves it and fades it
    with height — that pairing is most of what makes the ball read as heavy. */
@@ -737,12 +749,6 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 }
 .tcat__tank.is-still .tcat__ball__more { max-height: 8rem; opacity: 1; }
 
-.tcat__tank__soon {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 0.4rem; height: 100%; padding: var(--space-lg); text-align: center;
-}
-.tcat__tank__soon > span:first-child { font-size: 2.2rem; line-height: 1; }
-.tcat__tank__soon p { margin: 0; font-size: 0.9rem; color: var(--color-text-muted); }
 
 /* Stack sooner than before: with the tank holding a fixed 320px, anything
    under ~980px leaves the archive too little room for three columns that
