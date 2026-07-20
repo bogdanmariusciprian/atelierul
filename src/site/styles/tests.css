@@ -602,47 +602,82 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tcat__files { min-width: 0; }
 .tcat__files .tcat__ph { margin-bottom: var(--space-md); }
 
-/* The dark card: the only piece of console left on this page. */
-.tcat__gamecard {
-  min-width: 0;
-  background: color-mix(in srgb, var(--cat-color) 14%, #201d2b);
-  border: 1.5px solid color-mix(in srgb, var(--cat-color) 32%, transparent);
-  border-radius: 20px; padding: var(--space-lg);
-  color: #f5f3ff;
-  /* stays in view while the archive scrolls past it */
+/* ---- the tank, and the button adrift in it ----
+   The box holds still (sticky) while the archive scrolls past, which is what
+   turns scrolling into shaking. Everything that moves is done in `transform`
+   from JS — never `top`/`left`, which would relayout the page 60 times a
+   second. See tests-float.js for the physics. */
+.tcat__tank {
   position: sticky; top: var(--sticky-top, 104px);
+  min-width: 0; height: min(62vh, 520px);
+  border-radius: 20px;
+  border: 1.5px dashed color-mix(in srgb, var(--cat-color) 26%, transparent);
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--cat-color) 9%, transparent), transparent 70%);
+  overflow: hidden;
 }
-.tcat__gamecard__ic { font-size: 2.2rem; line-height: 1; display: block; margin-bottom: 0.6rem; }
-.tcat__gamecard__t {
-  margin: 0 0 0.4rem; font-size: 1.15rem;
-  color: color-mix(in srgb, var(--cat-color) 55%, #ffffff);
+.tcat__ball {
+  position: absolute; top: 0; left: 0;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.8rem 1.4rem; border-radius: 999px;
+  background: var(--cat-color); color: #fff; text-decoration: none;
+  font-weight: 800; user-select: none;
+  box-shadow: 0 10px 24px -10px var(--cat-color);
+  will-change: transform;
+  /* The scale/radius/colour change on hover is CSS; the travel is JS. Keeping
+     them apart means the transition below can never fight the physics loop. */
+  transition: padding 0.25s ease, border-radius 0.25s ease, box-shadow 0.25s ease;
 }
-.tcat__gamecard__lead { margin: 0 0 var(--space-md); font-size: 0.9rem; line-height: 1.65; color: #ada7c8; }
-.tcat__gamecard .tcat__play { width: 100%; justify-content: center; }
-.tcat__gamecard .tcat__soon { color: #ada7c8; }
+.tcat__ball__face { display: flex; align-items: center; gap: 0.55rem; white-space: nowrap; }
+.tcat__ball__ic { font-size: 1.25rem; line-height: 1; }
+.tcat__ball__t { font-size: 1.05rem; }
+/* Closed: the text is folded away, and it must not be reachable by keyboard or
+   read aloud while it's invisible. */
+.tcat__ball__more {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 0;
+  overflow: hidden; max-height: 0; opacity: 0;
+  font-weight: 500; font-size: 0.86rem; line-height: 1.6;
+  color: color-mix(in srgb, #fff 82%, var(--cat-color));
+  transition: max-height 0.28s ease, opacity 0.2s ease;
+}
+.tcat__ball__more b { font-weight: 800; color: #fff; }
 
-/* Stack sooner than before: with the card holding a fixed 320px, anything
+/* Open: it straightens up (JS eases the angle to 0), grows, squares off its
+   corners and lets the description out. */
+.tcat__tank.is-open .tcat__ball {
+  padding: 1.1rem 1.4rem; border-radius: 20px;
+  box-shadow: 0 18px 40px -12px var(--cat-color);
+}
+.tcat__tank.is-open .tcat__ball__more {
+  -webkit-line-clamp: 6; max-height: 9rem; opacity: 1;
+}
+
+/* No motion wanted, or no room for it: the button simply sits in the middle
+   and behaves like a button. */
+.tcat__tank.is-still { height: auto; border-style: solid; padding: var(--space-lg); }
+.tcat__tank.is-still .tcat__ball { position: static; max-width: none; }
+.tcat__tank.is-still .tcat__ball__more { max-height: 9rem; opacity: 1; -webkit-line-clamp: 6; }
+
+.tcat__tank__soon {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.4rem; height: 100%; padding: var(--space-lg); text-align: center;
+}
+.tcat__tank__soon > span:first-child { font-size: 2.2rem; line-height: 1; }
+.tcat__tank__soon p { margin: 0; font-size: 0.9rem; color: var(--color-text-muted); }
+
+/* Stack sooner than before: with the tank holding a fixed 320px, anything
    under ~980px leaves the archive too little room for three columns that
-   refuse to wrap. Stacked, it gets the full width instead. */
+   refuse to wrap. Stacked, it gets the full width instead — and below that
+   width tests-float.js keeps the button still anyway. */
 @media (max-width: 980px) {
   .tcat__split { grid-template-columns: 1fr; }
-  .tcat__gamecard { position: static; }
+  .tcat__tank { position: static; height: auto; }
 }
 
 .tcat__ph { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; font-size: 1.05rem; }
 .tcat__soon { margin: 0; color: var(--color-text-muted); font-style: italic; }
 
-.tcat__play {
-  display: inline-flex; align-items: center; gap: 0.6rem;
-  padding: 0.85rem 1.6rem; border-radius: 999px;
-  background: var(--cat-color); color: #fff; text-decoration: none;
-  font-weight: 800; font-size: 1.05rem; user-select: none;
-  box-shadow: 0 8px 20px -8px var(--cat-color);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-}
-.tcat__play:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 12px 26px -8px var(--cat-color); }
-.tcat__play:active { transform: translateY(0) scale(0.98); }
-.tcat__play__ic { font-size: 1.1rem; }
 .tcat__hint { margin: 0.8rem 0 0; font-size: 0.78rem; color: var(--color-text-muted); font-style: italic; }
 
 /* ---- downloadable tests: a real table, with the lines left undrawn ----
@@ -746,7 +781,6 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 
 @media (max-width: 560px) {
   .tcat__hero { flex-direction: column; text-align: center; }
-  .tcat__play { width: 100%; justify-content: center; }
 }
 
 /* =========================================================
@@ -1377,7 +1411,6 @@ body.tcat-page.tgame-active:not(.tg-mode) .page-crumbs a { color: var(--color-te
 /* anything sitting ON the bright accent needs dark ink, not white */
 body.tcat-page.tgame-active:not(.tg-mode) .tgame-chip.on,
 body.tcat-page.tgame-active:not(.tg-mode) .tgame-btn--primary,
-body.tcat-page.tgame-active:not(.tg-mode) .tcat__play,
 body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__row.on .tgame-tl__ord { color: var(--tc-ink); }
 
 /* ---- presentation panels ---- */
@@ -1386,7 +1419,6 @@ body.tcat-page.tgame-active:not(.tg-mode) .tcat__hero {
   border-color: color-mix(in srgb, var(--cat-color) 36%, transparent);
 }
 body.tcat-page.tgame-active:not(.tg-mode) .tcat__title { color: var(--tc-accent); }
-body.tcat-page.tgame-active:not(.tg-mode) .tcat__play { background: var(--tc-accent); box-shadow: none; }
 
 /* ---- the drag list, console style: slot, name, strength bar ---- */
 body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__row {

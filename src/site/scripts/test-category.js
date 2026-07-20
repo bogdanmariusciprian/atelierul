@@ -14,6 +14,7 @@ import { initTestGame } from "./tests-game.js";
 import { initTestAdminGrid } from "./tests-admin-grid.js";
 import { isAdmin } from "../../shared/scripts/session.js";
 import { fetchTestDownloads, fetchDriveFolderUrl } from "../../shared/scripts/test-repo.js";
+import { initFloatingPlay } from "./tests-float.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -23,6 +24,7 @@ let cat = null;
 let adminMode = false;
 let downloads = []; // published files for this category, newest year first
 let folderUrl = ""; // the Drive folder behind them, for „descarcă tot"
+let stopFloat = null; // tears down the floating button's loop + listeners
 
 export function initTestCategory(mountEl, slug) {
   cat = TEST_CAT_BY_SLUG[slug];
@@ -65,6 +67,7 @@ const wantsPractice = () =>
 function route() {
   const play = !!cat.live && wantsPractice();
   document.body.classList.toggle("tgame-active", play); // shrink the page hero while playing
+  if (play) { stopFloat?.(); stopFloat = null; }        // leaving the intro → drop the loop
   if (!play) { leaveAdminMode(); return renderIntro(); }
   if (adminMode) return initTestAdminGrid(root); // teacher → item grid
   leaveAdminMode();
@@ -187,17 +190,31 @@ function renderIntro() {
         ${downloadList()}
       </section>
 
-      <aside class="tcat__gamecard">
-        <span class="tcat__gamecard__ic" aria-hidden="true">${cat.icon}</span>
-        <h2 class="tcat__gamecard__t">Antrenament interactiv</h2>
+      <!-- The tank. Sticky, so it holds still while the archive scrolls past —
+           which is what makes scrolling feel like shaking it. -->
+      <aside class="tcat__tank">
         ${cat.live
-          ? `<p class="tcat__gamecard__lead">Rezolvi câte un item pe rând, cu explicație imediată. Cei greșiți revin până îi nimerești.</p>
-             <a class="tcat__play" href="#joc">
-               <span class="tcat__play__ic" aria-hidden="true">${adminMode ? "🛠️" : "▸"}</span>
-               ${adminMode ? "Deschide grila de itemi" : "Începe antrenamentul"}
+          ? `<a class="tcat__ball" href="#joc">
+               <span class="tcat__ball__face">
+                 <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
+                 <span class="tcat__ball__t">${adminMode ? "Grila de itemi" : "Exersează"}</span>
+               </span>
+               <span class="tcat__ball__more">
+                 <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
+                 explicație imediată. Cei greșiți revin până îi nimerești.
+               </span>
              </a>`
-          : `<p class="tcat__gamecard__lead">Banca de itemi pentru această categorie se pregătește.</p>
-             <span class="tcat__soon">Va urma.</span>`}
+          : `<div class="tcat__tank__soon">
+               <span aria-hidden="true">${cat.icon}</span>
+               <p>Banca de itemi pentru această categorie se pregătește.</p>
+               <span class="tcat__soon">Va urma.</span>
+             </div>`}
       </aside>
     </div>`;
+
+  // renderIntro runs again on every fetch and every role change, so the old
+  // loop and its listeners have to go before a new one starts — otherwise
+  // they stack up, each pushing the same button.
+  stopFloat?.();
+  stopFloat = initFloatingPlay(root.querySelector(".tcat__tank"));
 }
