@@ -658,22 +658,25 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tdl td:last-child, .tdl th:last-child { padding-right: 0; }
 .tdl td, .tdl th { padding-left: 0.5rem; }
 
-/* Two layers of hover, and they do different jobs.
-   The ROW gets the plain surface — that's the „which line am I on" answer.
-   The CELL UNDER THE CURSOR gets a stronger tint, in the colour of the season
-   its exam belongs to: July is summer yellow, September is autumn brown, the
-   rehearsal in April–May is spring green. Move across and the previous cell
-   drops back to plain — only one is ever lit, the one you're pointing at.
-   Empty cells stay out of it: colouring a blank would read as a glitch. */
-.tdl tbody tr:hover { background: var(--color-surface); }
-.tdl td { --tdl-k: var(--color-text-muted); transition: background-color 0.15s ease; }
-.tdl td.tdl-k0 { --tdl-k: #eab308; } /* iulie — vara */
-.tdl td.tdl-k1 { --tdl-k: #92400e; } /* septembrie — toamna */
-.tdl td.tdl-k2 { --tdl-k: #16a34a; } /* simulare — primăvara */
-.tdl td:hover:not(:empty) {
-  background: color-mix(in srgb, var(--tdl-k) 22%, transparent);
-  border-radius: 8px;
+/* Hovering a row lights up every cell in the shade of ITS kind of exam, so the
+   three columns say what they are without a header row.
+   Three hues of their own, NOT --cat-color: „Admitere Drept" is itself a burnt
+   orange, so borrowing it for July made July and September the same colour.
+   Green for the exam that counts, amber for autumn, blue for the rehearsal —
+   far enough apart on the wheel to stay apart at 14% alpha. Past the third,
+   grey: a fourth kind of exam still hovers, just without a voice of its own.
+   (A per-cell version was tried, where only the cell under the cursor lit up
+   in its season's colour. It read as restless — the whole row is the unit the
+   eye is following.) */
+.tdl td, .tdl th { --tdl-k: var(--color-text-muted); }
+.tdl td.tdl-k0 { --tdl-k: #15803d; }
+.tdl td.tdl-k1 { --tdl-k: #c2410c; }
+.tdl td.tdl-k2 { --tdl-k: #0369a1; }
+.tdl tbody tr:hover td, .tdl tbody tr:hover th {
+  background: color-mix(in srgb, var(--tdl-k) 14%, transparent);
 }
+.tdl tbody tr:hover th:first-child { border-radius: 8px 0 0 8px; }
+.tdl tbody tr:hover td:last-child { border-radius: 0 8px 8px 0; }
 .tdl__year {
   width: 3.4rem; font-weight: 800; font-size: 0.95rem;
   color: var(--cat-color); font-variant-numeric: tabular-nums;
