@@ -95,10 +95,13 @@ function downloadList() {
   // „2024 - Iulie - G1" reads simply „Iulie - G1".
   const sessionName = (f, year) =>
     String(f.label || "").replace(new RegExp(`^\\s*${year}\\s*[-–·]?\\s*`), "").trim() || String(f.label || "");
-  // What kind of session it is, ignoring the group: „Iulie - G1" and the older
-  // bare „Iulie" both answer „Iulie", so they share a column instead of
-  // opening two that mean the same thing.
-  const sessionKind = (name) => name.split(/\s+[-–]\s+/)[0].trim() || name;
+  // A column is a KIND OF EXAM, not a month — and in the naming scheme the
+  // first word is exactly that: „Iulie" the real exam, „Septembrie" the autumn
+  // one, „Simulare" the rehearsal whenever it happened to be held.
+  // So „Simulare aprilie - G1" and „Simulare mai - G1" share one column,
+  // instead of the calendar splitting a single kind of paper in two.
+  // The label the pupil reads stays whole; only the column is shared.
+  const sessionKind = (name) => name.trim().split(/\s+/)[0] || name;
 
   // A COLUMN IS A SESSION, not a position. 2026 has only its „Simulare mai",
   // and it belongs under the other years' „Simulare mai" — not in the first
