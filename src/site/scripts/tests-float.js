@@ -7,33 +7,41 @@
 //
 // Three simulations, each doing one job:
 //
-//   LIFT — gravity is gentle and the air is thick, which together make a
-//   balloon rather than a stone: it sinks lazily (the fall tops out around
-//   300px/s, G ÷ AIR), keeps most of its energy off a wall, and bobs several
-//   times before lying down. Its resting place is still the floor — but it
-//   takes its time getting there. Scrolling throws it up again.
+//   FLIGHT — gravity, air and Magnus. Drag is written as it really is, linear
+//   plus quadratic: the first term rules when the ball creeps, the second when
+//   it flies, and one exponential decay can only ever be the first. The Magnus
+//   term, a = k(ω × v), is what bends the path of a spinning ball — topspin
+//   dips, backspin floats. On the ground, rolling resistance takes over: a
+//   constant deceleration set by weight, not speed, so the ball truly stops
+//   rather than creeping toward an asymptote forever.
 //
-//   JELLY — the shape is TWO damped springs, one per axis, and an impact does
-//   not set them: it gives them a PUSH. That distinction is the whole feel of
-//   the thing. Setting the deformation makes the ball snap flat in a single
-//   frame and then relax — a slap. Pushing the spring makes it flatten over
-//   about a sixth of a second, overshoot, come back, overshoot less, and
-//   settle: a wobble. The strength of the push is proportional to the speed of
-//   the impact, so a graze ripples and a slam heaves.
-//   One spring per axis, rather than one spring plus a „which way" flag, means
-//   a corner hit wobbles on both axes at once, and a second knock while the
-//   first is still ringing adds to it instead of overwriting it.
-//   Volume is roughly conserved — flatter on one axis means fatter on the
-//   other — which is what reads as rubber instead of a resized picture.
+//   COLLISION — one impulse does all of it. The contact velocity u = v + ω × r
+//   is the velocity of the SURFACE, not of the centre, and everything follows
+//   from it: the normal impulse gives the bounce, the tangential impulse gives
+//   the spin, and Coulomb's jₜ ≤ μ·jₙ decides whether the ball grips or skids.
+//   Because spin enters u, a ball landing with backspin bounces back where it
+//   came from and one with topspin shoots on — not scripted, just the algebra.
 //
-//   ROLL — the ball turns about its vertical axis by the distance it travels
-//   divided by its radius, which is what rolling without slipping means. The
-//   word is not laid in front of the ball but ON it: test-category.js pushes
-//   every letter out to the surface and angles it along the curve, so the spin
-//   carries the outer letters past the edge and backface-visibility hides them.
-//   The word wraps around the back and comes round again. Point at the ball and
-//   the spin eases to zero, bringing the word to face you — it hides while it
-//   plays, and shows itself the moment you want to read it.
+//   JELLY — the shape is TWO damped springs per axis, and an impact does not
+//   set them: it gives them a PUSH. Setting the deformation makes the ball snap
+//   flat in one frame and relax — a slap. Pushing makes it flatten over a tenth
+//   of a second, overshoot, come back, and settle — a wobble. The overtone's
+//   share grows with the square of the force, so a graze and a slam differ in
+//   kind, not merely in size. Volume is roughly conserved.
+//
+//   ROTATION — orientation is a 3×3 matrix driven by an angular-velocity
+//   VECTOR, not a pair of angles. Euler angles cannot express tumbling: the
+//   second rotation happens in the frame the first one left, the axes drift and
+//   eventually collapse into one another. Small rotations composed onto a
+//   matrix (Rodrigues) have neither problem, and CSS takes the result through
+//   matrix3d. The word is printed on the sphere in spherical coordinates, so it
+//   turns with the ball and disappears round the back.
+//
+// A NOTE ON THE SIGN OF EVERYTHING. Screen y grows DOWNWARD. The floor's
+// outward normal is therefore (0,−1), and rolling without slipping — the
+// contact point standing still, v + ω × r = 0 with r = (0,+R,0) — gives
+// ω_z = +v_x ⁄ R. Getting that minus sign wrong is what had the ball rolling
+// one way while its lettering travelled the other.
 //
 // Transforms are split across elements on purpose: the outer one carries
 // position and squash (world axes, so the floor always squashes top-to-bottom),
@@ -53,8 +61,18 @@
 const G = 1250;          // px/s² — it falls, it doesn't sink
 const WALL_REST = 0.86;
 const FLOOR_REST = 0.80; // a real football returns about 60% of drop height
-const AIR = 0.22;        // thin air: the ball keeps what it has between bounces
-const ROLL = 0.6;        // …and rolls well once it's down
+// Air resistance, both regimes of it. Real drag is a·v + b·v²: the linear term
+// (Stokes) rules when things creep, the quadratic one (Newton) when they fly,
+// and a football at these speeds is firmly in the second. A single exponential
+// decay — what was here before — is only ever the first, so it braked the slow
+// ball too hard and the fast one not nearly enough.
+const AIR_LIN = 0.10;    // 1/s
+const AIR_SQ = 1.2e-3;   // 1/px — terminal speed √(G/AIR_SQ) ≈ 1020px/s
+// Rolling resistance is NOT drag. It comes from the skin flexing at the contact
+// patch, so it's proportional to the weight pressing down, not to speed: a
+// constant deceleration that brings the ball to a real stop instead of an
+// asymptote it never reaches.
+const ROLL_RES = 0.12;   // × gravity
 const V_SLEEP = 14;      // px/s — low, so the last little hops still happen
 const V_MAX = 900;       // a 260px drop already arrives at ~800px/s
 const SPIN_HOVER = 7;    // how fast the label swings back to face you
@@ -119,7 +137,15 @@ const STRETCH_EASE = 9;  // per second — how fast the stretch follows the spee
 // turning: nothing took its angular momentum away.
 const SPIN_AIR = 0.55;   // spin lost per second in flight
 const SPIN_GRIP = 9;     // how fast the floor forces rolling-without-slipping
-const WALL_GRIP = 0.42;  // how much of the tangential speed a wall turns to spin
+const MU = 0.42;         // Coulomb friction at the contact — the sliding limit
+
+// MAGNUS. A spinning ball drags air around with it; the side turning into the
+// airflow sees faster flow and lower pressure, so the ball is pushed sideways:
+//   a = k (ω × v)
+// It is why a struck football bends. Topspin (clockwise here, rolling-right
+// sense) crossed with a rightward flight gives a downward push — the dip every
+// player knows. Nothing else in this file produces a curved path.
+const MAGNUS = 0.055;
 const WAKE_EASE = 3.2;   // how fast the breathing fades in and out, per second
 
 // THE MAGNET, as an inverse-square field.
@@ -394,10 +420,31 @@ export function initFloatingPlay(tank) {
       S.vy = S.vy * k + (held ? 0 : G * dt * 0.25);
     } else {
       S.vy += G * dt;
-      const k = Math.exp(-((S.grounded ? ROLL : AIR) + drag) * dt);
-      S.vx *= k; S.vy *= k;
+
+      // MAGNUS. a = k(ω × v). Only the in-plane part can act on a body that
+      // doesn't move in depth, and that part is the ball bending its path:
+      // topspin dips, backspin floats, sidespin curls.
+      const mx = S.wy * 0 - S.wz * S.vy;
+      const my = S.wz * S.vx - S.wx * 0;
+      S.vx += MAGNUS * mx * dt;
+      S.vy += MAGNUS * my * dt;
+
       const sp = Math.hypot(S.vx, S.vy);
-      if (sp > V_MAX) { S.vx *= V_MAX / sp; S.vy *= V_MAX / sp; }
+      if (sp > 1e-4) {
+        // Air: linear plus quadratic, the two regimes of real drag.
+        const a = (AIR_LIN + AIR_SQ * sp) * dt;
+        const f = Math.max(0, 1 - a);
+        S.vx *= f; S.vy *= f;
+      }
+      // Rolling resistance: a constant deceleration while touching down, set by
+      // the weight rather than the speed — so the ball actually stops.
+      if (S.grounded && Math.abs(S.vx) > 1e-3) {
+        const d2 = ROLL_RES * G * dt;
+        S.vx -= Math.sign(S.vx) * Math.min(Math.abs(S.vx), d2);
+      }
+      S.vx *= Math.exp(-drag * dt); S.vy *= Math.exp(-drag * dt);
+      const sp2 = Math.hypot(S.vx, S.vy);
+      if (sp2 > V_MAX) { S.vx *= V_MAX / sp2; S.vy *= V_MAX / sp2; }
     }
 
     // Awake follows „is anything actually happening", smoothly.
@@ -407,66 +454,89 @@ export function initFloatingPlay(tank) {
     S.x += S.vx * dt;
     S.y += S.vy * dt;
 
-    // Side walls. The tangential speed — vertical, here — is partly turned into
-    // spin by friction, the way a ball scuffed down a wall starts to turn.
     const radius = Math.max(1, ball.offsetWidth / 2);
     // Harder landings give less back: more of the blow goes into working the
     // skin. A fixed restitution is one of the plainest tells of a simulation.
     const restFor = (base, speed) =>
       base * (1 - REST_LOSS * Math.min(1, speed / V_REF));
-    // A real ball almost never strikes dead centre, and it is off-centre hits
-    // that make things tumble. Writing it out honestly:
-    //
-    //   contact point   r = −n·R + t        (t is the off-centre part, ⟂ n)
-    //   impulse         J = n·j
-    //   torque          τ = r × J = j·(t × n)      — the −n·R part cancels
-    //   change in spin  Δω = τ ÷ I,  I = ⅖mR² for a solid sphere
-    //
-    // The offset lives partly in DEPTH, an axis the flat simulation has no
-    // opinion about, so it's drawn at random. That single unknown is what turns
-    // a wheel into a tumbling ball.
-    const torque = (nx, ny, nz, j) => {
-      let ax = Math.random() - 0.5, ay = Math.random() - 0.5, az = Math.random() - 0.5;
-      const along = ax * nx + ay * ny + az * nz;      // strip the part along n:
-      ax -= along * nx; ay -= along * ny; az -= along * nz; // an offset there is no offset
-      const len = Math.hypot(ax, ay, az) || 1;
-      const off = radius * 0.55 * Math.random();     // how far from centre it caught
-      ax = ax / len * off; ay = ay / len * off; az = az / len * off;
-      const k = SPIN_WOBBLE * j / (0.4 * radius * radius);
-      S.wx += k * (ay * nz - az * ny);
-      S.wy += k * (az * nx - ax * nz);
-      S.wz += k * (ax * ny - ay * nx);
-    };
 
-    if (S.x < 0) {
-      S.x = 0; hit("x", Math.abs(S.vx), 0);
-      S.wz -= (S.vy / radius) * WALL_GRIP;   // friction along the wall → roll
-      torque(1, 0, 0, Math.abs(S.vx));
-      S.vx = Math.abs(S.vx) * restFor(WALL_REST, Math.abs(S.vx));
-    } else if (S.x > b.w) {
-      S.x = b.w; hit("x", Math.abs(S.vx), 1);
-      S.wz += (S.vy / radius) * WALL_GRIP;
-      torque(-1, 0, 0, Math.abs(S.vx));
-      S.vx = -Math.abs(S.vx) * restFor(WALL_REST, Math.abs(S.vx));
+    // ---- COLLISION, PROPERLY: one impulse, normal and tangential ----
+    // Everything a bounce does — how high, which way, how much spin, whether it
+    // grips or skids — comes out of one impulse at the contact point. n points
+    // out of the wall, into the ball.
+    //
+    //   contact point      r = −n·R  (+ a small off-centre part, see below)
+    //   contact velocity   u = v + ω × r      ← the surface, not the centre
+    //   normal impulse     jₙ = −(1+e)(u·n)
+    //   to kill the slip   jₜ = (2/7)|uₜ|     ← 2/7 is ⅖mR² for a solid sphere
+    //   Coulomb's law      jₜ ≤ μ·jₙ          ← grip if it can, skid if it can't
+    //   then               Δv = J/m,  Δω = (r × J)/I
+    //
+    // Using the CONTACT velocity rather than the centre's is what makes spin and
+    // motion talk to each other. A ball arriving with backspin now bounces back
+    // the way it came, and one with topspin shoots forward — for free, from the
+    // same four lines, because that's what the algebra says.
+    function collide(nx, ny, base) {
+      // Where it caught. The off-centre part lives partly in DEPTH, an axis this
+      // flat simulation has no opinion about, so it is drawn at random — the one
+      // honest unknown, and the reason the ball tumbles instead of turning like
+      // a wheel.
+      let ox = Math.random() - 0.5, oy = Math.random() - 0.5, oz = Math.random() - 0.5;
+      const along = ox * nx + oy * ny;
+      ox -= along * nx; oy -= along * ny;
+      const olen = Math.hypot(ox, oy, oz) || 1;
+      const off = radius * 0.5 * Math.random() * SPIN_WOBBLE;
+      const rx = -nx * radius + ox / olen * off;
+      const ry = -ny * radius + oy / olen * off;
+      const rz = oz / olen * off;
+
+      // u = v + ω × r
+      const ux = S.vx + (S.wy * rz - S.wz * ry);
+      const uy = S.vy + (S.wz * rx - S.wx * rz);
+      const uz = 0 + (S.wx * ry - S.wy * rx);
+      const un = ux * nx + uy * ny;
+      if (un >= 0) return false;          // already separating — nothing to do
+
+      const e = restFor(base, -un);
+      const jn = -(1 + e) * un;
+
+      // Tangential part of the contact velocity, and the impulse that would
+      // stop it dead.
+      let tx = ux - un * nx, ty = uy - un * ny, tz = uz;
+      const tl = Math.hypot(tx, ty, tz);
+      let jt = 0;
+      if (tl > 1e-6) {
+        tx /= tl; ty /= tl; tz /= tl;
+        jt = Math.min((2 / 7) * tl, MU * jn);   // grip, or slide at the limit
+      }
+
+      const Jx = jn * nx - jt * tx, Jy = jn * ny - jt * ty, Jz = -jt * tz;
+      S.vx += Jx; S.vy += Jy;
+      const I = 0.4 * radius * radius;          // ⅖mR², per unit mass
+      S.wx += (ry * Jz - rz * Jy) / I;
+      S.wy += (rz * Jx - rx * Jz) / I;
+      S.wz += (rx * Jy - ry * Jx) / I;
+
+      hit(Math.abs(nx) > Math.abs(ny) ? "x" : "y", -un, ny > 0 ? 0 : ny < 0 ? 1 : nx > 0 ? 0 : 1);
+      return true;
     }
 
-    // Ceiling and floor. On the floor, a slow enough arrival stops bouncing
-    // altogether — otherwise it would jitter forever on ever-smaller hops, the
-    // classic way a physics toy betrays itself.
+    // n points from the wall into the ball. y grows DOWNWARD on a screen, so the
+    // floor's normal is (0,−1) — the single sign that had the text rolling
+    // backwards before.
+    if (S.x < 0) { S.x = 0; collide(1, 0, WALL_REST); }
+    else if (S.x > b.w) { S.x = b.w; collide(-1, 0, WALL_REST); }
+
     const wasGrounded = S.grounded;
     S.grounded = false;
-    if (S.y < 0) {
-      S.y = 0; hit("y", Math.abs(S.vy), 0); torque(0, 1, 0, Math.abs(S.vy));
-      S.vy = Math.abs(S.vy) * restFor(WALL_REST, Math.abs(S.vy));
-    } else if (S.y >= b.h) {
+    if (S.y < 0) { S.y = 0; collide(0, 1, WALL_REST); }
+    else if (S.y >= b.h) {
       S.y = b.h;
-      hit("y", Math.abs(S.vy), 1);
-      if (Math.abs(S.vy) > V_SLEEP) torque(0, -1, 0, Math.abs(S.vy));
       // Hysteresis: once asleep it takes a firmer knock to start hopping again
       // than it took to stop. With a single threshold, a body sitting right on
-      // it flickers between bouncing and resting — the stutter you noticed.
+      // it flickers between bouncing and resting.
       const wake = wasGrounded ? V_SLEEP * 2.2 : V_SLEEP;
-      if (Math.abs(S.vy) > wake) { S.vy = -Math.abs(S.vy) * restFor(FLOOR_REST, Math.abs(S.vy)); }
+      if (S.vy > wake) collide(0, -1, FLOOR_REST);
       else { S.vy = 0; S.grounded = true; }
     }
 
@@ -505,7 +575,12 @@ export function initFloatingPlay(tank) {
       orthonormalize();
     } else {
       if (S.grounded) {
-        const rolling = -S.vx / radius;
+        // Rolling without slipping means the material point at the contact is
+        // momentarily still: v + ω × r = 0, with r = (0, +R, 0) because the
+        // floor is at greater y. Working the cross product through gives
+        // ω_z = +v_x ⁄ R. The minus sign that used to be here is exactly why the
+        // ball rolled one way and its lettering the other.
+        const rolling = S.vx / radius;
         S.wz += (rolling - S.wz) * Math.min(1, SPIN_GRIP * dt);
         S.wx *= Math.exp(-SPIN_GRIP * 0.5 * dt);
         S.wy *= Math.exp(-SPIN_GRIP * 0.5 * dt);
