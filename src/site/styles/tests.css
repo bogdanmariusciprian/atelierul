@@ -616,48 +616,62 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
     radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--cat-color) 9%, transparent), transparent 70%);
   overflow: hidden;
 }
+/* A ball, so it must be a circle — equal width and height, radius 50%. The
+   squash comes from JS as a scale on this element, so nothing here may set its
+   own transform, or the two would overwrite each other. The soft inner light
+   keeps it from reading as a flat disc while it deforms. */
 .tcat__ball {
   position: absolute; top: 0; left: 0;
-  display: flex; flex-direction: column; gap: 0.5rem;
-  max-width: calc(100% - 2rem);
-  padding: 0.8rem 1.4rem; border-radius: 999px;
-  background: var(--cat-color); color: #fff; text-decoration: none;
+  width: 124px; height: 124px; border-radius: 50%;
+  display: grid; place-items: center;
+  padding: 0; overflow: hidden;
+  background:
+    radial-gradient(circle at 34% 28%, color-mix(in srgb, #fff 38%, transparent), transparent 58%),
+    var(--cat-color);
+  color: #fff; text-decoration: none; text-align: center;
   font-weight: 800; user-select: none;
-  box-shadow: 0 10px 24px -10px var(--cat-color);
+  box-shadow: 0 12px 26px -10px var(--cat-color), inset 0 -8px 18px -10px rgba(0, 0, 0, 0.45);
   will-change: transform;
-  /* The scale/radius/colour change on hover is CSS; the travel is JS. Keeping
-     them apart means the transition below can never fight the physics loop. */
-  transition: padding 0.25s ease, border-radius 0.25s ease, box-shadow 0.25s ease;
+  /* Size and shape are CSS transitions; travel and squash are JS. Keeping them
+     on separate properties means they can never fight each other. */
+  transition: width 0.3s cubic-bezier(0.34, 1.3, 0.64, 1),
+              height 0.3s cubic-bezier(0.34, 1.3, 0.64, 1),
+              border-radius 0.3s ease, box-shadow 0.3s ease;
 }
-.tcat__ball__face { display: flex; align-items: center; gap: 0.55rem; white-space: nowrap; }
-.tcat__ball__ic { font-size: 1.25rem; line-height: 1; }
-.tcat__ball__t { font-size: 1.05rem; }
-/* Closed: the text is folded away, and it must not be reachable by keyboard or
-   read aloud while it's invisible. */
+/* Carries only the tilt, so the squash above stays on world axes. */
+.tcat__ball__in {
+  display: flex; flex-direction: column; align-items: center; gap: 0.45rem;
+  padding: 0 0.9rem;
+}
+.tcat__ball__face { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
+.tcat__ball__ic { font-size: 1.6rem; line-height: 1; }
+.tcat__ball__t { font-size: 0.95rem; white-space: nowrap; }
+/* Folded away while it's a ball. */
 .tcat__ball__more {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 0;
-  overflow: hidden; max-height: 0; opacity: 0;
-  font-weight: 500; font-size: 0.86rem; line-height: 1.6;
+  max-height: 0; opacity: 0; overflow: hidden;
+  font-weight: 500; font-size: 0.84rem; line-height: 1.55;
   color: color-mix(in srgb, #fff 82%, var(--cat-color));
-  transition: max-height 0.28s ease, opacity 0.2s ease;
+  transition: max-height 0.3s ease, opacity 0.22s ease;
 }
 .tcat__ball__more b { font-weight: 800; color: #fff; }
 
-/* Open: it straightens up (JS eases the angle to 0), grows, squares off its
-   corners and lets the description out. */
+/* Open: it swells into a rounded blob and lets the description out. Not a
+   rectangle — a 32px radius keeps the family resemblance to the ball. */
 .tcat__tank.is-open .tcat__ball {
-  padding: 1.1rem 1.4rem; border-radius: 20px;
-  box-shadow: 0 18px 40px -12px var(--cat-color);
+  width: 246px; height: 208px; border-radius: 32px;
+  box-shadow: 0 20px 44px -12px var(--cat-color), inset 0 -8px 18px -12px rgba(0, 0, 0, 0.35);
 }
-.tcat__tank.is-open .tcat__ball__more {
-  -webkit-line-clamp: 6; max-height: 9rem; opacity: 1;
-}
+.tcat__tank.is-open .tcat__ball__more { max-height: 8rem; opacity: 1; }
+.tcat__tank.is-open .tcat__ball__ic { font-size: 1.35rem; }
 
-/* No motion wanted, or no room for it: the button simply sits in the middle
-   and behaves like a button. */
+/* No motion wanted, or no room for it: it stops being a ball and becomes an
+   ordinary wide button, open, in the flow. */
 .tcat__tank.is-still { height: auto; border-style: solid; padding: var(--space-lg); }
-.tcat__tank.is-still .tcat__ball { position: static; max-width: none; }
-.tcat__tank.is-still .tcat__ball__more { max-height: 9rem; opacity: 1; -webkit-line-clamp: 6; }
+.tcat__tank.is-still .tcat__ball {
+  position: static; width: 100%; height: auto; border-radius: 20px;
+  padding: var(--space-md) 0;
+}
+.tcat__tank.is-still .tcat__ball__more { max-height: 8rem; opacity: 1; }
 
 .tcat__tank__soon {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

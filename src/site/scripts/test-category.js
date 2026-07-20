@@ -195,13 +195,15 @@ function renderIntro() {
       <aside class="tcat__tank">
         ${cat.live
           ? `<a class="tcat__ball" href="#joc">
-               <span class="tcat__ball__face">
-                 <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
-                 <span class="tcat__ball__t">${adminMode ? "Grila de itemi" : "Exersează"}</span>
-               </span>
-               <span class="tcat__ball__more">
-                 <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
-                 explicație imediată. Cei greșiți revin până îi nimerești.
+               <span class="tcat__ball__in">
+                 <span class="tcat__ball__face">
+                   <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
+                   <span class="tcat__ball__t">${adminMode ? "Grila" : "Exersează"}</span>
+                 </span>
+                 <span class="tcat__ball__more">
+                   <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
+                   explicație imediată. Cei greșiți revin până îi nimerești.
+                 </span>
                </span>
              </a>`
           : `<div class="tcat__tank__soon">
