@@ -45,6 +45,10 @@ const NAV_LINKS = [
   { label: "Atelier", href: "comunitate/#forum", title: "Forumul și comunitatea" },
   // The community LANDING is a sales pitch — pointless once you're in.
   { label: "Comunitate", href: "comunitate/descopera/", title: "Ce primești ca membru", guestOnly: true },
+  // The tutoring planner is invitation-only: the teacher, and the pupils he has
+  // marked. Hidden from everyone else — a link that leads to „nu ai acces" is
+  // worse than no link. `plannerOnly` is resolved in renderNav.
+  { label: "Meditații", href: "meditatii/", title: "Îți alegi ora de meditație", plannerOnly: true },
   // The account slot at the end is ROLE-AWARE (initNavUser): guests get the
   // "Intră în cont" button, members get their identity chip (name + XP).
 ];
@@ -88,6 +92,7 @@ export async function renderChrome(basePath = "") {
   safe(() => initMessenger(basePath), "messenger"); // floating 💬 Messenger + guest contact
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
+  safe(revealPlannerLink, "plannerLink"); // show „Meditații" to those who have it
   if (!window.__identityCacheOn) {
     window.__identityCacheOn = true;
     window.addEventListener("atelier:role", cacheIdentity);
@@ -192,6 +197,19 @@ function initGuestOneTap() {
   supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_IN" && session?.user) window.location.reload();
   });
+}
+
+// „Meditații" is invitation-only. The nav renders it hidden and this switches
+// it on once we know the account is either the teacher or a marked pupil — one
+// small query, after the chrome is already on screen, so nothing waits for it.
+async function revealPlannerLink() {
+  if (!isLoggedIn()) return;
+  try {
+    const { hasPlannerAccess } = await import("../scripts/planner-repo.js");
+    if (await hasPlannerAccess()) document.body.classList.add("has-planner");
+  } catch (e) {
+    console.warn("[chrome] planner link:", e);
+  }
 }
 
 // The "log out" glyph used by the header logout button (a door + arrow).
@@ -556,7 +574,11 @@ function renderHeader(basePath) {
   const links = NAV_LINKS.map((link) => {
     // guest-only links are hidden via CSS once body.is-logged is set —
     // so the nav reacts live to the 🎭 role switch, no re-render needed.
-    const cls = link.guestOnly ? ' class="nav-guest-only"' : "";
+    // Same trick for the planner: rendered hidden, revealed by a body class the
+    // moment we know the account has access. Doing it in CSS rather than by
+    // re-rendering keeps the nav in step with the 🎭 role switch for free.
+    const cls = link.guestOnly ? ' class="nav-guest-only"'
+      : link.plannerOnly ? ' class="nav-planner-only"' : "";
     // Absolute paths from the domain root — robust with clean URLs and no
     // longer dependent on how deep the current page is (basePath).
     const href = "/" + link.href; // "Acasă" → "/", "despre/" → "/despre/", …

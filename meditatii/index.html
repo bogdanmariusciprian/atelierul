@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Planificator meditații — Atelierul de Română</title>
+  <meta name="description" content="Îți alegi singur ora de meditație: tragi blocul în ziua care îți convine." />
+  <meta name="robots" content="noindex" />
+  <link rel="apple-touch-icon" href="/assets/logo/logo.png" />
+  <meta name="theme-color" content="#7c3aed" />
+  <link rel="stylesheet" href="/src/shared/styles/main.css" />
+  <link rel="stylesheet" href="/src/planner/styles/planner.css" />
+</head>
+<body>
+  <div id="header"></div>
+
+  <main class="container">
+    <section class="page-hero">
+      <h1>Planificator meditații</h1>
+      <p>Îți alegi singur ora: tragi un bloc în ziua care îți convine. Dacă te răzgândești, îl muți sau îl anulezi.</p>
+    </section>
+
+    <!-- The planner mounts here. Access is checked twice: this script refuses to
+         draw a grid without it, and the database refuses to write without it. -->
+    <section class="pl-wrap" id="planner">
+      <p class="cx-muted">Se încarcă planificatorul…</p>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script type="module">
+    import { renderChrome } from "/src/shared/components/site-chrome.js";
+    import { initPlanner } from "/src/planner/scripts/planner.js";
+
+    await renderChrome("/");
+    initPlanner(document.getElementById("planner"));
+  </script>
+</body>
+</html>
