@@ -159,6 +159,21 @@ function downloadList() {
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
 }
 
+// „Exersează", painted onto the ball instead of laid in front of it: every
+// letter is pushed out to the surface (translateZ) and turned to face along it
+// (rotateY), so the word curves with the sphere. The spin then carries the
+// outer letters past the edge, where backface-visibility hides them — the word
+// wraps around the back and comes round again, which is the whole 3D illusion.
+// Hovering flattens all of it back to ordinary text; see tests.css.
+function ballWord(word) {
+  const ch = [...word];
+  const STEP = 13; // degrees between neighbours — the curvature of the word
+  return ch.map((c, i) => {
+    const a = (i - (ch.length - 1) / 2) * STEP;
+    return `<span class="tcat__ball__l" style="--a:${a.toFixed(1)}deg">${esc(c)}</span>`;
+  }).join("");
+}
+
 function renderIntro() {
   root.className = "tcat";
   const soon = `<p class="tcat__soon">Va urma.</p>`;
@@ -199,7 +214,7 @@ function renderIntro() {
                <span class="tcat__ball__in">
                  <span class="tcat__ball__face">
                    <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
-                   <span class="tcat__ball__t">Exersează</span>
+                   <span class="tcat__ball__t" aria-label="Exersează">${ballWord("Exersează")}</span>
                  </span>
                  <span class="tcat__ball__more">
                    <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu

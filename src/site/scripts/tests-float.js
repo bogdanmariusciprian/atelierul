@@ -1,5 +1,5 @@
 // =========================================================
-// The „Exersează" ball — a Chuzzle-ish blob with weight, in its tank.
+// The „Exersează" ball — a Chuzzle-ish balloon, in its tank.
 //
 // The tank is a fixed box beside the archive. Because it's sticky, it holds
 // still while a long list of papers scrolls past: scrolling is the reader
@@ -7,25 +7,27 @@
 //
 // Three simulations, each doing one job:
 //
-//   WEIGHT — gravity pulls it down, so its resting place is the floor. It
-//   bounces, each bounce lower than the last, then rolls and stops. Scrolling
-//   throws it upward; it arcs and falls back. Nothing floats here: if you leave
-//   the page alone, the ball settles, like an object would.
+//   LIFT — gravity is gentle and the air is thick, which together make a
+//   balloon rather than a stone: it sinks lazily (the fall tops out around
+//   300px/s, G ÷ AIR), keeps most of its energy off a wall, and bobs several
+//   times before lying down. Its resting place is still the floor — but it
+//   takes its time getting there. Scrolling throws it up again.
 //
-//   JELLY — the shape is a DAMPED SPRING, not an animation. On impact it
-//   squashes along the wall's normal by an amount proportional to how hard it
-//   hit, then oscillates back to round on its own. A fast bounce therefore
-//   looks heavier than a slow one without any extra rule: the same spring
-//   simply starts further from rest. Volume is roughly conserved — flatter on
-//   one axis means fatter on the other — which is what reads as rubber instead
-//   of as a picture being resized.
+//   JELLY — the shape is a DAMPED SPRING, not an animation. The squash is
+//   strictly proportional to the speed of the impact: a slow graze dents it 4%,
+//   a full-speed slam 45%, and everything in between lands in between. Then it
+//   oscillates back to round on its own. Volume is roughly conserved — flatter
+//   on one axis means fatter on the other — which is what reads as rubber
+//   instead of as a picture being resized.
 //
 //   ROLL — the ball turns about its vertical axis by the distance it travels
 //   divided by its radius, which is what rolling without slipping means. The
-//   label is painted on the surface, so it swings away and vanishes round the
-//   back, then comes round again. Point at the ball and the spin eases back to
-//   zero, bringing the word to face you — it hides while it plays, and shows
-//   itself the moment you want to read it.
+//   word is not laid in front of the ball but ON it: test-category.js pushes
+//   every letter out to the surface and angles it along the curve, so the spin
+//   carries the outer letters past the edge and backface-visibility hides them.
+//   The word wraps around the back and comes round again. Point at the ball and
+//   the spin eases to zero, bringing the word to face you — it hides while it
+//   plays, and shows itself the moment you want to read it.
 //
 // Transforms are split across elements on purpose: the outer one carries
 // position and squash (world axes, so the floor always squashes top-to-bottom),
@@ -37,24 +39,28 @@
 // Content Romanian, identifiers English.
 // =========================================================
 
-const G = 1500;          // px/s² — gravity. Earth-ish for a 124px ball.
-const WALL_REST = 0.78;  // energy kept bouncing off a side wall
-const FLOOR_REST = 0.62; // …and off the floor. Lower, so it settles quickly.
-const AIR = 0.12;        // velocity lost per second in flight
-const ROLL = 1.6;        // …and per second while rolling on the floor
-const V_SLEEP = 42;      // px/s — under this, on the floor, it lies down
-const V_MAX = 620;
+const G = 430;           // px/s² — gentle gravity: it sinks, it doesn't drop.
+const WALL_REST = 0.88;  // energy kept bouncing off a side wall — light things keep more
+const FLOOR_REST = 0.80; // …and off the floor. High, so it keeps bobbing a while.
+const AIR = 1.4;         // velocity lost per second in flight. THIS is the balloon:
+                         // thick air caps the fall at ~300px/s (v = G/AIR) and makes
+                         // every movement lazy, instead of a rock in a vacuum.
+const ROLL = 1.1;        // …and per second while rolling on the floor
+const V_SLEEP = 24;      // px/s — under this, on the floor, it lies down
+const V_MAX = 520;
 const SPIN_HOVER = 7;    // how fast the label swings back to face you
 const HOVER_DAMP = 6;
-const SCROLL_PUSH = 3.4; // px/s of kick per px scrolled — must beat gravity
+const SCROLL_PUSH = 2.6; // px/s of kick per px scrolled — a lighter body needs less
 
 // The jelly. K sets the wobble's pitch, C how fast it calms down.
-// ζ = C / (2·√K) ≈ 0.4 — underdamped, so a couple of visible wobbles before it
-// settles. Higher C looks like putty; lower rings like a bell and never stops.
-const K = 220, C = 12;
-const SQUASH_MAX = 0.42;
+// ζ = C / (2·√K) ≈ 0.35 — underdamped, and softer than a rubber ball's would be,
+// because a balloon's skin ripples more and for longer. Higher C looks like
+// putty; lower rings like a bell and never stops.
+const K = 150, C = 8.5;
+const SQUASH_MAX = 0.45;
+const V_REF = 420;       // the speed that produces the FULL squash
 const BULGE = 0.8;
-const IDLE_HZ = 0.55, IDLE_AMP = 0.02;
+const IDLE_HZ = 0.45, IDLE_AMP = 0.026;
 
 const reduceMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -94,8 +100,11 @@ export function initFloatingPlay(tank) {
   S.x = b0.w * (0.25 + Math.random() * 0.5);
   S.y = 0;
 
+  // Strictly proportional to how fast it arrived — no floor under it. A slow
+  // graze barely dents the surface; a fast slam flattens it to V_REF's worth.
+  // That single line is why the bounce „feels" heavier when it's quicker.
   const hit = (axis, speed) => {
-    const strength = Math.min(SQUASH_MAX, Math.max(0.06, (speed / V_MAX) * SQUASH_MAX * 1.6));
+    const strength = Math.min(SQUASH_MAX, (speed / V_REF) * SQUASH_MAX);
     if (strength > Math.abs(S.d)) { S.axis = axis; S.d = strength; S.dv = 0; }
   };
 

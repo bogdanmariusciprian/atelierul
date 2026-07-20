@@ -664,7 +664,26 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 
 .tcat__ball__face { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
 .tcat__ball__ic { font-size: 1.6rem; line-height: 1; }
-.tcat__ball__t { font-size: 0.95rem; white-space: nowrap; }
+/* The word lives ON the surface. Each letter is pushed out along the radius
+   and turned to face along the curve (its --a comes from test-category.js), so
+   the row of letters bends like paint on a sphere instead of sitting flat in
+   front of it. `preserve-3d` is what keeps the children in the same 3D space
+   as the ball; without it the browser flattens them and the effect dies. */
+.tcat__ball__t {
+  display: flex; justify-content: center;
+  font-size: 0.95rem; white-space: nowrap;
+  transform-style: preserve-3d;
+}
+.tcat__ball__l {
+  display: inline-block;
+  transform: rotateY(var(--a, 0deg)) translateZ(30px);
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  transition: transform 0.35s ease;
+}
+/* Pointed at, the word peels off the sphere and lies flat, so it reads as
+   ordinary type exactly when you want to read it. */
+.tcat__tank.is-open .tcat__ball__l,
+.tcat__tank.is-still .tcat__ball__l { transform: none; }
 /* Folded away while it's a ball. */
 .tcat__ball__more {
   max-height: 0; opacity: 0; overflow: hidden;
