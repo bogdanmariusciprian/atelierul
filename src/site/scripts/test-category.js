@@ -194,11 +194,12 @@ function renderIntro() {
            which is what makes scrolling feel like shaking it. -->
       <aside class="tcat__tank">
         ${cat.live
-          ? `<a class="tcat__ball" href="#joc">
+          ? `<span class="tcat__shadow" aria-hidden="true"></span>
+             <a class="tcat__ball" href="#joc">
                <span class="tcat__ball__in">
                  <span class="tcat__ball__face">
                    <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
-                   <span class="tcat__ball__t">${adminMode ? "Grila" : "Exersează"}</span>
+                   <span class="tcat__ball__t">Exersează</span>
                  </span>
                  <span class="tcat__ball__more">
                    <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu

@@ -1,52 +1,60 @@
 // =========================================================
-// The „Exersează" ball, adrift in its tank — a Chuzzle-style blob.
+// The „Exersează" ball — a Chuzzle-ish blob with weight, in its tank.
 //
-// The tank is a fixed box beside the archive; the ball is a body inside it,
-// moving on its own and bouncing off the walls. Because the tank is sticky, it
-// stays put while a long list of papers scrolls past — so scrolling is the
-// user shaking the container, and the body sloshes.
+// The tank is a fixed box beside the archive. Because it's sticky, it holds
+// still while a long list of papers scrolls past: scrolling is the reader
+// shaking the container, and the ball answers.
 //
-// Two simulations run side by side:
+// Three simulations, each doing one job:
 //
-//   TRAVEL — constant velocity, integrated against real elapsed time so the
-//   motion matches on a 60Hz and a 144Hz screen. Walls reflect it and keep a
-//   fraction of the energy; a floor on the speed stops it dying in a corner.
+//   WEIGHT — gravity pulls it down, so its resting place is the floor. It
+//   bounces, each bounce lower than the last, then rolls and stops. Scrolling
+//   throws it upward; it arcs and falls back. Nothing floats here: if you leave
+//   the page alone, the ball settles, like an object would.
 //
 //   JELLY — the shape is a DAMPED SPRING, not an animation. On impact it
 //   squashes along the wall's normal by an amount proportional to how hard it
-//   hit, then oscillates back to round on its own. That's why a fast bounce
-//   looks heavier than a slow one without a single extra rule: the same spring
-//   simply starts further from rest. Volume is roughly conserved — squashed on
-//   one axis means stretched on the other — which is what makes it read as
-//   rubber rather than as a picture being resized.
+//   hit, then oscillates back to round on its own. A fast bounce therefore
+//   looks heavier than a slow one without any extra rule: the same spring
+//   simply starts further from rest. Volume is roughly conserved — flatter on
+//   one axis means fatter on the other — which is what reads as rubber instead
+//   of as a picture being resized.
 //
-// Transforms are split across two elements on purpose: the outer one carries
-// position and squash (world axes, so a wall on the left always squashes
-// left-to-right), the inner one carries the tilt. Nesting them the other way
-// would spin the squash along with the body and it would look like shearing.
+//   ROLL — the ball turns about its vertical axis by the distance it travels
+//   divided by its radius, which is what rolling without slipping means. The
+//   label is painted on the surface, so it swings away and vanishes round the
+//   back, then comes round again. Point at the ball and the spin eases back to
+//   zero, bringing the word to face you — it hides while it plays, and shows
+//   itself the moment you want to read it.
+//
+// Transforms are split across elements on purpose: the outer one carries
+// position and squash (world axes, so the floor always squashes top-to-bottom),
+// the inner one carries the spin. Nested the other way, the squash would turn
+// with the body and read as shearing.
 //
 // It refuses to run when it shouldn't: „reduced motion" in the OS, narrow
 // screens, a hidden tab, or a tank scrolled out of view.
 // Content Romanian, identifiers English.
 // =========================================================
 
-const REST = 0.86;       // energy kept after a wall bounce
-const DRAG = 0.4;        // velocity lost per second while drifting
-const V_MIN = 26;        // px/s — below this it gets a nudge, never stalls
-const V_MAX = 520;       // px/s — above this it looks frantic, not playful
-const TILT = 0.05;       // degrees of lean per px/s of horizontal speed
-const HOVER_DAMP = 6;    // how hard the brakes are while pointed at
-const SCROLL_PUSH = 2.2; // px/s of kick per px scrolled
+const G = 1500;          // px/s² — gravity. Earth-ish for a 124px ball.
+const WALL_REST = 0.78;  // energy kept bouncing off a side wall
+const FLOOR_REST = 0.62; // …and off the floor. Lower, so it settles quickly.
+const AIR = 0.12;        // velocity lost per second in flight
+const ROLL = 1.6;        // …and per second while rolling on the floor
+const V_SLEEP = 42;      // px/s — under this, on the floor, it lies down
+const V_MAX = 620;
+const SPIN_HOVER = 7;    // how fast the label swings back to face you
+const HOVER_DAMP = 6;
+const SCROLL_PUSH = 3.4; // px/s of kick per px scrolled — must beat gravity
 
 // The jelly. K sets the wobble's pitch, C how fast it calms down.
-// ζ = C / (2·√K) ≈ 0.4 — underdamped, so you get a couple of visible wobbles
-// before it settles. Higher C and it would look like putty; lower and it would
-// ring like a bell and never stop.
+// ζ = C / (2·√K) ≈ 0.4 — underdamped, so a couple of visible wobbles before it
+// settles. Higher C looks like putty; lower rings like a bell and never stops.
 const K = 220, C = 12;
-const SQUASH_MAX = 0.42; // hardest possible impact: 42% flatter
-const BULGE = 0.8;       // how much of the squash comes back on the other axis
-const IDLE_HZ = 0.55;    // the slow breathing while it drifts, in cycles/s
-const IDLE_AMP = 0.022;
+const SQUASH_MAX = 0.42;
+const BULGE = 0.8;
+const IDLE_HZ = 0.55, IDLE_AMP = 0.02;
 
 const reduceMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -55,10 +63,9 @@ const reduceMotion = () =>
 export function initFloatingPlay(tank) {
   const ball = tank?.querySelector(".tcat__ball");
   const inner = tank?.querySelector(".tcat__ball__in");
+  const shadow = tank?.querySelector(".tcat__shadow");
   if (!tank || !ball || !inner) return () => {};
 
-  // Static fallback: centred, no loop, no listeners. Same button, same link —
-  // only the motion is gone.
   if (reduceMotion() || !window.matchMedia("(min-width: 981px)").matches) {
     tank.classList.add("is-still");
     return () => tank.classList.remove("is-still");
@@ -66,11 +73,12 @@ export function initFloatingPlay(tank) {
 
   const S = {
     x: 0, y: 0,
-    vx: 150 * (Math.random() < 0.5 ? -1 : 1),
-    vy: 110 * (Math.random() < 0.5 ? -1 : 1),
-    tilt: 0,
-    d: 0, dv: 0, axis: "x", // jelly: deformation, its velocity, which way
-    t: Math.random() * 10,  // clock for the idle breathing
+    vx: 190 * (Math.random() < 0.5 ? -1 : 1),
+    vy: 0,
+    spin: 0,                // degrees turned about the vertical axis
+    d: 0, dv: 0, axis: "y", // jelly: deformation, its velocity, which way
+    t: Math.random() * 10,
+    grounded: false,
     hot: false,
     raf: 0, last: 0,
   };
@@ -80,35 +88,47 @@ export function initFloatingPlay(tank) {
     h: Math.max(0, tank.clientHeight - ball.offsetHeight),
   });
 
-  // Start in the middle third, so it never appears half-buried in a corner.
+  // It starts up high and drops in — the fall is the introduction, and it says
+  // „this thing has weight" before the reader has to guess.
   const b0 = bounds();
-  S.x = b0.w * (0.33 + Math.random() * 0.34);
-  S.y = b0.h * (0.33 + Math.random() * 0.34);
+  S.x = b0.w * (0.25 + Math.random() * 0.5);
+  S.y = 0;
 
-  // A wall was hit: kick the spring. Sharper impacts start it further out, so
-  // the wobble that follows is bigger and lasts longer — all from one number.
   const hit = (axis, speed) => {
-    const strength = Math.min(SQUASH_MAX, Math.max(0.06, (speed / V_MAX) * SQUASH_MAX));
-    if (Math.abs(strength) > Math.abs(S.d)) { S.axis = axis; S.d = strength; S.dv = 0; }
+    const strength = Math.min(SQUASH_MAX, Math.max(0.06, (speed / V_MAX) * SQUASH_MAX * 1.6));
+    if (strength > Math.abs(S.d)) { S.axis = axis; S.d = strength; S.dv = 0; }
   };
 
   function draw() {
-    // The idle breath rides on top of the impact spring, so the blob is never
-    // perfectly still — that's most of what makes it feel alive.
-    const idle = S.hot ? 0 : Math.sin(S.t * Math.PI * 2 * IDLE_HZ) * IDLE_AMP;
+    const b = bounds();
+    // The breath only runs while it's awake; a ball lying still on the floor
+    // that keeps pulsing looks like it's out of breath, not alive.
+    const idle = S.hot || (S.grounded && Math.abs(S.vx) < 6)
+      ? 0 : Math.sin(S.t * Math.PI * 2 * IDLE_HZ) * IDLE_AMP;
     const d = S.d + idle;
     const sx = S.axis === "x" ? 1 - d : 1 + d * BULGE;
     const sy = S.axis === "x" ? 1 + d * BULGE : 1 - d;
     ball.style.transform =
       `translate3d(${S.x.toFixed(1)}px, ${S.y.toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
-    inner.style.transform = `rotate(${S.tilt.toFixed(2)}deg)`;
+    inner.style.transform = `rotateY(${S.spin.toFixed(2)}deg)`;
+
+    // The cast shadow is the other half of „weight": it tightens and darkens as
+    // the ball nears the floor, spreads and fades as it rises. Without it, a
+    // falling circle is just a circle moving down.
+    if (shadow && b.h > 0) {
+      const air = Math.max(0, Math.min(1, (b.h - S.y) / b.h)); // 0 = landed
+      const k = 1 - air * 0.55;
+      shadow.style.transform =
+        `translate3d(${(S.x + ball.offsetWidth / 2).toFixed(1)}px, 0, 0) translateX(-50%) scale(${k.toFixed(3)}, ${k.toFixed(3)})`;
+      shadow.style.opacity = (0.34 * k).toFixed(3);
+    }
   }
   draw();
 
   function step(now) {
     S.raf = requestAnimationFrame(step);
     // Clamp dt: a backgrounded tab hands back a huge gap, and integrating it
-    // would teleport the body straight through a wall.
+    // would drop the ball straight through the floor.
     const dt = Math.min(0.05, (now - (S.last || now)) / 1000);
     S.last = now;
     if (!dt) return;
@@ -118,43 +138,52 @@ export function initFloatingPlay(tank) {
     if (!b.w || !b.h) return; // tank not laid out yet
 
     if (S.hot) {
+      // Brakes, so a moving target becomes an easy one.
       const k = Math.exp(-HOVER_DAMP * dt);
-      S.vx *= k; S.vy *= k;
+      S.vx *= k;
+      if (!S.grounded) S.vy = S.vy * k + G * dt * 0.25; // still falls, gently
     } else {
-      const k = Math.exp(-DRAG * dt);
-      S.vx *= k; S.vy *= k;
+      S.vy += G * dt;
+      const k = Math.exp(-(S.grounded ? ROLL : AIR) * dt);
+      S.vx *= k;
       const sp = Math.hypot(S.vx, S.vy);
-      if (sp < V_MIN) {
-        const a = sp > 1 ? Math.atan2(S.vy, S.vx) : Math.random() * Math.PI * 2;
-        S.vx = Math.cos(a) * V_MIN * 1.6;
-        S.vy = Math.sin(a) * V_MIN * 1.6;
-      } else if (sp > V_MAX) {
-        S.vx *= V_MAX / sp; S.vy *= V_MAX / sp;
-      }
+      if (sp > V_MAX) { S.vx *= V_MAX / sp; S.vy *= V_MAX / sp; }
     }
 
     S.x += S.vx * dt;
     S.y += S.vy * dt;
 
-    // Walls. Reflect, lose a little energy, put the body back inside, and tell
-    // the jelly how hard it landed.
-    if (S.x < 0) { S.x = 0; hit("x", Math.abs(S.vx)); S.vx = Math.abs(S.vx) * REST; }
-    else if (S.x > b.w) { S.x = b.w; hit("x", Math.abs(S.vx)); S.vx = -Math.abs(S.vx) * REST; }
-    if (S.y < 0) { S.y = 0; hit("y", Math.abs(S.vy)); S.vy = Math.abs(S.vy) * REST; }
-    else if (S.y > b.h) { S.y = b.h; hit("y", Math.abs(S.vy)); S.vy = -Math.abs(S.vy) * REST; }
+    // Side walls.
+    if (S.x < 0) { S.x = 0; hit("x", Math.abs(S.vx)); S.vx = Math.abs(S.vx) * WALL_REST; }
+    else if (S.x > b.w) { S.x = b.w; hit("x", Math.abs(S.vx)); S.vx = -Math.abs(S.vx) * WALL_REST; }
 
-    // The spring, integrated semi-implicitly: update the velocity from the
-    // current position, THEN move. Plain Euler quietly adds energy here and the
-    // wobble would grow instead of dying.
+    // Ceiling and floor. On the floor, a slow enough arrival stops bouncing
+    // altogether — otherwise it would jitter forever on ever-smaller hops, the
+    // classic way a physics toy betrays itself.
+    S.grounded = false;
+    if (S.y < 0) { S.y = 0; hit("y", Math.abs(S.vy)); S.vy = Math.abs(S.vy) * WALL_REST; }
+    else if (S.y >= b.h) {
+      S.y = b.h;
+      if (Math.abs(S.vy) > V_SLEEP) { hit("y", Math.abs(S.vy)); S.vy = -Math.abs(S.vy) * FLOOR_REST; }
+      else { S.vy = 0; S.grounded = true; }
+    }
+
+    // The spring, integrated semi-implicitly: velocity first, then position.
+    // Plain Euler quietly adds energy here and the wobble would grow, not die.
     S.dv += (-K * S.d - C * S.dv) * dt;
     S.d += S.dv * dt;
     if (Math.abs(S.d) < 0.0006 && Math.abs(S.dv) < 0.01) { S.d = 0; S.dv = 0; }
 
-    // Leans into the direction of travel, straightens up when you point at it —
-    // the label is readable exactly when you want to read it.
-    S.tilt = S.hot
-      ? S.tilt * Math.exp(-HOVER_DAMP * dt)
-      : Math.max(-14, Math.min(14, S.tilt + S.vx * TILT * dt * 10));
+    // Rolling without slipping: turn = distance ÷ radius. Pointed at, the spin
+    // eases to zero by the shortest way round, so the word comes to face you.
+    if (S.hot) {
+      const target = Math.round(S.spin / 360) * 360;
+      S.spin += (target - S.spin) * Math.min(1, SPIN_HOVER * dt);
+    } else {
+      const radius = Math.max(1, ball.offsetWidth / 2);
+      S.spin += (S.vx * dt) / radius * (180 / Math.PI);
+      if (S.spin > 3600 || S.spin < -3600) S.spin %= 360; // keep the number small
+    }
 
     draw();
   }
@@ -167,10 +196,11 @@ export function initFloatingPlay(tank) {
   const onScroll = () => {
     const d = window.scrollY - lastY;
     lastY = window.scrollY;
-    // Opposite to the scroll: the tank moved, the body stayed. Capped so a
-    // flick of the wheel doesn't fire it across the box.
+    // Opposite to the scroll: the tank moved, the ball stayed. This is what
+    // has to beat gravity, which is why its constant is the largest here.
     S.vy = Math.max(-V_MAX, Math.min(V_MAX, S.vy - d * SCROLL_PUSH));
-    S.vx += (Math.random() - 0.5) * Math.abs(d) * 0.8; // a little slosh sideways
+    S.vx += (Math.random() - 0.5) * Math.abs(d) * 1.1; // a little slosh sideways
+    S.grounded = false;
   };
 
   const hotSet = (on) => { S.hot = on; tank.classList.toggle("is-open", on); };
@@ -192,7 +222,6 @@ export function initFloatingPlay(tank) {
   window.addEventListener("resize", onResize);
   document.addEventListener("visibilitychange", onVis);
 
-  // Off-screen → stop the loop entirely. Nothing to look at, nothing to spend.
   const io = new IntersectionObserver(([e]) => {
     e.isIntersecting && !document.hidden ? start() : stop();
   }, { threshold: 0 });
