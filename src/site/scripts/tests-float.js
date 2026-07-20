@@ -58,14 +58,38 @@ const SPIN_HOVER = 7;    // how fast the label swings back to face you
 const HOVER_DAMP = 6;
 const SCROLL_PUSH = 2.6; // px/s of kick per px scrolled — a lighter body needs less
 
-// The jelly. K sets the wobble's pitch, C how fast it calms down.
-// ζ = C / (2·√K) ≈ 0.22 — a slack balloon skin: it rings for about a second and
-// a half, through several visible swings, instead of the two brisk ones a
-// rubber ball would give. Higher C looks like putty; lower never settles.
-const K = 110, C = 4.6;
+// THE JELLY, IN TWO MODES.
+// A real skin doesn't ring at one pitch. Struck, it rings in several modes at
+// once: a slow, deep swing that carries most of the movement, and faster
+// ripples on top that die away quickly. Which modes get excited depends on how
+// hard you hit it — a tap sets only the deep one going, a slam sets off the lot.
+// That is precisely what „the wobble should match the force" means physically,
+// and it can't be had by scaling one spring's amplitude: a loud tap and a soft
+// slam would then look identical, just bigger and smaller.
+//
+// Mode 1 — the fundamental. Slow (1.7Hz), lightly damped, rings ~1.5s.
+// Mode 2 — the first overtone, 2.6× faster and damped harder, gone in ~0.4s.
+//          Its share grows with the SQUARE of the impact, so it's inaudible in
+//          a graze and dominant in a slam. That's the shudder before the swing.
+const K = 110, C = 4.6;               // ω=10.5 · ζ=0.22 · 1.67Hz
+const MODE2 = 2.6;                    // pitch ratio of the overtone
+const K2 = K * MODE2 * MODE2, C2 = 2 * 0.36 * Math.sqrt(K2);
+const PEAK1 = 0.737, PEAK2 = 0.624;   // measured: what fraction of v₀/ω each reaches
+const MODE2_MIX = 0.55;               // how much of a full-force hit goes overtone
+// Two modes never peak at the same instant, so their sum falls short of the
+// sum of their peaks — hence a gain, with the soft clamp in draw() catching the
+// top. The exponent above 1 is what widens the dynamic range: it quietens the
+// gentle end without touching the loud one, so a graze and a slam differ by
+// nearly eightfold instead of threefold.
+const AMP_GAIN = 2.3, AMP_CURVE = 1.5;
+
 const SQUASH_MAX = 0.45;
-const V_REF = 420;       // the speed that produces the FULL squash
+const V_REF = 420;       // the speed at which the squash is essentially full
 const V_DENT = 52;       // …and the speed under which it doesn't dent at all
+// Restitution falls as the impact hardens: a hard hit spends more of itself on
+// deforming the skin, so less comes back as bounce. Constant restitution is the
+// tell of a simulation — real things bounce worse the harder they land.
+const REST_LOSS = 0.22;
 const BULGE = 0.8;
 const IDLE_HZ = 0.45, IDLE_AMP = 0.026;
 
@@ -121,8 +145,9 @@ export function initFloatingPlay(tank) {
     stx: 0, sty: 0,         // eased motion stretch per axis
     cx: 0.5, cy: 0.5,       // where it last touched — the squash pivots there
     tilt: GLOBE_TILT,       // how far the globe is tipped, eased to 0 on hover
-    dx: 0, dxv: 0,          // jelly: squash along x, and how fast it's changing
-    dy: 0, dyv: 0,          // …and along y. Two springs, never one with a flag.
+    // Jelly: per axis, the fundamental (a…) and the overtone (b…).
+    ax1: 0, ax1v: 0, ax2: 0, ax2v: 0,
+    ay1: 0, ay1v: 0, ay2: 0, ay2v: 0,
     t: Math.random() * 10,
     grounded: false,
     hot: false,
@@ -156,17 +181,32 @@ export function initFloatingPlay(tank) {
   // Below V_DENT nothing happens at all. That deadzone is deliberate: the tiny
   // contacts a small scroll produces were each poking the spring, and a spring
   // poked twenty times a second is a stutter, not a wobble.
-  // v₀ ÷ ω is the peak of an UNdamped spring; ours loses about 31% of that on
-  // the way up, so the push is scaled back up to land on the figure asked for.
-  // Measured, not guessed — at ζ = 0.22 the ratio is 0.69.
-  const OMEGA = Math.sqrt(K) / 0.69;
-  // `at` is where on the ball the wall touched, 0…1 on each axis. Everything
-  // that follows hangs off it.
+  // Each mode is pushed, never placed, and each push is sized so that mode's
+  // peak lands where we want it — hence dividing by the measured peak ratios.
+  const OM1 = Math.sqrt(K) / PEAK1;
+  const OM2 = Math.sqrt(K2) / PEAK2;
+
+  // `at` is where on the ball the wall touched, 0…1 on each axis.
   const hit = (axis, speed, at) => {
     if (speed < V_DENT) return;
-    const push = Math.min(SQUASH_MAX, (speed / V_REF) * SQUASH_MAX) * OMEGA;
-    if (axis === "x") { S.dxv += push; S.cx = at; S.cy = 0.5; }
-    else { S.dyv += push; S.cy = at; S.cx = 0.5; }
+    // tanh instead of a hard cap: the skin stiffens as it stretches, so the
+    // squash approaches its limit smoothly instead of hitting a ceiling and
+    // going flat. Above V_REF, harder hits keep sounding harder — through the
+    // overtone — even though the depth barely grows.
+    const hard = Math.min(1.6, speed / V_REF);
+    const amp = SQUASH_MAX * AMP_GAIN * Math.tanh(hard ** AMP_CURVE);
+    // The overtone's share rises with the square of the force. This is the line
+    // that makes a graze and a slam different in KIND, not just in size.
+    const mix = MODE2_MIX * Math.min(1, hard) ** 2;
+    if (axis === "x") {
+      S.ax1v += amp * (1 - mix) * OM1;
+      S.ax2v += amp * mix * OM2;
+      S.cx = at; S.cy = 0.5;
+    } else {
+      S.ay1v += amp * (1 - mix) * OM1;
+      S.ay2v += amp * mix * OM2;
+      S.cy = at; S.cx = 0.5;
+    }
   };
 
   function draw() {
@@ -178,7 +218,12 @@ export function initFloatingPlay(tank) {
     // Each axis is shortened by its own spring and fattened by the other's —
     // that cross term is what keeps the volume roughly constant. The motion
     // stretch rides on top: longer along the way it's going, thinner across.
-    const dx = S.dx, dy = S.dy + idle;
+    // The modes simply add — that superposition IS the physics. Clamped softly
+    // with tanh rather than cut off, so a violent hit compresses toward the
+    // limit instead of slamming into a flat ceiling.
+    const soft = (v) => SQUASH_MAX * Math.tanh(v / SQUASH_MAX);
+    const dx = soft(S.ax1 + S.ax2);
+    const dy = soft(S.ay1 + S.ay2) + idle;
     const sx = 1 - dx + dy * BULGE + S.stx;
     const sy = 1 - dy + dx * BULGE + S.sty;
 
@@ -188,7 +233,7 @@ export function initFloatingPlay(tank) {
     // as fast as the deformation fades. Scaling about the centre was leaving a
     // visible gap under the ball at the very moment it should look pressed
     // hardest against the ground.
-    const amt = Math.min(1, Math.hypot(S.dx, S.dy) / SQUASH_MAX);
+    const amt = Math.min(1, Math.hypot(dx, dy - idle) / SQUASH_MAX);
     const ox = 50 + (S.cx - 0.5) * 100 * amt;
     const oy = 50 + (S.cy - 0.5) * 100 * amt;
     ball.style.transformOrigin = `${ox.toFixed(1)}% ${oy.toFixed(1)}%`;
@@ -210,7 +255,7 @@ export function initFloatingPlay(tank) {
       // shadow slides away from the light — which comes from up and to the
       // left, per the highlight painted on the sphere. A shadow sitting dead
       // centre under a lit ball is the giveaway of a fake.
-      const spread = 1 + Math.max(0, S.dy) * 1.5;
+      const spread = 1 + Math.max(0, dy) * 1.5;
       const lean = air * 16;
       shadow.style.transform =
         `translate3d(${(S.x + ball.offsetWidth / 2 + lean).toFixed(1)}px, 0, 0) translateX(-50%) `
@@ -276,14 +321,18 @@ export function initFloatingPlay(tank) {
     // spin by friction, the way a ball scuffed down a wall starts to turn.
     const radius = Math.max(1, ball.offsetWidth / 2);
     const toSpin = (v) => (v / radius) * (180 / Math.PI);
+    // Harder landings give less back: more of the blow goes into working the
+    // skin. A fixed restitution is one of the plainest tells of a simulation.
+    const restFor = (base, speed) =>
+      base * (1 - REST_LOSS * Math.min(1, speed / V_REF));
     if (S.x < 0) {
       S.x = 0; hit("x", Math.abs(S.vx), 0);
       S.spinV -= toSpin(S.vy) * WALL_GRIP;
-      S.vx = Math.abs(S.vx) * WALL_REST;
+      S.vx = Math.abs(S.vx) * restFor(WALL_REST, Math.abs(S.vx));
     } else if (S.x > b.w) {
       S.x = b.w; hit("x", Math.abs(S.vx), 1);
       S.spinV += toSpin(S.vy) * WALL_GRIP;
-      S.vx = -Math.abs(S.vx) * WALL_REST;
+      S.vx = -Math.abs(S.vx) * restFor(WALL_REST, Math.abs(S.vx));
     }
 
     // Ceiling and floor. On the floor, a slow enough arrival stops bouncing
@@ -291,7 +340,7 @@ export function initFloatingPlay(tank) {
     // classic way a physics toy betrays itself.
     const wasGrounded = S.grounded;
     S.grounded = false;
-    if (S.y < 0) { S.y = 0; hit("y", Math.abs(S.vy), 0); S.vy = Math.abs(S.vy) * WALL_REST; }
+    if (S.y < 0) { S.y = 0; hit("y", Math.abs(S.vy), 0); S.vy = Math.abs(S.vy) * restFor(WALL_REST, Math.abs(S.vy)); }
     else if (S.y >= b.h) {
       S.y = b.h;
       hit("y", Math.abs(S.vy), 1);
@@ -299,18 +348,29 @@ export function initFloatingPlay(tank) {
       // than it took to stop. With a single threshold, a body sitting right on
       // it flickers between bouncing and resting — the stutter you noticed.
       const wake = wasGrounded ? V_SLEEP * 2.2 : V_SLEEP;
-      if (Math.abs(S.vy) > wake) { S.vy = -Math.abs(S.vy) * FLOOR_REST; }
+      if (Math.abs(S.vy) > wake) { S.vy = -Math.abs(S.vy) * restFor(FLOOR_REST, Math.abs(S.vy)); }
       else { S.vy = 0; S.grounded = true; }
     }
 
-    // Both springs, integrated semi-implicitly: velocity first, then position.
-    // Plain Euler quietly adds energy here and the wobble would grow, not die.
-    S.dxv += (-K * S.dx - C * S.dxv) * dt;
-    S.dx = Math.max(-SQUASH_MAX, Math.min(SQUASH_MAX, S.dx + S.dxv * dt));
-    S.dyv += (-K * S.dy - C * S.dyv) * dt;
-    S.dy = Math.max(-SQUASH_MAX, Math.min(SQUASH_MAX, S.dy + S.dyv * dt));
-    if (Math.abs(S.dx) < 0.0005 && Math.abs(S.dxv) < 0.01) { S.dx = 0; S.dxv = 0; }
-    if (Math.abs(S.dy) < 0.0005 && Math.abs(S.dyv) < 0.01) { S.dy = 0; S.dyv = 0; }
+    // Four springs now — two modes on each axis — integrated semi-implicitly:
+    // velocity first, then position. Plain Euler quietly adds energy here and
+    // the wobble would grow instead of dying.
+    // The overtone is integrated in substeps: at 4.3Hz it is close enough to
+    // the frame rate that a single step per frame would lose its shape, and on
+    // a slow frame it would go unstable. Cheap insurance, four extra lines.
+    const sub = Math.max(1, Math.ceil(dt / 0.008));
+    const h = dt / sub;
+    for (let i = 0; i < sub; i++) {
+      S.ax1v += (-K * S.ax1 - C * S.ax1v) * h;  S.ax1 += S.ax1v * h;
+      S.ay1v += (-K * S.ay1 - C * S.ay1v) * h;  S.ay1 += S.ay1v * h;
+      S.ax2v += (-K2 * S.ax2 - C2 * S.ax2v) * h; S.ax2 += S.ax2v * h;
+      S.ay2v += (-K2 * S.ay2 - C2 * S.ay2v) * h; S.ay2 += S.ay2v * h;
+    }
+    const quiet = (v, vv) => Math.abs(v) < 0.0004 && Math.abs(vv) < 0.01;
+    if (quiet(S.ax1, S.ax1v)) { S.ax1 = 0; S.ax1v = 0; }
+    if (quiet(S.ay1, S.ay1v)) { S.ay1 = 0; S.ay1v = 0; }
+    if (quiet(S.ax2, S.ax2v)) { S.ax2 = 0; S.ax2v = 0; }
+    if (quiet(S.ay2, S.ay2v)) { S.ay2 = 0; S.ay2v = 0; }
 
     // Spin has its own momentum now. Airborne it only bleeds off slowly, so a
     // ball thrown upward keeps turning through the whole arc — before, the spin
