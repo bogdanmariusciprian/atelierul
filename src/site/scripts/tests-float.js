@@ -399,6 +399,11 @@ export function initFloatingPlay(tank) {
         S.vy += dy * MAG_GRAB_K * dt;
         drag = MAG_GRAB_C;
         S.grounded = false;
+        // Held means IN CONTACT, and contact carries the weight: the holding
+        // force cancels gravity exactly, as it does for anything resting on
+        // anything. Without this the ball hung a dozen pixels low — which reads
+        // as „it isn't quite following the pointer".
+        S.vy -= G * dt;
       } else if (dist < MAG_R) {
         const t = dist / MAG_R;
         // Full strength out to 0.6 of the reach, then faded smoothly to nothing
@@ -613,13 +618,20 @@ export function initFloatingPlay(tank) {
   const onScroll = () => {
     const d = window.scrollY - lastY;
     lastY = window.scrollY;
+    // ALWAYS re-measure, before anything else. The tank is sticky, so every
+    // pixel of scroll moves it relative to the page, and the pointer's position
+    // is worked out from this rectangle. This line used to sit BELOW the noise
+    // filter, so a slow trackpad scroll — which arrives as a long run of
+    // one-pixel steps — never refreshed it at all: the cache drifted by however
+    // far you had scrolled, and the ball chased a point that was no longer
+    // under your hand.
+    freshRect();
     // Opposite to the scroll: the tank moved, the ball stayed. This is what
     // has to beat gravity, which is why its constant is the largest here.
-    if (Math.abs(d) < 2) return; // ignore the noise a trackpad emits at rest
+    if (Math.abs(d) < 2) return; // …but ignore that noise for the shove itself
     S.vy = Math.max(-V_MAX, Math.min(V_MAX, S.vy - d * SCROLL_PUSH));
     S.vx += (Math.random() - 0.5) * Math.abs(d) * 0.5; // a little slosh sideways
     S.grounded = false;
-    freshRect(); // the tank is sticky: it just moved relative to the pointer
   };
 
   const hotSet = (on) => { S.hot = on; tank.classList.toggle("is-open", on); };
@@ -661,11 +673,19 @@ export function initFloatingPlay(tank) {
   }, { threshold: 0 });
   io.observe(tank);
 
+  // The page can change height without anyone scrolling — the archive arrives
+  // from the database after first paint and pushes the layout around. Watch for
+  // it rather than guessing when it might happen.
+  const ro = new ResizeObserver(() => freshRect());
+  ro.observe(tank);
+  ro.observe(document.documentElement);
+
   start();
 
   return () => {
     stop();
     io.disconnect();
+    ro.disconnect();
     ball.removeEventListener("pointerenter", onEnter);
     ball.removeEventListener("pointerleave", onLeave);
     ball.removeEventListener("focus", onEnter);
