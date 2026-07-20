@@ -650,7 +650,7 @@ function initNavUser(slot, basePath) {
       : `<span class="nav-user__av nav-user__av--init" style="--a:${CURRENT_USER.color}">${CURRENT_USER.initials}</span>`;
     const total = notifTotal();
     slot.innerHTML = `
-      <button type="button" class="nav-user" title="Click: profilul tău · Hover: noutățile tale">
+      <button type="button" class="nav-user" title="Click: panoul de admin · Hover: noutățile tale">
         ${avatar}
         <span class="nav-user__id">
           <b class="nav-user__name">🎓 Profesor</b>
@@ -916,8 +916,10 @@ function initNotifCenter(basePath) {
     if (e.target.closest(".xp__user, .nav-user")) e.preventDefault();
   });
 
-  // Click on the chip → "Pagina mea" (the admin, who has no wall, lands on
-  // his profile) — unless this very click was the tail of a long-press.
+  // Click on the chip → "Pagina mea" for a member. The TEACHER goes straight to
+  // the admin panel: he has no wall, no points and no profile worth the trip —
+  // the one place he actually heads for from anywhere on the site is his desk.
+  // Unless this very click was the tail of a long-press.
   document.addEventListener("click", (e) => {
     const chip = e.target.closest(".xp__user, .nav-user");
     if (chip) {
@@ -927,7 +929,7 @@ function initNotifCenter(basePath) {
         return;
       }
       close();
-      window.location.href = `${HUB}#${isAdmin() ? "profil" : "pagina-mea"}`;
+      window.location.href = `${HUB}#${isAdmin() ? "admin" : "pagina-mea"}`;
       return;
     }
     if (panel && !panel.contains(e.target)) close();
