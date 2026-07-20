@@ -13,12 +13,18 @@
 //   times before lying down. Its resting place is still the floor — but it
 //   takes its time getting there. Scrolling throws it up again.
 //
-//   JELLY — the shape is a DAMPED SPRING, not an animation. The squash is
-//   strictly proportional to the speed of the impact: a slow graze dents it 4%,
-//   a full-speed slam 45%, and everything in between lands in between. Then it
-//   oscillates back to round on its own. Volume is roughly conserved — flatter
-//   on one axis means fatter on the other — which is what reads as rubber
-//   instead of as a picture being resized.
+//   JELLY — the shape is TWO damped springs, one per axis, and an impact does
+//   not set them: it gives them a PUSH. That distinction is the whole feel of
+//   the thing. Setting the deformation makes the ball snap flat in a single
+//   frame and then relax — a slap. Pushing the spring makes it flatten over
+//   about a sixth of a second, overshoot, come back, overshoot less, and
+//   settle: a wobble. The strength of the push is proportional to the speed of
+//   the impact, so a graze ripples and a slam heaves.
+//   One spring per axis, rather than one spring plus a „which way" flag, means
+//   a corner hit wobbles on both axes at once, and a second knock while the
+//   first is still ringing adds to it instead of overwriting it.
+//   Volume is roughly conserved — flatter on one axis means fatter on the
+//   other — which is what reads as rubber instead of a resized picture.
 //
 //   ROLL — the ball turns about its vertical axis by the distance it travels
 //   divided by its radius, which is what rolling without slipping means. The
@@ -53,10 +59,10 @@ const HOVER_DAMP = 6;
 const SCROLL_PUSH = 2.6; // px/s of kick per px scrolled — a lighter body needs less
 
 // The jelly. K sets the wobble's pitch, C how fast it calms down.
-// ζ = C / (2·√K) ≈ 0.35 — underdamped, and softer than a rubber ball's would be,
-// because a balloon's skin ripples more and for longer. Higher C looks like
-// putty; lower rings like a bell and never stops.
-const K = 150, C = 8.5;
+// ζ = C / (2·√K) ≈ 0.22 — a slack balloon skin: it rings for about a second and
+// a half, through several visible swings, instead of the two brisk ones a
+// rubber ball would give. Higher C looks like putty; lower never settles.
+const K = 110, C = 4.6;
 const SQUASH_MAX = 0.45;
 const V_REF = 420;       // the speed that produces the FULL squash
 const V_DENT = 52;       // …and the speed under which it doesn't dent at all
@@ -100,7 +106,8 @@ export function initFloatingPlay(tank) {
     vy: 0,
     spin: 0,                // degrees turned about the vertical axis
     tilt: GLOBE_TILT,       // how far the globe is tipped, eased to 0 on hover
-    d: 0, dv: 0, axis: "y", // jelly: deformation, its velocity, which way
+    dx: 0, dxv: 0,          // jelly: squash along x, and how fast it's changing
+    dy: 0, dyv: 0,          // …and along y. Two springs, never one with a flag.
     t: Math.random() * 10,
     grounded: false,
     hot: false,
@@ -127,15 +134,21 @@ export function initFloatingPlay(tank) {
   S.x = b0.w * (0.25 + Math.random() * 0.5);
   S.y = 0;
 
-  // Strictly proportional to how fast it arrived: a slow graze barely dents the
-  // surface, a fast slam flattens it to V_REF's worth.
+  // An impact PUSHES the spring; it never places it. The push is sized so the
+  // wobble peaks near `strength`: for a lightly damped spring started from rest,
+  // the peak is v₀ ÷ ω, so v₀ = strength · ω gets us there — about 0.15s later,
+  // which is exactly the build-up that was missing.
   // Below V_DENT nothing happens at all. That deadzone is deliberate: the tiny
-  // contacts a small scroll produces were each restarting the spring, and a
-  // spring restarted twenty times a second is a stutter, not a wobble.
+  // contacts a small scroll produces were each poking the spring, and a spring
+  // poked twenty times a second is a stutter, not a wobble.
+  // v₀ ÷ ω is the peak of an UNdamped spring; ours loses about 31% of that on
+  // the way up, so the push is scaled back up to land on the figure asked for.
+  // Measured, not guessed — at ζ = 0.22 the ratio is 0.69.
+  const OMEGA = Math.sqrt(K) / 0.69;
   const hit = (axis, speed) => {
     if (speed < V_DENT) return;
-    const strength = Math.min(SQUASH_MAX, (speed / V_REF) * SQUASH_MAX);
-    if (strength > Math.abs(S.d)) { S.axis = axis; S.d = strength; S.dv = 0; }
+    const push = Math.min(SQUASH_MAX, (speed / V_REF) * SQUASH_MAX) * OMEGA;
+    if (axis === "x") S.dxv += push; else S.dyv += push;
   };
 
   function draw() {
@@ -144,9 +157,11 @@ export function initFloatingPlay(tank) {
     // between 0 and full amplitude mid-cycle made the balloon visibly jump the
     // instant it came to rest — a discontinuity in a value the eye is tracking.
     const idle = Math.sin(S.t * Math.PI * 2 * IDLE_HZ) * IDLE_AMP * S.awake;
-    const d = S.d + idle;
-    const sx = S.axis === "x" ? 1 - d : 1 + d * BULGE;
-    const sy = S.axis === "x" ? 1 + d * BULGE : 1 - d;
+    // Each axis is shortened by its own spring and fattened by the other's —
+    // that cross term is what keeps the volume roughly constant.
+    const dx = S.dx, dy = S.dy + idle;
+    const sx = 1 - dx + dy * BULGE;
+    const sy = 1 - dy + dx * BULGE;
     ball.style.transform =
       `translate3d(${S.x.toFixed(1)}px, ${S.y.toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
     // Tilt first, then spin: the letters turn about the sphere's own axis,
@@ -239,11 +254,14 @@ export function initFloatingPlay(tank) {
       else { S.vy = 0; S.grounded = true; }
     }
 
-    // The spring, integrated semi-implicitly: velocity first, then position.
+    // Both springs, integrated semi-implicitly: velocity first, then position.
     // Plain Euler quietly adds energy here and the wobble would grow, not die.
-    S.dv += (-K * S.d - C * S.dv) * dt;
-    S.d += S.dv * dt;
-    if (Math.abs(S.d) < 0.0006 && Math.abs(S.dv) < 0.01) { S.d = 0; S.dv = 0; }
+    S.dxv += (-K * S.dx - C * S.dxv) * dt;
+    S.dx = Math.max(-SQUASH_MAX, Math.min(SQUASH_MAX, S.dx + S.dxv * dt));
+    S.dyv += (-K * S.dy - C * S.dyv) * dt;
+    S.dy = Math.max(-SQUASH_MAX, Math.min(SQUASH_MAX, S.dy + S.dyv * dt));
+    if (Math.abs(S.dx) < 0.0005 && Math.abs(S.dxv) < 0.01) { S.dx = 0; S.dxv = 0; }
+    if (Math.abs(S.dy) < 0.0005 && Math.abs(S.dyv) < 0.01) { S.dy = 0; S.dyv = 0; }
 
     // Rolling without slipping: turn = distance ÷ radius. Pointed at, the spin
     // eases to zero by the shortest way round, so the word comes to face you.
