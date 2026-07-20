@@ -45,18 +45,21 @@
 // Content Romanian, identifiers English.
 // =========================================================
 
-const G = 430;           // px/s² — gentle gravity: it sinks, it doesn't drop.
-const WALL_REST = 0.88;  // energy kept bouncing off a side wall — light things keep more
-const FLOOR_REST = 0.80; // …and off the floor. High, so it keeps bobbing a while.
-const AIR = 1.4;         // velocity lost per second in flight. THIS is the balloon:
-                         // thick air caps the fall at ~300px/s (v = G/AIR) and makes
-                         // every movement lazy, instead of a rock in a vacuum.
-const ROLL = 1.1;        // …and per second while rolling on the floor
-const V_SLEEP = 24;      // px/s — under this, on the floor, it lies down
-const V_MAX = 520;
+// A FOOTBALL, not a balloon. The change that matters most here is AIR, not
+// restitution: at balloon drag the ball lost most of its speed on the way up,
+// so each hop was a fraction of the last and it looked like it was landing in
+// treacle. Thin the air and the same restitution suddenly gives a long, even
+// run of bounces — 260, 142, 80, 46, 27… — which is what a real ball does.
+const G = 1250;          // px/s² — it falls, it doesn't sink
+const WALL_REST = 0.86;
+const FLOOR_REST = 0.80; // a real football returns about 60% of drop height
+const AIR = 0.22;        // thin air: the ball keeps what it has between bounces
+const ROLL = 0.6;        // …and rolls well once it's down
+const V_SLEEP = 14;      // px/s — low, so the last little hops still happen
+const V_MAX = 900;       // a 260px drop already arrives at ~800px/s
 const SPIN_HOVER = 7;    // how fast the label swings back to face you
 const HOVER_DAMP = 6;
-const SCROLL_PUSH = 2.6; // px/s of kick per px scrolled — a lighter body needs less
+const SCROLL_PUSH = 4.2; // px/s of kick per px scrolled — mass needs a firmer shove
 
 // THE JELLY, IN TWO MODES.
 // A real skin doesn't ring at one pitch. Struck, it rings in several modes at
@@ -71,38 +74,44 @@ const SCROLL_PUSH = 2.6; // px/s of kick per px scrolled — a lighter body need
 // Mode 2 — the first overtone, 2.6× faster and damped harder, gone in ~0.4s.
 //          Its share grows with the SQUARE of the impact, so it's inaudible in
 //          a graze and dominant in a slam. That's the shudder before the swing.
-const K = 110, C = 4.6;               // ω=10.5 · ζ=0.22 · 1.67Hz
+// Football skin: stiff and well damped. It judders rather than wobbles — about
+// three times the pitch of the balloon and gone in half a second instead of
+// two. A ball this heavy that jiggled like jelly would look weightless.
+const K = 340, C = 15.5;              // ω=18.4 · ζ=0.42 · 2.93Hz
 const MODE2 = 2.6;                    // pitch ratio of the overtone
-const K2 = K * MODE2 * MODE2, C2 = 2 * 0.36 * Math.sqrt(K2);
-const PEAK1 = 0.737, PEAK2 = 0.624;   // measured: what fraction of v₀/ω each reaches
-const MODE2_MIX = 0.55;               // how much of a full-force hit goes overtone
+const K2 = K * MODE2 * MODE2, C2 = 2 * 0.55 * Math.sqrt(K2);
+const PEAK1 = 0.589, PEAK2 = 0.516;   // measured: what fraction of v₀/ω each reaches
+const MODE2_MIX = 0.5;                // how much of a full-force hit goes overtone
 // Two modes never peak at the same instant, so their sum falls short of the
 // sum of their peaks — hence a gain, with the soft clamp in draw() catching the
 // top. The exponent above 1 is what widens the dynamic range: it quietens the
 // gentle end without touching the loud one, so a graze and a slam differ by
 // nearly eightfold instead of threefold.
-const AMP_GAIN = 2.3, AMP_CURVE = 1.5;
+const AMP_GAIN = 1.8, AMP_CURVE = 1.4;
 
-const SQUASH_MAX = 0.45;
-const V_REF = 420;       // the speed at which the squash is essentially full
-const V_DENT = 52;       // …and the speed under which it doesn't dent at all
+const SQUASH_MAX = 0.20; // a football barely deforms: 20% on the hardest landing
+const V_REF = 700;       // the speed at which the squash is essentially full
+const V_DENT = 70;       // …and the speed under which it doesn't dent at all
 // Restitution falls as the impact hardens: a hard hit spends more of itself on
 // deforming the skin, so less comes back as bounce. Constant restitution is the
 // tell of a simulation — real things bounce worse the harder they land.
-const REST_LOSS = 0.22;
+const REST_LOSS = 0.12;  // a firm ball loses less to deformation
 const BULGE = 0.8;
-const IDLE_HZ = 0.45, IDLE_AMP = 0.026;
+const IDLE_HZ = 0.45, IDLE_AMP = 0.008;
 
-// The globe is tipped a few degrees toward the viewer, which turns the band of
-// letters from a straight ring into an ellipse on screen. That ellipse is the
-// clearest signal the eye gets that it is looking at a sphere. Pointed at, the
-// tilt eases to zero and the word comes level to be read.
-const GLOBE_TILT = -14;
+// FREE ROTATION. The orientation is a 3×3 matrix with an angular-velocity
+// VECTOR driving it, not a pair of angles. Euler angles cannot express tumbling:
+// rotate about y then x, and the second rotation happens in the frame the first
+// one left behind, so the axes drift and eventually collapse into each other —
+// gimbal lock. Composing small rotations onto a matrix has neither problem, and
+// CSS takes the result directly through matrix3d().
+const SPIN_WOBBLE = 0.55; // how much of an off-centre impact becomes tumble
+const ORTHO_EVERY = 30;   // frames between re-squaring the matrix
 
 // Motion stretch: a soft body elongates along the direction it travels. Purely
 // axis-aligned here, so a diagonal cancels out — which is honest, because an
 // axis-aligned scale genuinely cannot express a diagonal stretch.
-const STRETCH = 0.16;
+const STRETCH = 0.07;    // a firm ball hardly elongates
 const STRETCH_EASE = 9;  // per second — how fast the stretch follows the speed
 
 // Spin is now a real angular velocity with its own memory, not a number read
@@ -132,10 +141,12 @@ const WAKE_EASE = 3.2;   // how fast the breathing fades in and out, per second
 // along the ground toward you. That threshold is the honest version of what
 // used to be a fudge, and it reads better: the ball is visibly deciding.
 const MAG_R = 320;       // px — the field's reach
-const MAG_A = 1.4e7;     // px³/s² — strength; a = A/(d²+s²)
+const MAG_A = 3.2e7;     // px³/s² — strength; a = A/(d²+s²). Raised with the
+                         // ball's weight: the field still has to beat gravity,
+                         // and gravity nearly tripled.
 const MAG_SOFT = 42;     // px — softening, so the centre isn't a singularity
-const MAG_MAX = 2700;    // px/s² — cap, roughly six times gravity
-const MAG_EDDY = 3.0;    // 1/s of drag near the field, like eddy currents
+const MAG_MAX = 7000;    // px/s² — cap, roughly six times gravity
+const MAG_EDDY = 2.2;    // 1/s of drag near the field, like eddy currents
 
 // CONTACT. Inside this radius the field stops and a hold takes over: firm
 // damping and a gentle centring. Without it the ball buzzed across the cursor
@@ -144,8 +155,8 @@ const MAG_EDDY = 3.0;    // 1/s of drag near the field, like eddy currents
 // below the pointer — exactly where the hold balances gravity, which is the
 // sag a real hanging magnet has.
 const MAG_GRAB = 34;     // px
-const MAG_GRAB_K = 26;   // 1/s² of centring
-const MAG_GRAB_C = 13;   // 1/s of damping while held
+const MAG_GRAB_K = 78;   // 1/s² of centring — same ~16px sag under a heavier ball
+const MAG_GRAB_C = 22;   // 1/s of damping while held
 
 const reduceMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -166,10 +177,12 @@ export function initFloatingPlay(tank) {
     x: 0, y: 0,
     vx: 190 * (Math.random() < 0.5 ? -1 : 1),
     vy: 0,
-    spin: 0, spinV: 0,      // angle, and angular velocity in deg/s
+    // Orientation, row-major. Starts as identity: the word facing the reader.
+    R: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    wx: 0, wy: 0, wz: 0,    // angular velocity, rad/s, about the screen axes
+    frame: 0,
     stx: 0, sty: 0,         // eased motion stretch per axis
     cx: 0.5, cy: 0.5,       // where it last touched — the squash pivots there
-    tilt: GLOBE_TILT,       // how far the globe is tipped, eased to 0 on hover
     // Jelly: per axis, the fundamental (a…) and the overtone (b…).
     ax1: 0, ax1v: 0, ax2: 0, ax2v: 0,
     ay1: 0, ay1v: 0, ay2: 0, ay2v: 0,
@@ -188,6 +201,40 @@ export function initFloatingPlay(tank) {
   // is how you turn a smooth toy into a stuttering one.
   let rect = null;
   const freshRect = () => (rect = tank.getBoundingClientRect());
+
+  // R ← dR·R, where dR is the rotation of `ang` radians about a unit axis
+  // (Rodrigues' formula). Small rotations composed frame by frame add up to any
+  // orientation at all, which is exactly what tumbling needs.
+  function spinBy(ax, ay, az, ang) {
+    if (!ang) return;
+    const c = Math.cos(ang), s2 = Math.sin(ang), t = 1 - c;
+    const d = [
+      t * ax * ax + c, t * ax * ay - s2 * az, t * ax * az + s2 * ay,
+      t * ax * ay + s2 * az, t * ay * ay + c, t * ay * az - s2 * ax,
+      t * ax * az - s2 * ay, t * ay * az + s2 * ax, t * az * az + c,
+    ];
+    const R = S.R, out = new Array(9);
+    for (let r = 0; r < 3; r++)
+      for (let c2 = 0; c2 < 3; c2++)
+        out[r * 3 + c2] = d[r * 3] * R[c2] + d[r * 3 + 1] * R[3 + c2] + d[r * 3 + 2] * R[6 + c2];
+    S.R = out;
+  }
+
+  // Floating-point error creeps in over thousands of multiplications and the
+  // matrix slowly stops being a rotation — the ball would shear and shrink.
+  // Gram-Schmidt puts it back; every half second is plenty.
+  function orthonormalize() {
+    const R = S.R;
+    let n = Math.hypot(R[0], R[1], R[2]) || 1;
+    R[0] /= n; R[1] /= n; R[2] /= n;
+    const dot = R[0] * R[3] + R[1] * R[4] + R[2] * R[5];
+    R[3] -= dot * R[0]; R[4] -= dot * R[1]; R[5] -= dot * R[2];
+    n = Math.hypot(R[3], R[4], R[5]) || 1;
+    R[3] /= n; R[4] /= n; R[5] /= n;
+    R[6] = R[1] * R[5] - R[2] * R[4];
+    R[7] = R[2] * R[3] - R[0] * R[5];
+    R[8] = R[0] * R[4] - R[1] * R[3];
+  }
 
   const bounds = () => ({
     w: Math.max(0, tank.clientWidth - ball.offsetWidth),
@@ -266,10 +313,12 @@ export function initFloatingPlay(tank) {
 
     ball.style.transform =
       `translate3d(${S.x.toFixed(1)}px, ${S.y.toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
-    // Tilt first, then spin: the letters turn about the sphere's own axis,
-    // and that axis is what leans toward the viewer. The other order would
-    // wobble the axis itself, like a top about to fall.
-    globe.style.transform = `rotateX(${S.tilt.toFixed(2)}deg) rotateY(${S.spin.toFixed(2)}deg)`;
+    // CSS matrix3d is COLUMN-major, our R is row-major — hence the transpose in
+    // the ordering below. Get it wrong and the ball turns the wrong way, which
+    // is the sort of bug that looks like bad physics.
+    const R = S.R;
+    globe.style.transform =
+      `matrix3d(${R[0]},${R[3]},${R[6]},0,${R[1]},${R[4]},${R[7]},0,${R[2]},${R[5]},${R[8]},0,0,0,0,1)`;
 
     // The cast shadow is the other half of „weight": it tightens and darkens as
     // the ball nears the floor, spreads and fades as it rises. Without it, a
@@ -361,18 +410,43 @@ export function initFloatingPlay(tank) {
     // Side walls. The tangential speed — vertical, here — is partly turned into
     // spin by friction, the way a ball scuffed down a wall starts to turn.
     const radius = Math.max(1, ball.offsetWidth / 2);
-    const toSpin = (v) => (v / radius) * (180 / Math.PI);
     // Harder landings give less back: more of the blow goes into working the
     // skin. A fixed restitution is one of the plainest tells of a simulation.
     const restFor = (base, speed) =>
       base * (1 - REST_LOSS * Math.min(1, speed / V_REF));
+    // A real ball almost never strikes dead centre, and it is off-centre hits
+    // that make things tumble. Writing it out honestly:
+    //
+    //   contact point   r = −n·R + t        (t is the off-centre part, ⟂ n)
+    //   impulse         J = n·j
+    //   torque          τ = r × J = j·(t × n)      — the −n·R part cancels
+    //   change in spin  Δω = τ ÷ I,  I = ⅖mR² for a solid sphere
+    //
+    // The offset lives partly in DEPTH, an axis the flat simulation has no
+    // opinion about, so it's drawn at random. That single unknown is what turns
+    // a wheel into a tumbling ball.
+    const torque = (nx, ny, nz, j) => {
+      let ax = Math.random() - 0.5, ay = Math.random() - 0.5, az = Math.random() - 0.5;
+      const along = ax * nx + ay * ny + az * nz;      // strip the part along n:
+      ax -= along * nx; ay -= along * ny; az -= along * nz; // an offset there is no offset
+      const len = Math.hypot(ax, ay, az) || 1;
+      const off = radius * 0.55 * Math.random();     // how far from centre it caught
+      ax = ax / len * off; ay = ay / len * off; az = az / len * off;
+      const k = SPIN_WOBBLE * j / (0.4 * radius * radius);
+      S.wx += k * (ay * nz - az * ny);
+      S.wy += k * (az * nx - ax * nz);
+      S.wz += k * (ax * ny - ay * nx);
+    };
+
     if (S.x < 0) {
       S.x = 0; hit("x", Math.abs(S.vx), 0);
-      S.spinV -= toSpin(S.vy) * WALL_GRIP;
+      S.wz -= (S.vy / radius) * WALL_GRIP;   // friction along the wall → roll
+      torque(1, 0, 0, Math.abs(S.vx));
       S.vx = Math.abs(S.vx) * restFor(WALL_REST, Math.abs(S.vx));
     } else if (S.x > b.w) {
       S.x = b.w; hit("x", Math.abs(S.vx), 1);
-      S.spinV += toSpin(S.vy) * WALL_GRIP;
+      S.wz += (S.vy / radius) * WALL_GRIP;
+      torque(-1, 0, 0, Math.abs(S.vx));
       S.vx = -Math.abs(S.vx) * restFor(WALL_REST, Math.abs(S.vx));
     }
 
@@ -381,10 +455,13 @@ export function initFloatingPlay(tank) {
     // classic way a physics toy betrays itself.
     const wasGrounded = S.grounded;
     S.grounded = false;
-    if (S.y < 0) { S.y = 0; hit("y", Math.abs(S.vy), 0); S.vy = Math.abs(S.vy) * restFor(WALL_REST, Math.abs(S.vy)); }
-    else if (S.y >= b.h) {
+    if (S.y < 0) {
+      S.y = 0; hit("y", Math.abs(S.vy), 0); torque(0, 1, 0, Math.abs(S.vy));
+      S.vy = Math.abs(S.vy) * restFor(WALL_REST, Math.abs(S.vy));
+    } else if (S.y >= b.h) {
       S.y = b.h;
       hit("y", Math.abs(S.vy), 1);
+      if (Math.abs(S.vy) > V_SLEEP) torque(0, -1, 0, Math.abs(S.vy));
       // Hysteresis: once asleep it takes a firmer knock to start hopping again
       // than it took to stop. With a single threshold, a body sitting right on
       // it flickers between bouncing and resting — the stutter you noticed.
@@ -413,26 +490,35 @@ export function initFloatingPlay(tank) {
     if (quiet(S.ax2, S.ax2v)) { S.ax2 = 0; S.ax2v = 0; }
     if (quiet(S.ay2, S.ay2v)) { S.ay2 = 0; S.ay2v = 0; }
 
-    // Spin has its own momentum now. Airborne it only bleeds off slowly, so a
-    // ball thrown upward keeps turning through the whole arc — before, the spin
-    // was read straight off the horizontal speed and so froze in mid-air
-    // whenever the ball was travelling straight up or down, which is the one
-    // thing balls never do. On the ground, friction pulls it toward
-    // rolling-without-slipping.
-    S.tilt += ((S.hot ? 0 : GLOBE_TILT) - S.tilt) * Math.min(1, SPIN_HOVER * dt);
+    // Angular momentum, in three dimensions. Airborne it only bleeds off slowly.
+    // On the ground, friction drives the roll axis toward the one rolling
+    // without slipping demands — for motion along x on a floor whose normal
+    // points up, that is ω = (v × n)/r, which comes out along −z.
     if (S.hot) {
-      S.spinV *= Math.exp(-SPIN_HOVER * dt);
-      const target = Math.round(S.spin / 360) * 360;
-      S.spin += (target - S.spin) * Math.min(1, SPIN_HOVER * dt);
+      // Pointed at: stop turning, and let the orientation ease back to square
+      // so the word faces the reader. Blending the matrix toward identity and
+      // re-squaring it is the cheap, stable way to interpolate a rotation.
+      const k = Math.min(1, SPIN_HOVER * dt);
+      S.wx *= 1 - k; S.wy *= 1 - k; S.wz *= 1 - k;
+      const I = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+      for (let i = 0; i < 9; i++) S.R[i] += (I[i] - S.R[i]) * k;
+      orthonormalize();
     } else {
       if (S.grounded) {
-        const rolling = toSpin(S.vx);
-        S.spinV += (rolling - S.spinV) * Math.min(1, SPIN_GRIP * dt);
+        const rolling = -S.vx / radius;
+        S.wz += (rolling - S.wz) * Math.min(1, SPIN_GRIP * dt);
+        S.wx *= Math.exp(-SPIN_GRIP * 0.5 * dt);
+        S.wy *= Math.exp(-SPIN_GRIP * 0.5 * dt);
       } else {
-        S.spinV *= Math.exp(-SPIN_AIR * dt);
+        const k = Math.exp(-SPIN_AIR * dt);
+        S.wx *= k; S.wy *= k; S.wz *= k;
       }
-      S.spin += S.spinV * dt;
-      if (S.spin > 3600 || S.spin < -3600) S.spin %= 360; // keep the number small
+      const w = Math.hypot(S.wx, S.wy, S.wz);
+      if (w > 1e-4) {
+        const ang = w * dt;
+        spinBy(S.wx / w, S.wy / w, S.wz / w, ang);
+        if (++S.frame % ORTHO_EVERY === 0) orthonormalize();
+      }
     }
 
     // Motion stretch, eased so it swells and relaxes instead of tracking every
