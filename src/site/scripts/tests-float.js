@@ -74,6 +74,19 @@ const IDLE_HZ = 0.45, IDLE_AMP = 0.026;
 // clearest signal the eye gets that it is looking at a sphere. Pointed at, the
 // tilt eases to zero and the word comes level to be read.
 const GLOBE_TILT = -14;
+
+// Motion stretch: a soft body elongates along the direction it travels. Purely
+// axis-aligned here, so a diagonal cancels out — which is honest, because an
+// axis-aligned scale genuinely cannot express a diagonal stretch.
+const STRETCH = 0.16;
+const STRETCH_EASE = 9;  // per second — how fast the stretch follows the speed
+
+// Spin is now a real angular velocity with its own memory, not a number read
+// off the horizontal speed. That's why a ball dropped straight down keeps
+// turning: nothing took its angular momentum away.
+const SPIN_AIR = 0.55;   // spin lost per second in flight
+const SPIN_GRIP = 9;     // how fast the floor forces rolling-without-slipping
+const WALL_GRIP = 0.42;  // how much of the tangential speed a wall turns to spin
 const WAKE_EASE = 3.2;   // how fast the breathing fades in and out, per second
 
 // The magnet. Not a constant pull but a spring whose stiffness rises as the
@@ -104,7 +117,9 @@ export function initFloatingPlay(tank) {
     x: 0, y: 0,
     vx: 190 * (Math.random() < 0.5 ? -1 : 1),
     vy: 0,
-    spin: 0,                // degrees turned about the vertical axis
+    spin: 0, spinV: 0,      // angle, and angular velocity in deg/s
+    stx: 0, sty: 0,         // eased motion stretch per axis
+    cx: 0.5, cy: 0.5,       // where it last touched — the squash pivots there
     tilt: GLOBE_TILT,       // how far the globe is tipped, eased to 0 on hover
     dx: 0, dxv: 0,          // jelly: squash along x, and how fast it's changing
     dy: 0, dyv: 0,          // …and along y. Two springs, never one with a flag.
@@ -145,10 +160,13 @@ export function initFloatingPlay(tank) {
   // the way up, so the push is scaled back up to land on the figure asked for.
   // Measured, not guessed — at ζ = 0.22 the ratio is 0.69.
   const OMEGA = Math.sqrt(K) / 0.69;
-  const hit = (axis, speed) => {
+  // `at` is where on the ball the wall touched, 0…1 on each axis. Everything
+  // that follows hangs off it.
+  const hit = (axis, speed, at) => {
     if (speed < V_DENT) return;
     const push = Math.min(SQUASH_MAX, (speed / V_REF) * SQUASH_MAX) * OMEGA;
-    if (axis === "x") S.dxv += push; else S.dyv += push;
+    if (axis === "x") { S.dxv += push; S.cx = at; S.cy = 0.5; }
+    else { S.dyv += push; S.cy = at; S.cx = 0.5; }
   };
 
   function draw() {
@@ -158,10 +176,23 @@ export function initFloatingPlay(tank) {
     // instant it came to rest — a discontinuity in a value the eye is tracking.
     const idle = Math.sin(S.t * Math.PI * 2 * IDLE_HZ) * IDLE_AMP * S.awake;
     // Each axis is shortened by its own spring and fattened by the other's —
-    // that cross term is what keeps the volume roughly constant.
+    // that cross term is what keeps the volume roughly constant. The motion
+    // stretch rides on top: longer along the way it's going, thinner across.
     const dx = S.dx, dy = S.dy + idle;
-    const sx = 1 - dx + dy * BULGE;
-    const sy = 1 - dy + dx * BULGE;
+    const sx = 1 - dx + dy * BULGE + S.stx;
+    const sy = 1 - dy + dx * BULGE + S.sty;
+
+    // THE PIVOT. A ball flattening against the floor keeps its flat side ON the
+    // floor — it does not shrink toward its own middle and float free. So the
+    // squash pivots at the point of contact, and returns to the centre exactly
+    // as fast as the deformation fades. Scaling about the centre was leaving a
+    // visible gap under the ball at the very moment it should look pressed
+    // hardest against the ground.
+    const amt = Math.min(1, Math.hypot(S.dx, S.dy) / SQUASH_MAX);
+    const ox = 50 + (S.cx - 0.5) * 100 * amt;
+    const oy = 50 + (S.cy - 0.5) * 100 * amt;
+    ball.style.transformOrigin = `${ox.toFixed(1)}% ${oy.toFixed(1)}%`;
+
     ball.style.transform =
       `translate3d(${S.x.toFixed(1)}px, ${S.y.toFixed(1)}px, 0) scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`;
     // Tilt first, then spin: the letters turn about the sphere's own axis,
@@ -175,8 +206,15 @@ export function initFloatingPlay(tank) {
     if (shadow && b.h > 0) {
       const air = Math.max(0, Math.min(1, (b.h - S.y) / b.h)); // 0 = landed
       const k = 1 - air * 0.55;
+      // The contact patch widens as the ball flattens onto the floor, and the
+      // shadow slides away from the light — which comes from up and to the
+      // left, per the highlight painted on the sphere. A shadow sitting dead
+      // centre under a lit ball is the giveaway of a fake.
+      const spread = 1 + Math.max(0, S.dy) * 1.5;
+      const lean = air * 16;
       shadow.style.transform =
-        `translate3d(${(S.x + ball.offsetWidth / 2).toFixed(1)}px, 0, 0) translateX(-50%) scale(${k.toFixed(3)}, ${k.toFixed(3)})`;
+        `translate3d(${(S.x + ball.offsetWidth / 2 + lean).toFixed(1)}px, 0, 0) translateX(-50%) `
+        + `scale(${(k * spread).toFixed(3)}, ${k.toFixed(3)})`;
       shadow.style.opacity = (0.34 * k).toFixed(3);
     }
   }
@@ -234,23 +272,34 @@ export function initFloatingPlay(tank) {
     S.x += S.vx * dt;
     S.y += S.vy * dt;
 
-    // Side walls.
-    if (S.x < 0) { S.x = 0; hit("x", Math.abs(S.vx)); S.vx = Math.abs(S.vx) * WALL_REST; }
-    else if (S.x > b.w) { S.x = b.w; hit("x", Math.abs(S.vx)); S.vx = -Math.abs(S.vx) * WALL_REST; }
+    // Side walls. The tangential speed — vertical, here — is partly turned into
+    // spin by friction, the way a ball scuffed down a wall starts to turn.
+    const radius = Math.max(1, ball.offsetWidth / 2);
+    const toSpin = (v) => (v / radius) * (180 / Math.PI);
+    if (S.x < 0) {
+      S.x = 0; hit("x", Math.abs(S.vx), 0);
+      S.spinV -= toSpin(S.vy) * WALL_GRIP;
+      S.vx = Math.abs(S.vx) * WALL_REST;
+    } else if (S.x > b.w) {
+      S.x = b.w; hit("x", Math.abs(S.vx), 1);
+      S.spinV += toSpin(S.vy) * WALL_GRIP;
+      S.vx = -Math.abs(S.vx) * WALL_REST;
+    }
 
     // Ceiling and floor. On the floor, a slow enough arrival stops bouncing
     // altogether — otherwise it would jitter forever on ever-smaller hops, the
     // classic way a physics toy betrays itself.
     const wasGrounded = S.grounded;
     S.grounded = false;
-    if (S.y < 0) { S.y = 0; hit("y", Math.abs(S.vy)); S.vy = Math.abs(S.vy) * WALL_REST; }
+    if (S.y < 0) { S.y = 0; hit("y", Math.abs(S.vy), 0); S.vy = Math.abs(S.vy) * WALL_REST; }
     else if (S.y >= b.h) {
       S.y = b.h;
+      hit("y", Math.abs(S.vy), 1);
       // Hysteresis: once asleep it takes a firmer knock to start hopping again
       // than it took to stop. With a single threshold, a body sitting right on
       // it flickers between bouncing and resting — the stutter you noticed.
       const wake = wasGrounded ? V_SLEEP * 2.2 : V_SLEEP;
-      if (Math.abs(S.vy) > wake) { hit("y", Math.abs(S.vy)); S.vy = -Math.abs(S.vy) * FLOOR_REST; }
+      if (Math.abs(S.vy) > wake) { S.vy = -Math.abs(S.vy) * FLOOR_REST; }
       else { S.vy = 0; S.grounded = true; }
     }
 
@@ -263,17 +312,33 @@ export function initFloatingPlay(tank) {
     if (Math.abs(S.dx) < 0.0005 && Math.abs(S.dxv) < 0.01) { S.dx = 0; S.dxv = 0; }
     if (Math.abs(S.dy) < 0.0005 && Math.abs(S.dyv) < 0.01) { S.dy = 0; S.dyv = 0; }
 
-    // Rolling without slipping: turn = distance ÷ radius. Pointed at, the spin
-    // eases to zero by the shortest way round, so the word comes to face you.
+    // Spin has its own momentum now. Airborne it only bleeds off slowly, so a
+    // ball thrown upward keeps turning through the whole arc — before, the spin
+    // was read straight off the horizontal speed and so froze in mid-air
+    // whenever the ball was travelling straight up or down, which is the one
+    // thing balls never do. On the ground, friction pulls it toward
+    // rolling-without-slipping.
     S.tilt += ((S.hot ? 0 : GLOBE_TILT) - S.tilt) * Math.min(1, SPIN_HOVER * dt);
     if (S.hot) {
+      S.spinV *= Math.exp(-SPIN_HOVER * dt);
       const target = Math.round(S.spin / 360) * 360;
       S.spin += (target - S.spin) * Math.min(1, SPIN_HOVER * dt);
     } else {
-      const radius = Math.max(1, ball.offsetWidth / 2);
-      S.spin += (S.vx * dt) / radius * (180 / Math.PI);
+      if (S.grounded) {
+        const rolling = toSpin(S.vx);
+        S.spinV += (rolling - S.spinV) * Math.min(1, SPIN_GRIP * dt);
+      } else {
+        S.spinV *= Math.exp(-SPIN_AIR * dt);
+      }
+      S.spin += S.spinV * dt;
       if (S.spin > 3600 || S.spin < -3600) S.spin %= 360; // keep the number small
     }
+
+    // Motion stretch, eased so it swells and relaxes instead of tracking every
+    // twitch of the velocity. Longer along the way it's going, thinner across.
+    const tx = (Math.abs(S.vx) - Math.abs(S.vy)) / V_MAX * STRETCH;
+    S.stx += (tx - S.stx) * Math.min(1, STRETCH_EASE * dt);
+    S.sty += (-tx - S.sty) * Math.min(1, STRETCH_EASE * dt);
 
     draw();
   }
