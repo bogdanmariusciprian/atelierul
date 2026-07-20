@@ -30,7 +30,7 @@ import {
 } from "../../shared/scripts/moderation.js";
 import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
-  adminFetchTestDownloads, directDownloadUrl,
+  adminFetchTestDownloads, setTestDownloadSolved, directDownloadUrl,
   listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
   addTestDownloads, updateTestDownloads, deleteTestDownloads, guessFromFileName,
 } from "../../shared/scripts/test-repo.js";
@@ -3336,14 +3336,26 @@ export function renderCommunity(basePath = "") {
   // would silently undo. A file leaves the site by leaving the folder.
   function dlRow(d) {
     const fileName = `${d.label || "fișier"}.${String(d.kind || "PDF").toLowerCase()}`;
+    // Two separate buttons, not one inside the other: nesting them would be
+    // invalid HTML and the inner click would fight the outer one.
     return `
-      <button type="button" class="cx-dlfile" data-action="dl-copy"
-              data-url="${escapeHtml(directDownloadUrl(d.url))}"
-              title="Click pentru a copia linkul de descărcare">
-        <span class="cx-dlfile__ic" aria-hidden="true"></span>
-        <span class="cx-dlfile__name">${escapeHtml(fileName)}</span>
-        <span class="cx-dlfile__hint" aria-hidden="true">copiază linkul</span>
-      </button>`;
+      <div class="cx-dlfile">
+        <button type="button" class="cx-dlfile__copy" data-action="dl-copy"
+                data-url="${escapeHtml(directDownloadUrl(d.url))}"
+                title="Click pentru a copia linkul de descărcare">
+          <span class="cx-dlfile__ic" aria-hidden="true"></span>
+          <span class="cx-dlfile__name">${escapeHtml(fileName)}</span>
+          <span class="cx-dlfile__hint" aria-hidden="true">copiază linkul</span>
+        </button>
+        <button type="button" class="cx-dlsolved${d.solved ? " is-on" : ""}"
+                data-action="dl-solved" data-id="${d.id}" data-on="${d.solved ? "1" : "0"}"
+                aria-pressed="${d.solved ? "true" : "false"}"
+                title="${d.solved
+                  ? "Sesiunea e marcată ca rezolvată integral. Click pentru a scoate semnul."
+                  : "Marchează: sesiunea e introdusă integral în bancă, cu explicații."}">
+          ${d.solved ? "✓ rezolvat integral" : "○ nerezolvat"}
+        </button>
+      </div>`;
   }
 
   function adminTabGamification() {
@@ -4801,6 +4813,22 @@ export function renderCommunity(basePath = "") {
               showToast(`✓ ${added} adăugate, ${updated} actualizate, ${removed} eliminate.`, { kind: "success" });
             } else showToast("Lista era deja la zi.");
           });
+        return;
+      }
+      case "dl-solved": {
+        const did = btn.dataset.id;
+        const next = btn.dataset.on !== "1";
+        // Flip it on screen first — the teacher gets no lag — then persist,
+        // and put it back if the write failed rather than lie about it.
+        const row = state.downloads.find((d) => d.id === did);
+        if (row) row.solved = next;
+        render();
+        setTestDownloadSolved(did, next).then((ok) => {
+          if (ok) return showToast(next ? "✓ Marcat ca rezolvat integral." : "Semnul a fost scos.", { kind: "success" });
+          if (row) row.solved = !next;
+          render();
+          showToast("N-am putut salva marcajul.");
+        });
         return;
       }
       case "dl-copy": {

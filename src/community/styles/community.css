@@ -1022,13 +1022,28 @@
 /* One published file in the teacher's panel: the Drive file name, and a click
    that copies its download link. The hint only shows on hover, so a list of
    thirty reads as thirty file names and nothing else. */
-.cx-dlfile {
-  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+.cx-dlfile { display: flex; align-items: center; gap: 0.5rem; border-radius: 8px; }
+.cx-dlfile:hover { background: var(--color-surface); }
+.cx-dlfile__copy {
+  display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;
   padding: 0.4rem 0.6rem; border: 0; border-radius: 8px;
   background: none; cursor: pointer; text-align: left;
   font: inherit; font-size: 0.86rem; color: var(--color-text);
 }
-.cx-dlfile:hover { background: var(--color-surface); }
+/* The teacher's mark. Grey and hollow until it means something, so a list of
+   thirty shows at a glance which sessions are actually done. */
+.cx-dlsolved {
+  flex: none; margin-right: 0.4rem; padding: 0.2rem 0.6rem;
+  border: 1.5px solid var(--color-border); border-radius: 999px;
+  background: none; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 0.74rem; font-weight: 700;
+  color: var(--color-text-muted); user-select: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.cx-dlsolved:hover { border-color: var(--color-text-muted); color: var(--color-text); }
+.cx-dlsolved.is-on {
+  color: #15803d; border-color: #86efac; background: #f0fdf4;
+}
 .cx-dlfile__ic {
   flex: none; width: 1.1em; height: 1.1em;
   background: url("/assets/icons/pdf-file.png") center / contain no-repeat;

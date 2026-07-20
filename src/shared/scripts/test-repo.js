@@ -400,7 +400,7 @@ export async function fetchDriveFolderUrl(exam = "admitere-drept") {
 export async function fetchTestDownloads(exam = "admitere-drept") {
   const { data, error } = await supabase
     .from("test_downloads")
-    .select("id, year, label, note, kind, url, sort, active")
+    .select("id, year, label, note, kind, url, sort, active, solved")
     .eq("exam", exam).eq("active", true)
     .order("year", { ascending: false }).order("sort");
   if (error) { console.warn("fetchTestDownloads:", error.message); return []; }
@@ -410,7 +410,7 @@ export async function fetchTestDownloads(exam = "admitere-drept") {
 /** Admin: everything, including the ones switched off. `exam = null` → all. */
 export async function adminFetchTestDownloads(exam = null) {
   let q = supabase.from("test_downloads")
-    .select("id, exam, year, label, note, kind, url, sort, active");
+    .select("id, exam, year, label, note, kind, url, sort, active, solved");
   if (exam) q = q.eq("exam", exam);
   const { data, error } = await q
     .order("exam").order("year", { ascending: false }).order("sort");
@@ -469,6 +469,15 @@ export function guessFromFileName(name = "") {
     year: (base.match(/(20\d{2})/) || [])[1] || null,
     kind: ext.toUpperCase(),
   };
+}
+
+/** Mark (or unmark) a paper as fully entered in the item bank. The teacher's
+ *  own judgement, so the Drive sync never touches it. */
+export async function setTestDownloadSolved(id, solved) {
+  const { error } = await supabase.from("test_downloads")
+    .update({ solved: !!solved }).eq("id", id);
+  if (error) { console.warn("setTestDownloadSolved:", error.message); return false; }
+  return true;
 }
 
 export async function deleteTestDownload(id) {

@@ -677,6 +677,20 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 .tdl__file:hover { color: var(--cat-color); }
 .tdl__file:hover::before { opacity: 1; }
 
+/* „Rezolvat integral" — a check the teacher puts on a paper whose session is
+   in the bank end to end. Small and green: it should read as a quiet extra on
+   the row, not compete with the file name. It's also the shortcut into the
+   game, filtered on that very session. */
+.tdl__solved {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.25em; height: 1.25em; margin-left: 0.4em; vertical-align: -0.2em;
+  border-radius: 999px; text-decoration: none;
+  background: #dcfce7; color: #15803d;
+  font-size: 0.78em; font-weight: 800; line-height: 1;
+  user-select: none; transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.tdl__solved:hover { background: #86efac; transform: scale(1.15); }
+
 /* „Toate, pe Drive" — ieșirea de rezervă, pentru cine vrea tot dintr-o dată.
    Google face arhiva; noi doar deschidem folderul. Discret (contur, nu plin),
    fiindcă drumul obișnuit rămâne linkul direct pe fiecare test.

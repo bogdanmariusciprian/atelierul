@@ -175,6 +175,7 @@ export async function initTestGame(mountEl, exam) {
   G.typeOrder = [...G.availTypes];
   G.sel.years = new Set(); G.sel.sessions = new Set(); G.sel.types = new Set();
   G.all = { years: true, sessions: true, types: true };
+  applyPaperPreset(); // „✓ rezolvat integral" on a paper → land already filtered
   G.saved = isLoggedIn() ? await fetchMyTestSessions(exam) : [];
   // „Ți-am corectat itemul semnalat" → land on that item alone, no new game.
   const wanted = new URLSearchParams(location.search).get("item");
@@ -230,6 +231,43 @@ const allRedundant = (name) => {
   const uni = UNIVERSE[name]();
   return uni.length > 0 && !G.all[name] && G.sel[name].size === uni.length;
 };
+
+// ---------- arriving from a marked paper ----------
+// Strip case, diacritics and punctuation, so „Simulare mai - G1" and
+// „simulare MAI" compare as the same thing.
+const looseKey = (s) => String(s || "").toLowerCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9]+/g, " ").trim();
+
+// The badge on a downloadable paper links here with ?an=&ses=. Those names come
+// from FILE names, while the bank's sessions come from the teacher's import —
+// they rarely match to the letter. So: exact first, then either one containing
+// the other, then just the first word. Whatever doesn't match is simply left on
+// „toate", because a pupil arriving at an empty game would think it's broken.
+function applyPaperPreset() {
+  const q = new URLSearchParams(location.search);
+  const an = q.get("an"), ses = q.get("ses");
+  if (!an && !ses) return;
+
+  if (an) {
+    const hit = G.years.find((y) => String(y) === String(an));
+    if (hit != null) { G.sel.years = new Set([String(hit)]); G.all.years = false; }
+  }
+  if (ses) {
+    const want = looseKey(ses);
+    const hit = want && (
+      G.sessions.find((s) => looseKey(s) === want)
+      || G.sessions.find((s) => looseKey(s) && (want.startsWith(looseKey(s)) || looseKey(s).startsWith(want)))
+      // Last resort, on the first word only: „Iul" still finds „Iulie".
+      // Three characters minimum, so „G1" can't drag in something unrelated.
+      || G.sessions.find((s) => {
+        const a = looseKey(s).split(" ")[0], b = want.split(" ")[0];
+        return a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a));
+      })
+    );
+    if (hit) { G.sel.sessions = new Set([hit]); G.all.sessions = false; }
+  }
+}
 
 // ---------- filtering / ordering ----------
 function matchYearSession(it) {

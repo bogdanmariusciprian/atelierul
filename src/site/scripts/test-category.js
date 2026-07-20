@@ -126,8 +126,17 @@ function downloadList() {
     for (const f of ordered) {
       const name = sessionName(f, year);
       const tip = [f.note, f.kind || "PDF"].filter(Boolean).join(" · ");
+      // The teacher's mark: this paper is in the bank from end to end. It's a
+      // separate link, next to the download — not wrapped around it, which
+      // would be an <a> inside an <a>. Only for playable categories: promising
+      // a game where there's no item bank would be a broken promise.
+      const solved = f.solved && cat.live
+        ? `<a class="tdl__solved" href="?an=${encodeURIComponent(year)}&ses=${encodeURIComponent(name)}#joc"
+              title="Rezolvat integral în aplicație, cu explicații. Click pentru a te antrena pe această sesiune."
+              aria-label="Rezolvat integral — antrenează-te pe ${esc(name)} ${esc(String(year))}">✓</a>`
+        : "";
       const cell = `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
-                 title="Descarcă — ${esc(tip)}">${esc(name)}</a>`;
+                 title="Descarcă — ${esc(tip)}">${esc(name)}</a>${solved}`;
       // Its own column; if that one is taken (two „Iulie" in one year), the
       // next free one, so nothing is ever dropped.
       let at = columnar ? kinds.indexOf(sessionKind(name)) : -1;
