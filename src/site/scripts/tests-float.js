@@ -113,14 +113,39 @@ const SPIN_GRIP = 9;     // how fast the floor forces rolling-without-slipping
 const WALL_GRIP = 0.42;  // how much of the tangential speed a wall turns to spin
 const WAKE_EASE = 3.2;   // how fast the breathing fades in and out, per second
 
-// The magnet. Not a constant pull but a spring whose stiffness rises as the
-// pointer gets closer, plus damping that rises with it — that pairing is what
-// makes it settle ONTO the cursor instead of orbiting around it. Gravity is
-// eased out by the same factor, so near the pointer the balloon can hang in
-// mid-air rather than sagging under it.
-const MAG_R = 300;       // px — beyond this the pointer isn't felt at all
-const MAG_K = 17;        // 1/s² of pull per px of distance, at full closeness
-const MAG_C = 6.0;       // 1/s of damping, at full closeness
+// THE MAGNET, as an inverse-square field.
+// The first version was a spring: pull proportional to DISTANCE. That is
+// backwards for a magnet — a spring pulls hardest when far and lets go as it
+// arrives. Real attraction does the opposite, and the difference is the whole
+// character of the thing: a field you barely feel across the box, that turns
+// insistent in the last hundred pixels and irresistible in the last thirty.
+//
+//     a = A ÷ (d² + s²)
+//
+// The softening term s keeps it finite at the centre, where a true 1/d² would
+// go to infinity and fling the ball through the wall. A window fades the far
+// field to nothing by MAG_R, so there is no edge where the pull switches off.
+//
+// Gravity is NOT switched off any more. It stays on, always, and the field has
+// to beat it — which it does inside about 170px. Below that the balloon lifts
+// off the floor and rises to your hand; beyond it, it can only lean and roll
+// along the ground toward you. That threshold is the honest version of what
+// used to be a fudge, and it reads better: the ball is visibly deciding.
+const MAG_R = 320;       // px — the field's reach
+const MAG_A = 1.4e7;     // px³/s² — strength; a = A/(d²+s²)
+const MAG_SOFT = 42;     // px — softening, so the centre isn't a singularity
+const MAG_MAX = 2700;    // px/s² — cap, roughly six times gravity
+const MAG_EDDY = 3.0;    // 1/s of drag near the field, like eddy currents
+
+// CONTACT. Inside this radius the field stops and a hold takes over: firm
+// damping and a gentle centring. Without it the ball buzzed across the cursor
+// two hundred times a second, because nothing in a pure field ever says „stop".
+// Real magnets are stopped by touching something. The ball settles about 16px
+// below the pointer — exactly where the hold balances gravity, which is the
+// sag a real hanging magnet has.
+const MAG_GRAB = 34;     // px
+const MAG_GRAB_K = 26;   // 1/s² of centring
+const MAG_GRAB_C = 13;   // 1/s of damping while held
 
 const reduceMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -152,6 +177,7 @@ export function initFloatingPlay(tank) {
     grounded: false,
     hot: false,
     awake: 1,               // breathing amplitude, eased — never switched
+    held: false,            // snapped onto the pointer right now?
     pointer: null,          // {x, y} in tank coordinates, or null
     raf: 0, last: 0,
   };
@@ -282,30 +308,45 @@ export function initFloatingPlay(tank) {
     // pull stays polite far out and becomes insistent only up close. That curve
     // IS the effect: the balloon drifts on its own until your hand is near,
     // then increasingly wants to come to it.
-    let w = 0;
+    let held = false, drag = 0;
     if (S.pointer) {
       const cx = S.x + ball.offsetWidth / 2, cy = S.y + ball.offsetHeight / 2;
       const dx = S.pointer.x - cx, dy = S.pointer.y - cy;
-      const dist = Math.hypot(dx, dy);
-      if (dist < MAG_R) {
-        w = (1 - dist / MAG_R) ** 2;
-        // Spring toward the cursor, damped by the same factor. Both scale with
-        // w, so the far field is a hint and the near field is a grip.
-        S.vx += (dx * MAG_K - S.vx * MAG_C) * w * dt;
-        S.vy += (dy * MAG_K - S.vy * MAG_C) * w * dt;
-        if (w > 0.25) S.grounded = false; // it may leave the floor to come up
+      const dist = Math.hypot(dx, dy) || 0.001;
+      const ux = dx / dist, uy = dy / dist; // direction only; the law sets the size
+
+      if (dist < MAG_GRAB) {
+        // Snapped on. The moment of capture gets a squash, sized by how fast it
+        // arrived — the little clunk a magnet makes when it takes hold.
+        if (!S.held) hit(Math.abs(dx) > Math.abs(dy) ? "x" : "y", Math.hypot(S.vx, S.vy) * 0.55, 0.5);
+        held = true;
+        S.vx += dx * MAG_GRAB_K * dt;
+        S.vy += dy * MAG_GRAB_K * dt;
+        drag = MAG_GRAB_C;
+        S.grounded = false;
+      } else if (dist < MAG_R) {
+        const t = dist / MAG_R;
+        // Full strength out to 0.6 of the reach, then faded smoothly to nothing
+        // — no edge where the field switches off under your hand.
+        const window = t < 0.6 ? 1 : Math.max(0, 1 - (t - 0.6) / 0.4) ** 2;
+        const a = Math.min(MAG_MAX, MAG_A / (dist * dist + MAG_SOFT * MAG_SOFT)) * window;
+        S.vx += ux * a * dt;
+        S.vy += uy * a * dt;
+        drag = MAG_EDDY * (1 - t) ** 2;
+        if (a > G) S.grounded = false; // strong enough to lift it off the floor
       }
     }
+    S.held = held;
 
+    // Gravity always applies. The field either beats it or it doesn't.
     if (S.hot) {
-      // Brakes, so a moving target becomes an easy one.
-      const k = Math.exp(-HOVER_DAMP * dt);
+      const k = Math.exp(-(HOVER_DAMP + drag) * dt);
       S.vx *= k;
-      if (!S.grounded) S.vy = S.vy * k + G * dt * 0.25 * (1 - w); // still falls, gently
+      S.vy = S.vy * k + (held ? 0 : G * dt * 0.25);
     } else {
-      S.vy += G * dt * (1 - w); // held up in proportion to how close you are
-      const k = Math.exp(-(S.grounded ? ROLL : AIR) * dt);
-      S.vx *= k;
+      S.vy += G * dt;
+      const k = Math.exp(-((S.grounded ? ROLL : AIR) + drag) * dt);
+      S.vx *= k; S.vy *= k;
       const sp = Math.hypot(S.vx, S.vy);
       if (sp > V_MAX) { S.vx *= V_MAX / sp; S.vy *= V_MAX / sp; }
     }
