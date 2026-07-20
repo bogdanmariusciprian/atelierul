@@ -147,8 +147,10 @@ function downloadList() {
       if (at < 0) { cells.push(cell); continue; }
       cells[at] = cell;
     }
+    // Each cell carries its column's index, so hovering a row can tint every
+    // kind of exam in its own shade — see .tdl-k* in tests.css.
     return `<tr><th scope="row" class="tdl__year">${esc(year)}</th>${
-      cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+      cells.map((c, i) => `<td class="tdl-k${i}">${c}</td>`).join("")}</tr>`;
   }).join("");
   return `<table class="tdl"><tbody>${rows}</tbody></table>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;

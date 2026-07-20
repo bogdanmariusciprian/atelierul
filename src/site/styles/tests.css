@@ -656,7 +656,22 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   padding: 0.4rem 1.5rem 0.4rem 0; white-space: nowrap;
 }
 .tdl td:last-child, .tdl th:last-child { padding-right: 0; }
-.tdl tbody tr:hover { background: var(--color-surface); }
+.tdl td, .tdl th { padding-left: 0.5rem; }
+
+/* Hovering a row lights up every cell in the shade of ITS kind of exam, so the
+   three columns say what they are without a header row. One hue per column:
+   the main July exam borrows the category's own colour, autumn takes a warm
+   one, the rehearsal a cool one. Anything past the third falls back to grey —
+   a fourth kind of exam would still hover, just without a voice of its own. */
+.tdl td, .tdl th { --tdl-k: var(--color-text-muted); }
+.tdl td.tdl-k0 { --tdl-k: var(--cat-color); }
+.tdl td.tdl-k1 { --tdl-k: #c2410c; }
+.tdl td.tdl-k2 { --tdl-k: #0369a1; }
+.tdl tbody tr:hover td, .tdl tbody tr:hover th {
+  background: color-mix(in srgb, var(--tdl-k) 13%, transparent);
+}
+.tdl tbody tr:hover th:first-child { border-radius: 8px 0 0 8px; }
+.tdl tbody tr:hover td:last-child { border-radius: 0 8px 8px 0; }
 .tdl__year {
   width: 3.4rem; font-weight: 800; font-size: 0.95rem;
   color: var(--cat-color); font-variant-numeric: tabular-nums;
