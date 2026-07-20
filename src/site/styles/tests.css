@@ -689,14 +689,14 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
    away, and the one real copy of the word lies down as ordinary type. */
 .tcat__tank.is-open .tcat__ball__shade,
 .tcat__tank.is-still .tcat__ball__shade { opacity: 0; }
-.tcat__tank.is-open .tcat__ball__l.is-sep,
-.tcat__tank.is-open .tcat__ball__l[data-r="1"],
+/* Open, the sphere goes away entirely and an ordinary heading takes its place.
+   Flattening the letters in situ was the wrong idea: the globe is a grid, so a
+   letter that stops being absolutely positioned claims a row of its own, and
+   the word came out spelled downward through the description. */
+.tcat__tank.is-open .tcat__ball__globe,
 .tcat__tank.is-still .tcat__ball__globe { display: none; }
-.tcat__tank.is-open .tcat__ball__globe { align-content: start; padding-top: 1.15rem; }
-.tcat__tank.is-open .tcat__ball__l {
-  position: relative;
-  transform: none;
-  font-size: 1.05rem;
+.tcat__ball__title {
+  font-size: 1.15rem; font-weight: 800; line-height: 1.2;
 }
 /* The cast shadow. A sibling, not a child: it must stay flat on the floor
    while the ball above it squashes, spins and flies. JS moves it and fades it

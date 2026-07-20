@@ -240,6 +240,7 @@ function renderIntro() {
                <span class="tcat__ball__shade" aria-hidden="true"></span>
                <span class="tcat__ball__in">
                  <span class="tcat__ball__ic" aria-hidden="true">${adminMode ? "🛠️" : cat.icon}</span>
+                 <span class="tcat__ball__title" aria-hidden="true">Exersează</span>
                  <span class="tcat__ball__more">
                    <b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
                    explicație imediată. Cei greșiți revin până îi nimerești.
