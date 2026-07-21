@@ -247,6 +247,37 @@ export async function saveAvailabilityWindow({ weekday, startMin, endMin }) {
   return { ok: true };
 }
 
+/** Resize one window, keeping the day's invariant: windows stay disjoint.
+ *  The row is updated in place first, THEN the day is re-normalised — if the
+ *  stretched window now touches a neighbour, the two are merged into one.
+ *  Without that pass, the server guard („fit inside a SINGLE window") would
+ *  quietly refuse the lesson that straddles their former boundary. */
+export async function resizeAvailabilityWindow(id, { weekday, startMin, endMin }) {
+  const { error } = await supabase
+    .from("planner_availability")
+    .update({ start_min: startMin, end_min: endMin })
+    .eq("id", id);
+  if (error) return { ok: false, message: humanError(error) };
+
+  const day = (await fetchAvailability()).filter((w) => w.weekday === weekday);
+  const me = day.find((w) => w.id === id);
+  if (!me) return { ok: true };
+  const touching = day.filter((w) => me.startMin <= w.endMin && me.endMin >= w.startMin);
+  if (touching.length > 1) {
+    const merged = {
+      weekday,
+      start_min: Math.min(...touching.map((w) => w.startMin)),
+      end_min: Math.max(...touching.map((w) => w.endMin)),
+    };
+    const { error: e2 } = await supabase.from("planner_availability")
+      .delete().in("id", touching.map((w) => w.id));
+    if (e2) return { ok: false, message: humanError(e2) };
+    const { error: e3 } = await supabase.from("planner_availability").insert(merged);
+    if (e3) return { ok: false, message: humanError(e3) };
+  }
+  return { ok: true };
+}
+
 export async function deleteAvailabilityWindow(id) {
   const { error } = await supabase.from("planner_availability").delete().eq("id", id);
   if (error) return { ok: false, message: humanError(error) };

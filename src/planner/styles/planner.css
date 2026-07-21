@@ -599,3 +599,22 @@
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* ---- marginile ferestrei devin mânere, în modul pensulă ----
+   Ferestrele stau sub blocuri și nu prind cursorul în modul normal — altfel
+   ar fura tragerile de așezare. În modul pensulă se trezesc. */
+.pl-avail { pointer-events: none; }
+.pl-body.is-paint .pl-avail { pointer-events: auto; }
+.pl-avail__h {
+  position: absolute; left: 15%; right: 15%; height: 12px;
+  cursor: ns-resize; touch-action: none;
+}
+.pl-avail__h--top { top: -3px; }
+.pl-avail__h--bot { bottom: -3px; }
+.pl-avail__h::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 30px; height: 4px; border-radius: 999px;
+  transform: translate(-50%, -50%);
+  background: #16a34a; opacity: 0.55; transition: opacity 0.15s ease;
+}
+.pl-avail__h:hover::after { opacity: 1; }

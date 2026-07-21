@@ -30,7 +30,7 @@ import {
   weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, watchSlots,
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
   fetchVacations, saveVacation, deleteVacation, bookRecurring, cancelSeries,
-  fetchAvailability, saveAvailabilityWindow, deleteAvailabilityWindow,
+  fetchAvailability, saveAvailabilityWindow, deleteAvailabilityWindow, resizeAvailabilityWindow,
 } from "../../shared/scripts/planner-repo.js";
 import { CURRENT_USER, isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -521,7 +521,10 @@ function gridHtml() {
           return `<span class="pl-avail" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, în fiecare săptămână">
             <i class="pl-avail__tag">deschis ${mm(w.startMin)}–${mm(w.endMin)}</i>
-            ${S.paint ? `<button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
+            ${S.paint ? `
+              <span class="pl-avail__h pl-avail__h--top" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="top" title="Trage ca să muți începutul"></span>
+              <span class="pl-avail__h pl-avail__h--bot" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="bot" title="Trage ca să muți sfârșitul"></span>
+              <button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
           </span>`;
         }).join("")}
         ${isToday ? nowLineHtml() : ""}
@@ -566,7 +569,7 @@ function render() {
           <i class="pl-legend__k pl-legend__k--today"></i> azi
         </p>
         <p class="pl-hint">${S.paint
-          ? "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră pentru acea zi a săptămânii (în fiecare săptămână). Click pe × ca să o închizi."
+          ? "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră săptămânală. Trage de marginile uneia existente ca să o ajustezi; × o închide."
           : "Trage o bulină în orar ca să pui ora. Click pe bulină îi deschide setările. Ține cursorul pe un bloc ca să vezi al cui e."}</p>
       </div>` : ""}
       <div class="pl-live" data-role="live" hidden></div>`;
@@ -652,6 +655,26 @@ function onDown(e) {
   if (S.paint) {
     const lane = e.target.closest(".pl-lane");
     if (e.target.closest('[data-act="avail-del"]')) return; // the × is a click
+
+    // Grabbing a window's edge ADJUSTS it instead of painting a new one — the
+    // other edge stays anchored, exactly like resizing a block.
+    const rszA = e.target.closest('[data-act="avail-rsz"]');
+    if (rszA) {
+      const w = S.avail.find((x) => x.id === rszA.dataset.id);
+      if (!w) return;
+      S.drag = {
+        availResize: true, id: w.id, dayIdx: w.weekday, edge: rszA.dataset.edge,
+        startMin: w.startMin, endMin: w.endMin,
+        ghost: placeGhost(rszA.closest(".pl-lane")), moved: false,
+      };
+      S.root.classList.add("is-dragging");
+      e.preventDefault();
+      availResizeDrag(e.clientX, e.clientY);
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp, { once: true });
+      window.addEventListener("pointercancel", onUp, { once: true });
+      return;
+    }
     if (!lane) return;
     const { dayIdx, row } = pointToSlot(e.clientX, e.clientY);
     S.drag = { paint: true, dayIdx, row0: Math.min(row, ROWS - 1), ghost: placeGhost(lane), minutes: 60 };
@@ -790,6 +813,26 @@ function growIfAtBottom(row) {
   if (rail) rail.style.height = px;
 }
 
+function availResizeDrag(x, y) {
+  const d = S.drag;
+  const { row } = pointToSlot(x, y);
+  growIfAtBottom(row);
+  const m = DAY_START_H * 60 + Math.max(0, Math.min(ROWS, row)) * SNAP_MIN;
+  // The window can never shrink below one hour — the shortest lesson — and
+  // never leave the working day. The anchored edge enforces both.
+  if (d.edge === "top") d.startMin = Math.min(Math.max(DAY_START_H * 60, m), d.endMin - 60);
+  else d.endMin = Math.max(Math.min(DAY_END_H * 60, m), d.startMin + 60);
+  d.moved = true;
+  const g = d.ghost;
+  const rowA = (d.startMin - DAY_START_H * 60) / SNAP_MIN;
+  const rowB = (d.endMin - DAY_START_H * 60) / SNAP_MIN;
+  const mm = (v) => `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
+  g.classList.add("is-paint");
+  g.style.transform = `translateY(${rowA * ROW_PX}px)`;
+  g.style.height = `${(rowB - rowA) * ROW_PX - 3}px`;
+  g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}, săptămânal</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
+}
+
 function paintDrag(x, y) {
   const d = S.drag;
   const { row } = pointToSlot(x, y);
@@ -832,7 +875,8 @@ const onMove = (e) => {
   if (!S.drag) return;
   if (S.drag.fromTray && !S.floater) makeFloater(e.clientX, e.clientY);
   if (S.floater) S.floater.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
-  if (S.drag.paint) paintDrag(e.clientX, e.clientY);
+  if (S.drag.availResize) availResizeDrag(e.clientX, e.clientY);
+  else if (S.drag.paint) paintDrag(e.clientX, e.clientY);
   else moveDrag(e.clientX, e.clientY);
   e.preventDefault();
 };
@@ -865,6 +909,15 @@ async function onUp() {
     return;
   }
   if (!d.moved) return;
+
+  if (d.availResize) {
+    const r = await resizeAvailabilityWindow(d.id, { weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin });
+    if (!r.ok) { showToast(r.message); return; }
+    S.avail = await fetchAvailability();
+    showToast("Fereastră ajustată.", { kind: "success" });
+    render();
+    return;
+  }
 
   if (d.paint) {
     const r = await saveAvailabilityWindow({ weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin });
