@@ -168,7 +168,11 @@ export async function fetchMarkedPupils() {
     id: r.user_id,
     name: r.planner_name || r.profiles?.display_name || "Membru",
     profileName: r.profiles?.display_name || "Membru",
-    color: r.planner_color || r.profiles?.avatar_color || "#7c3aed",
+    // What the teacher CHOSE, if anything. The display colour is decided in the
+    // UI: custom if set, otherwise a hue derived from the pupil's id — at 16
+    // pupils, avatar colours (member-picked) collide far too often to tell
+    // blocks apart, which is the whole point of colouring them.
+    customColor: r.planner_color || null,
     minutes: r.planner_minutes || DEFAULT_DURATION,
   })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
 }

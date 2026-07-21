@@ -52,6 +52,42 @@ const REC_WEEKS = 12;                // how far a weekly series reaches
 const SWATCHES = ["#7c3aed", "#0891b2", "#16a34a", "#ea580c", "#be185d",
   "#1d4ed8", "#b45309", "#0f766e", "#dc2626", "#475569"];
 
+/** The auto-colour scheme, in two steps, because one wasn't enough.
+ *
+ *  Step 1 — a hue HASHED from the pupil's id. Stable: it never changes when
+ *  the roster grows, so the teacher's mental map („Ana e mov") survives.
+ *
+ *  Step 2 — a SPREAD pass. Hashing alone fails the birthday paradox: sixteen
+ *  pupils on a 360° wheel make a near-identical pair TYPICAL, not rare — the
+ *  numbers say the expected closest pair sits under 2° apart. So the hues are
+ *  sorted and pushed apart to at least MIN_HUE_GAP, deterministically; only
+ *  members of a crowded pair move, and only while the crowd exists.
+ *
+ *  A colour the teacher picked by hand skips all of this and always wins. */
+const MIN_HUE_GAP = 18;
+function hashHue(id) {
+  let h = 0;
+  for (const ch of String(id)) h = Math.imul(h ^ ch.charCodeAt(0), 2654435761) >>> 0;
+  return h % 360;
+}
+function spreadHues(items) {
+  if (items.length < 2) return;
+  items.sort((a, b) => a.h - b.h || String(a.id).localeCompare(String(b.id)));
+  for (let i = 1; i < items.length; i++) {
+    if (items[i].h - items[i - 1].h < MIN_HUE_GAP) items[i].h = items[i - 1].h + MIN_HUE_GAP;
+  }
+  // The wheel wraps: last and first are neighbours too. If the forward pass
+  // overflowed past one full turn minus a gap, fall back to even spacing
+  // anchored at the first hue — still deterministic for this roster.
+  const span = items[items.length - 1].h - items[0].h;
+  if (span > 360 - MIN_HUE_GAP) {
+    const step = 360 / items.length;
+    items.forEach((it, i) => { it.h = (items[0].h + i * step) % 360; });
+  } else {
+    items.forEach((it) => { it.h %= 360; });
+  }
+}
+
 const hhmm = (ms) => {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -70,6 +106,7 @@ const S = {
   personalTitle: "",
   recurring: false,    // admin: place as a weekly series
   editPupil: null,     // admin: chip being customised (userId)
+  dockQuery: "",       // admin: type-to-filter in the pupil dock
   vacOpen: false,      // admin: vacation form unfolded
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
@@ -168,40 +205,85 @@ function headerHtml() {
           </button>` : ""}
       </div>
     </div>
-    ${trayHtml()}
-    ${isAdmin() ? vacationsHtml() : ""}`;
+`;
 }
 
 // ---------- the tray ----------
 
 function trayHtml() {
-  const chips = isAdmin()
-    ? S.pupils.map((p) => `
-        <span class="pl-chipwrap">
-          <button type="button" class="pl-chip" data-act="pick" data-kind="lesson"
-                  data-uid="${esc(p.id)}" style="--c:${esc(p.color)}">
-            <i class="pl-chip__dot"></i>${esc(p.name)}
-            <em class="pl-chip__dur">${esc(durLabel(p.minutes))}</em>
-          </button>
-          <button type="button" class="pl-chip__cfg" data-act="cfg" data-uid="${esc(p.id)}"
-                  title="Personalizează: nume, culoare, durată" aria-label="Personalizează ${esc(p.name)}">✎</button>
-        </span>`).join("")
-      + `<span class="pl-tray__sep" aria-hidden="true"></span>
-         <button type="button" class="pl-chip pl-chip--personal" data-act="pick" data-kind="personal" style="--c:#475569">
-           <i class="pl-chip__dot"></i>${esc(S.personalTitle || "Activitate personală")}
-         </button>
-         <input class="pl-tray__name" data-act="ptitle" maxlength="40"
-                placeholder="denumește activitatea" value="${esc(S.personalTitle)}" />`
-    : `<button type="button" class="pl-chip" data-act="pick" data-kind="lesson"
-               data-uid="${esc(CURRENT_USER.authId || "")}" style="--c:${esc(S.myColor || CURRENT_USER.color || "#7c3aed")}">
-         <i class="pl-chip__dot"></i>Ora mea
-         <em class="pl-chip__dur">${esc(durLabel(S.minutes))}</em>
-       </button>`;
   return `<div class="pl-tray">
-      <b class="pl-tray__t">${isAdmin() ? "Trage un bloc în calendar" : "Trage-ți ora în ziua care îți convine"}</b>
-      <div class="pl-tray__row">${chips}</div>
-      ${S.editPupil ? pupilEditorHtml() : ""}
+      <b class="pl-tray__t">Trage-ți ora în ziua care îți convine</b>
+      <div class="pl-tray__row">
+        <button type="button" class="pl-chip" data-act="pick" data-kind="lesson"
+                data-uid="${esc(CURRENT_USER.authId || "")}" style="--c:${esc(S.myColor || CURRENT_USER.color || "#7c3aed")}">
+          <i class="pl-chip__dot"></i>Ora mea
+          <em class="pl-chip__dur">${esc(durLabel(S.minutes))}</em>
+        </button>
+      </div>
     </div>`;
+}
+
+/** THE DOCK — the teacher's pupil roster, down the right edge.
+ *  Built around the one question a teacher actually asks while planning:
+ *  „who still has no hour this week?" So the list is split in two — first the
+ *  unscheduled, then the scheduled with their day and hour on the card — and
+ *  a vertical column of names reads at a glance where a wrapped row of sixteen
+ *  chips never would. Cards are the drag source; ✎ unfolds the editor in
+ *  place; hovering a card lights that pupil's blocks in the grid. */
+function dockHtml() {
+  const q = S.dockQuery.trim().toLowerCase();
+
+  // This week's coverage, per pupil, from the slots already fetched.
+  const stat = new Map();
+  for (const s of S.slots) {
+    if (s.kind !== "lesson") continue;
+    const cur = stat.get(s.userId) || { min: 0, first: null };
+    cur.min += Math.round((s.end - s.start) / 60000);
+    if (!cur.first || s.start < cur.first.start) cur.first = s;
+    stat.set(s.userId, cur);
+  }
+
+  const card = (p) => {
+    const st = stat.get(p.id);
+    const status = st
+      ? `<span class="pl-card__st is-on">✓ ${esc(DAYS[dayIndexOf(st.first.start)])} ${hhmm(st.first.start)} · ${esc(durLabel(st.min))}${st.min > 120 ? "+" : ""}</span>`
+      : `<span class="pl-card__st">fără oră</span>`;
+    return `<div class="pl-card${st ? "" : " is-todo"}" data-name="${esc(p.name.toLowerCase())}" data-hover-uid="${esc(p.id)}">
+        <button type="button" class="pl-card__grab" data-act="pick" data-kind="lesson"
+                data-uid="${esc(p.id)}" style="--c:${esc(p.color)}"
+                title="Trage-l în calendar (${esc(durLabel(p.minutes))})">
+          <i class="pl-card__bar"></i>
+          <span class="pl-card__nm">${esc(p.name)}</span>
+          ${status}
+        </button>
+        <button type="button" class="pl-chip__cfg" data-act="cfg" data-uid="${esc(p.id)}"
+                title="Personalizează: nume, culoare, durată" aria-label="Personalizează ${esc(p.name)}">✎</button>
+      </div>
+      ${S.editPupil === p.id ? pupilEditorHtml() : ""}`;
+  };
+
+  const todo = S.pupils.filter((p) => !stat.get(p.id));
+  const done = S.pupils.filter((p) => stat.get(p.id));
+  const section = (label, list, cls) => list.length
+    ? `<p class="pl-dock__g ${cls}">${esc(label)} (${list.length})</p>${list.map(card).join("")}` : "";
+
+  return `<aside class="pl-dock">
+      <b class="pl-dock__t">Elevii tăi</b>
+      ${S.pupils.length > 7 ? `<input class="pl-dock__q" data-act="dockq" placeholder="caută elevul…" value="${esc(S.dockQuery)}" />` : ""}
+      ${q ? "" : ""}${section("De programat", todo, "is-todo")}
+      ${section("Au ora pusă", done, "is-done")}
+      ${S.pupils.length ? "" : `<p class="cx-muted">Niciun elev marcat încă. Îi marchezi din Atelier → Panou admin → Utilizatori.</p>`}
+      <div class="pl-dock__sep"></div>
+      <div class="pl-card">
+        <button type="button" class="pl-card__grab" data-act="pick" data-kind="personal" style="--c:#475569">
+          <i class="pl-card__bar"></i>
+          <span class="pl-card__nm">${esc(S.personalTitle || "Activitate personală")}</span>
+          <span class="pl-card__st">timpul tău</span>
+        </button>
+      </div>
+      <input class="pl-tray__name" data-act="ptitle" maxlength="40"
+             placeholder="denumește activitatea" value="${esc(S.personalTitle)}" />
+    </aside>`;
 }
 
 /** The chip editor: nickname, colour, default duration — the teacher's own
@@ -289,7 +371,7 @@ function gridHtml() {
            ${s.canEdit && !over ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să schimbi durata" aria-hidden="true"></span>` : ""}`;
       return `<div class="pl-block${s.mine ? " is-mine" : ""}${s.canEdit && !over ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
-        data-id="${esc(s.id)}" data-day="${i}" ${s.canEdit && !over && !confirming ? 'data-act="grab"' : ""}>
+        data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.userId)}" ${s.canEdit && !over && !confirming ? 'data-act="grab"' : ""}>
         ${body}
       </div>`;
     }).join("");
@@ -326,15 +408,21 @@ function nowLineHtml() {
 function render() {
   if (!S.root) return;
   const mineCount = S.slots.filter((s) => s.mine).length;
+  const body = S.loading
+    ? `<p class="cx-muted">Se încarcă…</p>`
+    : isAdmin()
+      ? `<div class="pl-body">${gridHtml()}${dockHtml()}</div>`
+      : gridHtml();
   S.root.innerHTML = `
     ${headerHtml()}
+    ${isAdmin() ? vacationsHtml() : trayHtml()}
     <p class="pl-hint">
       ${isAdmin()
-        ? "Trage un jeton în coloana zilei. Prinde un bloc ca să-l muți; trage-i marginea de jos ca să-i schimbi durata."
+        ? "Trage un elev din lista din dreapta în coloana zilei. Prinde un bloc ca să-l muți; trage-i marginea de jos ca să-i schimbi durata."
         : `Trage-ți jetonul în ziua care îți convine. Îți poți muta blocul oricând, iar de marginea lui de jos îl scurtezi sau îl lungești.${
             mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "rezervare" : "rezervări"} săptămâna asta.` : ""}`}
     </p>
-    ${S.loading ? `<p class="cx-muted">Se încarcă…</p>` : gridHtml()}
+    ${body}
     <div class="pl-live" data-role="live" hidden></div>`;
 }
 
@@ -614,14 +702,15 @@ async function onClick(e) {
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
   if (act === "cfg-close") { S.editPupil = null; render(); return; }
-  if (act === "cfg-color") {
+  if (act === "cfg-color" || act === "cfg-min") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
-    if (p) { p.color = b.dataset.c; render(); }
-    return;
-  }
-  if (act === "cfg-min") {
-    const p = S.pupils.find((x) => x.id === S.editPupil);
-    if (p) { p.minutes = +b.dataset.m; render(); }
+    if (!p) return;
+    // The name field holds uncommitted text; a re-render would rebuild it from
+    // p.name and eat what was typed. Pull it into p.name first.
+    const typed = S.root.querySelector('[data-act="cfg-name"]')?.value;
+    if (typed !== undefined) p.name = typed.trim() || p.profileName;
+    if (act === "cfg-color") p.color = b.dataset.c; else p.minutes = +b.dataset.m;
+    render();
     return;
   }
   if (act === "cfg-save") {
@@ -632,7 +721,7 @@ async function onClick(e) {
     const r = await savePupilPrefs(p.id, { name: p.name === p.profileName ? null : p.name, color: p.color, minutes: p.minutes });
     showToast(r.ok ? `Salvat pentru ${p.name}.` : r.message, r.ok ? { kind: "success" } : undefined);
     S.editPupil = null;
-    S.pupils = await fetchMarkedPupils();
+    await loadPupils();
     render(); return;
   }
 
@@ -661,10 +750,40 @@ async function onClick(e) {
 }
 
 function onTypeTitle(e) {
-  if (!e.target.matches('[data-act="ptitle"]')) return;
-  S.personalTitle = e.target.value.trim();
-  const chip = S.root.querySelector(".pl-chip--personal");
-  if (chip) chip.lastChild.textContent = S.personalTitle || "Activitate personală";
+  if (e.target.matches('[data-act="ptitle"]')) {
+    S.personalTitle = e.target.value.trim();
+    // Update the card label in place — a re-render would eat the focus mid-word.
+    const nm = S.root.querySelector('.pl-card__grab[data-kind="personal"] .pl-card__nm');
+    if (nm) nm.textContent = S.personalTitle || "Activitate personală";
+    return;
+  }
+  if (e.target.matches('[data-act="dockq"]')) {
+    S.dockQuery = e.target.value;
+    const q = S.dockQuery.trim().toLowerCase();
+    // Same reason: filter by toggling visibility, never by re-rendering the
+    // input being typed into.
+    for (const card of S.root.querySelectorAll(".pl-card[data-name]")) {
+      card.hidden = !!q && !card.dataset.name.includes(q);
+    }
+  }
+}
+
+/** Hovering a pupil in the dock lights their blocks in the grid and dims the
+ *  rest — sixteen pupils, one glance, „aha, Ana e joi". */
+function onDockHover(e) {
+  const card = e.target.closest("[data-hover-uid]");
+  if (!card || S.drag) return;
+  const uid = card.dataset.hoverUid;
+  for (const b of S.root.querySelectorAll(".pl-block[data-uid]")) {
+    b.classList.toggle("is-hilite", b.dataset.uid === uid);
+    b.classList.toggle("is-dim", b.dataset.uid !== uid);
+  }
+}
+function onDockLeave(e) {
+  if (e.target.closest && !e.target.closest("[data-hover-uid]")) return;
+  for (const b of S.root.querySelectorAll(".pl-block")) {
+    b.classList.remove("is-hilite", "is-dim");
+  }
 }
 
 // ---------- wiring ----------
@@ -673,6 +792,19 @@ async function refresh() {
   S.slots = await fetchWeek(S.week);
   S.loading = false;
   render();
+}
+
+/** One place computes the display colour, so the dock, the blocks and the
+ *  editor can never disagree about what colour a pupil is. */
+async function loadPupils() {
+  const raw = await fetchMarkedPupils();
+  const auto = raw.filter((p) => !p.customColor).map((p) => ({ id: p.id, h: hashHue(p.id) }));
+  spreadHues(auto);
+  const hueById = new Map(auto.map((a) => [a.id, a.h]));
+  S.pupils = raw.map((p) => ({
+    ...p,
+    color: p.customColor || `hsl(${Math.round(hueById.get(p.id))} 62% 40%)`,
+  }));
 }
 
 /** Mount the planner into `mount`. Returns a teardown.
@@ -694,6 +826,8 @@ export async function initPlanner(mount) {
   mount.addEventListener("pointerdown", onDown);
   mount.addEventListener("click", onClick);
   mount.addEventListener("input", onTypeTitle);
+  mount.addEventListener("mouseover", onDockHover);
+  mount.addEventListener("mouseout", onDockLeave);
 
   async function boot() {
     const my = ++bootId;
@@ -713,7 +847,7 @@ export async function initPlanner(mount) {
     }
 
     if (isAdmin()) {
-      S.pupils = await fetchMarkedPupils();
+      await loadPupils();
     } else {
       const prefs = await fetchMyPlannerPrefs();
       S.minutes = prefs.minutes;
@@ -741,6 +875,8 @@ export async function initPlanner(mount) {
     mount.removeEventListener("pointerdown", onDown);
     mount.removeEventListener("click", onClick);
     mount.removeEventListener("input", onTypeTitle);
+    mount.removeEventListener("mouseover", onDockHover);
+    mount.removeEventListener("mouseout", onDockLeave);
     window.removeEventListener("pointermove", onMove);
   };
 }
