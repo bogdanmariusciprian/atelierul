@@ -675,41 +675,69 @@ async function refresh() {
   render();
 }
 
-/** Mount the planner into `mount`. Returns a teardown. */
+/** Mount the planner into `mount`. Returns a teardown.
+ *
+ *  BOOT RUNS TWICE, and that is the fix for a real bug: the Supabase session
+ *  settles AFTER first paint, so at mount time isAdmin() still says false and
+ *  the teacher was served the pupil view — no pupil chips, no vacation bar,
+ *  or the „pe invitație" lock outright. The rest of the site re-renders on the
+ *  `atelier:role` event; the planner now does too. `bootId` discards a slow
+ *  first boot that finishes after a newer one started. */
 export async function initPlanner(mount) {
   if (!mount) return () => {};
   S.root = mount;
+  let disposed = false;
+  let bootId = 0;
 
-  if (!isLoggedIn()) {
-    mount.innerHTML = `<p class="cx-muted">Intră în cont ca să vezi planificatorul.</p>`;
-    return () => {};
-  }
-  if (!(await hasPlannerAccess())) {
-    mount.innerHTML = `<div class="pl-locked">
-        <b>Planificatorul e pe invitație.</b>
-        <p class="cx-muted">Profesorul îl deschide elevilor cu care lucrează. Dacă ar trebui să ai acces, scrie-i un mesaj.</p>
-      </div>`;
-    return () => {};
-  }
-
-  if (isAdmin()) {
-    S.pupils = await fetchMarkedPupils();
-  } else {
-    const prefs = await fetchMyPlannerPrefs();
-    S.minutes = prefs.minutes;
-    S.myColor = prefs.color;
-  }
-  S.vacations = await fetchVacations();
-  render();
-  await refresh();
-
+  // Listeners attach once, up front. They are inert without a grid, and
+  // attaching them per-boot would stack duplicates on every role change.
   mount.addEventListener("pointerdown", onDown);
   mount.addEventListener("click", onClick);
   mount.addEventListener("input", onTypeTitle);
-  S.unwatch = watchSlots(() => { if (!S.drag) refresh(); });
+
+  async function boot() {
+    const my = ++bootId;
+    const stale = () => disposed || my !== bootId;
+
+    if (!isLoggedIn()) {
+      mount.innerHTML = `<p class="cx-muted">Intră în cont ca să vezi planificatorul.</p>`;
+      return;
+    }
+    if (!(await hasPlannerAccess())) {
+      if (stale()) return;
+      mount.innerHTML = `<div class="pl-locked">
+          <b>Planificatorul e pe invitație.</b>
+          <p class="cx-muted">Profesorul îl deschide elevilor cu care lucrează. Dacă ar trebui să ai acces, scrie-i un mesaj.</p>
+        </div>`;
+      return;
+    }
+
+    if (isAdmin()) {
+      S.pupils = await fetchMarkedPupils();
+    } else {
+      const prefs = await fetchMyPlannerPrefs();
+      S.minutes = prefs.minutes;
+      S.myColor = prefs.color;
+    }
+    S.vacations = await fetchVacations();
+    if (stale()) return;
+    S.loading = true;
+    render();
+    await refresh();
+    if (stale()) return;
+
+    S.unwatch?.();
+    S.unwatch = watchSlots(() => { if (!S.drag) refresh(); });
+  }
+
+  await boot();
+  const onRole = () => { if (!disposed) boot(); };
+  window.addEventListener("atelier:role", onRole);
 
   return () => {
+    disposed = true;
     S.unwatch?.();
+    window.removeEventListener("atelier:role", onRole);
     mount.removeEventListener("pointerdown", onDown);
     mount.removeEventListener("click", onClick);
     mount.removeEventListener("input", onTypeTitle);

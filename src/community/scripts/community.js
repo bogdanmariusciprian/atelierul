@@ -4420,11 +4420,27 @@ export function renderCommunity(basePath = "") {
         if (!isAdmin()) return;
         const uid = Number(btn.dataset.uid);
         const uuid = uuidForSurrogate(uid);
-        if (!uuid) return;
-        // Real event access: insert/delete an event_access row (admin-only, RLS).
-        if (state.eventAccessUuids.has(uuid)) { state.eventAccessUuids.delete(uuid); revokeEventAccess(uuid); }
-        else { state.eventAccessUuids.add(uuid); grantEventAccess(uuid); }
-        return render();
+        if (!uuid) { showToast("Nu am găsit contul acestui membru. Reîncarcă pagina."); return; }
+        // The toggle flips optimistically so the click feels instant — but the
+        // write is AWAITED, and a failure flips it back and says so. The old
+        // fire-and-forget version could show „✓" over an insert that never
+        // happened, which is how a pupil goes missing from the planner while
+        // looking marked here.
+        const had = state.eventAccessUuids.has(uuid);
+        const who = userById(uid)?.name || "membrul";
+        if (had) state.eventAccessUuids.delete(uuid); else state.eventAccessUuids.add(uuid);
+        render();
+        (had ? revokeEventAccess(uuid) : grantEventAccess(uuid)).then((r) => {
+          if (r.ok) {
+            showToast(had ? `${who} nu mai are acces la meditații.` : `✓ ${who} are acum acces la meditații.`,
+              had ? undefined : { kind: "success" });
+            return;
+          }
+          if (had) state.eventAccessUuids.add(uuid); else state.eventAccessUuids.delete(uuid);
+          showToast(r.message);
+          render();
+        });
+        return;
       }
       case "admin-view":
         state.adminViewUser = Number(btn.dataset.uid);
