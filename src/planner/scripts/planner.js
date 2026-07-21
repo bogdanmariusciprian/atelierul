@@ -171,7 +171,11 @@ const vacationFor = (i) => {
 // weekday, plus any one-off exceptions pinned to its exact date. The pupil's
 // pills and the teacher's overlays both read the same answer.
 const winsFor = (dayIdx) =>
-  S.avail.filter((w) => (w.onDate ? w.onDate === isoDay(dayIdx) : w.weekday === dayIdx));
+  S.avail
+    .filter((w) => (w.onDate ? w.onDate === isoDay(dayIdx) : w.weekday === dayIdx))
+    // Weekly first, one-offs after → the amber exception always paints ON TOP
+    // of the green template, never drowned under it.
+    .sort((a, b) => (a.onDate ? 1 : 0) - (b.onDate ? 1 : 0));
 const minToMs = (dayIdx, min) => dayAt(dayIdx).getTime() + min * 60000;
 const minOf = (ms) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
 
@@ -208,11 +212,15 @@ const pupilEmoji = (uid) => S.pupils.find((p) => p.id === uid)?.emoji || "";
  *  evening hours taxing every other day. */
 function neededVisH() {
   let need = 10;
-  for (const x of S.slots) {
-    const endH = Math.ceil((minOf(x.end) || 24 * 60) / 60) - DAY_START_H;
-    // A block touching the last visible row reveals the next one, dimmed.
+  const stretch = (endMin) => {
+    const endH = Math.ceil(endMin / 60) - DAY_START_H;
     if (endH >= need) need = Math.min(HOURS, endH + 1);
-  }
+  };
+  for (const x of S.slots) stretch(minOf(x.end) || 24 * 60);
+  // Windows count too. Without this, a window ending at 19 had its bottom
+  // handle BELOW the visible rows — the „can't edit today" bug: the edge was
+  // there, just unreachable.
+  for (const w of S.avail) stretch(w.endMin);
   return need;
 }
 
@@ -937,6 +945,16 @@ async function onUp() {
 
   if (d.paint) {
     const onDate = S.paintOnce ? isoDay(d.dayIdx) : null;
+    // Painting inside an interval the SAME scope already covers would merge
+    // into… exactly what's there. Silent no-ops teach people the button is
+    // broken — say what happened instead.
+    const covered = winsFor(d.dayIdx).some((w) =>
+      (onDate ? w.onDate === onDate : !w.onDate)
+      && w.startMin <= d.startMin && w.endMin >= d.endMin);
+    if (covered) {
+      showToast("Intervalul era deja deschis — fereastra existentă îl cuprinde. Trage-i de margini ca să o ajustezi.");
+      return;
+    }
     const r = await saveAvailabilityWindow({ weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin, onDate });
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();

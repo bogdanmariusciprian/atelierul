@@ -32,6 +32,7 @@ function humanError(error) {
   if (error.code === "23514" || /programului|jumătate|disponibilit|trecut/.test(error.message || "")) {
     return error.message?.replace(/^.*?:\s*/, "") || "Intervalul nu e permis.";
   }
+  if (/on_date/.test(error.message || "")) return "Aplică întâi migrarea 0059 — ferestrele pe o singură zi au nevoie de ea.";
   if (error.code === "42501") return "Nu ai acces la planificator.";
   return "N-a mers. Încearcă din nou.";
 }
@@ -213,10 +214,18 @@ export async function fetchMyPlannerPrefs() {
 // isodow − 1 in the SQL guard. Minutes are wall-clock from midnight.
 
 export async function fetchAvailability() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("planner_availability")
     .select("id, weekday, start_min, end_min, on_date")
     .order("weekday").order("start_min");
+  // Before migration 0059 the on_date column doesn't exist. Falling back keeps
+  // the existing windows on screen instead of vanishing them all.
+  if (error && /on_date/.test(error.message || "")) {
+    ({ data, error } = await supabase
+      .from("planner_availability")
+      .select("id, weekday, start_min, end_min")
+      .order("weekday").order("start_min"));
+  }
   if (error) { console.warn("fetchAvailability:", error.message); return []; }
   return (data || []).map((w) => ({
     id: w.id, weekday: w.weekday, startMin: w.start_min, endMin: w.end_min,
