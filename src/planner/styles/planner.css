@@ -452,3 +452,70 @@
   background: none; font-size: 1rem; line-height: 1; color: var(--color-text-muted);
 }
 .pl-pill__x:hover { background: #fee2e2; color: #b91c1c; }
+
+/* ---- desenul lui Marius: paleta de buline + orarul-tablă ---- */
+
+.pl-palette {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem;
+  padding: 0.65rem 0.9rem; margin-bottom: 0.75rem;
+  border: 2px solid var(--color-text); border-radius: 14px;
+  background: var(--color-bg);
+}
+.pl-dot {
+  width: 2.4rem; height: 2.4rem; border-radius: 50%; cursor: grab;
+  border: 2.5px solid color-mix(in srgb, var(--c) 70%, #000);
+  background: var(--c); color: #fff;
+  display: grid; place-items: center; font-size: 1.05rem; line-height: 1;
+  user-select: none; touch-action: none; position: relative;
+}
+.pl-dot:hover { transform: scale(1.12); }
+.pl-dot:active { cursor: grabbing; }
+/* Elevul fără oră săptămâna asta: bulina pulsează discret — treaba săptămânii. */
+.pl-dot.is-todo::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%;
+  border: 2px dashed #b45309; opacity: 0.7;
+}
+.pl-dot--personal { border-style: dashed; font-size: 0.85rem; }
+.pl-palette__sep { width: 1.5px; height: 1.8rem; background: var(--color-border); }
+.pl-palette .pl-cfg { flex-basis: 100%; }
+.pl-cfg__emoji { font: inherit; width: 4.5rem; padding: 0.3rem 0.5rem; border-radius: 8px; border: 1.5px solid var(--color-border); text-align: center; }
+
+/* Tooltipul cu numele — pe buline și pe celule, din data-name, fără JS. */
+.pl-dot::before, .pl-block--cell::before {
+  content: attr(data-name);
+  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  padding: 0.25rem 0.6rem; border-radius: 8px; white-space: nowrap;
+  background: var(--color-text); color: var(--color-bg);
+  font-size: 0.74rem; font-weight: 700;
+  opacity: 0; pointer-events: none; transition: opacity 0.12s ease 0.08s;
+  z-index: 6;
+}
+.pl-dot:hover::before, .pl-block--cell:hover::before { opacity: 1; }
+
+/* Orarul-tablă: linii pline, ca în desen; orele târzii estompate. */
+.pl-lane { border: 1.5px solid var(--color-border); border-top: 0; }
+.pl-line { opacity: 1; }
+.pl-line.is-dim { opacity: 0.45; }
+.pl-hour.is-dim { opacity: 0.45; }
+.pl-hour { font-size: 0.85rem; font-weight: 700; }
+
+/* Celula plină de culoare: fără text; emoji-ul, dacă există, e semnul. */
+.pl-block--cell {
+  background: var(--c); border-left: 0; border-radius: 6px;
+  display: grid; place-items: center; padding: 0;
+}
+.pl-block--cell.is-past { filter: grayscale(0.6); opacity: 0.55; }
+.pl-block--cell.is-personal {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 7px, rgba(255, 255, 255, 0.22) 7px 14px),
+    var(--c);
+}
+.pl-cb__e { font-size: 1.15rem; line-height: 1; pointer-events: none; }
+.pl-cb__rec {
+  position: absolute; left: 3px; top: 2px; font-style: normal; font-size: 0.66rem;
+  opacity: 0.9;
+}
+.pl-block--cell .pl-block__x { background: rgba(255, 255, 255, 0.85); opacity: 0; }
+.pl-block--cell:hover .pl-block__x { opacity: 1; }
+.pl-block--cell .pl-block__rsz::after { background: rgba(255, 255, 255, 0.8); }
+.pl-block--cell.is-confirm { background: #fef2f2; display: flex; flex-direction: column; gap: 0.15rem; padding: 0.3rem 0.45rem; }

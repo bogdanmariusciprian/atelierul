@@ -162,7 +162,7 @@ export async function fetchMarkedPupils() {
   if (!isAdmin()) return [];
   const { data, error } = await supabase
     .from("event_access")
-    .select("user_id, planner_name, planner_color, planner_minutes, profiles!event_access_user_id_fkey(display_name, avatar_color)");
+    .select("user_id, planner_name, planner_color, planner_minutes, planner_emoji, profiles!event_access_user_id_fkey(display_name, avatar_color)");
   if (error) { console.warn("fetchMarkedPupils:", error.message); return []; }
   return (data || []).map((r) => ({
     id: r.user_id,
@@ -173,18 +173,20 @@ export async function fetchMarkedPupils() {
     // pupils, avatar colours (member-picked) collide far too often to tell
     // blocks apart, which is the whole point of colouring them.
     customColor: r.planner_color || null,
+    emoji: r.planner_emoji || "",
     minutes: r.planner_minutes || DEFAULT_DURATION,
   })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
 }
 
 /** The teacher customises a pupil's chip. Nulls mean „back to the profile". */
-export async function savePupilPrefs(userId, { name, color, minutes }) {
+export async function savePupilPrefs(userId, { name, color, minutes, emoji }) {
   const { error } = await supabase
     .from("event_access")
     .update({
       planner_name: name?.trim() || null,
       planner_color: color || null,
       planner_minutes: DURATIONS.includes(minutes) ? minutes : DEFAULT_DURATION,
+      planner_emoji: emoji?.trim() || null,
     })
     .eq("user_id", userId);
   if (error) return { ok: false, message: humanError(error) };

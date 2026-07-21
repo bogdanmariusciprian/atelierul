@@ -109,8 +109,9 @@ const S = {
   source: null,        // tray chip in hand: { kind, userId, title }
   personalTitle: "",
   recurring: false,    // admin: place as a weekly series
-  editPupil: null,     // admin: chip being customised (userId)
-  dockQuery: "",       // admin: type-to-filter in the pupil dock
+  editPupil: null,     // admin: pupil being customised (opened by CLICKING a dot)
+  editPersonal: false, // admin: naming the personal-time dot
+  visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
   vacOpen: false,      // admin: vacation form unfolded
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
@@ -190,6 +191,22 @@ function freeStartsFor(dayIdx, minutes) {
 const fitDurations = (dayIdx, startMs, ignoreId = null) =>
   DURATIONS.filter((m) => inAvailability(dayIdx, startMs, m) && !collides(startMs, m, ignoreId));
 
+const pupilEmoji = (uid) => S.pupils.find((p) => p.id === uid)?.emoji || "";
+
+/** How many hour-rows the timetable shows. 8:00–18:00 (ten rows, the last one
+ *  labelled 17) by default — Marius's rule — and it GROWS, dimmed, when a
+ *  block reaches the bottom, so late lessons are reachable without the empty
+ *  evening hours taxing every other day. */
+function neededVisH() {
+  let need = 10;
+  for (const x of S.slots) {
+    const endH = Math.ceil((minOf(x.end) || 24 * 60) / 60) - DAY_START_H;
+    // A block touching the last visible row reveals the next one, dimmed.
+    if (endH >= need) need = Math.min(HOURS, endH + 1);
+  }
+  return need;
+}
+
 /** The teacher's nickname for a pupil beats the profile name on his screen. */
 function slotName(s) {
   if (isAdmin() && s.kind === "lesson") {
@@ -246,67 +263,48 @@ function headerHtml() {
 
 // ---------- the tray ----------
 
-/** THE DOCK — the teacher's pupil roster, down the right edge.
- *  Built around the one question a teacher actually asks while planning:
- *  „who still has no hour this week?" So the list is split in two — first the
- *  unscheduled, then the scheduled with their day and hour on the card — and
- *  a vertical column of names reads at a glance where a wrapped row of sixteen
- *  chips never would. Cards are the drag source; ✎ unfolds the editor in
- *  place; hovering a card lights that pupil's blocks in the grid. */
-function dockHtml() {
-  const q = S.dockQuery.trim().toLowerCase();
-
-  // This week's coverage, per pupil, from the slots already fetched.
+/** THE PALETTE — Marius's own drawing, implemented as drawn: a row of round
+ *  colour dots along the top. The dot IS the pupil; the name lives in a hover
+ *  tooltip, and an optional emoji sits inside the circle as a second mark of
+ *  identity. One object, two gestures: DRAG a dot into the timetable to place
+ *  a lesson, CLICK it (press without moving) to open its little editor —
+ *  distinguished by the same `moved` flag the drag machinery already keeps.
+ *  The grey dashed dot at the end is the teacher's own time. */
+function paletteHtml() {
   const stat = new Map();
-  for (const s of S.slots) {
-    if (s.kind !== "lesson") continue;
-    const cur = stat.get(s.userId) || { min: 0, first: null };
-    cur.min += Math.round((s.end - s.start) / 60000);
-    if (!cur.first || s.start < cur.first.start) cur.first = s;
-    stat.set(s.userId, cur);
+  for (const x of S.slots) {
+    if (x.kind !== "lesson") continue;
+    const cur = stat.get(x.userId) || { min: 0, first: null };
+    cur.min += Math.round((x.end - x.start) / 60000);
+    if (!cur.first || x.start < cur.first.start) cur.first = x;
+    stat.set(x.userId, cur);
   }
-
-  const card = (p) => {
+  const dots = S.pupils.map((p) => {
     const st = stat.get(p.id);
-    const status = st
-      ? `<span class="pl-card__st is-on">✓ ${esc(DAYS[dayIndexOf(st.first.start)])} ${hhmm(st.first.start)} · ${esc(durLabel(st.min))}${st.min > 120 ? "+" : ""}</span>`
-      : `<span class="pl-card__st">fără oră</span>`;
-    return `<div class="pl-card${st ? "" : " is-todo"}" data-name="${esc(p.name.toLowerCase())}" data-hover-uid="${esc(p.id)}">
-        <button type="button" class="pl-card__grab" data-act="pick" data-kind="lesson"
-                data-uid="${esc(p.id)}" style="--c:${esc(p.color)}"
-                title="Trage-l în calendar (${esc(durLabel(p.minutes))})">
-          <i class="pl-card__bar"></i>
-          <span class="pl-card__nm">${esc(p.name)}</span>
-          ${status}
-        </button>
-        <button type="button" class="pl-chip__cfg" data-act="cfg" data-uid="${esc(p.id)}"
-                title="Personalizează: nume, culoare, durată" aria-label="Personalizează ${esc(p.name)}">✎</button>
-      </div>
-      ${S.editPupil === p.id ? pupilEditorHtml() : ""}`;
-  };
-
-  const todo = S.pupils.filter((p) => !stat.get(p.id));
-  const done = S.pupils.filter((p) => stat.get(p.id));
-  const section = (label, list, cls) => list.length
-    ? `<p class="pl-dock__g ${cls}">${esc(label)} (${list.length})</p>${list.map(card).join("")}` : "";
-
-  return `<aside class="pl-dock">
-      <b class="pl-dock__t">Elevii tăi</b>
-      ${S.pupils.length > 7 ? `<input class="pl-dock__q" data-act="dockq" placeholder="caută elevul…" value="${esc(S.dockQuery)}" />` : ""}
-      ${q ? "" : ""}${section("De programat", todo, "is-todo")}
-      ${section("Au ora pusă", done, "is-done")}
-      ${S.pupils.length ? "" : `<p class="cx-muted">Niciun elev marcat încă. Îi marchezi din Atelier → Panou admin → Utilizatori.</p>`}
-      <div class="pl-dock__sep"></div>
-      <div class="pl-card">
-        <button type="button" class="pl-card__grab" data-act="pick" data-kind="personal" style="--c:#475569">
-          <i class="pl-card__bar"></i>
-          <span class="pl-card__nm">${esc(S.personalTitle || "Activitate personală")}</span>
-          <span class="pl-card__st">timpul tău</span>
-        </button>
-      </div>
-      <input class="pl-tray__name" data-act="ptitle" maxlength="40"
-             placeholder="denumește activitatea" value="${esc(S.personalTitle)}" />
-    </aside>`;
+    const tip = st
+      ? `${p.name} — ${DAYS[dayIndexOf(st.first.start)]} ${hhmm(st.first.start)}, ${durLabel(st.min)}${st.min > 120 ? "+" : ""}`
+      : `${p.name} — fără oră săptămâna asta`;
+    return `<button type="button" class="pl-dot${st ? "" : " is-todo"}" data-act="pick" data-kind="lesson"
+        data-uid="${esc(p.id)}" data-hover-uid="${esc(p.id)}" data-name="${esc(tip)}"
+        style="--c:${esc(p.color)}" aria-label="${esc(tip)}">${esc(p.emoji || "")}</button>`;
+  }).join("");
+  return `<div class="pl-palette">
+      ${dots}
+      <span class="pl-palette__sep" aria-hidden="true"></span>
+      <button type="button" class="pl-dot pl-dot--personal" data-act="pick" data-kind="personal"
+        data-name="${esc(S.personalTitle || "Activitate personală")} — timpul tău"
+        style="--c:#475569" aria-label="Activitate personală">✎</button>
+      ${S.editPupil ? pupilEditorHtml() : ""}
+      ${S.editPersonal ? `<div class="pl-cfg">
+          <label class="pl-cfg__f">Denumirea activității tale
+            <input class="pl-cfg__name" data-act="ptitle" maxlength="40"
+                   value="${esc(S.personalTitle)}" placeholder="ex. pregătire, consultații" />
+          </label>
+          <div class="pl-cfg__acts">
+            <button type="button" class="btn-mini" data-act="cfg-close">Închide</button>
+          </div>
+        </div>` : ""}
+    </div>`;
 }
 
 /** The chip editor: nickname, colour, default duration — the teacher's own
@@ -325,6 +323,10 @@ function pupilEditorHtml() {
       <label class="pl-cfg__f">Nume pe bloc
         <input class="pl-cfg__name" data-act="cfg-name" maxlength="30"
                value="${esc(p.name)}" placeholder="${esc(p.profileName)}" />
+      </label>
+      <label class="pl-cfg__f">Simbol
+        <input class="pl-cfg__emoji" data-act="cfg-emoji" maxlength="8"
+               value="${esc(p.emoji || "")}" placeholder="ex. ⚽" />
       </label>
       <div class="pl-cfg__f"><span>Culoare</span><div class="pl-cfg__sw">${sw}</div></div>
       <div class="pl-cfg__f"><span>Durata lui implicită</span><div>${durs}</div></div>
@@ -454,9 +456,13 @@ function pupilViewHtml() {
 function gridHtml() {
   const today = new Date().setHours(0, 0, 0, 0);
   const now = Date.now();
+  S.visH = Math.max(S.visH, neededVisH());
+  const visPx = S.visH * SLOTS_PER_H * ROW_PX;
 
-  const rail = Array.from({ length: HOURS + 1 }, (_, h) =>
-    `<span class="pl-hour" style="top:${h * SLOTS_PER_H * ROW_PX}px">${String(DAY_START_H + h).padStart(2, "0")}:00</span>`
+  // Hour labels sit centred IN their row, like a school timetable, not on the
+  // boundary lines. Rows past the base ten render dimmed.
+  const rail = Array.from({ length: HOURS }, (_, h) =>
+    `<span class="pl-hour${h >= 10 ? " is-dim" : ""}" style="top:${(h + 0.5) * SLOTS_PER_H * ROW_PX}px">${DAY_START_H + h}</span>`
   ).join("");
 
   const cols = DAYS.map((label, i) => {
@@ -477,13 +483,18 @@ function gridHtml() {
                ? `<button type="button" class="pl-mini pl-mini--no" data-act="conf-series" data-id="${esc(s.id)}">Toată seria</button>` : ""}
              <button type="button" class="pl-mini" data-act="conf-no">Nu</button>
            </span>`
-        : `<b class="pl-block__who">${esc(slotName(s))}${s.recurrenceId ? ` <i class="pl-block__rec" title="Se repetă săptămânal">🔁</i>` : ""}</b>
-           <span class="pl-block__when">${esc(DAYS[i])} · ${hhmm(s.start)}–${hhmm(s.end)}</span>
+        : `${s.kind === "lesson" && pupilEmoji(s.userId) ? `<span class="pl-cb__e" aria-hidden="true">${esc(pupilEmoji(s.userId))}</span>` : ""}
+           ${s.recurrenceId ? `<i class="pl-cb__rec" title="Se repetă săptămânal">🔁</i>` : ""}
            ${s.canEdit && !over ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
            ${s.canEdit && !over ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să schimbi durata" aria-hidden="true"></span>` : ""}`;
-      return `<div class="pl-block${s.mine ? " is-mine" : ""}${s.canEdit && !over ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}"
+      // A full-colour CELL, straight from Marius's drawing: no text inside — the
+      // colour is the identity, and the name arrives on hover, as a tooltip
+      // fed by data-name. Screen readers get the same words via aria-label.
+      const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
+      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${s.canEdit && !over ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
-        data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.userId)}" ${s.canEdit && !over && !confirming ? 'data-act="grab"' : ""}>
+        data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.userId)}" data-name="${esc(tip)}"
+        aria-label="${esc(tip)}" ${s.canEdit && !over && !confirming ? 'data-act="grab"' : ""}>
         ${body}
       </div>`;
     }).join("");
@@ -495,8 +506,8 @@ function gridHtml() {
         ${isToday ? `<i class="pl-colhead__today">AZI</i>` : ""}
         ${vac ? `<i class="pl-colhead__vac" title="${esc(vac.label)}">🏖 vacanță</i>` : ""}
       </div>
-      <div class="pl-lane" data-day="${i}" style="height:${ROWS * ROW_PX}px">
-        ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
+      <div class="pl-lane" data-day="${i}" style="height:${visPx}px">
+        ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
         ${winsFor(i).map((w) => `<span class="pl-avail" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px">
             ${S.paint ? `<button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
           </span>`).join("")}
@@ -507,7 +518,7 @@ function gridHtml() {
   }).join("");
 
   return `<div class="pl-grid">
-      <div class="pl-rail" style="height:${ROWS * ROW_PX}px">${rail}</div>
+      <div class="pl-rail" style="height:${visPx}px">${rail}</div>
       <div class="pl-cols">${cols}</div>
     </div>`;
 }
@@ -526,16 +537,17 @@ function render() {
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
     : isAdmin()
-      ? `<div class="pl-body${S.paint ? " is-paint" : ""}">${gridHtml()}${dockHtml()}</div>`
+      ? `<div class="pl-body${S.paint ? " is-paint" : ""}">${gridHtml()}</div>`
       : pupilViewHtml();
   S.root.innerHTML = `
+    ${isAdmin() && !S.loading ? paletteHtml() : ""}
     ${headerHtml()}
     ${isAdmin() ? vacationsHtml() : ""}
     <p class="pl-hint">
       ${isAdmin()
         ? S.paint
           ? "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră pentru acea zi a săptămânii (în fiecare săptămână). Click pe × ca să o închizi."
-          : "Trage un elev din lista din dreapta în coloana zilei. Prinde un bloc ca să-l muți; trage-i marginea de jos ca să-i schimbi durata."
+          : "Trage o bulină în orar ca să pui ora. Click pe bulină îi deschide setările. Ține cursorul pe un bloc ca să vezi al cui e."
         : `Apasă o oră liberă, alege durata, gata.${
             mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "rezervare" : "rezervări"} săptămâna asta.` : ""}`}
     </p>
@@ -729,6 +741,7 @@ function moveDrag(x, y) {
 
   const { dayIdx, lane, row } = pointToSlot(x, y);
   if (!d.ghost) { d.ghost = placeGhost(lane); d.dayIdx = dayIdx; }
+  growIfAtBottom(row + d.minutes / SNAP_MIN - 1);
   const maxRow = ROWS - d.minutes / SNAP_MIN;
   const r = Math.max(0, Math.min(maxRow, row + d.offsetRows));
   const startMs = rowToMs(dayIdx, r);
@@ -739,9 +752,22 @@ function moveDrag(x, y) {
   updateGhost();
 }
 
+/** Nearing the bottom edge grows the timetable one dimmed hour-row, live —
+ *  heights are poked directly because a re-render mid-drag would destroy the
+ *  ghost under the pointer. */
+function growIfAtBottom(row) {
+  if (row < S.visH * SLOTS_PER_H - 1 || S.visH >= HOURS) return;
+  S.visH++;
+  const px = `${S.visH * SLOTS_PER_H * ROW_PX}px`;
+  for (const el of S.root.querySelectorAll(".pl-lane")) el.style.height = px;
+  const rail = S.root.querySelector(".pl-rail");
+  if (rail) rail.style.height = px;
+}
+
 function paintDrag(x, y) {
   const d = S.drag;
   const { row } = pointToSlot(x, y);
+  growIfAtBottom(row);
   const r = Math.max(0, Math.min(ROWS, row));
   d.rowA = Math.min(d.row0, r);
   d.rowB = Math.max(d.row0 + 1, r);
@@ -775,7 +801,22 @@ async function onUp() {
   d?.ghost?.remove();
   const live = S.root.querySelector('[data-role="live"]');
   if (live) live.hidden = true;
-  if (!d || !d.moved) return;
+  if (!d) return;
+
+  // A press on a dot that never moved is a CLICK — and a click opens the dot's
+  // settings. One object, two gestures, told apart by the flag the drag
+  // machinery already keeps for free.
+  if (d.fromTray && !d.moved) {
+    if (S.source?.kind === "personal") {
+      S.editPersonal = !S.editPersonal; S.editPupil = null;
+    } else if (S.source?.userId) {
+      S.editPupil = S.editPupil === S.source.userId ? null : S.source.userId;
+      S.editPersonal = false;
+    }
+    render();
+    return;
+  }
+  if (!d.moved) return;
 
   if (d.paint) {
     const r = await saveAvailabilityWindow({ weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin });
@@ -908,7 +949,7 @@ async function onClick(e) {
 
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
-  if (act === "cfg-close") { S.editPupil = null; render(); return; }
+  if (act === "cfg-close") { S.editPupil = null; S.editPersonal = false; render(); return; }
   if (act === "cfg-color" || act === "cfg-min") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
     if (!p) return;
@@ -916,6 +957,8 @@ async function onClick(e) {
     // p.name and eat what was typed. Pull it into p.name first.
     const typed = S.root.querySelector('[data-act="cfg-name"]')?.value;
     if (typed !== undefined) p.name = typed.trim() || p.profileName;
+    const typedEmoji = S.root.querySelector('[data-act="cfg-emoji"]')?.value;
+    if (typedEmoji !== undefined) p.emoji = typedEmoji.trim();
     if (act === "cfg-color") p.color = b.dataset.c; else p.minutes = +b.dataset.m;
     render();
     return;
@@ -925,7 +968,8 @@ async function onClick(e) {
     if (!p) return;
     const nameInput = S.root.querySelector('[data-act="cfg-name"]');
     p.name = (nameInput?.value || "").trim() || p.profileName;
-    const r = await savePupilPrefs(p.id, { name: p.name === p.profileName ? null : p.name, color: p.color, minutes: p.minutes });
+    p.emoji = (S.root.querySelector('[data-act="cfg-emoji"]')?.value || "").trim();
+    const r = await savePupilPrefs(p.id, { name: p.name === p.profileName ? null : p.name, color: p.color, minutes: p.minutes, emoji: p.emoji });
     showToast(r.ok ? `Salvat pentru ${p.name}.` : r.message, r.ok ? { kind: "success" } : undefined);
     S.editPupil = null;
     await loadPupils();
@@ -959,19 +1003,10 @@ async function onClick(e) {
 function onTypeTitle(e) {
   if (e.target.matches('[data-act="ptitle"]')) {
     S.personalTitle = e.target.value.trim();
-    // Update the card label in place — a re-render would eat the focus mid-word.
-    const nm = S.root.querySelector('.pl-card__grab[data-kind="personal"] .pl-card__nm');
-    if (nm) nm.textContent = S.personalTitle || "Activitate personală";
+    // Update the dot's tooltip in place — a re-render would eat the focus.
+    const dot = S.root.querySelector(".pl-dot--personal");
+    if (dot) dot.dataset.name = `${S.personalTitle || "Activitate personală"} — timpul tău`;
     return;
-  }
-  if (e.target.matches('[data-act="dockq"]')) {
-    S.dockQuery = e.target.value;
-    const q = S.dockQuery.trim().toLowerCase();
-    // Same reason: filter by toggling visibility, never by re-rendering the
-    // input being typed into.
-    for (const card of S.root.querySelectorAll(".pl-card[data-name]")) {
-      card.hidden = !!q && !card.dataset.name.includes(q);
-    }
   }
 }
 
