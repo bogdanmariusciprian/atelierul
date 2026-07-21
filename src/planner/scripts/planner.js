@@ -229,10 +229,6 @@ function headerHtml() {
     ? `${from.getDate()}–${to.getDate()} ${MONTHS[to.getMonth()]}`
     : `${from.getDate()} ${MONTHS[from.getMonth()]} – ${to.getDate()} ${MONTHS[to.getMonth()]}`;
   const isCurrent = S.week.getTime() === weekStart().getTime();
-  const durs = DURATIONS.map((m) => `
-    <button type="button" class="pl-dur${S.minutes === m ? " on" : ""}" data-act="dur" data-m="${m}">
-      ${esc(durLabel(m))}
-    </button>`).join("");
   return `
     <div class="pl-bar">
       <div class="pl-nav">
@@ -245,15 +241,26 @@ function headerHtml() {
         </span>
         <button type="button" class="pl-navbtn" data-act="next"><span>săpt. viitoare</span> ›</button>
       </div>
-      ${isAdmin() ? `<div class="pl-tools">
-        <span class="pl-dur__lab">Durata</span>${durs}
-        <button type="button" class="pl-paint${S.paint ? " on" : ""}" data-act="paint"
-                title="Pictează ferestrele în care elevii își pot alege ore. Se aplică în fiecare săptămână.">
-          🖌 disponibilitate
-        </button>
-      </div>` : ""}
     </div>
 `;
+}
+
+/** The controls Marius asked to live BELOW the timetable: duration, the
+ *  availability brush, vacations, the legend and the how-to line. The board
+ *  itself stays clean — palette, week, grid — and everything that CONFIGURES
+ *  the board sits underneath it, out of the way until needed. */
+function toolsHtml() {
+  const durs = DURATIONS.map((m) => `
+    <button type="button" class="pl-dur${S.minutes === m ? " on" : ""}" data-act="dur" data-m="${m}">
+      ${esc(durLabel(m))}
+    </button>`).join("");
+  return `<div class="pl-tools">
+      <span class="pl-dur__lab">Durata</span>${durs}
+      <button type="button" class="pl-paint${S.paint ? " on" : ""}" data-act="paint"
+              title="Pictează ferestrele în care elevii își pot alege ore. Se aplică în fiecare săptămână.">
+        🖌 disponibilitate
+      </button>
+    </div>`;
 }
 
 // ---------- the tray ----------
@@ -545,23 +552,30 @@ function render() {
     : isAdmin()
       ? `<div class="pl-body${S.paint ? " is-paint" : ""}">${gridHtml()}</div>`
       : pupilViewHtml();
-  S.root.innerHTML = `
-    ${isAdmin() && !S.loading ? paletteHtml() : ""}
-    ${headerHtml()}
-    ${isAdmin() ? vacationsHtml() : ""}
-    ${isAdmin() && !S.loading ? `<p class="pl-legend">
-        <i class="pl-legend__k pl-legend__k--avail"></i> ore deschise elevilor (pictate cu 🖌)
-        <i class="pl-legend__k pl-legend__k--personal"></i> timpul tău
-        <i class="pl-legend__k pl-legend__k--today"></i> azi
-      </p>` : ""}
-    <p class="pl-hint">
-      ${isAdmin()
-        ? S.paint
+  if (isAdmin()) {
+    S.root.innerHTML = `
+      ${!S.loading ? paletteHtml() : ""}
+      ${headerHtml()}
+      ${body}
+      ${!S.loading ? `<div class="pl-below">
+        ${toolsHtml()}
+        ${vacationsHtml()}
+        <p class="pl-legend">
+          <i class="pl-legend__k pl-legend__k--avail"></i> ore deschise elevilor (pictate cu 🖌)
+          <i class="pl-legend__k pl-legend__k--personal"></i> timpul tău
+          <i class="pl-legend__k pl-legend__k--today"></i> azi
+        </p>
+        <p class="pl-hint">${S.paint
           ? "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră pentru acea zi a săptămânii (în fiecare săptămână). Click pe × ca să o închizi."
-          : "Trage o bulină în orar ca să pui ora. Click pe bulină îi deschide setările. Ține cursorul pe un bloc ca să vezi al cui e."
-        : `Apasă o oră liberă, alege durata, gata.${
-            mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "rezervare" : "rezervări"} săptămâna asta.` : ""}`}
-    </p>
+          : "Trage o bulină în orar ca să pui ora. Click pe bulină îi deschide setările. Ține cursorul pe un bloc ca să vezi al cui e."}</p>
+      </div>` : ""}
+      <div class="pl-live" data-role="live" hidden></div>`;
+    return;
+  }
+  S.root.innerHTML = `
+    ${headerHtml()}
+    <p class="pl-hint">Apasă o oră liberă, alege durata, gata.${
+      mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "rezervare" : "rezervări"} săptămâna asta.` : ""}</p>
     ${body}
     <div class="pl-live" data-role="live" hidden></div>`;
 }

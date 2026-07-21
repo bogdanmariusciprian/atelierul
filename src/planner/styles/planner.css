@@ -584,3 +584,10 @@
   background: repeating-linear-gradient(135deg, #cbd5e1 0 4px, #f1f5f9 4px 8px);
 }
 .pl-legend__k--today { background: color-mix(in srgb, var(--color-primary) 14%, transparent); border: 1.5px solid var(--color-primary); }
+
+/* ---- tot ce CONFIGUREAZĂ orarul stă sub el, la cererea lui Marius ----
+   Sus rămâne doar ce folosești mereu: paleta, săptămâna, orarul. */
+.pl-below { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 0.8rem; }
+.pl-below .pl-tools { margin-left: 0; }
+.pl-below .pl-vacbar { margin-bottom: 0; }
+.pl-below .pl-legend, .pl-below .pl-hint { margin: 0; }
