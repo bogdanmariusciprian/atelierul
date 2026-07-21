@@ -509,9 +509,14 @@ function gridHtml() {
       </div>
       <div class="pl-lane" data-day="${i}" style="height:${visPx}px">
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
-        ${winsFor(i).map((w) => `<span class="pl-avail" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px">
+        ${winsFor(i).map((w) => {
+          const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+          return `<span class="pl-avail" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
+              title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, în fiecare săptămână">
+            <i class="pl-avail__tag">deschis ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint ? `<button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
-          </span>`).join("")}
+          </span>`;
+        }).join("")}
         ${isToday ? nowLineHtml() : ""}
         ${blocks}
       </div>
@@ -544,6 +549,11 @@ function render() {
     ${isAdmin() && !S.loading ? paletteHtml() : ""}
     ${headerHtml()}
     ${isAdmin() ? vacationsHtml() : ""}
+    ${isAdmin() && !S.loading ? `<p class="pl-legend">
+        <i class="pl-legend__k pl-legend__k--avail"></i> ore deschise elevilor (pictate cu 🖌)
+        <i class="pl-legend__k pl-legend__k--personal"></i> timpul tău
+        <i class="pl-legend__k pl-legend__k--today"></i> azi
+      </p>` : ""}
     <p class="pl-hint">
       ${isAdmin()
         ? S.paint
