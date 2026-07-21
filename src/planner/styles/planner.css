@@ -623,3 +623,11 @@
    curte liberă sus, primul rând de nume s-ar lipi de meniul site-ului sau
    s-ar tăia. Rezervăm exact cât ocupă un tooltip: înălțimea lui plus pauza. */
 .pl-palette { margin-top: 2.6rem; }
+
+/* Fereastra de-o-singură-zi: contur PLIN, nu punctat — excepția e fermă, nu
+   un obicei — și în chihlimbar, ca să nu se confunde cu șablonul verde. */
+.pl-avail.is-once {
+  border-style: solid; border-color: color-mix(in srgb, #d97706 55%, transparent);
+  background: color-mix(in srgb, #f59e0b 9%, transparent);
+}
+.pl-avail.is-once .pl-avail__tag { color: #b45309; }

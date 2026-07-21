@@ -215,25 +215,33 @@ export async function fetchMyPlannerPrefs() {
 export async function fetchAvailability() {
   const { data, error } = await supabase
     .from("planner_availability")
-    .select("id, weekday, start_min, end_min")
+    .select("id, weekday, start_min, end_min, on_date")
     .order("weekday").order("start_min");
   if (error) { console.warn("fetchAvailability:", error.message); return []; }
   return (data || []).map((w) => ({
     id: w.id, weekday: w.weekday, startMin: w.start_min, endMin: w.end_min,
+    onDate: w.on_date || null, // null = șablon săptămânal; setat = doar acea zi
   }));
 }
+
+/** Two windows share a SCOPE when they'd govern the same days: both weekly on
+ *  the same weekday, or both one-offs on the same date. Merging across scopes
+ *  would let an exception swallow the template — or the other way round. */
+const sameScope = (w, weekday, onDate) =>
+  onDate ? w.onDate === onDate : (!w.onDate && w.weekday === weekday);
 
 /** Add a window to one weekday — MERGING with whatever it touches. The windows
  *  on a day must be disjoint, and not for tidiness: the server guard demands a
  *  booking fit inside a SINGLE window, so two abutting windows (16–18, 18–20)
  *  would silently forbid the 17–19 lesson that plainly fits. Merging at write
  *  time makes that case impossible in the data rather than handled in code. */
-export async function saveAvailabilityWindow({ weekday, startMin, endMin }) {
+export async function saveAvailabilityWindow({ weekday, startMin, endMin, onDate = null }) {
   const all = await fetchAvailability();
-  const day = all.filter((w) => w.weekday === weekday);
+  const day = all.filter((w) => sameScope(w, weekday, onDate));
   const touching = day.filter((w) => startMin <= w.endMin && endMin >= w.startMin);
   const merged = {
     weekday,
+    on_date: onDate,
     start_min: Math.min(startMin, ...touching.map((w) => w.startMin)),
     end_min: Math.max(endMin, ...touching.map((w) => w.endMin)),
   };
@@ -252,20 +260,21 @@ export async function saveAvailabilityWindow({ weekday, startMin, endMin }) {
  *  stretched window now touches a neighbour, the two are merged into one.
  *  Without that pass, the server guard („fit inside a SINGLE window") would
  *  quietly refuse the lesson that straddles their former boundary. */
-export async function resizeAvailabilityWindow(id, { weekday, startMin, endMin }) {
+export async function resizeAvailabilityWindow(id, { weekday, startMin, endMin, onDate = null }) {
   const { error } = await supabase
     .from("planner_availability")
     .update({ start_min: startMin, end_min: endMin })
     .eq("id", id);
   if (error) return { ok: false, message: humanError(error) };
 
-  const day = (await fetchAvailability()).filter((w) => w.weekday === weekday);
+  const day = (await fetchAvailability()).filter((w) => sameScope(w, weekday, onDate));
   const me = day.find((w) => w.id === id);
   if (!me) return { ok: true };
   const touching = day.filter((w) => me.startMin <= w.endMin && me.endMin >= w.startMin);
   if (touching.length > 1) {
     const merged = {
       weekday,
+      on_date: onDate,
       start_min: Math.min(...touching.map((w) => w.startMin)),
       end_min: Math.max(...touching.map((w) => w.endMin)),
     };

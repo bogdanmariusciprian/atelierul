@@ -103,6 +103,7 @@ const S = {
   vacations: [],
   avail: [],           // the teacher's weekly windows — the source of pupil slots
   paint: false,        // admin: painting availability instead of placing blocks
+  paintOnce: false,    // admin: the next window is for ONE calendar day only
   pick: null,          // pupil: { dayIdx, startMs, minutes } being confirmed
   minutes: DEFAULT_DURATION,
   myColor: null,       // pupil: colour the teacher picked for them
@@ -156,12 +157,21 @@ const inHours = (startMs, minutes) => {
 // after dropping. The teacher stays exempt — he may log a lesson already held.
 const inPast = (startMs) => !isAdmin() && startMs < Date.now() - 5 * 60000;
 
+const isoDay = (i) => {
+  const d = dayAt(i);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 const vacationFor = (i) => {
-  const iso = `${dayAt(i).getFullYear()}-${String(dayAt(i).getMonth() + 1).padStart(2, "0")}-${String(dayAt(i).getDate()).padStart(2, "0")}`;
+  const iso = isoDay(i);
   return S.vacations.find((v) => iso >= v.from && iso <= v.to) || null;
 };
 
-const winsFor = (dayIdx) => S.avail.filter((w) => w.weekday === dayIdx);
+// The windows governing THIS concrete day: the weekly template for its
+// weekday, plus any one-off exceptions pinned to its exact date. The pupil's
+// pills and the teacher's overlays both read the same answer.
+const winsFor = (dayIdx) =>
+  S.avail.filter((w) => (w.onDate ? w.onDate === isoDay(dayIdx) : w.weekday === dayIdx));
 const minToMs = (dayIdx, min) => dayAt(dayIdx).getTime() + min * 60000;
 const minOf = (ms) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
 
@@ -257,9 +267,14 @@ function toolsHtml() {
   return `<div class="pl-tools">
       <span class="pl-dur__lab">Durata</span>${durs}
       <button type="button" class="pl-paint${S.paint ? " on" : ""}" data-act="paint"
-              title="Pictează ferestrele în care elevii își pot alege ore. Se aplică în fiecare săptămână.">
+              title="Pictează ferestrele în care elevii își pot alege ore.">
         🖌 disponibilitate
       </button>
+      ${S.paint ? `
+        <button type="button" class="pl-dur${S.paintOnce ? "" : " on"}" data-act="paint-scope" data-v="week"
+                title="Fereastra pictată se repetă în fiecare săptămână.">în fiecare săptămână</button>
+        <button type="button" class="pl-dur${S.paintOnce ? " on" : ""}" data-act="paint-scope" data-v="once"
+                title="Fereastra pictată există doar în ziua aleasă — șablonul săptămânal rămâne neatins.">doar ziua aleasă</button>` : ""}
     </div>`;
 }
 
@@ -518,9 +533,9 @@ function gridHtml() {
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
         ${winsFor(i).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-          return `<span class="pl-avail" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
-              title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, în fiecare săptămână">
-            <i class="pl-avail__tag">deschis ${mm(w.startMin)}–${mm(w.endMin)}</i>
+          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
+              title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
+            <i class="pl-avail__tag">${w.onDate ? "doar azi" : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint ? `
               <span class="pl-avail__h pl-avail__h--top" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="top" title="Trage ca să muți începutul"></span>
               <span class="pl-avail__h pl-avail__h--bot" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="bot" title="Trage ca să muți sfârșitul"></span>
@@ -664,6 +679,7 @@ function onDown(e) {
       if (!w) return;
       S.drag = {
         availResize: true, id: w.id, dayIdx: w.weekday, edge: rszA.dataset.edge,
+        onDate: w.onDate || null,
         startMin: w.startMin, endMin: w.endMin,
         ghost: placeGhost(rszA.closest(".pl-lane")), moved: false,
       };
@@ -830,7 +846,7 @@ function availResizeDrag(x, y) {
   g.classList.add("is-paint");
   g.style.transform = `translateY(${rowA * ROW_PX}px)`;
   g.style.height = `${(rowB - rowA) * ROW_PX - 3}px`;
-  g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}, săptămânal</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
+  g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}${d.onDate ? ", doar ziua asta" : ", săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
 }
 
 function paintDrag(x, y) {
@@ -850,7 +866,7 @@ function paintDrag(x, y) {
   g.style.transform = `translateY(${d.rowA * ROW_PX}px)`;
   g.style.height = `${(d.rowB - d.rowA) * ROW_PX - 3}px`;
   const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-  g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}, săptămânal</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
+  g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}${S.paintOnce ? `, doar ${dayAt(d.dayIdx).getDate()} ${esc(MONTHS[dayAt(d.dayIdx).getMonth()].slice(0, 3))}` : ", săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
 }
 
 /** The dot that RIDES THE POINTER while a palette drag is live. A fixed clone
@@ -911,7 +927,7 @@ async function onUp() {
   if (!d.moved) return;
 
   if (d.availResize) {
-    const r = await resizeAvailabilityWindow(d.id, { weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin });
+    const r = await resizeAvailabilityWindow(d.id, { weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin, onDate: d.onDate });
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();
     showToast("Fereastră ajustată.", { kind: "success" });
@@ -920,10 +936,13 @@ async function onUp() {
   }
 
   if (d.paint) {
-    const r = await saveAvailabilityWindow({ weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin });
+    const onDate = S.paintOnce ? isoDay(d.dayIdx) : null;
+    const r = await saveAvailabilityWindow({ weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin, onDate });
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();
-    showToast(`Fereastră deschisă: ${DAYS[d.dayIdx]}, săptămânal.`, { kind: "success" });
+    showToast(onDate
+      ? `Fereastră deschisă DOAR pe ${DAYS[d.dayIdx]}, ${dayAt(d.dayIdx).getDate()} ${MONTHS[dayAt(d.dayIdx).getMonth()]}.`
+      : `Fereastră deschisă: ${DAYS[d.dayIdx]}, săptămânal.`, { kind: "success" });
     render();
     return;
   }
@@ -992,6 +1011,7 @@ async function onClick(e) {
   if (act === "today") { S.week = weekStart(); S.loading = true; render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
   if (act === "paint") { S.paint = !S.paint; render(); return; }
+  if (act === "paint-scope") { S.paintOnce = b.dataset.v === "once"; render(); return; }
   if (act === "avail-del") {
     const r = await deleteAvailabilityWindow(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
