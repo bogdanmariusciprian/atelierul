@@ -591,3 +591,11 @@
 .pl-below .pl-tools { margin-left: 0; }
 .pl-below .pl-vacbar { margin-bottom: 0; }
 .pl-below .pl-legend, .pl-below .pl-hint { margin: 0; }
+
+/* Titlul paginii există pentru structură (cititoare de ecran, cuprinsul
+   documentului), dar nu ocupă niciun pixel: bannerul de deasupra unui orar
+   care spunea „orar" cheltuia un ecran ca să nu spună nimic. */
+.pl-pagetitle {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

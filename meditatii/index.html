@@ -16,14 +16,14 @@
   <div id="header"></div>
 
   <main class="container">
-    <section class="page-hero">
-      <h1>Planificator meditații</h1>
-      <p>Îți alegi singur ora: tragi un bloc în ziua care îți convine. Dacă te răzgândești, îl muți sau îl anulezi.</p>
-    </section>
+    <!-- No hero. The palette and the timetable ARE the page; a banner that
+         says „planificator" above a planner spends a screenful saying nothing.
+         The h1 stays for structure, but visually out of the flow. -->
+    <h1 class="pl-pagetitle">Planificator meditații</h1>
 
     <!-- The planner mounts here. Access is checked twice: this script refuses to
          draw a grid without it, and the database refuses to write without it. -->
-    <section class="pl-wrap" id="planner">
+    <section class="pl-wrap" id="planner" aria-label="Planificator meditații">
       <p class="cx-muted">Se încarcă planificatorul…</p>
     </section>
   </main>
