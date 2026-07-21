@@ -519,3 +519,40 @@
 .pl-block--cell:hover .pl-block__x { opacity: 1; }
 .pl-block--cell .pl-block__rsz::after { background: rgba(255, 255, 255, 0.8); }
 .pl-block--cell.is-confirm { background: #fef2f2; display: flex; flex-direction: column; gap: 0.15rem; padding: 0.3rem 0.45rem; }
+
+/* ---- bulina care călătorește cu pointerul ----
+   Clonă fixă pe <body>, deasupra a tot, imună la strămoși cu transform.
+   Fantoma din coloană spune UNDE aterizezi; asta spune CE ții în mână. */
+.pl-floater {
+  position: fixed; left: 0; top: 0; z-index: 999;
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  pointer-events: none; will-change: transform;
+  margin: -1.2rem 0 0 -1.2rem; /* centrul bulinei chiar sub vârful cursorului */
+}
+.pl-floater__dot {
+  width: 2.4rem; height: 2.4rem; border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, var(--c) 70%, #000);
+  background: var(--c); color: #fff;
+  display: grid; place-items: center; font-style: normal; font-size: 1.05rem;
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.45);
+}
+.pl-floater__nm {
+  padding: 0.1rem 0.5rem; border-radius: 999px; white-space: nowrap;
+  background: var(--color-text); color: var(--color-bg);
+  font-size: 0.7rem; font-weight: 700;
+}
+
+/* Numele pe celulă: alb pe culoarea plină, cu o umbră cât să respire pe
+   nuanțele deschise. Emoji-ul îi stă înainte, ca pe bulină. */
+.pl-cb__nm {
+  max-width: 100%; padding: 0 0.3rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #fff; font-size: 0.78rem; line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.pl-dot__rec {
+  position: absolute; right: -4px; bottom: -4px; font-style: normal;
+  font-size: 0.72rem; background: var(--color-bg); border-radius: 50%;
+  padding: 1px; line-height: 1;
+}

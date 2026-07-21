@@ -108,7 +108,6 @@ const S = {
   myColor: null,       // pupil: colour the teacher picked for them
   source: null,        // tray chip in hand: { kind, userId, title }
   personalTitle: "",
-  recurring: false,    // admin: place as a weekly series
   editPupil: null,     // admin: pupil being customised (opened by CLICKING a dot)
   editPersonal: false, // admin: naming the personal-time dot
   visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
@@ -248,10 +247,6 @@ function headerHtml() {
       </div>
       ${isAdmin() ? `<div class="pl-tools">
         <span class="pl-dur__lab">Durata</span>${durs}
-        <button type="button" class="pl-rec${S.recurring ? " on" : ""}" data-act="rec"
-                title="Blocul așezat se repetă săptămânal, ${REC_WEEKS} săptămâni. Sare peste vacanțe.">
-          🔁 săptămânal
-        </button>
         <button type="button" class="pl-paint${S.paint ? " on" : ""}" data-act="paint"
                 title="Pictează ferestrele în care elevii își pot alege ore. Se aplică în fiecare săptămână.">
           🖌 disponibilitate
@@ -285,8 +280,9 @@ function paletteHtml() {
       ? `${p.name} — ${DAYS[dayIndexOf(st.first.start)]} ${hhmm(st.first.start)}, ${durLabel(st.min)}${st.min > 120 ? "+" : ""}`
       : `${p.name} — fără oră săptămâna asta`;
     return `<button type="button" class="pl-dot${st ? "" : " is-todo"}" data-act="pick" data-kind="lesson"
-        data-uid="${esc(p.id)}" data-hover-uid="${esc(p.id)}" data-name="${esc(tip)}"
-        style="--c:${esc(p.color)}" aria-label="${esc(tip)}">${esc(p.emoji || "")}</button>`;
+        data-uid="${esc(p.id)}" data-hover-uid="${esc(p.id)}" data-name="${esc(tip)}${p.recurring ? " · săptămânal" : ""}"
+        style="--c:${esc(p.color)}" aria-label="${esc(tip)}">${esc(p.emoji || "")}${
+          p.recurring ? `<i class="pl-dot__rec" aria-hidden="true">🔁</i>` : ""}</button>`;
   }).join("");
   return `<div class="pl-palette">
       ${dots}
@@ -330,6 +326,11 @@ function pupilEditorHtml() {
       </label>
       <div class="pl-cfg__f"><span>Culoare</span><div class="pl-cfg__sw">${sw}</div></div>
       <div class="pl-cfg__f"><span>Durata lui implicită</span><div>${durs}</div></div>
+      <div class="pl-cfg__f"><span>Ritm</span>
+        <button type="button" class="pl-dur${p.recurring ? " on" : ""}" data-act="cfg-rec">
+          ${p.recurring ? "🔁 săptămânal, " + REC_WEEKS + " săpt." : "doar când îl așez"}
+        </button>
+      </div>
       <div class="pl-cfg__acts">
         <button type="button" class="btn-mini btn-mini--ok" data-act="cfg-save">Salvează</button>
         <button type="button" class="btn-mini" data-act="cfg-close">Închide</button>
@@ -483,7 +484,7 @@ function gridHtml() {
                ? `<button type="button" class="pl-mini pl-mini--no" data-act="conf-series" data-id="${esc(s.id)}">Toată seria</button>` : ""}
              <button type="button" class="pl-mini" data-act="conf-no">Nu</button>
            </span>`
-        : `${s.kind === "lesson" && pupilEmoji(s.userId) ? `<span class="pl-cb__e" aria-hidden="true">${esc(pupilEmoji(s.userId))}</span>` : ""}
+        : `<b class="pl-cb__nm">${s.kind === "lesson" && pupilEmoji(s.userId) ? `${esc(pupilEmoji(s.userId))} ` : ""}${esc(slotName(s))}</b>
            ${s.recurrenceId ? `<i class="pl-cb__rec" title="Se repetă săptămânal">🔁</i>` : ""}
            ${s.canEdit && !over ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
            ${s.canEdit && !over ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să schimbi durata" aria-hidden="true"></span>` : ""}`;
@@ -680,6 +681,7 @@ function onDown(e) {
       userId: chip.dataset.uid || null,
       title: chip.dataset.kind === "personal" ? (S.personalTitle || "Activitate personală") : "",
     };
+
     // Picking a pupil's chip adopts THEIR default duration — the teacher set it
     // per pupil for a reason, and this is where it pays off.
     if (isAdmin() && S.source.kind === "lesson") {
@@ -784,8 +786,28 @@ function paintDrag(x, y) {
   g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}, săptămânal</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
 }
 
+/** The dot that RIDES THE POINTER while a palette drag is live. A fixed clone
+ *  on <body>, so no transformed ancestor can hijack its coordinates (the
+ *  configurator taught us that one). Born on the FIRST real movement, not on
+ *  pointerdown — otherwise a plain click (which opens the dot's settings)
+ *  would flash it for a frame. The lane ghost answers WHERE you'd land; this
+ *  answers WHAT you're holding. */
+function makeFloater(x, y) {
+  const p = S.pupils.find((q) => q.id === S.source?.userId);
+  const personal = S.source?.kind === "personal";
+  const fl = document.createElement("div");
+  fl.className = "pl-floater";
+  fl.innerHTML = `<i class="pl-floater__dot" style="--c:${esc(personal ? "#475569" : p?.color || "#7c3aed")}">${esc(personal ? "✎" : p?.emoji || "")}</i>
+    <b class="pl-floater__nm">${esc(personal ? (S.personalTitle || "Activitate personală") : p?.name || "Elev")}</b>`;
+  fl.style.transform = `translate(${x}px, ${y}px)`;
+  document.body.appendChild(fl);
+  S.floater = fl;
+}
+
 const onMove = (e) => {
   if (!S.drag) return;
+  if (S.drag.fromTray && !S.floater) makeFloater(e.clientX, e.clientY);
+  if (S.floater) S.floater.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
   if (S.drag.paint) paintDrag(e.clientX, e.clientY);
   else moveDrag(e.clientX, e.clientY);
   e.preventDefault();
@@ -798,6 +820,8 @@ async function onUp() {
   S.root.classList.remove("is-dragging");
   S.root.querySelector(".pl-block.is-dragging")?.classList.remove("is-dragging");
   S.root.querySelector(".pl-chip.is-held")?.classList.remove("is-held");
+  S.floater?.remove();
+  S.floater = null;
   d?.ghost?.remove();
   const live = S.root.querySelector('[data-role="live"]');
   if (live) live.hidden = true;
@@ -846,8 +870,10 @@ async function onUp() {
     return;
   }
 
-  // New block. A weekly series only makes sense for a pupil's lesson.
-  if (isAdmin() && S.recurring && S.source?.kind === "lesson") {
+  // New block. The rhythm belongs to the PUPIL: if their dot is set to
+  // weekly, dropping it plants the whole series; otherwise one lesson.
+  const srcPupil = S.pupils.find((x) => x.id === S.source?.userId);
+  if (isAdmin() && S.source?.kind === "lesson" && srcPupil?.recurring) {
     const r = await bookRecurring({
       startMs: d.startMs, minutes: d.minutes,
       userId: S.source.userId, weeks: REC_WEEKS, vacations: S.vacations,
@@ -888,7 +914,6 @@ async function onClick(e) {
   }
   if (act === "today") { S.week = weekStart(); S.loading = true; render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
-  if (act === "rec") { S.recurring = !S.recurring; render(); return; }
   if (act === "paint") { S.paint = !S.paint; render(); return; }
   if (act === "avail-del") {
     const r = await deleteAvailabilityWindow(b.dataset.id);
@@ -950,7 +975,7 @@ async function onClick(e) {
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
   if (act === "cfg-close") { S.editPupil = null; S.editPersonal = false; render(); return; }
-  if (act === "cfg-color" || act === "cfg-min") {
+  if (act === "cfg-color" || act === "cfg-min" || act === "cfg-rec") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
     if (!p) return;
     // The name field holds uncommitted text; a re-render would rebuild it from
@@ -959,7 +984,9 @@ async function onClick(e) {
     if (typed !== undefined) p.name = typed.trim() || p.profileName;
     const typedEmoji = S.root.querySelector('[data-act="cfg-emoji"]')?.value;
     if (typedEmoji !== undefined) p.emoji = typedEmoji.trim();
-    if (act === "cfg-color") p.color = b.dataset.c; else p.minutes = +b.dataset.m;
+    if (act === "cfg-color") p.color = b.dataset.c;
+    else if (act === "cfg-min") p.minutes = +b.dataset.m;
+    else p.recurring = !p.recurring;
     render();
     return;
   }
@@ -969,7 +996,7 @@ async function onClick(e) {
     const nameInput = S.root.querySelector('[data-act="cfg-name"]');
     p.name = (nameInput?.value || "").trim() || p.profileName;
     p.emoji = (S.root.querySelector('[data-act="cfg-emoji"]')?.value || "").trim();
-    const r = await savePupilPrefs(p.id, { name: p.name === p.profileName ? null : p.name, color: p.color, minutes: p.minutes, emoji: p.emoji });
+    const r = await savePupilPrefs(p.id, { name: p.name === p.profileName ? null : p.name, color: p.color, minutes: p.minutes, emoji: p.emoji, recurring: p.recurring });
     showToast(r.ok ? `Salvat pentru ${p.name}.` : r.message, r.ok ? { kind: "success" } : undefined);
     S.editPupil = null;
     await loadPupils();
