@@ -618,3 +618,8 @@
   background: #16a34a; opacity: 0.55; transition: opacity 0.15s ease;
 }
 .pl-avail__h:hover::after { opacity: 1; }
+
+/* Bannerul a plecat, dar tooltipurile bulinelor răsar DEASUPRA lor — fără o
+   curte liberă sus, primul rând de nume s-ar lipi de meniul site-ului sau
+   s-ar tăia. Rezervăm exact cât ocupă un tooltip: înălțimea lui plus pauza. */
+.pl-palette { margin-top: 2.6rem; }
