@@ -29,7 +29,7 @@ export const DEFAULT_DURATION = 120;
 function humanError(error) {
   if (!error) return "";
   if (error.code === "23P01") return "Cineva tocmai a rezervat intervalul ăsta. Alege altul.";
-  if (error.code === "23514" || /programului|jumătate/.test(error.message || "")) {
+  if (error.code === "23514" || /programului|jumătate|disponibilit|trecut/.test(error.message || "")) {
     return error.message?.replace(/^.*?:\s*/, "") || "Intervalul nu e permis.";
   }
   if (error.code === "42501") return "Nu ai acces la planificator.";
@@ -202,6 +202,51 @@ export async function fetchMyPlannerPrefs() {
     minutes: data?.planner_minutes || DEFAULT_DURATION,
     color: data?.planner_color || null,
   };
+}
+
+// ---- availability (the teacher's weekly template) ----
+// Weekday 0 = Monday … 6 = Sunday, matching (getDay() + 6) % 7 in JS and
+// isodow − 1 in the SQL guard. Minutes are wall-clock from midnight.
+
+export async function fetchAvailability() {
+  const { data, error } = await supabase
+    .from("planner_availability")
+    .select("id, weekday, start_min, end_min")
+    .order("weekday").order("start_min");
+  if (error) { console.warn("fetchAvailability:", error.message); return []; }
+  return (data || []).map((w) => ({
+    id: w.id, weekday: w.weekday, startMin: w.start_min, endMin: w.end_min,
+  }));
+}
+
+/** Add a window to one weekday — MERGING with whatever it touches. The windows
+ *  on a day must be disjoint, and not for tidiness: the server guard demands a
+ *  booking fit inside a SINGLE window, so two abutting windows (16–18, 18–20)
+ *  would silently forbid the 17–19 lesson that plainly fits. Merging at write
+ *  time makes that case impossible in the data rather than handled in code. */
+export async function saveAvailabilityWindow({ weekday, startMin, endMin }) {
+  const all = await fetchAvailability();
+  const day = all.filter((w) => w.weekday === weekday);
+  const touching = day.filter((w) => startMin <= w.endMin && endMin >= w.startMin);
+  const merged = {
+    weekday,
+    start_min: Math.min(startMin, ...touching.map((w) => w.startMin)),
+    end_min: Math.max(endMin, ...touching.map((w) => w.endMin)),
+  };
+  if (touching.length) {
+    const { error } = await supabase.from("planner_availability")
+      .delete().in("id", touching.map((w) => w.id));
+    if (error) return { ok: false, message: humanError(error) };
+  }
+  const { error } = await supabase.from("planner_availability").insert(merged);
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+export async function deleteAvailabilityWindow(id) {
+  const { error } = await supabase.from("planner_availability").delete().eq("id", id);
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
 }
 
 // ---- vacations ----

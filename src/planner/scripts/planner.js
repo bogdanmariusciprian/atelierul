@@ -30,6 +30,7 @@ import {
   weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, watchSlots,
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
   fetchVacations, saveVacation, deleteVacation, bookRecurring, cancelSeries,
+  fetchAvailability, saveAvailabilityWindow, deleteAvailabilityWindow,
 } from "../../shared/scripts/planner-repo.js";
 import { CURRENT_USER, isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -100,6 +101,9 @@ const S = {
   slots: [],
   pupils: [],          // admin: marked pupils with custom name/colour/minutes
   vacations: [],
+  avail: [],           // the teacher's weekly windows — the source of pupil slots
+  paint: false,        // admin: painting availability instead of placing blocks
+  pick: null,          // pupil: { dayIdx, startMs, minutes } being confirmed
   minutes: DEFAULT_DURATION,
   myColor: null,       // pupil: colour the teacher picked for them
   source: null,        // tray chip in hand: { kind, userId, title }
@@ -157,6 +161,35 @@ const vacationFor = (i) => {
   return S.vacations.find((v) => iso >= v.from && iso <= v.to) || null;
 };
 
+const winsFor = (dayIdx) => S.avail.filter((w) => w.weekday === dayIdx);
+const minToMs = (dayIdx, min) => dayAt(dayIdx).getTime() + min * 60000;
+const minOf = (ms) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
+
+/** Inside ONE window — same rule as the server guard, mirrored so the pupil
+ *  never sees an option the database would refuse. */
+const inAvailability = (dayIdx, startMs, minutes) => {
+  const a = minOf(startMs), b = a + minutes;
+  return winsFor(dayIdx).some((w) => w.startMin <= a && w.endMin >= b);
+};
+
+/** Every start a pupil could actually book on this day, for this duration:
+ *  windows, stepped by half hours, minus clashes, minus the past. */
+function freeStartsFor(dayIdx, minutes) {
+  const out = [];
+  for (const w of winsFor(dayIdx)) {
+    for (let m = w.startMin; m + minutes <= w.endMin; m += SNAP_MIN) {
+      const at = minToMs(dayIdx, m);
+      if (!collides(at, minutes) && !inPast(at)) out.push(at);
+    }
+  }
+  return out;
+}
+
+/** Which durations fit at this start — drives the enabled/disabled state of
+ *  the 1h / 1h30 / 2h buttons in the confirm step and on own bookings. */
+const fitDurations = (dayIdx, startMs, ignoreId = null) =>
+  DURATIONS.filter((m) => inAvailability(dayIdx, startMs, m) && !collides(startMs, m, ignoreId));
+
 /** The teacher's nickname for a pupil beats the profile name on his screen. */
 function slotName(s) {
   if (isAdmin() && s.kind === "lesson") {
@@ -196,32 +229,22 @@ function headerHtml() {
         </span>
         <button type="button" class="pl-navbtn" data-act="next"><span>săpt. viitoare</span> ›</button>
       </div>
-      <div class="pl-tools">
+      ${isAdmin() ? `<div class="pl-tools">
         <span class="pl-dur__lab">Durata</span>${durs}
-        ${isAdmin() ? `
-          <button type="button" class="pl-rec${S.recurring ? " on" : ""}" data-act="rec"
-                  title="Blocul așezat se repetă săptămânal, ${REC_WEEKS} săptămâni. Sare peste vacanțe.">
-            🔁 săptămânal
-          </button>` : ""}
-      </div>
+        <button type="button" class="pl-rec${S.recurring ? " on" : ""}" data-act="rec"
+                title="Blocul așezat se repetă săptămânal, ${REC_WEEKS} săptămâni. Sare peste vacanțe.">
+          🔁 săptămânal
+        </button>
+        <button type="button" class="pl-paint${S.paint ? " on" : ""}" data-act="paint"
+                title="Pictează ferestrele în care elevii își pot alege ore. Se aplică în fiecare săptămână.">
+          🖌 disponibilitate
+        </button>
+      </div>` : ""}
     </div>
 `;
 }
 
 // ---------- the tray ----------
-
-function trayHtml() {
-  return `<div class="pl-tray">
-      <b class="pl-tray__t">Trage-ți ora în ziua care îți convine</b>
-      <div class="pl-tray__row">
-        <button type="button" class="pl-chip" data-act="pick" data-kind="lesson"
-                data-uid="${esc(CURRENT_USER.authId || "")}" style="--c:${esc(S.myColor || CURRENT_USER.color || "#7c3aed")}">
-          <i class="pl-chip__dot"></i>Ora mea
-          <em class="pl-chip__dur">${esc(durLabel(S.minutes))}</em>
-        </button>
-      </div>
-    </div>`;
-}
 
 /** THE DOCK — the teacher's pupil roster, down the right edge.
  *  Built around the one question a teacher actually asks while planning:
@@ -339,6 +362,95 @@ function vacationsHtml() {
 
 // ---------- the grid ----------
 
+/** THE PUPIL'S VIEW — no calendar, no dragging. Days as cards; under each,
+ *  pills. Green pills are starts born from the teacher's windows minus what's
+ *  taken; grey pills are taken hours, shown WITHOUT names — a pupil sees that
+ *  18:00 is gone, never whose it is. Tapping a green pill unfolds the one
+ *  decision left: the duration (preset to theirs), then „Rezervă". Two taps.
+ *  Their own booking sits highlighted, with duration switches and a cancel
+ *  that confirms in place. */
+function pupilViewHtml() {
+  if (!S.avail.length) {
+    return `<div class="pl-locked">
+        <b>Profesorul încă nu a deschis orele.</b>
+        <p class="cx-muted">Când își va seta disponibilitatea, aici vor apărea orele libere pe care le poți alege cu o apăsare.</p>
+      </div>`;
+  }
+  const today = new Date().setHours(0, 0, 0, 0);
+
+  const cards = DAYS.map((label, i) => {
+    const d = dayAt(i);
+    const isToday = d.getTime() === today;
+    const isPast = d.getTime() < today;
+    const vac = vacationFor(i);
+    const wins = winsFor(i);
+    const daySlots = S.slots.filter((x) => dayIndexOf(x.start) === i).sort((a, b) => a.start - b.start);
+
+    const mine = daySlots.filter((x) => x.mine).map((x) => {
+      const confirming = S.confirmId === x.id;
+      const durs = DURATIONS.map((m) => {
+        const cur = Math.round((x.end - x.start) / 60000) === m;
+        const can = cur || fitDurations(i, x.start, x.id).includes(m);
+        return `<button type="button" class="pl-pill__d${cur ? " on" : ""}" data-act="my-dur"
+                 data-id="${esc(x.id)}" data-m="${m}" ${can ? "" : "disabled"}>${esc(durLabel(m))}</button>`;
+      }).join("");
+      return `<div class="pl-mypill" style="--c:${esc(S.myColor || "#7c3aed")}">
+          <b>Ora ta · ${hhmm(x.start)}–${hhmm(x.end)}</b>
+          ${confirming
+            ? `<span class="pl-block__confirm">Anulezi?
+                 <button type="button" class="pl-mini pl-mini--no" data-act="conf-yes" data-id="${esc(x.id)}">Da</button>
+                 <button type="button" class="pl-mini" data-act="conf-no">Nu</button></span>`
+            : `<span class="pl-mypill__acts">${durs}
+                 <button type="button" class="pl-pill__x" data-act="cancel" data-id="${esc(x.id)}" aria-label="Anulează ora">×</button></span>`}
+        </div>`;
+    }).join("");
+
+    const taken = daySlots.filter((x) => !x.mine).map((x) =>
+      `<span class="pl-pill is-taken">${hhmm(x.start)}–${hhmm(x.end)} · Ocupat</span>`).join("");
+
+    // Free starts, computed for the SHORTEST duration: a start that fits one
+    // hour is worth showing even if two don't fit — the duration step will
+    // grey out what doesn't. Skipped entirely for past days.
+    const free = isPast ? [] : freeStartsFor(i, DURATIONS[0]);
+    const pills = free.map((at) => {
+      const picked = S.pick && S.pick.startMs === at;
+      if (!picked) {
+        return `<button type="button" class="pl-pill" data-act="pick-slot" data-day="${i}" data-at="${at}">${hhmm(at)}</button>`;
+      }
+      const durs = DURATIONS.map((m) => {
+        const can = fitDurations(i, at).includes(m);
+        return `<button type="button" class="pl-pill__d${S.pick.minutes === m ? " on" : ""}" data-act="pick-dur"
+                 data-m="${m}" ${can ? "" : "disabled"}>${esc(durLabel(m))}</button>`;
+      }).join("");
+      return `<span class="pl-pickbox">
+          <b>${esc(label)} · ${hhmm(at)}–${hhmm(at + S.pick.minutes * 60000)}</b>
+          ${durs}
+          <button type="button" class="pl-mini pl-mini--go" data-act="pick-book">Rezervă</button>
+          <button type="button" class="pl-mini" data-act="pick-x">Renunță</button>
+        </span>`;
+    }).join("");
+
+    const empty = !wins.length
+      ? `<span class="pl-day__none">zi fără ore deschise</span>`
+      : !mine && !taken && !free.length && !isPast
+        ? `<span class="pl-day__none">toate orele sunt ocupate</span>`
+        : "";
+
+    return `<section class="pl-day${isToday ? " is-today" : ""}${isPast ? " is-past" : ""}">
+        <header class="pl-day__h">
+          <b>${esc(label)}</b>
+          <span>${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}</span>
+          ${isToday ? `<i class="pl-colhead__today">AZI</i>` : ""}
+          ${vac ? `<i class="pl-colhead__vac">🏖 ${esc(vac.label)}</i>` : ""}
+        </header>
+        <div class="pl-day__b">${mine}${taken ? `<div class="pl-day__row">${taken}</div>` : ""}
+          ${pills ? `<div class="pl-day__row">${pills}</div>` : ""}${empty}</div>
+      </section>`;
+  }).join("");
+
+  return `<div class="pl-days">${cards}</div>`;
+}
+
 function gridHtml() {
   const today = new Date().setHours(0, 0, 0, 0);
   const now = Date.now();
@@ -385,6 +497,9 @@ function gridHtml() {
       </div>
       <div class="pl-lane" data-day="${i}" style="height:${ROWS * ROW_PX}px">
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
+        ${winsFor(i).map((w) => `<span class="pl-avail" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px">
+            ${S.paint ? `<button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
+          </span>`).join("")}
         ${isToday ? nowLineHtml() : ""}
         ${blocks}
       </div>
@@ -411,15 +526,17 @@ function render() {
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
     : isAdmin()
-      ? `<div class="pl-body">${gridHtml()}${dockHtml()}</div>`
-      : gridHtml();
+      ? `<div class="pl-body${S.paint ? " is-paint" : ""}">${gridHtml()}${dockHtml()}</div>`
+      : pupilViewHtml();
   S.root.innerHTML = `
     ${headerHtml()}
-    ${isAdmin() ? vacationsHtml() : trayHtml()}
+    ${isAdmin() ? vacationsHtml() : ""}
     <p class="pl-hint">
       ${isAdmin()
-        ? "Trage un elev din lista din dreapta în coloana zilei. Prinde un bloc ca să-l muți; trage-i marginea de jos ca să-i schimbi durata."
-        : `Trage-ți jetonul în ziua care îți convine. Îți poți muta blocul oricând, iar de marginea lui de jos îl scurtezi sau îl lungești.${
+        ? S.paint
+          ? "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră pentru acea zi a săptămânii (în fiecare săptămână). Click pe × ca să o închizi."
+          : "Trage un elev din lista din dreapta în coloana zilei. Prinde un bloc ca să-l muți; trage-i marginea de jos ca să-i schimbi durata."
+        : `Apasă o oră liberă, alege durata, gata.${
             mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "rezervare" : "rezervări"} săptămâna asta.` : ""}`}
     </p>
     ${body}
@@ -490,6 +607,26 @@ function markBad(d) {
 
 function onDown(e) {
   if (!isLoggedIn()) return;
+  // The pupil's world is taps now — nothing there is draggable, and a stray
+  // press must never start a ghost.
+  if (!isAdmin()) return;
+
+  // Painting availability: a drag on a lane sketches a window for that WEEKDAY.
+  if (S.paint) {
+    const lane = e.target.closest(".pl-lane");
+    if (e.target.closest('[data-act="avail-del"]')) return; // the × is a click
+    if (!lane) return;
+    const { dayIdx, row } = pointToSlot(e.clientX, e.clientY);
+    S.drag = { paint: true, dayIdx, row0: Math.min(row, ROWS - 1), ghost: placeGhost(lane), minutes: 60 };
+    S.root.classList.add("is-dragging");
+    e.preventDefault();
+    paintDrag(e.clientX, e.clientY);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+    window.addEventListener("pointercancel", onUp, { once: true });
+    return;
+  }
+
   const rsz = e.target.closest('[data-act="rsz"]');
   const chip = e.target.closest('[data-act="pick"]');
   const grab = rsz ? null : e.target.closest('[data-act="grab"]');
@@ -602,7 +739,31 @@ function moveDrag(x, y) {
   updateGhost();
 }
 
-const onMove = (e) => { if (S.drag) { moveDrag(e.clientX, e.clientY); e.preventDefault(); } };
+function paintDrag(x, y) {
+  const d = S.drag;
+  const { row } = pointToSlot(x, y);
+  const r = Math.max(0, Math.min(ROWS, row));
+  d.rowA = Math.min(d.row0, r);
+  d.rowB = Math.max(d.row0 + 1, r);
+  // A window shorter than the shortest lesson would be a slot nobody can use.
+  if (d.rowB - d.rowA < 2) d.rowB = Math.min(ROWS, d.rowA + 2);
+  d.startMin = DAY_START_H * 60 + d.rowA * SNAP_MIN;
+  d.endMin = DAY_START_H * 60 + d.rowB * SNAP_MIN;
+  d.moved = true;
+  const g = d.ghost;
+  g.classList.add("is-paint");
+  g.style.transform = `translateY(${d.rowA * ROW_PX}px)`;
+  g.style.height = `${(d.rowB - d.rowA) * ROW_PX - 3}px`;
+  const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}, săptămânal</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
+}
+
+const onMove = (e) => {
+  if (!S.drag) return;
+  if (S.drag.paint) paintDrag(e.clientX, e.clientY);
+  else moveDrag(e.clientX, e.clientY);
+  e.preventDefault();
+};
 
 async function onUp() {
   window.removeEventListener("pointermove", onMove);
@@ -615,6 +776,15 @@ async function onUp() {
   const live = S.root.querySelector('[data-role="live"]');
   if (live) live.hidden = true;
   if (!d || !d.moved) return;
+
+  if (d.paint) {
+    const r = await saveAvailabilityWindow({ weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin });
+    if (!r.ok) { showToast(r.message); return; }
+    S.avail = await fetchAvailability();
+    showToast(`Fereastră deschisă: ${DAYS[d.dayIdx]}, săptămânal.`, { kind: "success" });
+    render();
+    return;
+  }
 
   if (d.bad) { showToast(`Nu se poate: ${d.badWhy}.`); return; }
 
@@ -678,6 +848,43 @@ async function onClick(e) {
   if (act === "today") { S.week = weekStart(); S.loading = true; render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
   if (act === "rec") { S.recurring = !S.recurring; render(); return; }
+  if (act === "paint") { S.paint = !S.paint; render(); return; }
+  if (act === "avail-del") {
+    const r = await deleteAvailabilityWindow(b.dataset.id);
+    if (!r.ok) { showToast(r.message); return; }
+    S.avail = await fetchAvailability();
+    showToast("Fereastră închisă.");
+    render(); return;
+  }
+
+  // ---- the pupil's two taps ----
+  if (act === "pick-slot") {
+    const dayIdx = +b.dataset.day, startMs = +b.dataset.at;
+    const fits = fitDurations(dayIdx, startMs);
+    if (!fits.length) { showToast("Ora tocmai s-a ocupat."); refresh(); return; }
+    // Their default duration if it still fits; otherwise the longest that does.
+    const minutes = fits.includes(S.minutes) ? S.minutes : fits[fits.length - 1];
+    S.pick = { dayIdx, startMs, minutes };
+    render(); return;
+  }
+  if (act === "pick-dur") { if (S.pick) { S.pick.minutes = +b.dataset.m; render(); } return; }
+  if (act === "pick-x") { S.pick = null; render(); return; }
+  if (act === "pick-book") {
+    if (!S.pick) return;
+    const { startMs, minutes, dayIdx } = S.pick;
+    S.pick = null;
+    const r = await bookSlot({ startMs, minutes });
+    if (!r.ok) { showToast(r.message); await refresh(); return; }
+    showToast(`Rezervat: ${DAYS[dayIdx]}, ${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}.`, { kind: "success" });
+    await refresh(); return;
+  }
+  if (act === "my-dur") {
+    const x = S.slots.find((q) => q.id === b.dataset.id);
+    if (!x) return;
+    const r = await moveSlot(x.id, { startMs: x.start, minutes: +b.dataset.m });
+    showToast(r.ok ? `Durata e acum ${durLabel(+b.dataset.m)}.` : r.message, r.ok ? { kind: "success" } : undefined);
+    await refresh(); return;
+  }
 
   // cancel: two taps, in place. The first turns the block into its own confirm
   // dialog — no modal to dismiss, nothing to hunt for, and a recurring block
@@ -854,6 +1061,7 @@ export async function initPlanner(mount) {
       S.myColor = prefs.color;
     }
     S.vacations = await fetchVacations();
+    S.avail = await fetchAvailability();
     if (stale()) return;
     S.loading = true;
     render();

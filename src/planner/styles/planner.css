@@ -366,3 +366,89 @@
   .pl-dock__g { width: 100%; }
   .pl-dock__sep { display: none; }
 }
+
+/* ---- modelul „Calendly": ferestre, pastile, alegerea elevului ---- */
+
+/* Butonul pensulei + ferestrele verzi de pe grila profesorului. */
+.pl-paint {
+  padding: 0.3rem 0.7rem; border-radius: 999px; cursor: pointer;
+  border: 1.5px dashed var(--color-border); background: var(--color-bg);
+  font: inherit; font-size: 0.8rem; font-weight: 700; color: var(--color-text-muted);
+}
+.pl-paint.on { border-style: solid; border-color: #15803d; color: #15803d; background: #f0fdf4; }
+.pl-avail {
+  position: absolute; left: 0; right: 0; z-index: 0;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+  border-left: 3px solid color-mix(in srgb, #22c55e 55%, transparent);
+}
+.pl-body.is-paint .pl-block { pointer-events: none; opacity: 0.45; }
+.pl-body.is-paint .pl-lane { cursor: crosshair; }
+.pl-avail__x {
+  position: absolute; top: 2px; right: 2px; width: 1.2rem; height: 1.2rem;
+  border: 0; border-radius: 50%; cursor: pointer; font-size: 0.85rem; line-height: 1;
+  background: var(--color-bg); color: #15803d;
+}
+.pl-avail__x:hover { background: #fee2e2; color: #b91c1c; }
+.pl-ghost.is-paint { border-color: #15803d; background: color-mix(in srgb, #22c55e 16%, var(--color-bg)); }
+
+/* Zilele-card ale elevului. */
+.pl-days { display: flex; flex-direction: column; gap: 0.6rem; }
+.pl-day { border: 1.5px solid var(--color-border); border-radius: 14px; overflow: hidden; }
+.pl-day.is-past { opacity: 0.55; }
+.pl-day__h {
+  display: flex; align-items: baseline; gap: 0.6rem;
+  padding: 0.5rem 0.8rem; background: var(--color-surface);
+}
+.pl-day__h b { font-size: 1rem; }
+.pl-day__h > span { font-size: 0.78rem; color: var(--color-text-muted); }
+.pl-day.is-today { border-color: var(--color-primary); }
+.pl-day.is-today .pl-day__h { background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface)); }
+.pl-day__b { padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.pl-day__row { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.pl-day__none { font-size: 0.8rem; font-style: italic; color: var(--color-text-muted); }
+
+/* Pastilele: liberă (apăsabilă), ocupată (mută, fără nume). */
+.pl-pill {
+  padding: 0.35rem 0.85rem; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid #86efac; background: #f0fdf4; color: #15803d;
+  font: inherit; font-size: 0.86rem; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pl-pill:hover { background: #dcfce7; border-color: #22c55e; }
+.pl-pill.is-taken {
+  cursor: default; border-color: var(--color-border);
+  background: var(--color-surface); color: var(--color-text-muted);
+}
+
+/* Confirmarea în loc: intervalul, durata, Rezervă. */
+.pl-pickbox {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  padding: 0.45rem 0.7rem; border-radius: 12px;
+  border: 1.5px solid var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-bg));
+  font-size: 0.84rem;
+}
+.pl-pill__d {
+  padding: 0.2rem 0.55rem; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--color-border); background: var(--color-bg);
+  font: inherit; font-size: 0.74rem; font-weight: 700; color: var(--color-text-muted);
+}
+.pl-pill__d.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.pl-pill__d:disabled { opacity: 0.4; cursor: not-allowed; }
+.pl-mini--go { border-color: var(--color-primary); color: var(--color-primary); }
+.pl-mini--go:hover { background: color-mix(in srgb, var(--color-primary) 14%, transparent); }
+
+/* Ora proprie: evidențiată în culoarea elevului, cu acțiunile lângă ea. */
+.pl-mypill {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.7rem; border-radius: 12px;
+  border-left: 4px solid var(--c);
+  background: color-mix(in srgb, var(--c) 14%, var(--color-bg));
+  font-size: 0.88rem;
+}
+.pl-mypill__acts { display: inline-flex; align-items: center; gap: 0.3rem; margin-left: auto; }
+.pl-pill__x {
+  width: 1.4rem; height: 1.4rem; border: 0; border-radius: 50%; cursor: pointer;
+  background: none; font-size: 1rem; line-height: 1; color: var(--color-text-muted);
+}
+.pl-pill__x:hover { background: #fee2e2; color: #b91c1c; }
