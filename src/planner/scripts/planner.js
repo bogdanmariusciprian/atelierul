@@ -27,7 +27,7 @@
 // =========================================================
 import {
   DAY_START_H, DAY_END_H, SNAP_MIN, DURATIONS, DEFAULT_DURATION,
-  weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, watchSlots,
+  weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, renameSlot, watchSlots,
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
   fetchVacations, saveVacation, deleteVacation, bookRecurring, cancelSeries,
   fetchAvailability, saveAvailabilityWindow, deleteAvailabilityWindow, resizeAvailabilityWindow,
@@ -93,7 +93,8 @@ const hhmm = (ms) => {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
-const durLabel = (m) => (m === 60 ? "1 oră" : m === 90 ? "1h 30" : "2 ore");
+const durLabel = (m) => (m === 60 ? "1 oră" : m === 90 ? "1h 30" : m === 120 ? "2 ore"
+  : m < 60 ? `${m} min` : m % 60 === 0 ? `${m / 60} ore` : `${Math.floor(m / 60)}h ${m % 60}`);
 
 const S = {
   root: null,
@@ -102,7 +103,8 @@ const S = {
   pupils: [],          // admin: marked pupils with custom name/colour/minutes
   vacations: [],
   avail: [],           // the teacher's weekly windows — the source of pupil slots
-  paint: false,        // admin: painting availability instead of placing blocks
+  paint: false,        // admin: the pencil — editing his own layer of the board
+  paintWhat: "avail",  // pencil regime: availability windows or personal blocks
   paintOnce: false,    // admin: the next window is for ONE calendar day only
   pick: null,          // pupil: { dayIdx, startMs, minutes } being confirmed
   minutes: DEFAULT_DURATION,
@@ -110,7 +112,7 @@ const S = {
   source: null,        // tray chip in hand: { kind, userId, title }
   personalTitle: "",
   editPupil: null,     // admin: pupil being customised (opened by CLICKING a dot)
-  editPersonal: false, // admin: naming the personal-time dot
+  renameId: null,      // admin: personal block whose inline rename is open
   visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
   vacOpen: false,      // admin: vacation form unfolded
   confirmId: null,     // block whose × was pressed — inline confirm shown
@@ -275,14 +277,23 @@ function toolsHtml() {
   return `<div class="pl-tools">
       <span class="pl-dur__lab">Durata</span>${durs}
       <button type="button" class="pl-paint${S.paint ? " on" : ""}" data-act="paint"
-              title="Pictează ferestrele în care elevii își pot alege ore.">
-        🖌 disponibilitate
+              title="Editează stratul tău de pe orar: ferestrele pentru elevi și activitățile tale.">
+        🖌 creion
       </button>
       ${S.paint ? `
+        <button type="button" class="pl-dur${S.paintWhat === "avail" ? " on" : ""}" data-act="paint-what" data-v="avail"
+                title="Pictează ferestrele în care elevii își pot alege ore.">disponibilitate</button>
+        <button type="button" class="pl-dur${S.paintWhat === "personal" ? " on" : ""}" data-act="paint-what" data-v="personal"
+                title="Desenează direct în orar timpul tău: ședințe, pregătire, orice te face indisponibil.">✎ activitate personală</button>
+        <span class="pl-tools__sep" aria-hidden="true"></span>` : ""}
+      ${S.paint && S.paintWhat === "avail" ? `
         <button type="button" class="pl-dur${S.paintOnce ? "" : " on"}" data-act="paint-scope" data-v="week"
                 title="Fereastra pictată se repetă în fiecare săptămână.">în fiecare săptămână</button>
         <button type="button" class="pl-dur${S.paintOnce ? " on" : ""}" data-act="paint-scope" data-v="once"
                 title="Fereastra pictată există doar în ziua aleasă — șablonul săptămânal rămâne neatins.">doar ziua aleasă</button>` : ""}
+      ${S.paint && S.paintWhat === "personal" ? `
+        <input class="pl-ptitle" data-act="ptitle" maxlength="40" value="${esc(S.personalTitle)}"
+               placeholder="denumirea activității (ex. pregătire)" aria-label="Denumirea activității personale" />` : ""}
     </div>`;
 }
 
@@ -294,7 +305,8 @@ function toolsHtml() {
  *  identity. One object, two gestures: DRAG a dot into the timetable to place
  *  a lesson, CLICK it (press without moving) to open its little editor —
  *  distinguished by the same `moved` flag the drag machinery already keeps.
- *  The grey dashed dot at the end is the teacher's own time. */
+ *  The teacher's own time is NOT here any more — it lives under the 🖌
+ *  pencil, next to the availability windows: one place for his whole layer. */
 function paletteHtml() {
   const stat = new Map();
   for (const x of S.slots) {
@@ -316,20 +328,7 @@ function paletteHtml() {
   }).join("");
   return `<div class="pl-palette">
       ${dots}
-      <span class="pl-palette__sep" aria-hidden="true"></span>
-      <button type="button" class="pl-dot pl-dot--personal" data-act="pick" data-kind="personal"
-        data-name="${esc(S.personalTitle || "Activitate personală")} — timpul tău"
-        style="--c:#475569" aria-label="Activitate personală">✎</button>
       ${S.editPupil ? pupilEditorHtml() : ""}
-      ${S.editPersonal ? `<div class="pl-cfg">
-          <label class="pl-cfg__f">Denumirea activității tale
-            <input class="pl-cfg__name" data-act="ptitle" maxlength="40"
-                   value="${esc(S.personalTitle)}" placeholder="ex. pregătire, consultații" />
-          </label>
-          <div class="pl-cfg__acts">
-            <button type="button" class="btn-mini" data-act="cfg-close">Închide</button>
-          </div>
-        </div>` : ""}
     </div>`;
 }
 
@@ -506,6 +505,7 @@ function gridHtml() {
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
       const confirming = S.confirmId === s.id;
+      const renaming = S.renameId === s.id;
       const body = confirming
         ? `<b class="pl-block__who">Anulezi?</b>
            <span class="pl-block__confirm">
@@ -513,6 +513,12 @@ function gridHtml() {
              ${s.recurrenceId && s.canEdit && isAdmin()
                ? `<button type="button" class="pl-mini pl-mini--no" data-act="conf-series" data-id="${esc(s.id)}">Toată seria</button>` : ""}
              <button type="button" class="pl-mini" data-act="conf-no">Nu</button>
+           </span>`
+        : renaming
+        ? `<span class="pl-block__ren">
+             <input data-role="rename" maxlength="40" value="${esc(s.name)}" aria-label="Denumirea activității" />
+             <button type="button" class="pl-mini" data-act="rename-ok" data-id="${esc(s.id)}">✓</button>
+             <button type="button" class="pl-mini" data-act="rename-no">×</button>
            </span>`
         : `<b class="pl-cb__nm">${s.kind === "lesson" && pupilEmoji(s.userId) ? `${esc(pupilEmoji(s.userId))} ` : ""}${esc(slotName(s))}</b>
            ${s.recurrenceId ? `<i class="pl-cb__rec" title="Se repetă săptămânal">🔁</i>` : ""}
@@ -522,10 +528,10 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${s.canEdit && !over ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}"
+      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${s.canEdit && !over ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.userId)}" data-name="${esc(tip)}"
-        aria-label="${esc(tip)}" ${s.canEdit && !over && !confirming ? 'data-act="grab"' : ""}>
+        aria-label="${esc(tip)}" ${s.canEdit && !over && !confirming && !renaming ? 'data-act="grab"' : ""}>
         ${body}
       </div>`;
     }).join("");
@@ -544,7 +550,7 @@ function gridHtml() {
           return `<span class="pl-avail${w.onDate ? " is-once" : ""}" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? "doar azi" : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
-            ${S.paint ? `
+            ${S.paint && S.paintWhat === "avail" ? `
               <span class="pl-avail__h pl-avail__h--top" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="top" title="Trage ca să muți începutul"></span>
               <span class="pl-avail__h pl-avail__h--bot" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="bot" title="Trage ca să muți sfârșitul"></span>
               <button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
@@ -576,7 +582,7 @@ function render() {
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
     : isAdmin()
-      ? `<div class="pl-body${S.paint ? " is-paint" : ""}">${gridHtml()}</div>`
+      ? `<div class="pl-body${S.paint ? ` is-paint is-paint-${S.paintWhat}` : ""}">${gridHtml()}</div>`
       : pupilViewHtml();
   if (isAdmin()) {
     S.root.innerHTML = `
@@ -592,7 +598,9 @@ function render() {
           <i class="pl-legend__k pl-legend__k--today"></i> azi
         </p>
         <p class="pl-hint">${S.paint
-          ? "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră săptămânală. Trage de marginile uneia existente ca să o ajustezi; × o închide."
+          ? (S.paintWhat === "personal"
+            ? "Mod activitate personală: desenează în orar intervalul tău — cât tragi, atât durează. Blocurile gri rămân vii: le muți, le întinzi, iar un click le redenumește."
+            : "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră. Trage de marginile uneia existente ca să o ajustezi; × o închide.")
           : "Trage o bulină în orar ca să pui ora. Click pe bulină îi deschide setările. Ține cursorul pe un bloc ca să vezi al cui e."}</p>
       </div>` : ""}
       <div class="pl-live" data-role="live" hidden></div>`;
@@ -611,7 +619,6 @@ function render() {
 function sourceLabel() {
   const s = S.source;
   if (!s) return "";
-  if (s.kind === "personal") return s.title || "Activitate personală";
   if (!isAdmin()) return "Ora mea";
   return S.pupils.find((p) => p.id === s.userId)?.name || "Elev";
 }
@@ -674,11 +681,37 @@ function onDown(e) {
   // press must never start a ghost.
   if (!isAdmin()) return;
 
-  // Painting availability: a drag on a lane sketches a window for that WEEKDAY.
+  // THE PENCIL. Two regimes share one gesture — a drag on a lane sketches
+  // something for that day: an availability window, or a personal block.
   if (S.paint) {
-    const lane = e.target.closest(".pl-lane");
-    if (e.target.closest('[data-act="avail-del"]')) return; // the × is a click
+    // Buttons and fields on the board stay CLICKS even in pencil mode.
+    if (e.target.closest('[data-act="avail-del"], [data-act="cancel"], [data-act="rename-ok"], [data-act="rename-no"], [data-role="rename"], .pl-block__confirm, .pl-mini')) return;
 
+    // Regime „activitate personală": personal blocks stay ALIVE — the handle
+    // resizes, a drag moves, a motionless press renames (see onUp). A press on
+    // anything else either sketches a NEW personal block or does nothing.
+    if (S.paintWhat === "personal") {
+      const t = e.target.closest('[data-act="rsz"], [data-act="grab"]');
+      const ts = t ? S.slots.find((x) => x.id === t.dataset.id) : null;
+      if (!(ts?.kind === "personal" && ts.canEdit)) {
+        if (e.target.closest(".pl-block--cell")) return; // lessons are scenery here
+        const lane = e.target.closest(".pl-lane");
+        if (!lane) return;
+        const { dayIdx, row } = pointToSlot(e.clientX, e.clientY);
+        S.drag = { paintP: true, dayIdx, row0: Math.min(row, ROWS - 1), ghost: placeGhost(lane) };
+        S.root.classList.add("is-dragging");
+        e.preventDefault();
+        paintDrag(e.clientX, e.clientY);
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp, { once: true });
+        window.addEventListener("pointercancel", onUp, { once: true });
+        return;
+      }
+      // Falls THROUGH to the ordinary move/resize machinery below — it already
+      // knows this block; the pencil only decided it is allowed to.
+    } else {
+
+    const lane = e.target.closest(".pl-lane");
     // Grabbing a window's edge ADJUSTS it instead of painting a new one — the
     // other edge stays anchored, exactly like resizing a block.
     const rszA = e.target.closest('[data-act="avail-rsz"]');
@@ -709,6 +742,7 @@ function onDown(e) {
     window.addEventListener("pointerup", onUp, { once: true });
     window.addEventListener("pointercancel", onUp, { once: true });
     return;
+    }
   }
 
   const rsz = e.target.closest('[data-act="rsz"]');
@@ -726,6 +760,7 @@ function onDown(e) {
     const host = rsz.closest(".pl-lane");
     S.drag = {
       id: s.id, resize: true,
+      free: s.kind === "personal", // personal time snaps to ANY half hour
       dayIdx: +host.dataset.day,
       anchorMs: s.start,
       startMs: s.start,
@@ -747,11 +782,7 @@ function onDown(e) {
   if (grab && !existing?.canEdit) return;
 
   if (chip) {
-    S.source = {
-      kind: chip.dataset.kind || "lesson",
-      userId: chip.dataset.uid || null,
-      title: chip.dataset.kind === "personal" ? (S.personalTitle || "Activitate personală") : "",
-    };
+    S.source = { kind: "lesson", userId: chip.dataset.uid || null, title: "" };
 
     // Picking a pupil's chip adopts THEIR default duration — the teacher set it
     // per pupil for a reason, and this is where it pays off.
@@ -802,9 +833,12 @@ function moveDrag(x, y) {
     const { row } = pointToSlot(x, y);
     const anchorRow = msToRow(d.anchorMs);
     const rawMin = Math.max(SNAP_MIN, (row - anchorRow) * SNAP_MIN);
-    const nearest = DURATIONS.reduce((best, m) =>
-      Math.abs(m - rawMin) < Math.abs(best - rawMin) ? m : best, DURATIONS[0]);
-    d.minutes = nearest;
+    // A lesson snaps to the three legal durations; the teacher's own time is
+    // free — any half-hour multiple (the DB check in 0060 says the same).
+    d.minutes = d.free
+      ? rawMin
+      : DURATIONS.reduce((best, m) =>
+          Math.abs(m - rawMin) < Math.abs(best - rawMin) ? m : best, DURATIONS[0]);
     d.startMs = d.anchorMs;
     d.moved = true;
     markBad(d);
@@ -865,7 +899,8 @@ function paintDrag(x, y) {
   d.rowA = Math.min(d.row0, r);
   d.rowB = Math.max(d.row0 + 1, r);
   // A window shorter than the shortest lesson would be a slot nobody can use.
-  if (d.rowB - d.rowA < 2) d.rowB = Math.min(ROWS, d.rowA + 2);
+  // Personal time has no such floor: half an hour of pregătire is real.
+  if (!d.paintP && d.rowB - d.rowA < 2) d.rowB = Math.min(ROWS, d.rowA + 2);
   d.startMin = DAY_START_H * 60 + d.rowA * SNAP_MIN;
   d.endMin = DAY_START_H * 60 + d.rowB * SNAP_MIN;
   d.moved = true;
@@ -874,6 +909,15 @@ function paintDrag(x, y) {
   g.style.transform = `translateY(${d.rowA * ROW_PX}px)`;
   g.style.height = `${(d.rowB - d.rowA) * ROW_PX - 3}px`;
   const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  if (d.paintP) {
+    // Sketching MY time: clashes must show while the pointer is still down —
+    // the exclusion constraint would refuse them at drop anyway.
+    d.bad = collides(rowToMs(d.dayIdx, d.rowA), d.endMin - d.startMin);
+    g.classList.add("is-personal");
+    g.classList.toggle("is-bad", d.bad);
+    g.innerHTML = `<b>✎ ${esc(S.personalTitle || "Activitate personală")}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>${d.bad ? "<i>ocupat</i>" : ""}`;
+    return;
+  }
   g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}${S.paintOnce ? `, doar ${dayAt(d.dayIdx).getDate()} ${esc(MONTHS[dayAt(d.dayIdx).getMonth()].slice(0, 3))}` : ", săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
 }
 
@@ -885,11 +929,10 @@ function paintDrag(x, y) {
  *  answers WHAT you're holding. */
 function makeFloater(x, y) {
   const p = S.pupils.find((q) => q.id === S.source?.userId);
-  const personal = S.source?.kind === "personal";
   const fl = document.createElement("div");
   fl.className = "pl-floater";
-  fl.innerHTML = `<i class="pl-floater__dot" style="--c:${esc(personal ? "#475569" : p?.color || "#7c3aed")}">${esc(personal ? "✎" : p?.emoji || "")}</i>
-    <b class="pl-floater__nm">${esc(personal ? (S.personalTitle || "Activitate personală") : p?.name || "Elev")}</b>`;
+  fl.innerHTML = `<i class="pl-floater__dot" style="--c:${esc(p?.color || "#7c3aed")}">${esc(p?.emoji || "")}</i>
+    <b class="pl-floater__nm">${esc(p?.name || "Elev")}</b>`;
   fl.style.transform = `translate(${x}px, ${y}px)`;
   document.body.appendChild(fl);
   S.floater = fl;
@@ -923,16 +966,24 @@ async function onUp() {
   // settings. One object, two gestures, told apart by the flag the drag
   // machinery already keeps for free.
   if (d.fromTray && !d.moved) {
-    if (S.source?.kind === "personal") {
-      S.editPersonal = !S.editPersonal; S.editPupil = null;
-    } else if (S.source?.userId) {
-      S.editPupil = S.editPupil === S.source.userId ? null : S.source.userId;
-      S.editPersonal = false;
-    }
+    if (S.source?.userId) S.editPupil = S.editPupil === S.source.userId ? null : S.source.userId;
     render();
     return;
   }
-  if (!d.moved) return;
+  if (!d.moved) {
+    // Third use of the same click-vs-drag flag: in the pencil's personal
+    // regime, a motionless press on a grey block opens its inline rename.
+    if (d.id && S.paint && S.paintWhat === "personal") {
+      const x = S.slots.find((q) => q.id === d.id);
+      if (x?.kind === "personal") {
+        S.renameId = S.renameId === d.id ? null : d.id;
+        render();
+        const inp = S.root.querySelector('[data-role="rename"]');
+        inp?.focus(); inp?.select();
+      }
+    }
+    return;
+  }
 
   if (d.availResize) {
     const r = await resizeAvailabilityWindow(d.id, { weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin, onDate: d.onDate });
@@ -940,6 +991,19 @@ async function onUp() {
     S.avail = await fetchAvailability();
     showToast("Fereastră ajustată.", { kind: "success" });
     render();
+    return;
+  }
+
+  // Dropping a personal sketch books it directly — the teacher's own time,
+  // any half-hour length, no availability window required.
+  if (d.paintP) {
+    if (d.bad) { showToast("Nu se poate: intervalul se suprapune cu o rezervare."); return; }
+    const startMs = rowToMs(d.dayIdx, d.rowA);
+    const minutes = d.endMin - d.startMin;
+    const res = await bookSlot({ startMs, minutes, kind: "personal", title: S.personalTitle || "" });
+    if (!res.ok) { showToast(res.message); await refresh(); return; }
+    showToast(`Notat: ${S.personalTitle || "Activitate personală"} — ${DAYS[d.dayIdx]}, ${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}.`, { kind: "success" });
+    await refresh();
     return;
   }
 
@@ -1006,8 +1070,6 @@ async function onUp() {
   const res = await bookSlot({
     startMs: d.startMs, minutes: d.minutes,
     userId: isAdmin() ? S.source?.userId : null,
-    kind: S.source?.kind || "lesson",
-    title: S.source?.title || "",
   });
   if (!res.ok) { showToast(res.message); await refresh(); return; }
   showToast(`Rezervat: ${label}`, { kind: "success" });
@@ -1028,7 +1090,8 @@ async function onClick(e) {
   }
   if (act === "today") { S.week = weekStart(); S.loading = true; render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
-  if (act === "paint") { S.paint = !S.paint; render(); return; }
+  if (act === "paint") { S.paint = !S.paint; if (!S.paint) S.renameId = null; render(); return; }
+  if (act === "paint-what") { S.paintWhat = b.dataset.v; S.renameId = null; render(); return; }
   if (act === "paint-scope") { S.paintOnce = b.dataset.v === "once"; render(); return; }
   if (act === "avail-del") {
     const r = await deleteAvailabilityWindow(b.dataset.id);
@@ -1037,6 +1100,15 @@ async function onClick(e) {
     showToast("Fereastră închisă.");
     render(); return;
   }
+
+  if (act === "rename-ok") {
+    const v = (S.root.querySelector('[data-role="rename"]')?.value || "").trim();
+    S.renameId = null;
+    const r = await renameSlot(b.dataset.id, v);
+    showToast(r.ok ? "Activitate redenumită." : r.message, r.ok ? { kind: "success" } : undefined);
+    await refresh(); return;
+  }
+  if (act === "rename-no") { S.renameId = null; render(); return; }
 
   // ---- the pupil's two taps ----
   if (act === "pick-slot") {
@@ -1089,7 +1161,7 @@ async function onClick(e) {
 
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
-  if (act === "cfg-close") { S.editPupil = null; S.editPersonal = false; render(); return; }
+  if (act === "cfg-close") { S.editPupil = null; render(); return; }
   if (act === "cfg-color" || act === "cfg-min" || act === "cfg-rec") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
     if (!p) return;
@@ -1144,11 +1216,8 @@ async function onClick(e) {
 
 function onTypeTitle(e) {
   if (e.target.matches('[data-act="ptitle"]')) {
+    // Remembered, not re-rendered — a render here would eat the focus.
     S.personalTitle = e.target.value.trim();
-    // Update the dot's tooltip in place — a re-render would eat the focus.
-    const dot = S.root.querySelector(".pl-dot--personal");
-    if (dot) dot.dataset.name = `${S.personalTitle || "Activitate personală"} — timpul tău`;
-    return;
   }
 }
 
@@ -1210,6 +1279,12 @@ export async function initPlanner(mount) {
   mount.addEventListener("pointerdown", onDown);
   mount.addEventListener("click", onClick);
   mount.addEventListener("input", onTypeTitle);
+  mount.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.matches('[data-role="rename"]')) {
+      e.preventDefault();
+      mount.querySelector('[data-act="rename-ok"]')?.click();
+    }
+  });
   mount.addEventListener("mouseover", onDockHover);
   mount.addEventListener("mouseout", onDockLeave);
 

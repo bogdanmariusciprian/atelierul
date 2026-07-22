@@ -134,6 +134,17 @@ export async function cancelSlot(id) {
   return { ok: true };
 }
 
+/** Rename a personal block in place. Times untouched, so the hours-guard
+ *  trigger lets it through even for a block already in the past. */
+export async function renameSlot(id, title) {
+  const { error } = await supabase
+    .from("tutoring_slots")
+    .update({ title: title || "Activitate personală" })
+    .eq("id", id);
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
 /** Live updates. Someone else's booking should appear while you're looking at
  *  the grid — that's what stops most collisions before they happen.
  *  Returns an unsubscribe function. */
