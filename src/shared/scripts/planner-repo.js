@@ -71,7 +71,9 @@ export async function fetchWeek(from = weekStart()) {
     return {
       id: r.id,
       userId: r.user_id,
-      kind: r.kind || "lesson",
+      // The KIND of someone else's hour is the teacher's business, not the
+      // pupil's — masked to a plain busy lesson, same as the name and note.
+      kind: admin || mine ? (r.kind || "lesson") : "lesson",
       recurrenceId: r.recurrence_id || null,
       mine,
       name: label,
@@ -114,12 +116,16 @@ export async function bookSlot({ startMs, minutes, userId = null, note = "", kin
 
 /** Move or resize. Same failure modes as booking — the constraint doesn't care
  *  whether a row is new or moved, only whether the range is free. */
-export async function moveSlot(id, { startMs, minutes }) {
+export async function moveSlot(id, { startMs, minutes, detach = false }) {
   const { error } = await supabase
     .from("tutoring_slots")
     .update({
       starts_at: new Date(startMs).toISOString(),
       ends_at: new Date(startMs + minutes * 60000).toISOString(),
+      // A series means „the same slot, weekly". An occurrence dragged to a new
+      // time stops BEING that slot — it detaches, so its 🔁 stops lying and
+      // „cancel the whole series" keeps meaning what it says.
+      ...(detach ? { recurrence_id: null } : {}),
     })
     .eq("id", id);
   if (error) return { ok: false, message: humanError(error), code: error.code };

@@ -143,7 +143,9 @@ function msToRow(ms) {
   return Math.round((d - base) / (SNAP_MIN * 60000));
 }
 
-const dayIndexOf = (ms) => Math.floor((new Date(ms).setHours(0, 0, 0, 0) - S.week.getTime()) / 86400000);
+// ROUND, not floor: the DST week has a 23- or 25-hour day, so Sunday sits at
+// 5.96 or 6.04 „days" from Monday — floor would file it under Saturday.
+const dayIndexOf = (ms) => Math.round((new Date(ms).setHours(0, 0, 0, 0) - S.week.getTime()) / 86400000);
 
 function collides(startMs, minutes, ignoreId = null) {
   const end = startMs + minutes * 60000;
@@ -179,7 +181,10 @@ const winsFor = (dayIdx) =>
     // Weekly first, one-offs after → the amber exception always paints ON TOP
     // of the green template, never drowned under it.
     .sort((a, b) => (a.onDate ? 1 : 0) - (b.onDate ? 1 : 0));
-const minToMs = (dayIdx, min) => dayAt(dayIdx).getTime() + min * 60000;
+// Wall-clock minutes via setMinutes: adding raw milliseconds to midnight
+// drifts one hour on the DST Sunday — the pill would say 09:00 and the server
+// guard would judge 09:00, for a window the teacher drew at 10:00.
+const minToMs = (dayIdx, min) => { const d = dayAt(dayIdx); d.setMinutes(min); return d.getTime(); };
 const minOf = (ms) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
 
 /** Inside ONE window — same rule as the server guard, mirrored so the pupil
@@ -199,7 +204,9 @@ function freeStartsFor(dayIdx, minutes) {
       if (!collides(at, minutes) && !inPast(at)) out.push(at);
     }
   }
-  return out;
+  // Template and one-off exception can OVERLAP; the same start must not
+  // become two identical pills. Deduplicated, in clock order.
+  return [...new Set(out)].sort((a, b) => a - b);
 }
 
 /** Which durations fit at this start — drives the enabled/disabled state of
@@ -438,6 +445,14 @@ function pupilViewHtml() {
     const daySlots = S.slots.filter((x) => dayIndexOf(x.start) === i).sort((a, b) => a.start - b.start);
 
     const mine = daySlots.filter((x) => x.mine).map((x) => {
+      const over = x.end < Date.now();
+      if (over) {
+        // A held lesson is history — no duration switches, no cancel. The
+        // server refuses those edits anyway (0061); the UI simply agrees.
+        return `<div class="pl-mypill is-past" style="--c:${esc(S.myColor || "#7c3aed")}">
+            <b>Ora ta · ${hhmm(x.start)}–${hhmm(x.end)}</b><i class="pl-mypill__past">încheiată</i>
+          </div>`;
+      }
       const confirming = S.confirmId === x.id;
       const durs = DURATIONS.map((m) => {
         const cur = Math.round((x.end - x.start) / 60000) === m;
@@ -543,7 +558,7 @@ function gridHtml() {
              <button type="button" class="pl-mini" data-act="rename-no">×</button>
            </span>`
         : `<b class="pl-cb__nm">${s.kind === "lesson" && pupilEmoji(s.userId) ? `${esc(pupilEmoji(s.userId))} ` : ""}${esc(slotName(s))}</b>
-           ${s.recurrenceId ? `<i class="pl-cb__rec" title="Se repetă săptămânal">🔁</i>` : ""}
+           ${s.recurrenceId ? `<i class="pl-cb__rec" title="Parte dintr-o serie săptămânală. Mutată în alt interval, iese din serie; × poate anula toată seria.">🔁</i>` : ""}
            ${alive ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
            ${alive && s.kind === "personal" ? `<span class="pl-block__rsz pl-block__rsz--top" data-act="rsz-top" data-id="${esc(s.id)}" title="Trage ca să muți începutul" aria-hidden="true"></span>` : ""}
            ${alive ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să ${s.kind === "personal" ? "muți sfârșitul" : "schimbi durata"}" aria-hidden="true"></span>` : ""}`;
@@ -572,7 +587,7 @@ function gridHtml() {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
           return `<span class="pl-avail${w.onDate ? " is-once" : ""}" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
-            <i class="pl-avail__tag">${w.onDate ? "doar azi" : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
+            <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint && S.paintWhat === "avail" ? `
               <span class="pl-avail__h pl-avail__h--top" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="top" title="Trage ca să muți începutul"></span>
               <span class="pl-avail__h pl-avail__h--bot" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="bot" title="Trage ca să muți sfârșitul"></span>
@@ -983,9 +998,10 @@ function paintDrag(x, y) {
     // Sketching MY time: clashes must show while the pointer is still down —
     // the exclusion constraint would refuse them at drop anyway.
     d.bad = collides(rowToMs(d.dayIdx, d.rowA), d.endMin - d.startMin);
+    const vac = vacationFor(d.dayIdx);
     g.classList.add("is-personal");
     g.classList.toggle("is-bad", d.bad);
-    g.innerHTML = `<b>✎ ${esc(S.personalTitle || "Activitate personală")}${S.paintOnceP ? "" : " · 🔁 săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>${d.bad ? "<i>ocupat</i>" : ""}`;
+    g.innerHTML = `<b>✎ ${esc(S.personalTitle || "Activitate personală")}${S.paintOnceP ? "" : " · 🔁 săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>${d.bad ? "<i>ocupat</i>" : vac ? `<i class="is-vac">🏖 ${esc(vac.label)}</i>` : ""}`;
     return;
   }
   g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}${S.paintOnce ? `, doar ${dayAt(d.dayIdx).getDate()} ${esc(MONTHS[dayAt(d.dayIdx).getMonth()].slice(0, 3))}` : ", săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
@@ -1082,7 +1098,7 @@ async function onUp() {
     // cancelling one week never touches the others.
     if (!S.paintOnceP) {
       const r = await bookRecurring({ startMs, minutes, kind: "personal", title, weeks: REC_WEEKS, vacations: S.vacations });
-      if (!r.ok) showToast(r.message || "N-am putut crea seria.");
+      if (!r.ok) showToast(`${r.message || "N-am putut crea seria."}${r.created ? ` (${r.created} deja create)` : ""}`);
       else {
         const parts = [`${r.created} din ${REC_WEEKS} create`];
         if (r.inVacation) parts.push(`${r.inVacation} în vacanță`);
@@ -1134,8 +1150,12 @@ async function onUp() {
   }
 
   if (d.id) {
-    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes });
-    showToast(res.ok ? `Mutat: ${label}` : res.message, res.ok ? { kind: "success" } : undefined);
+    const s0 = S.slots.find((x) => x.id === d.id);
+    const detach = !!s0?.recurrenceId && s0.start !== d.startMs;
+    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes, detach });
+    showToast(res.ok
+      ? `Mutat: ${label}${detach ? " · scoasă din seria săptămânală (restul săptămânilor rămân)" : ""}`
+      : res.message, res.ok ? { kind: "success" } : undefined);
     await refresh();
     return;
   }
@@ -1148,7 +1168,7 @@ async function onUp() {
       startMs: d.startMs, minutes: d.minutes,
       userId: S.source.userId, weeks: REC_WEEKS, vacations: S.vacations,
     });
-    if (!r.ok) showToast(r.message || "N-am putut crea seria.");
+    if (!r.ok) showToast(`${r.message || "N-am putut crea seria."}${r.created ? ` (${r.created} deja create)` : ""}`);
     else {
       const parts = [`${r.created} din ${REC_WEEKS} create`];
       if (r.inVacation) parts.push(`${r.inVacation} în vacanță`);
