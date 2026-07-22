@@ -559,7 +559,7 @@
 
 .pl-palette {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem;
-  padding: 0.65rem 0.9rem; margin-bottom: 0.75rem;
+  padding: 0.65rem 0.9rem; margin-bottom: 1.35rem;
   border: 2px solid var(--color-text); border-radius: 14px;
   background: var(--color-bg);
 }
