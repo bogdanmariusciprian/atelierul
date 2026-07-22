@@ -74,7 +74,9 @@ export async function fetchWeek(from = weekStart()) {
       // The KIND of someone else's hour is the teacher's business, not the
       // pupil's — masked to a plain busy lesson, same as the name and note.
       kind: admin || mine ? (r.kind || "lesson") : "lesson",
-      recurrenceId: r.recurrence_id || null,
+      // The rhythm of a STRANGER's hour is the teacher's scheduling, not the
+      // pupil's business — masked, like the name, the note and the kind.
+      recurrenceId: admin || mine ? (r.recurrence_id || null) : null,
       mine,
       name: label,
       color: personal

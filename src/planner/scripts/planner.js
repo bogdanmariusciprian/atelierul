@@ -112,7 +112,6 @@ const S = {
   paintWhat: "avail",  // pencil regime: availability windows or personal blocks
   paintOnce: false,    // rhythm of drawn WINDOWS: weekly template vs one day
   paintOnceP: true,    // rhythm of drawn PERSONAL blocks: one-off by default
-  pick: null,          // pupil: { dayIdx, startMs, minutes } being confirmed
   minutes: DEFAULT_DURATION,
   myColor: null,       // pupil: colour the teacher picked for them
   source: null,        // tray chip in hand: { kind, userId, title }
@@ -201,25 +200,7 @@ const inAvailability = (dayIdx, startMs, minutes) => {
   return winsFor(dayIdx).some((w) => w.startMin <= a && w.endMin >= b);
 };
 
-/** Every start a pupil could actually book on this day, for this duration:
- *  windows, stepped by half hours, minus clashes, minus the past. */
-function freeStartsFor(dayIdx, minutes) {
-  const out = [];
-  for (const w of winsFor(dayIdx)) {
-    for (let m = w.startMin; m + minutes <= w.endMin; m += SNAP_MIN) {
-      const at = minToMs(dayIdx, m);
-      if (!collides(at, minutes) && !inPast(at)) out.push(at);
-    }
-  }
-  // Template and one-off exception can OVERLAP; the same start must not
-  // become two identical pills. Deduplicated, in clock order.
-  return [...new Set(out)].sort((a, b) => a - b);
-}
 
-/** Which durations fit at this start — drives the enabled/disabled state of
- *  the 1h / 1h30 / 2h buttons in the confirm step and on own bookings. */
-const fitDurations = (dayIdx, startMs, ignoreId = null) =>
-  DURATIONS.filter((m) => inAvailability(dayIdx, startMs, m) && !collides(startMs, m, ignoreId));
 
 const pupilEmoji = (uid) => S.pupils.find((p) => p.id === uid)?.emoji || "";
 
@@ -440,104 +421,6 @@ function vacationsHtml() {
 
 // ---------- the grid ----------
 
-/** THE PUPIL'S VIEW — no calendar, no dragging. Days as cards; under each,
- *  pills. Green pills are starts born from the teacher's windows minus what's
- *  taken; grey pills are taken hours, shown WITHOUT names — a pupil sees that
- *  18:00 is gone, never whose it is. Tapping a green pill unfolds the one
- *  decision left: the duration (preset to theirs), then „Rezervă". Two taps.
- *  Their own booking sits highlighted, with duration switches and a cancel
- *  that confirms in place. */
-function pupilViewHtml() {
-  if (!S.avail.length) {
-    return `<div class="pl-locked">
-        <b>Profesorul încă nu a deschis orele.</b>
-        <p class="cx-muted">Când își va seta disponibilitatea, aici vor apărea orele libere pe care le poți alege cu o apăsare.</p>
-      </div>`;
-  }
-  const today = new Date().setHours(0, 0, 0, 0);
-
-  const cards = DAYS.map((label, i) => {
-    const d = dayAt(i);
-    const isToday = d.getTime() === today;
-    const isPast = d.getTime() < today;
-    const vac = vacationFor(i);
-    const wins = winsFor(i);
-    const daySlots = S.slots.filter((x) => dayIndexOf(x.start) === i).sort((a, b) => a.start - b.start);
-
-    const mine = daySlots.filter((x) => x.mine).map((x) => {
-      const over = x.end < Date.now();
-      if (over) {
-        // A held lesson is history — no duration switches, no cancel. The
-        // server refuses those edits anyway (0061); the UI simply agrees.
-        return `<div class="pl-mypill is-past" style="--c:${esc(S.myColor || "#7c3aed")}">
-            <b>Ora ta · ${hhmm(x.start)}–${hhmm(x.end)}</b><i class="pl-mypill__past">încheiată</i>
-          </div>`;
-      }
-      const confirming = S.confirmId === x.id;
-      const durs = DURATIONS.map((m) => {
-        const cur = Math.round((x.end - x.start) / 60000) === m;
-        const can = cur || fitDurations(i, x.start, x.id).includes(m);
-        return `<button type="button" class="pl-pill__d${cur ? " on" : ""}" data-act="my-dur"
-                 data-id="${esc(x.id)}" data-m="${m}" ${can ? "" : "disabled"}>${esc(durLabel(m))}</button>`;
-      }).join("");
-      return `<div class="pl-mypill" style="--c:${esc(S.myColor || "#7c3aed")}">
-          <b>Ora ta · ${hhmm(x.start)}–${hhmm(x.end)}</b>
-          ${confirming
-            ? `<span class="pl-block__confirm">Anulezi?
-                 <button type="button" class="pl-mini pl-mini--no" data-act="conf-yes" data-id="${esc(x.id)}">Da</button>
-                 <button type="button" class="pl-mini" data-act="conf-no">Nu</button></span>`
-            : `<span class="pl-mypill__acts">${durs}
-                 <button type="button" class="pl-pill__x" data-act="cancel" data-id="${esc(x.id)}" aria-label="Anulează ora">×</button></span>`}
-        </div>`;
-    }).join("");
-
-    const taken = daySlots.filter((x) => !x.mine).map((x) =>
-      `<span class="pl-pill is-taken">${hhmm(x.start)}–${hhmm(x.end)} · Ocupat</span>`).join("");
-
-    // Free starts, computed for the SHORTEST duration: a start that fits one
-    // hour is worth showing even if two don't fit — the duration step will
-    // grey out what doesn't. Skipped entirely for past days.
-    const free = isPast ? [] : freeStartsFor(i, DURATIONS[0]);
-    const pills = free.map((at) => {
-      const picked = S.pick && S.pick.startMs === at;
-      if (!picked) {
-        return `<button type="button" class="pl-pill" data-act="pick-slot" data-day="${i}" data-at="${at}">${hhmm(at)}</button>`;
-      }
-      const durs = DURATIONS.map((m) => {
-        const can = fitDurations(i, at).includes(m);
-        return `<button type="button" class="pl-pill__d${S.pick.minutes === m ? " on" : ""}" data-act="pick-dur"
-                 data-m="${m}" ${can ? "" : "disabled"}>${esc(durLabel(m))}</button>`;
-      }).join("");
-      return `<span class="pl-pickbox">
-          <b>${esc(label)} · ${hhmm(at)}–${hhmm(at + S.pick.minutes * 60000)}</b>
-          ${durs}
-          <button type="button" class="pl-mini pl-mini--go" data-act="pick-book">Rezervă</button>
-          <button type="button" class="pl-mini" data-act="pick-x">Renunță</button>
-        </span>`;
-    }).join("");
-
-    const empty = isPast
-      ? "" // trecutul nu mai e o ofertă — nu comentăm disponibilitatea lui
-      : !wins.length
-        ? `<span class="pl-day__none">zi fără ore deschise</span>`
-        : !mine && !taken && !free.length
-          ? `<span class="pl-day__none">toate orele sunt ocupate</span>`
-          : "";
-
-    return `<section class="pl-day${isToday ? " is-today" : ""}${isPast ? " is-past" : ""}">
-        <header class="pl-day__h">
-          <b>${esc(label)}</b>
-          <span>${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}</span>
-          ${isToday ? `<i class="pl-colhead__today">AZI</i>` : ""}
-          ${vac ? `<i class="pl-colhead__vac">🏖 ${esc(vac.label)}</i>` : ""}
-        </header>
-        <div class="pl-day__b">${mine}${taken ? `<div class="pl-day__row">${taken}</div>` : ""}
-          ${pills ? `<div class="pl-day__row">${pills}</div>` : ""}${empty}</div>
-      </section>`;
-  }).join("");
-
-  return `<div class="pl-days">${cards}</div>`;
-}
 
 function gridHtml() {
   const today = new Date().setHours(0, 0, 0, 0);
@@ -591,12 +474,12 @@ function gridHtml() {
              <button type="button" class="pl-mini" data-act="rename-no">×</button>
            </span>`
         : `${s.kind === "lesson" && pupilEmoji(s.userId) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm">${esc(slotName(s))}</b>
-           ${alive ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
+           ${alive && isAdmin() ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
                title="${s.recurrenceId
                  ? "Se repetă săptămânal. Apasă ca să oprești repetarea de aici înainte — blocul ăsta rămâne, singur."
                  : `Apasă ca să se repete săptămânal de aici înainte (${REC_WEEKS} săptămâni).`}"
                aria-pressed="${s.recurrenceId ? "true" : "false"}" aria-label="Repetare săptămânală">🔁</button>`
-             : s.recurrenceId ? `<i class="pl-cb__rec" title="Făcea parte dintr-o serie săptămânală">🔁</i>` : ""}
+             : s.recurrenceId ? `<i class="pl-cb__rec" title="Oră care se repetă săptămânal">🔁</i>` : ""}
            ${alive ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
            ${alive && s.kind === "personal" ? `<span class="pl-block__rsz pl-block__rsz--top" data-act="rsz-top" data-id="${esc(s.id)}" title="Trage ca să muți începutul" aria-hidden="true"></span>` : ""}
            ${alive ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să ${s.kind === "personal" ? "muți sfârșitul" : "schimbi durata"}" aria-hidden="true"></span>` : ""}`;
@@ -657,9 +540,7 @@ function render() {
   const mineCount = S.slots.filter((s) => s.mine).length;
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
-    : isAdmin()
-      ? `<div class="pl-body${S.paint ? ` is-paint is-paint-${S.paintWhat}` : ""}">${gridHtml()}</div>`
-      : pupilViewHtml();
+    : `<div class="pl-body${S.paint ? ` is-paint is-paint-${S.paintWhat}` : ""}">${gridHtml()}</div>`;
   if (isAdmin()) {
     S.root.innerHTML = `
       ${!S.loading ? paletteHtml() : ""}
@@ -677,11 +558,39 @@ function render() {
       <div class="pl-live" data-role="live" hidden></div>`;
     return;
   }
+  // THE PUPIL: the same board, his own powers. No palette, no pencil, no
+  // vacations bar — just the grid, his duration chips, a small legend and
+  // the one sentence that teaches the gesture.
+  if (!S.avail.length && !S.loading) {
+    S.root.innerHTML = `
+      ${headerHtml()}
+      <div class="pl-locked">
+        <b>Profesorul încă nu a deschis orele.</b>
+        <p class="cx-muted">Când își va seta disponibilitatea, aici vor apărea zonele verzi în care îți poți trage ora.</p>
+      </div>
+      <div class="pl-live" data-role="live" hidden></div>`;
+    return;
+  }
+  const durs = DURATIONS.map((m) => `
+    <button type="button" class="pl-dur${S.minutes === m ? " on" : ""}" data-act="dur" data-m="${m}">
+      ${esc(durLabel(m))}
+    </button>`).join("");
   S.root.innerHTML = `
     ${headerHtml()}
-    <p class="pl-hint">Apasă o oră liberă, alege durata, gata.${
-      mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "rezervare" : "rezervări"} săptămâna asta.` : ""}</p>
     ${body}
+    ${!S.loading ? `<div class="pl-below">
+      <div class="pl-tools"><span class="pl-dur__lab">Durata</span>${durs}</div>
+      <p class="pl-legend">
+        <i class="pl-legend__k pl-legend__k--avail"></i> deschis — aici îți tragi ora
+        <i class="pl-legend__k pl-legend__k--once"></i> deschis doar în ziua aceea
+        <i class="pl-legend__k pl-legend__k--lesson"></i> ora ta
+        <i class="pl-legend__k pl-legend__k--personal"></i> ocupat
+        <i class="pl-legend__k pl-legend__k--today"></i> azi
+        <i class="pl-legend__k pl-legend__k--now"></i> acum
+      </p>
+      <p class="pl-hint">Trage în zona deschisă ca să-ți pui ora — blocul tău îl muți, îl întinzi de mânerul de jos (1h · 1h30 · 2h) sau îl anulezi cu ×.${
+        mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "oră" : "ore"} săptămâna asta.` : ""}</p>
+    </div>` : ""}
     <div class="pl-live" data-role="live" hidden></div>`;
 }
 
@@ -744,6 +653,12 @@ function markBad(d) {
   if (collides(d.startMs, d.minutes, d.id)) { d.bad = true; d.badWhy = "ocupat"; return; }
   if (!inHours(d.startMs, d.minutes)) { d.bad = true; d.badWhy = "în afara programului"; return; }
   if (inPast(d.startMs)) { d.bad = true; d.badWhy = "în trecut"; return; }
+  // The pupil's world ends at the teacher's open windows — the ghost goes red
+  // outside them, mirroring the server guard so the refusal happens under the
+  // finger, not after the drop.
+  if (!isAdmin() && !inAvailability(d.dayIdx, d.startMs, d.minutes)) {
+    d.bad = true; d.badWhy = "în afara orelor deschise"; return;
+  }
   d.bad = false; d.badWhy = "";
 }
 
@@ -752,9 +667,10 @@ function onDown(e) {
   // without this guard the pre-menu press was quietly placing pupil blocks.
   if (e.button !== 0) return;
   if (!isLoggedIn()) return;
-  // The pupil's world is taps now — nothing there is draggable, and a stray
-  // press must never start a ghost.
-  if (!isAdmin()) return;
+  // SAME experience for the pupil: he drags too. His powers are trimmed by
+  // the pieces that simply don't exist for him — no pencil (S.paint stays
+  // false), no palette dots, grab/resize only on blocks he canEdit (his own),
+  // and markBad turns the ghost red outside the teacher's open windows.
 
   // THE PENCIL. Two regimes share one gesture — a drag on a lane sketches
   // something for that day: an availability window, or a personal block.
@@ -1181,8 +1097,8 @@ async function onUp() {
     const s0 = S.slots.find((x) => x.id === d.id);
     const changed = s0 && (s0.start !== d.startMs || Math.round((s0.end - s0.start) / 60000) !== d.minutes);
     if (!changed) return;
-    if (s0.recurrenceId) { openMoveAsk(s0, d, "resize"); return; }
-    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes });
+    if (s0.recurrenceId && isAdmin()) { openMoveAsk(s0, d, "resize"); return; }
+    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes, detach: !!s0.recurrenceId });
     showToast(res.ok ? `Durata e acum ${durLabel(d.minutes)} (${label}).` : res.message,
       res.ok ? { kind: "success" } : undefined);
     await refresh();
@@ -1192,8 +1108,8 @@ async function onUp() {
   if (d.id) {
     const s0 = S.slots.find((x) => x.id === d.id);
     if (s0 && s0.start === d.startMs && Math.round((s0.end - s0.start) / 60000) === d.minutes) return;
-    if (s0?.recurrenceId) { openMoveAsk(s0, d, "move"); return; }
-    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes });
+    if (s0?.recurrenceId && isAdmin()) { openMoveAsk(s0, d, "move"); return; }
+    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes, detach: !!s0?.recurrenceId });
     showToast(res.ok ? `Mutat: ${label}` : res.message, res.ok ? { kind: "success" } : undefined);
     await refresh();
     return;
@@ -1265,38 +1181,6 @@ async function onClick(e) {
     await refresh(); return;
   }
   if (act === "rename-no") { S.renameId = null; render(); return; }
-
-  // ---- the pupil's two taps ----
-  if (act === "pick-slot") {
-    const dayIdx = +b.dataset.day, startMs = +b.dataset.at;
-    const fits = fitDurations(dayIdx, startMs);
-    if (!fits.length) { showToast("Ora tocmai s-a ocupat."); refresh(); return; }
-    // Their default duration if it still fits; otherwise the longest that does.
-    const minutes = fits.includes(S.minutes) ? S.minutes : fits[fits.length - 1];
-    S.pick = { dayIdx, startMs, minutes };
-    render(); return;
-  }
-  if (act === "pick-dur") { if (S.pick) { S.pick.minutes = +b.dataset.m; render(); } return; }
-  if (act === "pick-x") { S.pick = null; render(); return; }
-  if (act === "pick-book") {
-    if (!S.pick) return;
-    const { startMs, minutes, dayIdx } = S.pick;
-    S.pick = null;
-    const r = await bookSlot({ startMs, minutes });
-    if (!r.ok) { showToast(r.message); await refresh(); return; }
-    showToast(`Rezervat: ${DAYS[dayIdx]}, ${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}.`, { kind: "success" });
-    await refresh(); return;
-  }
-  if (act === "my-dur") {
-    const x = S.slots.find((q) => q.id === b.dataset.id);
-    if (!x) return;
-    if (Math.round((x.end - x.start) / 60000) === +b.dataset.m) return; // e deja
-    // A pupil's tweak makes THIS week an exception; the teacher's series
-    // stays intact for the other weeks. Silent — series are teacher tooling.
-    const r = await moveSlot(x.id, { startMs: x.start, minutes: +b.dataset.m, detach: !!x.recurrenceId });
-    showToast(r.ok ? `Durata e acum ${durLabel(+b.dataset.m)}.` : r.message, r.ok ? { kind: "success" } : undefined);
-    await refresh(); return;
-  }
 
   if (act === "ask-no") { S.moveAsk = null; render(); return; }
   if (act === "ask-once") {
@@ -1490,9 +1374,9 @@ function openCtx(x, y, items) {
   document.addEventListener("pointerdown", onCtxAway, true);
 }
 function onCtxMenu(e) {
-  if (!isAdmin()) return;
+  if (!isLoggedIn()) return;
   const blk = e.target.closest(".pl-block--cell");
-  const win = blk ? null : e.target.closest(".pl-avail");
+  const win = blk ? null : (isAdmin() ? e.target.closest(".pl-avail") : null);
   if (blk) {
     const x = S.slots.find((q) => q.id === blk.dataset.id);
     if (!x) return;
