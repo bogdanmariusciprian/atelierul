@@ -36,6 +36,23 @@ const UPLOAD_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const VERIFY_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="tg-dots" cx="12" cy="12" r="8.5" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="0.2 3.15"/><path class="tg-tick" d="M6.4 12.4 L10.4 16.6 L18.4 6.8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 let root = null;
+
+// ---------- aureola pointerului ----------
+// Grila e o pădure de câmpuri text: cursorul devine peste tot acel „I" subțire
+// și se pierde. Un halou moale, fixat sub pointer, îl ține mereu la vedere.
+// Doar pentru mouse adevărat (pointer: fine) — degetul n-are nevoie de el.
+let glowEl = null;
+function ensureGlow() {
+  if (glowEl || !window.matchMedia("(pointer: fine)").matches) return;
+  glowEl = document.createElement("div");
+  glowEl.className = "tg-glow";
+  document.body.appendChild(glowEl);
+  root.addEventListener("mousemove", (e) => {
+    glowEl.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    glowEl.style.opacity = "1";
+  });
+  root.addEventListener("mouseleave", () => { if (glowEl) glowEl.style.opacity = "0"; });
+}
 let wired = false;
 const state = {
   exam: "admitere-drept",
@@ -52,6 +69,7 @@ export async function initTestAdminGrid(mountEl) {
   if (!isMobile()) lockPageScroll(true); // desktop: Excel-like full screen (no page scroll). Phone scrolls normally.
   document.body.classList.add("tg-mode");
   if (!wired) { wireEvents(); wired = true; }
+  ensureGlow();
   root.className = "tg-wrap";
   state.loading = true;
   render();
