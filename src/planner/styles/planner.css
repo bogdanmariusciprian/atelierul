@@ -300,6 +300,9 @@
   opacity: 0; transition: opacity 0.15s ease;
 }
 .pl-block:hover .pl-block__rsz::after { opacity: 1; }
+/* Mânerul de sus — doar blocurile personale îl au: începutul se mută liber. */
+.pl-block__rsz--top { bottom: auto; top: 0; }
+.pl-block__rsz--top::after { bottom: auto; top: 3px; }
 
 /* ---- confirmarea în loc, pe bloc ---- */
 .pl-block.is-confirm { background: #fef2f2; border-left-color: #dc2626; }

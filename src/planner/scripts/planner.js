@@ -504,6 +504,9 @@ function gridHtml() {
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
+      // A past LESSON is shared history — frozen. A past PERSONAL block is the
+      // teacher's own note about his own time: stays fully editable.
+      const alive = s.canEdit && (!over || s.kind === "personal");
       const confirming = S.confirmId === s.id;
       const renaming = S.renameId === s.id;
       const body = confirming
@@ -522,16 +525,17 @@ function gridHtml() {
            </span>`
         : `<b class="pl-cb__nm">${s.kind === "lesson" && pupilEmoji(s.userId) ? `${esc(pupilEmoji(s.userId))} ` : ""}${esc(slotName(s))}</b>
            ${s.recurrenceId ? `<i class="pl-cb__rec" title="Se repetă săptămânal">🔁</i>` : ""}
-           ${s.canEdit && !over ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
-           ${s.canEdit && !over ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să schimbi durata" aria-hidden="true"></span>` : ""}`;
+           ${alive ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
+           ${alive && s.kind === "personal" ? `<span class="pl-block__rsz pl-block__rsz--top" data-act="rsz-top" data-id="${esc(s.id)}" title="Trage ca să muți începutul" aria-hidden="true"></span>` : ""}
+           ${alive ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să ${s.kind === "personal" ? "muți sfârșitul" : "schimbi durata"}" aria-hidden="true"></span>` : ""}`;
       // A full-colour CELL, straight from Marius's drawing: no text inside — the
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${s.canEdit && !over ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.userId)}" data-name="${esc(tip)}"
-        aria-label="${esc(tip)}" ${s.canEdit && !over && !confirming && !renaming ? 'data-act="grab"' : ""}>
+        aria-label="${esc(tip)}" ${alive && !confirming && !renaming ? 'data-act="grab"' : ""}>
         ${body}
       </div>`;
     }).join("");
@@ -637,7 +641,8 @@ function updateGhost() {
   g.style.transform = `translateY(${msToRow(startMs) * ROW_PX}px)`;
   g.style.height = `${(minutes / SNAP_MIN) * ROW_PX - 3}px`;
   g.classList.toggle("is-bad", !!bad);
-  const who = S.drag.id && !resize ? "" : resize ? durLabel(minutes) : sourceLabel();
+  const rsz = resize || S.drag.resizeTop;
+  const who = S.drag.id && !rsz ? "" : rsz ? durLabel(minutes) : sourceLabel();
   const vac = vacationFor(dayIdx);
   g.innerHTML = `<b>${esc(DAYS[dayIdx])}</b><span>${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}</span>
     ${who ? `<em>${esc(who)}</em>` : ""}
@@ -691,7 +696,7 @@ function onDown(e) {
     // resizes, a drag moves, a motionless press renames (see onUp). A press on
     // anything else either sketches a NEW personal block or does nothing.
     if (S.paintWhat === "personal") {
-      const t = e.target.closest('[data-act="rsz"], [data-act="grab"]');
+      const t = e.target.closest('[data-act="rsz-top"], [data-act="rsz"], [data-act="grab"]');
       const ts = t ? S.slots.find((x) => x.id === t.dataset.id) : null;
       if (!(ts?.kind === "personal" && ts.canEdit)) {
         if (e.target.closest(".pl-block--cell")) return; // lessons are scenery here
@@ -743,6 +748,32 @@ function onDown(e) {
     window.addEventListener("pointercancel", onUp, { once: true });
     return;
     }
+  }
+
+  // Top handle (personal blocks only): the END stays anchored, the START
+  // follows the pointer — the mirror image of the bottom handle.
+  const rszT = e.target.closest('[data-act="rsz-top"]');
+  if (rszT) {
+    const s = S.slots.find((x) => x.id === rszT.dataset.id);
+    if (!s?.canEdit) return;
+    const host = rszT.closest(".pl-lane");
+    S.drag = {
+      id: s.id, resizeTop: true, free: true,
+      dayIdx: +host.dataset.day,
+      anchorEndMs: s.end,
+      startMs: s.start,
+      minutes: Math.round((s.end - s.start) / 60000),
+      ghost: placeGhost(host),
+      moved: false,
+    };
+    rszT.closest(".pl-block")?.classList.add("is-dragging");
+    S.root.classList.add("is-dragging");
+    e.preventDefault();
+    updateGhost();
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+    window.addEventListener("pointercancel", onUp, { once: true });
+    return;
   }
 
   const rsz = e.target.closest('[data-act="rsz"]');
@@ -826,6 +857,20 @@ function onDown(e) {
 function moveDrag(x, y) {
   const d = S.drag;
   if (!d) return;
+
+  if (d.resizeTop) {
+    const { row } = pointToSlot(x, y);
+    const endRow = msToRow(d.anchorEndMs);
+    // The start may crawl up to the day's first row, and down to half an hour
+    // before the anchored end — a block can't be shorter than one snap.
+    const r = Math.max(0, Math.min(endRow - 1, row));
+    d.startMs = rowToMs(d.dayIdx, r);
+    d.minutes = Math.round((d.anchorEndMs - d.startMs) / 60000);
+    d.moved = true;
+    markBad(d);
+    updateGhost();
+    return;
+  }
 
   if (d.resize) {
     // Pointer row below the anchor → a candidate length, snapped to the
@@ -1033,7 +1078,7 @@ async function onUp() {
 
   const label = `${DAYS[d.dayIdx]}, ${hhmm(d.startMs)}–${hhmm(d.startMs + d.minutes * 60000)}`;
 
-  if (d.resize) {
+  if (d.resize || d.resizeTop) {
     const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes });
     showToast(res.ok ? `Durata e acum ${durLabel(d.minutes)} (${label}).` : res.message,
       res.ok ? { kind: "success" } : undefined);
