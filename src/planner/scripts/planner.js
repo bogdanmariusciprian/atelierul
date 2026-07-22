@@ -319,6 +319,13 @@ function toolsHtml() {
   // Two rows, deliberately: the pencil's capsule gets its OWN line above the
   // duration chips, so it can never wrap into them and shuffle the layout.
   return `<div class="pl-tools pl-tools--pen">${pen}</div>
+    <p class="pl-legend">
+      <i class="pl-legend__k pl-legend__k--avail"></i> deschis săptămânal
+      <i class="pl-legend__k pl-legend__k--once"></i> deschis doar în ziua aceea
+      <i class="pl-legend__k pl-legend__k--personal"></i> timpul tău
+      <i class="pl-legend__k pl-legend__k--lesson"></i> ora unui elev (culoarea bulinei lui)
+      <i class="pl-legend__k pl-legend__k--today"></i> azi
+    </p>
     <div class="pl-tools">
       <span class="pl-dur__lab">Durata</span>${durs}
     </div>`;
@@ -641,11 +648,6 @@ function render() {
       ${!S.loading ? `<div class="pl-below">
         ${toolsHtml()}
         ${vacationsHtml()}
-        <p class="pl-legend">
-          <i class="pl-legend__k pl-legend__k--avail"></i> ore deschise elevilor (pictate cu 🖌)
-          <i class="pl-legend__k pl-legend__k--personal"></i> timpul tău
-          <i class="pl-legend__k pl-legend__k--today"></i> azi
-        </p>
         <p class="pl-hint">${S.paint
           ? (S.paintWhat === "personal"
             ? "Mod activitate personală: desenează în orar intervalul tău — cât tragi, atât durează, iar ritmul decide dacă se repetă săptămânal. Blocurile gri rămân vii: le muți, le întinzi de ambele capete, un click le redenumește."
