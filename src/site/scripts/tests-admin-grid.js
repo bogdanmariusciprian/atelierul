@@ -958,11 +958,18 @@ function mCardHtml(it) {
 function mBars() {
   const yearsSel = state.years.map((y) =>
     `<option value="${y.year}"${y.year === state.year ? " selected" : ""}>${y.year} (${y.n})</option>`).join("");
+  // Pe telefon, căutarea liberă lasă locul filtrului de SESIUNE (Iulie - G1 /
+  // Simulare / Septembrie…) — la cererea lui Marius: pe mobil corectezi o
+  // sesiune anume, nu cauți în text. Handlerul lui #tg-ses există deja
+  // (comun cu desktopul), doar îl servim și de aici.
+  const sessions = [...new Set(state.items.map((i) => i.session).filter(Boolean))].sort();
+  const sesSel = `<option value="">toate sesiunile</option>` +
+    sessions.map((v) => `<option value="${esc(v)}"${v === state.session ? " selected" : ""}>${esc(v)}</option>`).join("");
   return `
     <div class="tgm-top">
       <a class="tg-back" href="./" aria-label="Înapoi la categorie">‹</a>
       <select id="tg-year" class="tgm-year" aria-label="An">${yearsSel}</select>
-      <input id="tg-search" class="tgm-search" type="search" placeholder="Caută…" value="${esc(state.search)}" />
+      <select id="tg-ses" class="tgm-ses" aria-label="Sesiune">${sesSel}</select>
       <button type="button" class="tg-chip tgm-chip${state.hideVerified ? " on" : ""}" data-toggle="hideVerified" title="Ascunde itemii verificați">✓ ascunde</button>
     </div>`;
 }

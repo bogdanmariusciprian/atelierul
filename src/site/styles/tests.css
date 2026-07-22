@@ -497,6 +497,7 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
   .tgm-top .tg-back { font-size: 1.6rem; line-height: 1; padding: 0 0.25rem; color: var(--color-text-muted); text-decoration: none; }
   .tgm-year { font: inherit; padding: 0.45rem 0.4rem; border-radius: 9px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
   .tgm-search { flex: 1 1 auto; min-width: 0; font: inherit; padding: 0.5rem 0.6rem; border-radius: 9px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
+  .tgm-ses { flex: 1 1 auto; min-width: 0; font: inherit; padding: 0.45rem 0.4rem; border-radius: 9px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
   .tgm-chip { flex: none; font-size: 0.78rem; }
 
   /* progress row: ‹  N / total · verif.  [saved]  › */
