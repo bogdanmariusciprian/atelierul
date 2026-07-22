@@ -590,7 +590,7 @@ function gridHtml() {
              <button type="button" class="pl-mini" data-act="rename-ok" data-id="${esc(s.id)}">✓</button>
              <button type="button" class="pl-mini" data-act="rename-no">×</button>
            </span>`
-        : `<b class="pl-cb__nm">${s.kind === "lesson" && pupilEmoji(s.userId) ? `${esc(pupilEmoji(s.userId))} ` : ""}${esc(slotName(s))}</b>
+        : `${s.kind === "lesson" && pupilEmoji(s.userId) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm">${esc(slotName(s))}</b>
            ${alive ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
                title="${s.recurrenceId
                  ? "Se repetă săptămânal. Apasă ca să oprești repetarea de aici înainte — blocul ăsta rămâne, singur."
