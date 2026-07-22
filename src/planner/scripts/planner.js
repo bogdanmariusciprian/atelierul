@@ -261,14 +261,14 @@ function headerHtml() {
   return `
     <div class="pl-bar">
       <div class="pl-nav">
-        <button type="button" class="pl-navbtn" data-act="prev">‹ <span>săpt. trecută</span></button>
+        <button type="button" class="pl-navbtn" data-act="prev" title="Săptămâna trecută" aria-label="Săptămâna trecută">‹<span>săpt. trecută</span></button>
         <span class="pl-span">
           <b>${esc(span)}</b>
           ${isCurrent
             ? `<i class="pl-span__now">săptămâna curentă</i>`
             : `<button type="button" class="pl-back" data-act="today">↩ Revino la azi</button>`}
         </span>
-        <button type="button" class="pl-navbtn" data-act="next"><span>săpt. viitoare</span> ›</button>
+        <button type="button" class="pl-navbtn" data-act="next" title="Săptămâna viitoare" aria-label="Săptămâna viitoare"><span>săpt. viitoare</span>›</button>
       </div>
     </div>
 `;
