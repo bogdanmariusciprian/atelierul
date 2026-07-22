@@ -726,6 +726,10 @@ function onDown(e) {
         S.root.classList.add("is-dragging");
         e.preventDefault();
         paintDrag(e.clientX, e.clientY);
+        // The sketch drawn AT press is a preview. Without real movement it
+        // must not book anything — a stray click planted invisible 30-minute
+        // blocks that later „collided" with the drawing you actually meant.
+        S.drag.moved = false;
         window.addEventListener("pointermove", onMove);
         window.addEventListener("pointerup", onUp, { once: true });
         window.addEventListener("pointercancel", onUp, { once: true });
@@ -751,6 +755,7 @@ function onDown(e) {
       S.root.classList.add("is-dragging");
       e.preventDefault();
       availResizeDrag(e.clientX, e.clientY);
+      S.drag.moved = false; // grabbing the edge is not yet an adjustment
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp, { once: true });
       window.addEventListener("pointercancel", onUp, { once: true });
@@ -762,6 +767,7 @@ function onDown(e) {
     S.root.classList.add("is-dragging");
     e.preventDefault();
     paintDrag(e.clientX, e.clientY);
+    S.drag.moved = false; // preview at press — same rule as the personal sketch
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
     window.addEventListener("pointercancel", onUp, { once: true });
@@ -1045,6 +1051,8 @@ async function onUp() {
         const inp = S.root.querySelector('[data-role="rename"]');
         inp?.focus(); inp?.select();
       }
+    } else if (d.paintP || d.paint) {
+      showToast("Ca să desenezi, ține apăsat și trage pe verticală.");
     }
     return;
   }
