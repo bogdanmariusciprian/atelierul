@@ -505,11 +505,13 @@ function pupilViewHtml() {
         </span>`;
     }).join("");
 
-    const empty = !wins.length
-      ? `<span class="pl-day__none">zi fără ore deschise</span>`
-      : !mine && !taken && !free.length && !isPast
-        ? `<span class="pl-day__none">toate orele sunt ocupate</span>`
-        : "";
+    const empty = isPast
+      ? "" // trecutul nu mai e o ofertă — nu comentăm disponibilitatea lui
+      : !wins.length
+        ? `<span class="pl-day__none">zi fără ore deschise</span>`
+        : !mine && !taken && !free.length
+          ? `<span class="pl-day__none">toate orele sunt ocupate</span>`
+          : "";
 
     return `<section class="pl-day${isToday ? " is-today" : ""}${isPast ? " is-past" : ""}">
         <header class="pl-day__h">
@@ -608,7 +610,7 @@ function gridHtml() {
       </div>
       <div class="pl-lane" data-day="${i}" style="height:${visPx}px">
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
-        ${winsFor(i).map((w) => {
+        ${(isPast ? [] : winsFor(i)).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
           return `<span class="pl-avail${w.onDate ? " is-once" : ""}" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
