@@ -173,7 +173,7 @@ async function enrichCommentReactions(commentByUuid, myUuid) {
   const commentIds = [...commentByUuid.keys()];
   if (!commentIds.length) return;
   const { data: cReacts } = await supabase
-    .from("comment_reactions")
+    .from("forum_comments_reactions")
     .select("comment_id, user_id, emoji")
     .in("comment_id", commentIds);
   if (!cReacts) return;
@@ -199,9 +199,9 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
   const myUuid = CURRENT_USER.authId;
 
   let sel = supabase
-    .from("posts")
+    .from("forum_posts")
     .select(
-      "id, author_id, body, type, background, audience, share_of, surface, group_id, media, pinned, generated, generated_from, created_at, edited_at, author:profiles!posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, author_id, body, type, background, audience, share_of, surface, group_id, media, pinned, generated, generated_from, created_at, edited_at, author:profiles!forum_posts_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .eq("moderation_status", "visible")
     .is("share_of", null);
@@ -229,9 +229,9 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
   // --- Comments (nested) ---
   const commentByUuid = new Map();
   const { data: commentRows, error: cErr } = await supabase
-    .from("comments")
+    .from("forum_comments")
     .select(
-      "id, post_id, parent_id, body, edited_at, correct, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, post_id, parent_id, body, edited_at, correct, created_at, author:profiles!forum_comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .in("post_id", postIds)
     .eq("moderation_status", "visible")
@@ -259,7 +259,7 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
 
   // --- Post likes (♥) ---
   const { data: postLikes } = await supabase
-    .from("post_reactions")
+    .from("forum_posts_reactions")
     .select("post_id, user_id")
     .in("post_id", postIds)
     .eq("emoji", LIKE_EMOJI);
@@ -276,7 +276,7 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
   // --- Saved posts (this user) ---
   if (myUuid) {
     const { data: savedRows } = await supabase
-      .from("saved_posts")
+      .from("forum_posts_saved")
       .select("post_id")
       .eq("user_id", myUuid);
     if (savedRows) {
@@ -294,7 +294,7 @@ export async function fetchFeed({ limit = 40, surface = "forum", groupId = null 
 // ---------------------------------------------------------
 export async function createPost({ type, bg, audience, text, media, surface, groupId = null, generated = false, generatedFrom = null }) {
   const { data, error } = await supabase
-    .from("posts")
+    .from("forum_posts")
     .insert({
       author_id: CURRENT_USER.authId,
       body: text,
@@ -319,22 +319,22 @@ export async function createPost({ type, bg, audience, text, media, surface, gro
 export async function updatePost(postSurrogate, text) {
   const pid = postUuidBySurr.get(postSurrogate);
   if (!pid) return;
-  await supabase.from("posts").update({ body: text, edited_at: new Date().toISOString() }).eq("id", pid);
+  await supabase.from("forum_posts").update({ body: text, edited_at: new Date().toISOString() }).eq("id", pid);
 }
 
 export async function deletePost(postSurrogate) {
   const pid = postUuidBySurr.get(postSurrogate);
   if (!pid) return;
-  await supabase.from("posts").delete().eq("id", pid);
+  await supabase.from("forum_posts").delete().eq("id", pid);
 }
 
 export async function togglePostLike(postSurrogate, liked) {
   const pid = postUuidBySurr.get(postSurrogate);
   if (!pid || !CURRENT_USER.authId) return;
   if (liked) {
-    await supabase.from("post_reactions").insert({ post_id: pid, user_id: CURRENT_USER.authId, emoji: LIKE_EMOJI });
+    await supabase.from("forum_posts_reactions").insert({ post_id: pid, user_id: CURRENT_USER.authId, emoji: LIKE_EMOJI });
   } else {
-    await supabase.from("post_reactions").delete().eq("post_id", pid).eq("user_id", CURRENT_USER.authId).eq("emoji", LIKE_EMOJI);
+    await supabase.from("forum_posts_reactions").delete().eq("post_id", pid).eq("user_id", CURRENT_USER.authId).eq("emoji", LIKE_EMOJI);
   }
 }
 
@@ -342,9 +342,9 @@ export async function toggleSave(postSurrogate, saved) {
   const pid = postUuidBySurr.get(postSurrogate);
   if (!pid || !CURRENT_USER.authId) return;
   if (saved) {
-    await supabase.from("saved_posts").insert({ post_id: pid, user_id: CURRENT_USER.authId });
+    await supabase.from("forum_posts_saved").insert({ post_id: pid, user_id: CURRENT_USER.authId });
   } else {
-    await supabase.from("saved_posts").delete().eq("post_id", pid).eq("user_id", CURRENT_USER.authId);
+    await supabase.from("forum_posts_saved").delete().eq("post_id", pid).eq("user_id", CURRENT_USER.authId);
   }
 }
 
@@ -353,7 +353,7 @@ export async function createComment({ postSurrogate, parentSurrogate = null, tex
   if (!postId) return null;
   const parentId = parentSurrogate ? commentUuidBySurr.get(parentSurrogate) : null;
   const { data, error } = await supabase
-    .from("comments")
+    .from("forum_comments")
     .insert({ post_id: postId, parent_id: parentId, author_id: CURRENT_USER.authId, body: text })
     .select("id")
     .single();
@@ -372,9 +372,9 @@ export async function createComment({ postSurrogate, parentSurrogate = null, tex
 export async function fetchLessonComments(slug) {
   const myUuid = CURRENT_USER.authId;
   const { data: rows, error } = await supabase
-    .from("comments")
+    .from("forum_comments")
     .select(
-      "id, lesson_slug, parent_id, body, edited_at, correct, created_at, author:profiles!comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
+      "id, lesson_slug, parent_id, body, edited_at, correct, created_at, author:profiles!forum_comments_author_id_fkey(id, display_name, avatar_color, avatar, points, last_seen_at, role)"
     )
     .eq("lesson_slug", slug)
     .eq("moderation_status", "visible")
@@ -398,7 +398,7 @@ export async function fetchLessonComments(slug) {
 export async function addLessonComment({ lessonSlug, parentSurrogate = null, text }) {
   const parentId = parentSurrogate ? commentUuidBySurr.get(parentSurrogate) : null;
   const { data, error } = await supabase
-    .from("comments")
+    .from("forum_comments")
     .insert({ lesson_slug: lessonSlug, parent_id: parentId, author_id: CURRENT_USER.authId, body: text })
     .select("id")
     .single();
@@ -424,22 +424,22 @@ export async function markCommentCorrect(commentSurrogate, on) {
 export async function updateComment(commentSurrogate, text) {
   const cid = commentUuidBySurr.get(commentSurrogate);
   if (!cid) return;
-  await supabase.from("comments").update({ body: text, edited_at: new Date().toISOString() }).eq("id", cid);
+  await supabase.from("forum_comments").update({ body: text, edited_at: new Date().toISOString() }).eq("id", cid);
 }
 
 export async function deleteComment(commentSurrogate) {
   const cid = commentUuidBySurr.get(commentSurrogate);
   if (!cid) return;
-  await supabase.from("comments").delete().eq("id", cid);
+  await supabase.from("forum_comments").delete().eq("id", cid);
 }
 
 export async function toggleCommentLike(commentSurrogate, liked) {
   const cid = commentUuidBySurr.get(commentSurrogate);
   if (!cid || !CURRENT_USER.authId) return;
   if (liked) {
-    await supabase.from("comment_reactions").insert({ comment_id: cid, user_id: CURRENT_USER.authId, emoji: LIKE_EMOJI });
+    await supabase.from("forum_comments_reactions").insert({ comment_id: cid, user_id: CURRENT_USER.authId, emoji: LIKE_EMOJI });
   } else {
-    await supabase.from("comment_reactions").delete().eq("comment_id", cid).eq("user_id", CURRENT_USER.authId).eq("emoji", LIKE_EMOJI);
+    await supabase.from("forum_comments_reactions").delete().eq("comment_id", cid).eq("user_id", CURRENT_USER.authId).eq("emoji", LIKE_EMOJI);
   }
 }
 
@@ -453,9 +453,9 @@ export async function fetchMyFriends() {
   const empty = { friendIds: [], incoming: [], outgoing: [] };
   if (!me) return empty;
   const { data, error } = await supabase
-    .from("friendships")
+    .from("social_friendships")
     .select(
-      "requester_id, addressee_id, status, requester:profiles!friendships_requester_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role), addressee:profiles!friendships_addressee_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role)"
+      "requester_id, addressee_id, status, requester:profiles!social_friendships_requester_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role), addressee:profiles!social_friendships_addressee_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role)"
     )
     .or(`requester_id.eq.${me},addressee_id.eq.${me}`);
   if (error) {
@@ -514,26 +514,26 @@ export async function fetchPointsHistory(limit = 50) {
 export async function fetchFavorites() {
   const me = CURRENT_USER.authId;
   if (!me) return [];
-  const { data, error } = await supabase.from("favorites")
+  const { data, error } = await supabase.from("learn_lessons_favorites")
     .select("lesson_slug").eq("user_id", me).order("created_at", { ascending: false });
   if (error) { console.warn("fetchFavorites:", error.message); return []; }
   return (data || []).map((r) => r.lesson_slug);
 }
 export async function addFavorite(slug) {
   if (!slug || !CURRENT_USER.authId) return;
-  const { error } = await supabase.from("favorites").insert({ user_id: CURRENT_USER.authId, lesson_slug: slug });
+  const { error } = await supabase.from("learn_lessons_favorites").insert({ user_id: CURRENT_USER.authId, lesson_slug: slug });
   if (error && error.code !== "23505") console.warn("addFavorite:", error.message);
 }
 export async function removeFavorite(slug) {
   if (!slug || !CURRENT_USER.authId) return;
-  await supabase.from("favorites").delete().eq("user_id", CURRENT_USER.authId).eq("lesson_slug", slug);
+  await supabase.from("learn_lessons_favorites").delete().eq("user_id", CURRENT_USER.authId).eq("lesson_slug", slug);
 }
 
 // ---- Finished lessons (real, cross-device) — reads lesson_progress (0002) ----
 export async function fetchMyLessonProgress() {
   const me = CURRENT_USER.authId;
   if (!me) return new Set();
-  const { data, error } = await supabase.from("lesson_progress").select("lesson_slug").eq("user_id", me);
+  const { data, error } = await supabase.from("learn_lessons_progress").select("lesson_slug").eq("user_id", me);
   if (error) { console.warn("fetchMyLessonProgress:", error.message); return new Set(); }
   return new Set((data || []).map((r) => r.lesson_slug));
 }
@@ -563,7 +563,7 @@ export async function adminFetchUsers() {
 export async function sendFriendRequest(userSurrogate) {
   const other = userUuidBySurr.get(userSurrogate);
   if (!other || !CURRENT_USER.authId) return;
-  await supabase.from("friendships").insert({
+  await supabase.from("social_friendships").insert({
     requester_id: CURRENT_USER.authId,
     addressee_id: other,
     status: "pending",
@@ -573,21 +573,21 @@ export async function sendFriendRequest(userSurrogate) {
 export async function cancelFriendRequest(userSurrogate) {
   const other = userUuidBySurr.get(userSurrogate);
   if (!other || !CURRENT_USER.authId) return;
-  await supabase.from("friendships").delete()
+  await supabase.from("social_friendships").delete()
     .eq("requester_id", CURRENT_USER.authId).eq("addressee_id", other);
 }
 
 export async function acceptFriendRequest(userSurrogate) {
   const other = userUuidBySurr.get(userSurrogate);
   if (!other || !CURRENT_USER.authId) return;
-  await supabase.from("friendships").update({ status: "accepted" })
+  await supabase.from("social_friendships").update({ status: "accepted" })
     .eq("requester_id", other).eq("addressee_id", CURRENT_USER.authId);
 }
 
 export async function declineFriendRequest(userSurrogate) {
   const other = userUuidBySurr.get(userSurrogate);
   if (!other || !CURRENT_USER.authId) return;
-  await supabase.from("friendships").delete()
+  await supabase.from("social_friendships").delete()
     .eq("requester_id", other).eq("addressee_id", CURRENT_USER.authId);
 }
 
@@ -595,7 +595,7 @@ export async function removeFriend(userSurrogate) {
   const other = userUuidBySurr.get(userSurrogate);
   if (!other || !CURRENT_USER.authId) return;
   const me = CURRENT_USER.authId;
-  await supabase.from("friendships").delete().or(
+  await supabase.from("social_friendships").delete().or(
     `and(requester_id.eq.${me},addressee_id.eq.${other}),and(requester_id.eq.${other},addressee_id.eq.${me})`
   );
 }
@@ -605,8 +605,8 @@ export async function removeFriend(userSurrogate) {
 // teacher→member (free text). Mapped into the hub's conversation shape.
 // ---------------------------------------------------------
 const MSG_PROFILE_SEL =
-  "sender:profiles!messages_sender_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role), " +
-  "recipient:profiles!messages_recipient_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role)";
+  "sender:profiles!social_messages_sender_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role), " +
+  "recipient:profiles!social_messages_recipient_id_fkey(id,display_name,avatar_color,avatar,points,last_seen_at,role)";
 
 /** My conversations, grouped by partner, in the hub's shape:
  *  [{ key, partnerId(surrogate), partnerName, teacher, guest, msgs[], unread }].
@@ -616,7 +616,7 @@ export async function fetchConversations(asAdmin = false) {
   if (!me) return [];
   const filter = asAdmin ? `to_admin.eq.true,sender_id.eq.${me}` : `sender_id.eq.${me},recipient_id.eq.${me}`;
   const { data, error } = await supabase
-    .from("messages")
+    .from("social_messages")
     .select(`id, sender_id, recipient_id, to_admin, body, template_key, guest_name, guest_email, created_at, read_at, ${MSG_PROFILE_SEL}`)
     .or(filter)
     .order("created_at", { ascending: true });
@@ -678,7 +678,7 @@ export async function sendTemplateMsg(recipientSurrogate, body, templateKey) {
   const to = uuidForSurrogate(recipientSurrogate);
   if (!to || !CURRENT_USER.authId) return null;
   const { data, error } = await supabase
-    .from("messages")
+    .from("social_messages")
     .insert({ sender_id: CURRENT_USER.authId, recipient_id: to, to_admin: false, body, template_key: templateKey || "tpl" })
     .select("id").single();
   if (error) { console.warn("sendTemplateMsg:", error.message); return null; }
@@ -689,7 +689,7 @@ export async function sendTemplateMsg(recipientSurrogate, body, templateKey) {
 export async function sendTeacherMsg(body) {
   if (!CURRENT_USER.authId) return null;
   const { data, error } = await supabase
-    .from("messages")
+    .from("social_messages")
     .insert({ sender_id: CURRENT_USER.authId, recipient_id: null, to_admin: true, body })
     .select("id").single();
   if (error) { console.warn("sendTeacherMsg:", error.message); return null; }
@@ -716,7 +716,7 @@ export async function sendTeacherReply(recipientSurrogate, body) {
   const to = uuidForSurrogate(recipientSurrogate);
   if (!to || !CURRENT_USER.authId) return null;
   const { error } = await supabase
-    .from("messages")
+    .from("social_messages")
     .insert({ sender_id: CURRENT_USER.authId, recipient_id: to, to_admin: false, body });
   if (error) console.warn("sendTeacherReply:", error.message);
 }
@@ -727,7 +727,7 @@ export async function fetchNotifications(limit = 30) {
   const me = CURRENT_USER.authId;
   if (!me) return [];
   const { data, error } = await supabase
-    .from("notifications")
+    .from("social_notifications")
     .select("id, type, payload, read_at, created_at")
     .eq("user_id", me)
     .order("created_at", { ascending: false })
@@ -739,13 +739,13 @@ export async function fetchNotifications(limit = 30) {
 /** Mark specific notifications (by id) as read. */
 export async function markNotificationsRead(ids) {
   if (!ids || !ids.length || !CURRENT_USER.authId) return;
-  await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
+  await supabase.from("social_notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
 }
 
 /** Delete ALL of my notifications ("șterge tot"). */
 export async function deleteAllNotifications() {
   if (!CURRENT_USER.authId) return;
-  await supabase.from("notifications").delete().eq("user_id", CURRENT_USER.authId);
+  await supabase.from("social_notifications").delete().eq("user_id", CURRENT_USER.authId);
 }
 
 /** The teacher's last_seen (ms) so a pupil's messenger can show the teacher as
@@ -764,7 +764,7 @@ export async function fetchTeacherPresence() {
  *  (the last two = "⚑ semnalează o eroare de conținut"). targetUuid = real uuid. */
 export async function reportContent(targetType, targetUuid, reason) {
   if (!targetUuid || !CURRENT_USER.authId) return false;
-  const { error } = await supabase.from("reports").insert({
+  const { error } = await supabase.from("forum_reports").insert({
     reporter_id: CURRENT_USER.authId, target_type: targetType, target_id: targetUuid, reason: reason || null,
   });
   if (error && error.code !== "23505") { console.warn("reportContent:", error.message); return false; }
@@ -796,8 +796,8 @@ export async function fetchOpenModerationCount() {
 /** Admin: open reports (newest first), with the reporter's display name. */
 export async function fetchContentReports() {
   const { data, error } = await supabase
-    .from("reports")
-    .select("id, target_type, target_id, reason, status, meta, reporter_id, created_at, reporter:profiles!reports_reporter_id_fkey(display_name)")
+    .from("forum_reports")
+    .select("id, target_type, target_id, reason, status, meta, reporter_id, created_at, reporter:profiles!forum_reports_reporter_id_fkey(display_name)")
     .eq("status", "open")
     .order("created_at", { ascending: false });
   if (error) { console.warn("fetchContentReports:", error.message); return []; }
@@ -825,26 +825,26 @@ export async function resolveTestReport(id, founded, note) {
 /** Admin: mark a report resolved. */
 export async function resolveReport(id) {
   if (!id) return;
-  await supabase.from("reports").update({ status: "resolved" }).eq("id", id);
+  await supabase.from("forum_reports").update({ status: "resolved" }).eq("id", id);
 }
 
 // ---- Custom profanity terms (admin-managed; also used by the server trigger) ----
 export async function fetchProfanityTerms() {
-  const { data, error } = await supabase.from("profanity_terms").select("id, term").order("term");
+  const { data, error } = await supabase.from("forum_profanity_terms").select("id, term").order("term");
   if (error) { console.warn("fetchProfanityTerms:", error.message); return []; }
   return data || [];
 }
 export async function addProfanityTerm(term) {
   const t = (term || "").trim().toLowerCase();
   if (!t || !CURRENT_USER.authId) return null;
-  const { data, error } = await supabase.from("profanity_terms")
+  const { data, error } = await supabase.from("forum_profanity_terms")
     .insert({ term: t, added_by: CURRENT_USER.authId }).select("id, term").single();
   if (error) { console.warn("addProfanityTerm:", error.message); return null; }
   return data;
 }
 export async function removeProfanityTerm(id) {
   if (!id) return;
-  await supabase.from("profanity_terms").delete().eq("id", id);
+  await supabase.from("forum_profanity_terms").delete().eq("id", id);
 }
 
 // ---- Held content (kept out of the feed by the profanity filter) — admin review ----
@@ -852,11 +852,11 @@ export async function removeProfanityTerm(id) {
  *  already lets the admin read them (posts_read/comments_read include is_admin_user). */
 export async function fetchHeldContent() {
   const [posts, comments] = await Promise.all([
-    supabase.from("posts")
-      .select("id, body, created_at, author:profiles!posts_author_id_fkey(display_name)")
+    supabase.from("forum_posts")
+      .select("id, body, created_at, author:profiles!forum_posts_author_id_fkey(display_name)")
       .eq("moderation_status", "held").order("created_at", { ascending: false }),
-    supabase.from("comments")
-      .select("id, body, created_at, author:profiles!comments_author_id_fkey(display_name)")
+    supabase.from("forum_comments")
+      .select("id, body, created_at, author:profiles!forum_comments_author_id_fkey(display_name)")
       .eq("moderation_status", "held").order("created_at", { ascending: false }),
   ]);
   const map = (res, kind) => (res.data || []).map((r) => ({
@@ -881,8 +881,8 @@ export async function fetchMyBlocks() {
   const me = CURRENT_USER.authId;
   if (!me) return new Set();
   const { data, error } = await supabase
-    .from("user_blocks")
-    .select("blocked_id, blocked:profiles!user_blocks_blocked_id_fkey(id, display_name, avatar_color, avatar, status_line, points, last_seen_at, role)")
+    .from("social_blocks")
+    .select("blocked_id, blocked:profiles!social_blocks_blocked_id_fkey(id, display_name, avatar_color, avatar, status_line, points, last_seen_at, role)")
     .eq("blocker_id", me);
   if (error) { console.warn("fetchMyBlocks:", error.message); return new Set(); }
   const set = new Set();
@@ -892,13 +892,13 @@ export async function fetchMyBlocks() {
 export async function blockUser(surrogate) {
   const uuid = uuidForSurrogate(surrogate);
   if (!uuid || !CURRENT_USER.authId) return;
-  const { error } = await supabase.from("user_blocks").insert({ blocker_id: CURRENT_USER.authId, blocked_id: uuid });
+  const { error } = await supabase.from("social_blocks").insert({ blocker_id: CURRENT_USER.authId, blocked_id: uuid });
   if (error && error.code !== "23505") console.warn("blockUser:", error.message);
 }
 export async function unblockUser(surrogate) {
   const uuid = uuidForSurrogate(surrogate);
   if (!uuid || !CURRENT_USER.authId) return;
-  await supabase.from("user_blocks").delete().eq("blocker_id", CURRENT_USER.authId).eq("blocked_id", uuid);
+  await supabase.from("social_blocks").delete().eq("blocker_id", CURRENT_USER.authId).eq("blocked_id", uuid);
 }
 
 /** Purge MY read notifications older than `days` — keeps the tray from growing
@@ -906,7 +906,7 @@ export async function unblockUser(surrogate) {
 export async function purgeOldReadNotifications(days = 7) {
   if (!CURRENT_USER.authId) return;
   const cutoff = new Date(Date.now() - days * 864e5).toISOString();
-  await supabase.from("notifications").delete()
+  await supabase.from("social_notifications").delete()
     .eq("user_id", CURRENT_USER.authId)
     .not("read_at", "is", null)
     .lt("read_at", cutoff);
@@ -931,7 +931,7 @@ export function subscribeInserts(table, onInsert) {
 // ---- Teacher's inbox labels (admin) + event-access (auto "Evenimente") ----
 /** All conversation labels, keyed by member UUID → 'curent'|'incheiat'|'amanat'. */
 export async function fetchConversationLabels() {
-  const { data, error } = await supabase.from("conversation_labels").select("user_id, label");
+  const { data, error } = await supabase.from("social_messages_labels").select("user_id, label");
   if (error) { console.warn("fetchConversationLabels:", error.message); return {}; }
   const out = {};
   for (const r of data || []) out[r.user_id] = r.label;
@@ -943,16 +943,16 @@ export async function setConversationLabel(memberSurrogate, label) {
   const uuid = uuidForSurrogate(memberSurrogate);
   if (!uuid) return;
   if (!label) {
-    await supabase.from("conversation_labels").delete().eq("user_id", uuid);
+    await supabase.from("social_messages_labels").delete().eq("user_id", uuid);
   } else {
-    await supabase.from("conversation_labels").upsert({ user_id: uuid, label, updated_at: new Date().toISOString() });
+    await supabase.from("social_messages_labels").upsert({ user_id: uuid, label, updated_at: new Date().toISOString() });
   }
 }
 
 /** Set of member UUIDs that have Events access (drives the auto "Evenimente"
  *  label). Admin sees every row (RLS: own or admin). */
 export async function fetchEventAccessUsers() {
-  const { data, error } = await supabase.from("event_access").select("user_id");
+  const { data, error } = await supabase.from("planner_pupils").select("user_id");
   if (error) { console.warn("fetchEventAccessUsers:", error.message); return new Set(); }
   return new Set((data || []).map((r) => r.user_id));
 }
@@ -974,7 +974,7 @@ export async function sendFreeMsg(recipientSurrogate, body) {
 /** Report a message to the teacher (moderation queue). */
 export async function reportMessage(messageId, reason) {
   if (!messageId || !CURRENT_USER.authId) return;
-  await supabase.from("reports").insert({
+  await supabase.from("forum_reports").insert({
     reporter_id: CURRENT_USER.authId,
     target_type: "message",
     target_id: messageId,
@@ -992,7 +992,7 @@ export async function markConversationReadReal(conv, asAdmin) {
     })
     .map((m) => m.id);
   if (!ids.length) return;
-  await supabase.from("messages").update({ read_at: new Date().toISOString() }).in("id", ids);
+  await supabase.from("social_messages").update({ read_at: new Date().toISOString() }).in("id", ids);
 }
 
 /** The current user's own profile (settings) row, or null.
@@ -1036,7 +1036,7 @@ export async function updateMyProfile(fields) {
 export async function fetchMyEventsAccess() {
   if (!CURRENT_USER.authId) return false;
   const { data } = await supabase
-    .from("event_access")
+    .from("planner_pupils")
     .select("user_id")
     .eq("user_id", CURRENT_USER.authId)
     .maybeSingle();
@@ -1047,8 +1047,8 @@ export async function toggleCommentReaction(commentSurrogate, emoji, added) {
   const cid = commentUuidBySurr.get(commentSurrogate);
   if (!cid || !CURRENT_USER.authId) return;
   if (added) {
-    await supabase.from("comment_reactions").insert({ comment_id: cid, user_id: CURRENT_USER.authId, emoji });
+    await supabase.from("forum_comments_reactions").insert({ comment_id: cid, user_id: CURRENT_USER.authId, emoji });
   } else {
-    await supabase.from("comment_reactions").delete().eq("comment_id", cid).eq("user_id", CURRENT_USER.authId).eq("emoji", emoji);
+    await supabase.from("forum_comments_reactions").delete().eq("comment_id", cid).eq("user_id", CURRENT_USER.authId).eq("emoji", emoji);
   }
 }

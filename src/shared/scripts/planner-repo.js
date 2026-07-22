@@ -51,8 +51,8 @@ export async function fetchWeek(from = weekStart()) {
   const to = new Date(from);
   to.setDate(to.getDate() + 7);
   const { data, error } = await supabase
-    .from("tutoring_slots")
-    .select("id, user_id, starts_at, ends_at, note, status, kind, title, recurrence_id, profiles!tutoring_slots_user_id_fkey(display_name, avatar_color)")
+    .from("planner_slots")
+    .select("id, user_id, starts_at, ends_at, note, status, kind, title, recurrence_id, profiles!planner_slots_user_id_fkey(display_name, avatar_color)")
     .eq("status", "booked")
     .gte("starts_at", from.toISOString())
     .lt("starts_at", to.toISOString())
@@ -97,7 +97,7 @@ export async function bookSlot({ startMs, minutes, userId = null, note = "", kin
   const starts = new Date(startMs);
   const ends = new Date(startMs + minutes * 60000);
   const { data, error } = await supabase
-    .from("tutoring_slots")
+    .from("planner_slots")
     .insert({
       user_id: uid,
       starts_at: starts.toISOString(),
@@ -118,7 +118,7 @@ export async function bookSlot({ startMs, minutes, userId = null, note = "", kin
  *  whether a row is new or moved, only whether the range is free. */
 export async function moveSlot(id, { startMs, minutes, detach = false }) {
   const { error } = await supabase
-    .from("tutoring_slots")
+    .from("planner_slots")
     .update({
       starts_at: new Date(startMs).toISOString(),
       ends_at: new Date(startMs + minutes * 60000).toISOString(),
@@ -135,7 +135,7 @@ export async function moveSlot(id, { startMs, minutes, detach = false }) {
 /** Cancel. The row stays as history; only 'booked' rows hold a slot. */
 export async function cancelSlot(id) {
   const { error } = await supabase
-    .from("tutoring_slots").update({ status: "cancelled" }).eq("id", id);
+    .from("planner_slots").update({ status: "cancelled" }).eq("id", id);
   if (error) return { ok: false, message: humanError(error) };
   return { ok: true };
 }
@@ -144,7 +144,7 @@ export async function cancelSlot(id) {
  *  trigger lets it through even for a block already in the past. */
 export async function renameSlot(id, title) {
   const { error } = await supabase
-    .from("tutoring_slots")
+    .from("planner_slots")
     .update({ title: title || "Activitate personală" })
     .eq("id", id);
   if (error) return { ok: false, message: humanError(error) };
@@ -156,8 +156,8 @@ export async function renameSlot(id, title) {
  *  Returns an unsubscribe function. */
 export function watchSlots(onChange) {
   const ch = supabase
-    .channel("tutoring_slots_live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "tutoring_slots" }, onChange)
+    .channel("planner_slots_live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "planner_slots" }, onChange)
     .subscribe();
   return () => { try { supabase.removeChannel(ch); } catch { /* already gone */ } };
 }
@@ -167,7 +167,7 @@ export async function hasPlannerAccess() {
   if (isAdmin()) return true;
   if (!CURRENT_USER.authId) return false;
   const { data, error } = await supabase
-    .from("event_access").select("user_id").eq("user_id", CURRENT_USER.authId).maybeSingle();
+    .from("planner_pupils").select("user_id").eq("user_id", CURRENT_USER.authId).maybeSingle();
   if (error) { console.warn("hasPlannerAccess:", error.message); return false; }
   return !!data;
 }
@@ -179,8 +179,8 @@ export async function hasPlannerAccess() {
 export async function fetchMarkedPupils() {
   if (!isAdmin()) return [];
   const { data, error } = await supabase
-    .from("event_access")
-    .select("user_id, planner_name, planner_color, planner_minutes, planner_emoji, planner_recurring, profiles!event_access_user_id_fkey(display_name, avatar_color)");
+    .from("planner_pupils")
+    .select("user_id, planner_name, planner_color, planner_minutes, planner_emoji, planner_recurring, profiles!planner_pupils_user_id_fkey(display_name, avatar_color)");
   if (error) { console.warn("fetchMarkedPupils:", error.message); return []; }
   return (data || []).map((r) => ({
     id: r.user_id,
@@ -200,7 +200,7 @@ export async function fetchMarkedPupils() {
 /** The teacher customises a pupil's chip. Nulls mean „back to the profile". */
 export async function savePupilPrefs(userId, { name, color, minutes, emoji, recurring }) {
   const { error } = await supabase
-    .from("event_access")
+    .from("planner_pupils")
     .update({
       planner_name: name?.trim() || null,
       planner_color: color || null,
@@ -217,7 +217,7 @@ export async function savePupilPrefs(userId, { name, color, minutes, emoji, recu
 export async function fetchMyPlannerPrefs() {
   if (!CURRENT_USER.authId) return { minutes: DEFAULT_DURATION, color: null };
   const { data } = await supabase
-    .from("event_access")
+    .from("planner_pupils")
     .select("planner_minutes, planner_color")
     .eq("user_id", CURRENT_USER.authId).maybeSingle();
   return {
@@ -387,7 +387,7 @@ export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vaca
 export async function makeRecurring({ id, startMs, minutes, userId, kind = "lesson", title = "", weeks = 12, vacations = [] }) {
   const recurrenceId = crypto.randomUUID();
   const { error } = await supabase
-    .from("tutoring_slots").update({ recurrence_id: recurrenceId }).eq("id", id);
+    .from("planner_slots").update({ recurrence_id: recurrenceId }).eq("id", id);
   if (error) return { ok: false, message: humanError(error) };
   const r = await plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek: 1 });
   return { ...r, created: r.created + 1, recurrenceId };
@@ -399,10 +399,10 @@ export async function makeRecurring({ id, startMs, minutes, userId, kind = "less
  *  or are due sooner, and stopping the future is not rewriting the past. */
 export async function stopSeriesHere({ id, recurrenceId, startMs }) {
   const { error } = await supabase
-    .from("tutoring_slots").update({ recurrence_id: null }).eq("id", id);
+    .from("planner_slots").update({ recurrence_id: null }).eq("id", id);
   if (error) return { ok: false, message: humanError(error) };
   const { data, error: e2 } = await supabase
-    .from("tutoring_slots")
+    .from("planner_slots")
     .update({ status: "cancelled" })
     .eq("recurrence_id", recurrenceId)
     .eq("status", "booked")
@@ -419,7 +419,7 @@ export async function stopSeriesHere({ id, recurrenceId, startMs }) {
  *  Past hours stay — they happened. Returns how many were cancelled. */
 export async function cancelFutureSlotsFor(userId) {
   const { data, error } = await supabase
-    .from("tutoring_slots")
+    .from("planner_slots")
     .update({ status: "cancelled" })
     .eq("user_id", userId)
     .eq("status", "booked")
@@ -432,7 +432,7 @@ export async function cancelFutureSlotsFor(userId) {
 /** Cancel every FUTURE occurrence of a series. The past stays — it happened. */
 export async function cancelSeries(recurrenceId) {
   const { error } = await supabase
-    .from("tutoring_slots")
+    .from("planner_slots")
     .update({ status: "cancelled" })
     .eq("recurrence_id", recurrenceId)
     .gte("starts_at", new Date().toISOString());

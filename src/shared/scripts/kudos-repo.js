@@ -26,12 +26,12 @@ export async function loadKudos() {
   _myClaps.clear();
   _myPokes.clear();
   // Totals (small community; counted client-side — swap for an aggregate view if it ever grows).
-  const { data: claps } = await supabase.from("kudos").select("to_user").eq("kind", "clap");
+  const { data: claps } = await supabase.from("social_kudos").select("to_user").eq("kind", "clap");
   for (const r of claps || []) _clapCounts.set(r.to_user, (_clapCounts.get(r.to_user) || 0) + 1);
   // What I gave today (so the buttons lock correctly on reload).
   if (CURRENT_USER.authId) {
     const { data: mine } = await supabase
-      .from("kudos").select("to_user, kind")
+      .from("social_kudos").select("to_user, kind")
       .eq("from_user", CURRENT_USER.authId)
       .gte("created_at", todayStart().toISOString());
     for (const r of mine || []) (r.kind === "poke" ? _myPokes : _myClaps).add(r.to_user);

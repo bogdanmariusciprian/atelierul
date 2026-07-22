@@ -20,7 +20,7 @@ import { CURRENT_USER } from "./session.js";
 
 export async function grantEventAccess(userUuid) {
   const { error } = await supabase
-    .from("event_access")
+    .from("planner_pupils")
     .insert({ user_id: userUuid, granted_by: CURRENT_USER.authId });
   // 23505 = the row already exists — the pupil IS marked, so that's a success.
   if (error && error.code !== "23505") {
@@ -31,7 +31,7 @@ export async function grantEventAccess(userUuid) {
 }
 
 export async function revokeEventAccess(userUuid) {
-  const { error } = await supabase.from("event_access").delete().eq("user_id", userUuid);
+  const { error } = await supabase.from("planner_pupils").delete().eq("user_id", userUuid);
   if (error) {
     console.warn("revokeEventAccess:", error.message);
     return { ok: false, message: "N-am putut retrage marcarea. Încearcă din nou." };

@@ -15,7 +15,7 @@ import { CURRENT_USER, isAdmin } from "./session.js";
  *  plus my own pending/rejected, plus all of them for the teacher. */
 export async function fetchNotationWords() {
   const { data, error } = await supabase
-    .from("notation_words")
+    .from("learn_notation_words")
     .select("id, kind, word, status, author_id, created_at")
     .neq("status", "rejected")
     .order("created_at");
@@ -39,7 +39,7 @@ export async function addNotationWord(kind, word) {
     row.decided_by = CURRENT_USER.authId;
     row.decided_at = new Date().toISOString();
   }
-  const { error } = await supabase.from("notation_words").insert(row);
+  const { error } = await supabase.from("learn_notation_words").insert(row);
   if (!error) return { ok: true };
   console.warn("addNotationWord:", error.message);
   return { ok: false, duplicate: error.code === "23505" };
@@ -49,7 +49,7 @@ export async function addNotationWord(kind, word) {
  *  approved word — it simply flips to 'rejected'). Enforced by RLS. */
 export async function reviewNotationWord(id, approve) {
   const { error } = await supabase
-    .from("notation_words")
+    .from("learn_notation_words")
     .update({
       status: approve ? "approved" : "rejected",
       decided_by: CURRENT_USER.authId,

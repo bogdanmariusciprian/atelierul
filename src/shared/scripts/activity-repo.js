@@ -101,16 +101,16 @@ export async function fetchGivenActivity(limit = 30) {
   const uid = CURRENT_USER.authId;
   if (!uid) return [];
   const [posts, comments, likes, kudos] = await Promise.all([
-    supabase.from("posts").select("id, body, created_at").eq("author_id", uid)
+    supabase.from("forum_posts").select("id, body, created_at").eq("author_id", uid)
       .order("created_at", { ascending: false }).limit(limit),
-    supabase.from("comments").select("id, body, created_at, post_id, lesson_slug").eq("author_id", uid)
+    supabase.from("forum_comments").select("id, body, created_at, post_id, lesson_slug").eq("author_id", uid)
       .order("created_at", { ascending: false }).limit(limit),
-    supabase.from("post_reactions")
-      .select("post_id, created_at, post:posts!post_reactions_post_id_fkey(body)")
+    supabase.from("forum_posts_reactions")
+      .select("post_id, created_at, post:forum_posts!forum_posts_reactions_post_id_fkey(body)")
       .eq("user_id", uid).eq("emoji", LIKE_EMOJI)
       .order("created_at", { ascending: false }).limit(limit),
-    supabase.from("kudos")
-      .select("id, kind, created_at, to:profiles!kudos_to_user_fkey(display_name)")
+    supabase.from("social_kudos")
+      .select("id, kind, created_at, to:profiles!social_kudos_to_user_fkey(display_name)")
       .eq("from_user", uid)
       .order("created_at", { ascending: false }).limit(limit),
   ]);
@@ -175,7 +175,7 @@ export async function fetchMyLessonSlugs() {
   const uid = CURRENT_USER.authId;
   if (!uid) return new Set();
   const { data, error } = await supabase
-    .from("lesson_progress").select("lesson_slug").eq("user_id", uid);
+    .from("learn_lessons_progress").select("lesson_slug").eq("user_id", uid);
   if (error) {
     console.warn("fetchMyLessonSlugs:", error.message);
     return new Set();

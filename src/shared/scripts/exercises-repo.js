@@ -62,7 +62,7 @@ function mapRow(row, { myVote = false, voteCount = 0, mySolve = null } = {}) {
 async function withVotes(rows) {
   const ids = rows.map((r) => r.id);
   if (!ids.length) return new Map();
-  const { data } = await supabase.from("exercise_votes").select("exercise_id, user_id").in("exercise_id", ids);
+  const { data } = await supabase.from("learn_exercises_votes").select("exercise_id, user_id").in("exercise_id", ids);
   const counts = new Map();
   const mine = new Set();
   for (const v of data || []) {
@@ -76,7 +76,7 @@ async function mySolves(ids) {
   const out = new Map();
   if (!ids.length || !CURRENT_USER.authId) return out;
   const { data } = await supabase
-    .from("exercise_solves").select("exercise_id, correct")
+    .from("learn_exercises_solves").select("exercise_id, correct")
     .eq("user_id", CURRENT_USER.authId).in("exercise_id", ids);
   for (const s of data || []) out.set(s.exercise_id, s);
   return out;
@@ -127,7 +127,7 @@ export function fetchPendingForLesson(slug) {
 /** Propose an exercise (status is forced to 'pending' by RLS). */
 export async function proposeExercise({ lessonSlug, kind, prompt, data }) {
   const { data: row, error } = await supabase
-    .from("exercises")
+    .from("learn_exercises")
     .insert({ lesson_slug: lessonSlug, author_id: CURRENT_USER.authId, kind, prompt, data, status: "pending" })
     .select("id").single();
   if (error) { console.warn("proposeExercise:", error.message); return null; }
@@ -137,10 +137,10 @@ export async function proposeExercise({ lessonSlug, kind, prompt, data }) {
 /** Toggle my up-vote on a proposal. */
 export async function voteExercise(id, on) {
   if (on) {
-    const { error } = await supabase.from("exercise_votes").insert({ exercise_id: id, user_id: CURRENT_USER.authId });
+    const { error } = await supabase.from("learn_exercises_votes").insert({ exercise_id: id, user_id: CURRENT_USER.authId });
     if (error && error.code !== "23505") console.warn("voteExercise:", error.message); // ignore dup
   } else {
-    const { error } = await supabase.from("exercise_votes").delete().eq("exercise_id", id).eq("user_id", CURRENT_USER.authId);
+    const { error } = await supabase.from("learn_exercises_votes").delete().eq("exercise_id", id).eq("user_id", CURRENT_USER.authId);
     if (error) console.warn("unvoteExercise:", error.message);
   }
 }
@@ -161,20 +161,20 @@ export async function rejectExercise(id) {
 
 /** Teacher: delete a proposal outright (removes it from history too). */
 export async function deleteExercise(id) {
-  const { error } = await supabase.from("exercises").delete().eq("id", id);
+  const { error } = await supabase.from("learn_exercises").delete().eq("id", id);
   if (error) console.warn("deleteExercise:", error.message);
 }
 
 /** How many proposals are pending (admin attention badge). */
 export async function fetchPendingCount() {
-  const { count } = await supabase.from("exercises").select("id", { count: "exact", head: true }).eq("status", "pending");
+  const { count } = await supabase.from("learn_exercises").select("id", { count: "exact", head: true }).eq("status", "pending");
   return count || 0;
 }
 
 /** How many proposals are pending for one lesson (per-lesson badge). */
 export async function fetchPendingCountForLesson(slug) {
   const { count } = await supabase
-    .from("exercises").select("id", { count: "exact", head: true })
+    .from("learn_exercises").select("id", { count: "exact", head: true })
     .eq("status", "pending").eq("lesson_slug", slug);
   return count || 0;
 }
@@ -183,7 +183,7 @@ export async function fetchPendingCountForLesson(slug) {
 export async function fetchMyApprovedExerciseCount() {
   if (!CURRENT_USER.authId) return 0;
   const { count } = await supabase
-    .from("exercises").select("id", { count: "exact", head: true })
+    .from("learn_exercises").select("id", { count: "exact", head: true })
     .eq("author_id", CURRENT_USER.authId).eq("status", "approved");
   return count || 0;
 }
@@ -194,7 +194,7 @@ export async function updateExercise(id, fields) {
   if (fields.prompt != null) patch.prompt = fields.prompt;
   if (fields.data !== undefined) patch.data = fields.data;
   if (fields.kind) patch.kind = fields.kind;
-  const { error } = await supabase.from("exercises").update(patch).eq("id", id);
+  const { error } = await supabase.from("learn_exercises").update(patch).eq("id", id);
   if (error) console.warn("updateExercise:", error.message);
 }
 

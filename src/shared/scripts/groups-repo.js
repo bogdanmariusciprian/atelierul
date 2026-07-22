@@ -14,8 +14,8 @@ import { surrogateForAuthor, fetchFeed, createPost } from "./forum-repo.js";
 const P = "id, display_name, avatar_color, avatar, points, status_line, last_seen_at, role";
 const GROUP_SEL =
   `id, name, description, icon_id, allow_members_add, creator_id, ` +
-  `creator:profiles!groups_creator_id_fkey(${P}), ` +
-  `group_members(user_id, member:profiles!group_members_user_id_fkey(${P}))`;
+  `creator:profiles!forum_groups_creator_id_fkey(${P}), ` +
+  `group_members:forum_groups_members(user_id, member:profiles!forum_groups_members_user_id_fkey(${P}))`;
 
 function mapGroup(row) {
   const members = row.group_members || [];
@@ -38,7 +38,7 @@ function mapGroup(row) {
 
 /** All study groups, with members resolved into the shared user registry. */
 export async function listGroups() {
-  const { data, error } = await supabase.from("groups").select(GROUP_SEL).order("created_at", { ascending: true });
+  const { data, error } = await supabase.from("forum_groups").select(GROUP_SEL).order("created_at", { ascending: true });
   if (error) { console.warn("listGroups:", error.message); return []; }
   return (data || []).map(mapGroup);
 }
@@ -56,36 +56,36 @@ export function postToGroup(groupId, { text, type, bg, media } = {}) {
 /** Create a group and auto-join the creator. Returns the new group id. */
 export async function createGroup({ name, iconId = 0, description = "", allowMembersAdd = false }) {
   const { data, error } = await supabase
-    .from("groups")
+    .from("forum_groups")
     .insert({ name, icon_id: iconId, description, allow_members_add: allowMembersAdd, creator_id: CURRENT_USER.authId })
     .select("id").single();
   if (error) { console.warn("createGroup:", error.message); return null; }
-  await supabase.from("group_members").insert({ group_id: data.id, user_id: CURRENT_USER.authId, added_by: CURRENT_USER.authId });
+  await supabase.from("forum_groups_members").insert({ group_id: data.id, user_id: CURRENT_USER.authId, added_by: CURRENT_USER.authId });
   return data;
 }
 
 /** Join a group myself. */
 export async function joinGroup(groupId) {
-  const { error } = await supabase.from("group_members").insert({ group_id: groupId, user_id: CURRENT_USER.authId, added_by: CURRENT_USER.authId });
+  const { error } = await supabase.from("forum_groups_members").insert({ group_id: groupId, user_id: CURRENT_USER.authId, added_by: CURRENT_USER.authId });
   if (error && error.code !== "23505") console.warn("joinGroup:", error.message);
 }
 
 /** Leave a group. */
 export async function leaveGroup(groupId) {
-  const { error } = await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", CURRENT_USER.authId);
+  const { error } = await supabase.from("forum_groups_members").delete().eq("group_id", groupId).eq("user_id", CURRENT_USER.authId);
   if (error) console.warn("leaveGroup:", error.message);
 }
 
 /** Add another member (creator, or when the group allows it — enforced by RLS). */
 export async function addGroupMember(groupId, userUuid) {
-  const { error } = await supabase.from("group_members").insert({ group_id: groupId, user_id: userUuid, added_by: CURRENT_USER.authId });
+  const { error } = await supabase.from("forum_groups_members").insert({ group_id: groupId, user_id: userUuid, added_by: CURRENT_USER.authId });
   if (error && error.code !== "23505") console.warn("addGroupMember:", error.message);
 }
 
 /** Creator/admin: remove another member from the group (RLS enforces it — 0004). */
 export async function kickGroupMember(groupId, userUuid) {
   if (!userUuid) return;
-  const { error } = await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", userUuid);
+  const { error } = await supabase.from("forum_groups_members").delete().eq("group_id", groupId).eq("user_id", userUuid);
   if (error) console.warn("kickGroupMember:", error.message);
 }
 
@@ -96,12 +96,12 @@ export async function updateGroup(groupId, fields) {
   if (fields.description != null) patch.description = fields.description;
   if (fields.iconId != null) patch.icon_id = fields.iconId;
   if (fields.allowMembersAdd != null) patch.allow_members_add = fields.allowMembersAdd;
-  const { error } = await supabase.from("groups").update(patch).eq("id", groupId);
+  const { error } = await supabase.from("forum_groups").update(patch).eq("id", groupId);
   if (error) console.warn("updateGroup:", error.message);
 }
 
 /** Delete a group (creator or admin — enforced by RLS). */
 export async function deleteGroup(groupId) {
-  const { error } = await supabase.from("groups").delete().eq("id", groupId);
+  const { error } = await supabase.from("forum_groups").delete().eq("id", groupId);
   if (error) console.warn("deleteGroup:", error.message);
 }

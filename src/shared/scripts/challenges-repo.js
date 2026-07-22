@@ -35,7 +35,7 @@ function mapRow(row) {
  *  browser before the pupil has used their one attempt. */
 export async function fetchTodayChallenge() {
   const { data, error } = await supabase
-    .from("challenges")
+    .from("learn_challenges")
     .select("id, active_date, prompt, data, reward")
     .eq("active_date", todayISO())
     .order("created_at", { ascending: false })
@@ -63,7 +63,7 @@ export async function fetchChallengeAnswer(challengeId) {
 export async function fetchMyChallengeSolve(challengeId) {
   if (!challengeId || !CURRENT_USER.authId) return null;
   const { data } = await supabase
-    .from("challenge_solves")
+    .from("learn_challenges_solves")
     .select("choice, correct")
     .eq("challenge_id", challengeId)
     .eq("user_id", CURRENT_USER.authId)
@@ -111,7 +111,7 @@ function toRow({ prompt, options, correct, explanation, date, reward }) {
 
 export async function createChallenge(fields) {
   const { data, error } = await supabase
-    .from("challenges")
+    .from("learn_challenges")
     .insert({ ...toRow(fields), created_by: CURRENT_USER.authId })
     .select("id")
     .single();
@@ -123,11 +123,11 @@ export async function createChallenge(fields) {
 }
 
 export async function updateChallenge(id, fields) {
-  const { error } = await supabase.from("challenges").update(toRow(fields)).eq("id", id);
+  const { error } = await supabase.from("learn_challenges").update(toRow(fields)).eq("id", id);
   if (error) console.warn("updateChallenge:", error.message);
 }
 
 export async function deleteChallenge(id) {
-  const { error } = await supabase.from("challenges").delete().eq("id", id);
+  const { error } = await supabase.from("learn_challenges").delete().eq("id", id);
   if (error) console.warn("deleteChallenge:", error.message);
 }

@@ -24,7 +24,7 @@ const mapRow = (r) => ({
 export async function loadNotes() {
   if (!CURRENT_USER.authId) { _cache = []; return _cache; }
   const { data, error } = await supabase
-    .from("notes")
+    .from("learn_notes")
     .select("id, title, body, lesson_slug, created_at")
     .eq("user_id", CURRENT_USER.authId)
     .order("created_at", { ascending: false });
@@ -41,7 +41,7 @@ export function getNotes() {
 export async function addNote({ title, text, lessonHref = null } = {}) {
   if (!CURRENT_USER.authId || !text) return null;
   const { data, error } = await supabase
-    .from("notes")
+    .from("learn_notes")
     .insert({ user_id: CURRENT_USER.authId, title: title || null, body: text, lesson_slug: lessonHref || null })
     .select("id, title, body, lesson_slug, created_at")
     .single();
@@ -56,7 +56,7 @@ export async function updateNote(id, { title, text, lessonHref } = {}) {
   if (title !== undefined) patch.title = title || null;
   if (text !== undefined) patch.body = text || "";
   if (lessonHref !== undefined) patch.lesson_slug = lessonHref || null;
-  const { error } = await supabase.from("notes").update(patch).eq("id", id);
+  const { error } = await supabase.from("learn_notes").update(patch).eq("id", id);
   if (error) { console.warn("updateNote:", error.message); return; }
   _cache = _cache.map((n) =>
     n.id === id
@@ -66,7 +66,7 @@ export async function updateNote(id, { title, text, lessonHref } = {}) {
 }
 
 export async function deleteNote(id) {
-  const { error } = await supabase.from("notes").delete().eq("id", id);
+  const { error } = await supabase.from("learn_notes").delete().eq("id", id);
   if (error) { console.warn("deleteNote:", error.message); return; }
   _cache = _cache.filter((n) => n.id !== id);
 }

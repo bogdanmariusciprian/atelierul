@@ -55,7 +55,7 @@ function mapRow(r) {
 
 /** Verified items for a category (optionally a single year). Guests + members. */
 export async function fetchTestItems({ exam = "admitere-drept", year = null } = {}) {
-  let q = supabase.from("test_items").select(PUBLIC_COLS).eq("exam", exam);
+  let q = supabase.from("tests_items").select(PUBLIC_COLS).eq("exam", exam);
   if (year != null) q = q.eq("year", year);
   const { data, error } = await q.order("session").order("item_no");
   if (error) {
@@ -90,7 +90,7 @@ export async function adminFetchTestItem(id) {
  *  without disturbing the answer they already picked. Never returns the key. */
 export async function fetchTestItem(id) {
   if (!id) return null;
-  const { data, error } = await supabase.from("test_items").select(PUBLIC_COLS).eq("id", id).single();
+  const { data, error } = await supabase.from("tests_items").select(PUBLIC_COLS).eq("id", id).single();
   if (error) { console.warn("fetchTestItem:", error.message); return null; }
   return mapRow(data);
 }
@@ -157,7 +157,7 @@ export async function adminFetchTestItems(exam = "admitere-drept", year = null) 
 
 /** Publish / unpublish (verify) an item so pupils can see it. */
 export async function setTestVerified(id, on) {
-  const { error } = await supabase.from("test_items").update({ verified: !!on }).eq("id", id);
+  const { error } = await supabase.from("tests_items").update({ verified: !!on }).eq("id", id);
   if (error) {
     console.warn("setTestVerified:", error.message);
     return false;
@@ -167,7 +167,7 @@ export async function setTestVerified(id, on) {
 
 /** Publish / unpublish — controls whether pupils can see the item. */
 export async function setTestPublished(id, on) {
-  const { error } = await supabase.from("test_items").update({ published: !!on }).eq("id", id);
+  const { error } = await supabase.from("tests_items").update({ published: !!on }).eq("id", id);
   if (error) {
     console.warn("setTestPublished:", error.message);
     return false;
@@ -177,7 +177,7 @@ export async function setTestPublished(id, on) {
 
 /** Toggle the teacher's private marker (own tracking; not shown to pupils). */
 export async function setTestFlagged(id, on) {
-  const { error } = await supabase.from("test_items").update({ flagged: !!on }).eq("id", id);
+  const { error } = await supabase.from("tests_items").update({ flagged: !!on }).eq("id", id);
   if (error) {
     console.warn("setTestFlagged:", error.message);
     return false;
@@ -193,7 +193,7 @@ export async function updateTestItem(id, patch) {
                    "year", "session", "item_no", "types"]) {
     if (k in patch) allowed[k] = patch[k];
   }
-  const { error } = await supabase.from("test_items").update(allowed).eq("id", id);
+  const { error } = await supabase.from("tests_items").update(allowed).eq("id", id);
   if (error) {
     console.warn("updateTestItem:", error.message);
     return false;
@@ -208,7 +208,7 @@ export async function updateTestItem(id, patch) {
 export async function fetchMyTestSessions(exam = "admitere-drept") {
   if (!CURRENT_USER.authId) return [];
   const { data, error } = await supabase
-    .from("test_sessions")
+    .from("tests_sessions")
     .select("id, emoji, label, config, queue, stats, updated_at")
     .eq("exam", exam)
     .order("updated_at", { ascending: false });
@@ -238,7 +238,7 @@ export async function saveTestSession({ id, exam = "admitere-drept", emoji, labe
     updated_at: new Date().toISOString(),
   };
   if (id) row.id = id;
-  const { data, error } = await supabase.from("test_sessions").upsert(row).select("id").single();
+  const { data, error } = await supabase.from("tests_sessions").upsert(row).select("id").single();
   if (error) { console.warn("saveTestSession:", error.message); return null; }
   return data?.id || null;
 }
@@ -246,7 +246,7 @@ export async function saveTestSession({ id, exam = "admitere-drept", emoji, labe
 /** Drop a session (finished, or the pupil deleted it). */
 export async function deleteTestSession(id) {
   if (!id || !CURRENT_USER.authId) return;
-  const { error } = await supabase.from("test_sessions").delete().eq("id", id);
+  const { error } = await supabase.from("tests_sessions").delete().eq("id", id);
   if (error) console.warn("deleteTestSession:", error.message);
 }
 
@@ -257,7 +257,7 @@ export async function deleteTestSession(id) {
 /** Active prompts only — never the answers. */
 export async function fetchBonusQuestions() {
   const { data, error } = await supabase
-    .from("bonus_questions").select("id, prompt").eq("active", true);
+    .from("tests_bonus_questions").select("id, prompt").eq("active", true);
   if (error) { console.warn("fetchBonusQuestions:", error.message); return []; }
   return data || [];
 }
@@ -294,7 +294,7 @@ export async function useBooster(sessionId, kind, itemId = null) {
 export async function fetchBoosters(sessionId) {
   if (!sessionId || !CURRENT_USER.authId) return {};
   const { data, error } = await supabase
-    .from("game_boosters").select("kind, qty").eq("session_id", sessionId);
+    .from("tests_boosters").select("kind, qty").eq("session_id", sessionId);
   if (error) { console.warn("fetchBoosters:", error.message); return {}; }
   return Object.fromEntries((data || []).filter((r) => r.qty > 0).map((r) => [r.kind, r.qty]));
 }
@@ -399,7 +399,7 @@ export async function fetchDriveFolderUrl(exam = "admitere-drept") {
 /** Published files for one category, newest year first. Guests included. */
 export async function fetchTestDownloads(exam = "admitere-drept") {
   const { data, error } = await supabase
-    .from("test_downloads")
+    .from("tests_downloads")
     .select("id, year, label, note, kind, url, sort, active, solved")
     .eq("exam", exam).eq("active", true)
     .order("year", { ascending: false }).order("sort");
@@ -409,7 +409,7 @@ export async function fetchTestDownloads(exam = "admitere-drept") {
 
 /** Admin: everything, including the ones switched off. `exam = null` → all. */
 export async function adminFetchTestDownloads(exam = null) {
-  let q = supabase.from("test_downloads")
+  let q = supabase.from("tests_downloads")
     .select("id, exam, year, label, note, kind, url, sort, active, solved");
   if (exam) q = q.eq("exam", exam);
   const { data, error } = await q
@@ -427,8 +427,8 @@ export async function saveTestDownload(row) {
     sort: Number(row.sort) || 0, active: row.active !== false,
   };
   const { error } = row.id
-    ? await supabase.from("test_downloads").update(body).eq("id", row.id)
-    : await supabase.from("test_downloads").insert(body);
+    ? await supabase.from("tests_downloads").update(body).eq("id", row.id)
+    : await supabase.from("tests_downloads").insert(body);
   if (error) { console.warn("saveTestDownload:", error.message); return false; }
   return true;
 }
@@ -436,7 +436,7 @@ export async function saveTestDownload(row) {
 /** Add several at once — one round trip instead of one per file. */
 export async function addTestDownloads(rows) {
   if (!rows?.length) return 0;
-  const { error } = await supabase.from("test_downloads").insert(rows);
+  const { error } = await supabase.from("tests_downloads").insert(rows);
   if (error) { console.warn("addTestDownloads:", error.message); return 0; }
   return rows.length;
 }
@@ -449,7 +449,7 @@ export async function addTestDownloads(rows) {
 export async function updateTestDownloads(rows) {
   if (!rows?.length) return 0;
   const results = await Promise.all(rows.map(({ id, label, year, kind, sort }) =>
-    supabase.from("test_downloads").update({ label, year, kind, sort }).eq("id", id)
+    supabase.from("tests_downloads").update({ label, year, kind, sort }).eq("id", id)
   ));
   const failed = results.filter((r) => r.error);
   if (failed.length) console.warn("updateTestDownloads:", failed[0].error.message);
@@ -474,21 +474,21 @@ export function guessFromFileName(name = "") {
 /** Mark (or unmark) a paper as fully entered in the item bank. The teacher's
  *  own judgement, so the Drive sync never touches it. */
 export async function setTestDownloadSolved(id, solved) {
-  const { error } = await supabase.from("test_downloads")
+  const { error } = await supabase.from("tests_downloads")
     .update({ solved: !!solved }).eq("id", id);
   if (error) { console.warn("setTestDownloadSolved:", error.message); return false; }
   return true;
 }
 
 export async function deleteTestDownload(id) {
-  const { error } = await supabase.from("test_downloads").delete().eq("id", id);
+  const { error } = await supabase.from("tests_downloads").delete().eq("id", id);
   if (error) console.warn("deleteTestDownload:", error.message);
 }
 
 /** Remove several at once (files that vanished from the Drive folder). */
 export async function deleteTestDownloads(ids) {
   if (!ids?.length) return 0;
-  const { error } = await supabase.from("test_downloads").delete().in("id", ids);
+  const { error } = await supabase.from("tests_downloads").delete().in("id", ids);
   if (error) { console.warn("deleteTestDownloads:", error.message); return 0; }
   return ids.length;
 }
@@ -504,12 +504,12 @@ export async function adminFetchBonusQuestions() {
 export async function saveBonusQuestion({ id, prompt, answers, active }) {
   const row = { prompt, answers: answers || [], active: active !== false };
   const { error } = id
-    ? await supabase.from("bonus_questions").update(row).eq("id", id)
-    : await supabase.from("bonus_questions").insert(row);
+    ? await supabase.from("tests_bonus_questions").update(row).eq("id", id)
+    : await supabase.from("tests_bonus_questions").insert(row);
   if (error) { console.warn("saveBonusQuestion:", error.message); return false; }
   return true;
 }
 export async function deleteBonusQuestion(id) {
-  const { error } = await supabase.from("bonus_questions").delete().eq("id", id);
+  const { error } = await supabase.from("tests_bonus_questions").delete().eq("id", id);
   if (error) console.warn("deleteBonusQuestion:", error.message);
 }
