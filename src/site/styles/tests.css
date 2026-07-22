@@ -1723,20 +1723,26 @@ body.tgame-active .page-hero { max-height: 0; opacity: 0; margin-block: 0; paddi
   will-change: transform;
 }
 
-/* I-beam-ul, redesenat NEGRU și mai gros — cel nativ e o lamelă palidă.
+/* I-beam-ul, redesenat: smarald pe cămașă albă — vizibil, dar plăcut.
    Cursor SVG cu hotspot în centru (12 12); `text` rămâne rezerva. */
 .tg-wrap input,
 .tg-wrap textarea,
 .tg-wrap [contenteditable] {
-  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M9 3h6M9 21h6M12 3v18' stroke='black' stroke-width='2.2' fill='none' stroke-linecap='round'/></svg>") 12 12, text;
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M9 3h6M9 21h6M12 3v18' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/><path d='M9 3h6M9 21h6M12 3v18' stroke='%230f766e' stroke-width='2' fill='none' stroke-linecap='round'/></svg>") 12 12, text;
 }
 
-/* Și mânuța, tot NEAGRĂ — sora I-beam-ului de mai sus. Hotspot pe vârful
+/* Mânuța, în aceeași familie: smarald cu contur alb. Hotspot pe vârful
    degetului arătător (10 3); `pointer` rămâne rezerva. */
 .tg-wrap button,
 .tg-wrap a,
 .tg-wrap select,
 .tg-wrap label,
 .tg-wrap [role="button"] {
-  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path fill='black' d='M10 1.8c-.9 0-1.6.7-1.6 1.6v9l-1.7-1.6c-.7-.7-1.9-.7-2.6.1-.6.7-.6 1.8.1 2.5l4.8 4.9c.9.9 2.1 1.5 3.4 1.5h2.7c2.6 0 4.7-2.1 4.7-4.7v-4.6c0-.9-.7-1.6-1.6-1.6-.3 0-.6.1-.9.3-.2-.7-.9-1.2-1.6-1.2-.4 0-.8.1-1.1.4-.3-.6-.9-1-1.6-1-.4 0-.7.1-1 .3V3.4c0-.9-.7-1.6-1.6-1.6z'/></svg>") 10 3, pointer;
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path fill='%230f766e' stroke='white' stroke-width='1.1' d='M10 1.8c-.9 0-1.6.7-1.6 1.6v9l-1.7-1.6c-.7-.7-1.9-.7-2.6.1-.6.7-.6 1.8.1 2.5l4.8 4.9c.9.9 2.1 1.5 3.4 1.5h2.7c2.6 0 4.7-2.1 4.7-4.7v-4.6c0-.9-.7-1.6-1.6-1.6-.3 0-.6.1-.9.3-.2-.7-.9-1.2-1.6-1.2-.4 0-.8.1-1.1.4-.3-.6-.9-1-1.6-1-.4 0-.7.1-1 .3V3.4c0-.9-.7-1.6-1.6-1.6z'/></svg>") 10 3, pointer;
+}
+
+/* Și săgeata „normală" din editor — aceeași familie: smarald, contur alb.
+   Hotspot la vârf (3 2); `default` rămâne rezerva. */
+.tg-wrap {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path fill='%230f766e' stroke='white' stroke-width='1.2' stroke-linejoin='round' d='M5 2v16.5l4.3-3.7 2.6 6 2.9-1.2-2.6-6 5.8-.5z'/></svg>") 3 2, default;
 }
