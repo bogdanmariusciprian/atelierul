@@ -45,7 +45,9 @@
 }
 .pl-rec.on { border-style: solid; border-color: var(--color-primary); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 
-.pl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-left: auto; }
+.pl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+/* Rândul creionului stă singur, deasupra Duratei — nu se amestecă niciodată. */
+.pl-tools--pen { flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.5rem; }
 .pl-dur__lab { font-size: 0.8rem; color: var(--color-text-muted); margin-right: 0.15rem; }
 .pl-dur {
   padding: 0.3rem 0.7rem; border-radius: 999px; cursor: pointer;
@@ -59,12 +61,13 @@
 /* Capsula creionului: tot ce decurge din 🖌 stă în același chenar — un singur
    grup vizual, imposibil de confundat cu uneltele din afara lui. */
 .pl-pen {
-  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.45rem;
-  padding: 0.28rem 0.5rem; border-radius: 1.1rem;
+  display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 0.45rem;
+  padding: 0.28rem 0.5rem; border-radius: 999px;
   border: 1.5px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
   background: color-mix(in srgb, var(--color-primary) 7%, transparent);
 }
 .pl-pen__lab {
+  white-space: nowrap;
   font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--color-text-muted); user-select: none;
 }
@@ -73,6 +76,7 @@
   border: 1.5px solid var(--color-border); background: var(--color-bg);
 }
 .pl-seg__b {
+  white-space: nowrap;
   border: 0; background: none; cursor: pointer; font: inherit;
   font-size: 0.78rem; font-weight: 700; color: var(--color-text-muted);
   padding: 0.28rem 0.62rem;

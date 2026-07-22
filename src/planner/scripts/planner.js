@@ -308,9 +308,11 @@ function toolsHtml() {
           <input class="pl-ptitle" data-act="ptitle" maxlength="40" value="${esc(S.personalTitle)}"
                  placeholder="denumirea activității (ex. pregătire)" aria-label="Denumirea activității personale" />` : ""}
       </div>`;
-  return `<div class="pl-tools">
+  // Two rows, deliberately: the pencil's capsule gets its OWN line above the
+  // duration chips, so it can never wrap into them and shuffle the layout.
+  return `<div class="pl-tools pl-tools--pen">${pen}</div>
+    <div class="pl-tools">
       <span class="pl-dur__lab">Durata</span>${durs}
-      ${pen}
     </div>`;
 }
 
