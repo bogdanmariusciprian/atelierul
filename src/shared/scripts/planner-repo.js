@@ -182,7 +182,7 @@ export async function fetchMarkedPupils() {
   if (!isAdmin()) return [];
   const { data, error } = await supabase
     .from("planner_pupils")
-    .select("user_id, planner_name, planner_color, planner_minutes, planner_emoji, planner_recurring, profiles!planner_pupils_user_id_fkey(display_name, avatar_color)");
+    .select("user_id, planner_name, planner_color, planner_minutes, planner_emoji, planner_recurring, planner_max_weekly, profiles!planner_pupils_user_id_fkey(display_name, avatar_color)");
   if (error) { console.warn("fetchMarkedPupils:", error.message); return []; }
   return (data || []).map((r) => ({
     id: r.user_id,
@@ -196,11 +196,12 @@ export async function fetchMarkedPupils() {
     emoji: r.planner_emoji || "",
     recurring: !!r.planner_recurring,
     minutes: r.planner_minutes || DEFAULT_DURATION,
+    maxWeekly: r.planner_max_weekly || 1,
   })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
 }
 
 /** The teacher customises a pupil's chip. Nulls mean „back to the profile". */
-export async function savePupilPrefs(userId, { name, color, minutes, emoji, recurring }) {
+export async function savePupilPrefs(userId, { name, color, minutes, emoji, recurring, maxWeekly }) {
   // .select() makes silent RLS filtering VISIBLE: an update that matches zero
   // rows is not a success, it is a policy problem wearing a success mask —
   // that mask cost us a whole debugging round on planner_emoji.
@@ -212,6 +213,7 @@ export async function savePupilPrefs(userId, { name, color, minutes, emoji, recu
       planner_minutes: DURATIONS.includes(minutes) ? minutes : DEFAULT_DURATION,
       planner_emoji: emoji?.trim() || null,
       planner_recurring: !!recurring,
+      planner_max_weekly: [1, 2, 3].includes(maxWeekly) ? maxWeekly : 1,
     })
     .eq("user_id", userId)
     .select("user_id");
@@ -225,11 +227,12 @@ export async function fetchMyPlannerPrefs() {
   if (!CURRENT_USER.authId) return { minutes: DEFAULT_DURATION, color: null };
   const { data } = await supabase
     .from("planner_pupils")
-    .select("planner_minutes, planner_color")
+    .select("planner_minutes, planner_color, planner_max_weekly")
     .eq("user_id", CURRENT_USER.authId).maybeSingle();
   return {
     minutes: data?.planner_minutes || DEFAULT_DURATION,
     color: data?.planner_color || null,
+    maxWeekly: data?.planner_max_weekly || 1,
   };
 }
 

@@ -114,6 +114,7 @@ const S = {
   paintOnceP: true,    // rhythm of drawn PERSONAL blocks: one-off by default
   minutes: DEFAULT_DURATION,
   myColor: null,       // pupil: colour the teacher picked for them
+  myMax: 1,            // pupil: how many lessons a week he may place himself
   source: null,        // tray chip in hand: { kind, userId, title }
   personalTitle: "",
   editPupil: null,     // admin: pupil being customised (opened by CLICKING a dot)
@@ -387,6 +388,9 @@ function pupilEditorHtml() {
       </div>
       <div class="pl-cfg__f"><span>Culoare</span><div class="pl-cfg__sw">${sw}</div></div>
       <div class="pl-cfg__f"><span>Durata lui implicită</span><div>${durs}</div></div>
+      <div class="pl-cfg__f"><span>Ore pe săptămână</span><div>${[1, 2, 3].map((k) => `
+        <button type="button" class="pl-dur${(p.maxWeekly || 1) === k ? " on" : ""}" data-act="cfg-max" data-k="${k}"
+                title="Câte ore pe săptămână își poate pune singur.">${k}</button>`).join("")}</div></div>
       <div class="pl-cfg__acts">
         <button type="button" class="btn-mini btn-mini--ok" data-act="cfg-save">Salvează</button>
         <button type="button" class="btn-mini" data-act="cfg-close">Închide</button>
@@ -588,7 +592,7 @@ function render() {
         <i class="pl-legend__k pl-legend__k--today"></i> azi
         <i class="pl-legend__k pl-legend__k--now"></i> acum
       </p>
-      <p class="pl-hint">Trage în zona deschisă ca să-ți pui ora — blocul tău îl muți, îl întinzi de mânerul de jos (1h · 1h30 · 2h) sau îl anulezi cu ×.${
+      <p class="pl-hint">Ai dreptul la ${S.myMax} ${S.myMax === 1 ? "oră" : "ore"} pe săptămână. Trage în zona deschisă ca să-ți pui ora — blocul tău îl muți, îl întinzi de mânerul de jos (1h · 1h30 · 2h) sau îl anulezi cu ×.${
         mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "oră" : "ore"} săptămâna asta.` : ""}</p>
     </div>` : ""}
     <div class="pl-live" data-role="live" hidden></div>`;
@@ -658,6 +662,17 @@ function markBad(d) {
   // finger, not after the drop.
   if (!isAdmin() && !inAvailability(d.dayIdx, d.startMs, d.minutes)) {
     d.bad = true; d.badWhy = "în afara orelor deschise"; return;
+  }
+  // Cota săptămânală (0065): un bloc NOU peste numărul îngăduit se refuză
+  // sub deget. Mutarea blocului existent în aceeași săptămână rămâne liberă
+  // (el însuși nu se numără).
+  if (!isAdmin() && !d.id) {
+    const mine = S.slots.filter((x) => x.mine && x.kind === "lesson").length;
+    if (mine >= S.myMax) {
+      d.bad = true;
+      d.badWhy = S.myMax === 1 ? "ai deja ora săptămânii" : "ai deja orele săptămânii";
+      return;
+    }
   }
   d.bad = false; d.badWhy = "";
 }
@@ -1268,7 +1283,7 @@ async function onClick(e) {
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
   if (act === "cfg-close") { S.editPupil = null; render(); return; }
-  if (act === "cfg-color" || act === "cfg-min" || act === "cfg-sym") {
+  if (act === "cfg-color" || act === "cfg-min" || act === "cfg-sym" || act === "cfg-max") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
     if (!p) return;
     // The name field holds uncommitted text; a re-render would rebuild it from
@@ -1279,6 +1294,7 @@ async function onClick(e) {
     if (typedEmoji !== undefined) p.emoji = typedEmoji.trim();
     if (act === "cfg-color") p.color = b.dataset.c;
     else if (act === "cfg-sym") p.emoji = p.emoji === b.dataset.e ? "" : b.dataset.e;
+    else if (act === "cfg-max") p.maxWeekly = +b.dataset.k;
     else p.minutes = +b.dataset.m;
     render();
     return;
@@ -1289,7 +1305,7 @@ async function onClick(e) {
     const nameInput = S.root.querySelector('[data-act="cfg-name"]');
     p.name = (nameInput?.value || "").trim() || p.profileName;
     p.emoji = (S.root.querySelector('[data-act="cfg-emoji"]')?.value || "").trim();
-    const r = await savePupilPrefs(p.id, { name: p.name === p.profileName ? null : p.name, color: p.color, minutes: p.minutes, emoji: p.emoji, recurring: p.recurring });
+    const r = await savePupilPrefs(p.id, { name: p.name === p.profileName ? null : p.name, color: p.color, minutes: p.minutes, emoji: p.emoji, recurring: p.recurring, maxWeekly: p.maxWeekly || 1 });
     showToast(r.ok ? `Salvat pentru ${p.name}.` : r.message, r.ok ? { kind: "success" } : undefined);
     S.editPupil = null;
     await loadPupils();
@@ -1481,6 +1497,7 @@ export async function initPlanner(mount) {
       const prefs = await fetchMyPlannerPrefs();
       S.minutes = prefs.minutes;
       S.myColor = prefs.color;
+      S.myMax = prefs.maxWeekly;
     }
     S.vacations = await fetchVacations();
     S.avail = await fetchAvailability();
