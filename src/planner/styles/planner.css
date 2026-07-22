@@ -681,19 +681,13 @@
 
 /* Numele pe celulă: alb pe culoarea plină, cu o umbră cât să respire pe
    nuanțele deschise. Emoji-ul îi stă înainte, ca pe bulină. */
-/* Simbolul elevului — DEASUPRA numelui, mare, ca o stemă a blocului.
-   Nu un abțibild alb PESTE bloc, ci blocul însuși SUBȚIAT în jurul glifei:
-   haloul e culoarea de sub bloc (suprafața), topită radial spre margini —
-   pare că fundalul își pierde opacitatea acolo, și merge și pe temele închise. */
+/* Simbolul elevului — DEASUPRA numelui: disc alb plin, circular, fără
+   contur. Simplu și cu contrast garantat pe orice culoare de bloc. */
 .pl-cb__sym {
-  font-style: normal; font-size: 1.5rem; line-height: 1.05;
-  padding: 0.16rem 0.42rem; border-radius: 50%;
-  /* 50% = culoarea blocului se vede PRIN halou → „subțiere", nu disc alb.
-     Crește procentul pentru mai mult contrast, scade-l pentru mai subtil. */
-  background: radial-gradient(closest-side,
-    color-mix(in srgb, var(--color-surface) 50%, transparent),
-    transparent 100%);
-  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.25));
+  font-style: normal; font-size: 1.35rem; line-height: 1;
+  width: 2.1rem; height: 2.1rem; border-radius: 50%;
+  background: #fff;
+  display: inline-grid; place-items: center;
 }
 .pl-cb__nm {
   max-width: 100%; padding: 0 0.3rem;
