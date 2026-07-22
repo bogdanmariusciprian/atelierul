@@ -1752,5 +1752,5 @@ body.tgame-active .page-hero { max-height: 0; opacity: 0; margin-block: 0; paddi
 .tg-wrap s, .tg-wrap strike, .tg-wrap del,
 .tgame s, .tgame strike, .tgame del {
   text-decoration: none;
-  background: linear-gradient(currentColor, currentColor) no-repeat left 0 top 60% / 100% 1.5px;
+  background: linear-gradient(currentColor, currentColor) no-repeat left 0 top 63% / 100% 1.5px;
 }
