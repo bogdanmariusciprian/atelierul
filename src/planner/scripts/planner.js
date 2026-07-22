@@ -119,6 +119,7 @@ const S = {
   vacOpen: false,      // admin: vacation form unfolded
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
+  fetchId: 0,          // guards racing week-fetches: the newest click wins
   unwatch: null,
   loading: true,
 };
@@ -1215,12 +1216,15 @@ async function onClick(e) {
   if (!b) return;
   const act = b.dataset.act;
 
+  // Navigation never blanks the screen: the new week is drawn NOW from what
+  // we already know (header, rails, template windows — all local), and the
+  // booked blocks land a beat later. No „Se încarcă" flash between weeks.
   if (act === "prev" || act === "next") {
     const d = new Date(S.week);
     d.setDate(d.getDate() + (act === "next" ? 7 : -7));
-    S.week = d; S.loading = true; render(); refresh(); return;
+    S.week = d; render(); refresh(); return;
   }
-  if (act === "today") { S.week = weekStart(); S.loading = true; render(); refresh(); return; }
+  if (act === "today") { S.week = weekStart(); render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
   if (act === "paint") { S.paint = !S.paint; if (!S.paint) S.renameId = null; render(); return; }
   if (act === "paint-what") { S.paintWhat = b.dataset.v; S.renameId = null; render(); return; }
@@ -1443,7 +1447,12 @@ function onDockLeave(e) {
 // ---------- wiring ----------
 
 async function refresh() {
-  S.slots = await fetchWeek(S.week);
+  // Two fast arrow clicks = two fetches in flight; the SLOW one can land
+  // last and paint the WRONG week. The token makes the newest click win.
+  const my = ++S.fetchId;
+  const slots = await fetchWeek(S.week);
+  if (my !== S.fetchId || !S.root) return;
+  S.slots = slots;
   S.loading = false;
   render();
 }
