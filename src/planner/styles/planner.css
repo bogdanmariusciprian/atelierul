@@ -56,7 +56,30 @@
 .pl-dur.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 
 .pl-hint { margin: 0 0 0.75rem; font-size: 0.85rem; color: var(--color-text-muted); }
-.pl-tools__sep { width: 1.5px; height: 1.4rem; background: var(--color-border); }
+/* Capsula creionului: tot ce decurge din 🖌 stă în același chenar — un singur
+   grup vizual, imposibil de confundat cu uneltele din afara lui. */
+.pl-pen {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.45rem;
+  padding: 0.28rem 0.5rem; border-radius: 1.1rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+.pl-pen__lab {
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--color-text-muted); user-select: none;
+}
+.pl-seg {
+  display: inline-flex; overflow: hidden; border-radius: 999px;
+  border: 1.5px solid var(--color-border); background: var(--color-bg);
+}
+.pl-seg__b {
+  border: 0; background: none; cursor: pointer; font: inherit;
+  font-size: 0.78rem; font-weight: 700; color: var(--color-text-muted);
+  padding: 0.28rem 0.62rem;
+}
+.pl-seg__b + .pl-seg__b { border-left: 1.5px solid var(--color-border); }
+.pl-seg__b.on { background: var(--color-primary); color: #fff; }
+.pl-seg__b:not(.on):hover { color: var(--color-primary); }
 .pl-ptitle {
   font: inherit; font-size: 0.8rem; padding: 0.3rem 0.7rem; min-width: 12rem;
   border: 1.5px solid var(--color-border); border-radius: 999px;

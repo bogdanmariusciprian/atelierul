@@ -349,7 +349,7 @@ export async function deleteVacation(id) {
  *  new machinery. Occurrences that fall in a vacation are skipped by design
  *  (the weekly rhythm pauses); occurrences that clash are skipped because the
  *  database refuses them. Both are counted and reported, not hidden. */
-export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vacations = [] }) {
+export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vacations = [], kind = "lesson", title = "" }) {
   const recurrenceId = crypto.randomUUID();
   const WEEK = 7 * 86400000;
   let created = 0, inVacation = 0, clashed = 0;
@@ -357,7 +357,7 @@ export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vaca
     const at = startMs + w * WEEK;
     const dayIso = new Date(at).toISOString().slice(0, 10);
     if (vacations.some((v) => dayIso >= v.from && dayIso <= v.to)) { inVacation++; continue; }
-    const r = await bookSlot({ startMs: at, minutes, userId, recurrenceId });
+    const r = await bookSlot({ startMs: at, minutes, userId, recurrenceId, kind, title });
     if (r.ok) created++;
     else if (r.code === "23P01") clashed++;
     else return { ok: false, message: r.message, created, inVacation, clashed };

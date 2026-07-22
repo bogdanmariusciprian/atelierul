@@ -105,7 +105,8 @@ const S = {
   avail: [],           // the teacher's weekly windows — the source of pupil slots
   paint: false,        // admin: the pencil — editing his own layer of the board
   paintWhat: "avail",  // pencil regime: availability windows or personal blocks
-  paintOnce: false,    // admin: the next window is for ONE calendar day only
+  paintOnce: false,    // rhythm of drawn WINDOWS: weekly template vs one day
+  paintOnceP: true,    // rhythm of drawn PERSONAL blocks: one-off by default
   pick: null,          // pupil: { dayIdx, startMs, minutes } being confirmed
   minutes: DEFAULT_DURATION,
   myColor: null,       // pupil: colour the teacher picked for them
@@ -274,26 +275,42 @@ function toolsHtml() {
     <button type="button" class="pl-dur${S.minutes === m ? " on" : ""}" data-act="dur" data-m="${m}">
       ${esc(durLabel(m))}
     </button>`).join("");
+  // DESIGN RULE: everything that flows from the pencil lives INSIDE one
+  // capsule with it. Two labelled switches — WHAT you draw and its RHYTHM —
+  // and, for personal time, the title field. Outside the capsule, nothing
+  // belongs to the pencil; inside it, everything does.
+  const once = S.paintWhat === "personal" ? S.paintOnceP : S.paintOnce;
+  const segT = S.paintWhat === "personal"
+    ? { week: `Activitatea se repetă săptămânal — plantează ${REC_WEEKS} apariții (sare vacanțele).`,
+        once: "Activitatea există doar în ziua în care o desenezi." }
+    : { week: "Fereastra pictată se repetă în fiecare săptămână.",
+        once: "Fereastra pictată există doar în ziua aleasă — șablonul săptămânal rămâne neatins." };
+  const pen = !S.paint
+    ? `<button type="button" class="pl-paint" data-act="paint"
+              title="Editează stratul tău de pe orar: ferestrele pentru elevi și activitățile tale.">🖌 creion</button>`
+    : `<div class="pl-pen" role="group" aria-label="Uneltele creionului">
+        <button type="button" class="pl-paint on" data-act="paint" title="Închide creionul.">🖌 creion</button>
+        <span class="pl-pen__lab">desenezi</span>
+        <span class="pl-seg" role="group" aria-label="Ce desenezi">
+          <button type="button" class="pl-seg__b${S.paintWhat === "avail" ? " on" : ""}" data-act="paint-what" data-v="avail"
+                  title="Pictează ferestrele în care elevii își pot alege ore.">disponibilitate</button>
+          <button type="button" class="pl-seg__b${S.paintWhat === "personal" ? " on" : ""}" data-act="paint-what" data-v="personal"
+                  title="Desenează direct în orar timpul tău: ședințe, pregătire, orice te face indisponibil.">✎ personală</button>
+        </span>
+        <span class="pl-pen__lab">ritm</span>
+        <span class="pl-seg" role="group" aria-label="Ritmul">
+          <button type="button" class="pl-seg__b${once ? "" : " on"}" data-act="paint-scope" data-v="week"
+                  title="${esc(segT.week)}">în fiecare săptămână</button>
+          <button type="button" class="pl-seg__b${once ? " on" : ""}" data-act="paint-scope" data-v="once"
+                  title="${esc(segT.once)}">doar ziua aleasă</button>
+        </span>
+        ${S.paintWhat === "personal" ? `
+          <input class="pl-ptitle" data-act="ptitle" maxlength="40" value="${esc(S.personalTitle)}"
+                 placeholder="denumirea activității (ex. pregătire)" aria-label="Denumirea activității personale" />` : ""}
+      </div>`;
   return `<div class="pl-tools">
       <span class="pl-dur__lab">Durata</span>${durs}
-      <button type="button" class="pl-paint${S.paint ? " on" : ""}" data-act="paint"
-              title="Editează stratul tău de pe orar: ferestrele pentru elevi și activitățile tale.">
-        🖌 creion
-      </button>
-      ${S.paint ? `
-        <button type="button" class="pl-dur${S.paintWhat === "avail" ? " on" : ""}" data-act="paint-what" data-v="avail"
-                title="Pictează ferestrele în care elevii își pot alege ore.">disponibilitate</button>
-        <button type="button" class="pl-dur${S.paintWhat === "personal" ? " on" : ""}" data-act="paint-what" data-v="personal"
-                title="Desenează direct în orar timpul tău: ședințe, pregătire, orice te face indisponibil.">✎ activitate personală</button>
-        <span class="pl-tools__sep" aria-hidden="true"></span>` : ""}
-      ${S.paint && S.paintWhat === "avail" ? `
-        <button type="button" class="pl-dur${S.paintOnce ? "" : " on"}" data-act="paint-scope" data-v="week"
-                title="Fereastra pictată se repetă în fiecare săptămână.">în fiecare săptămână</button>
-        <button type="button" class="pl-dur${S.paintOnce ? " on" : ""}" data-act="paint-scope" data-v="once"
-                title="Fereastra pictată există doar în ziua aleasă — șablonul săptămânal rămâne neatins.">doar ziua aleasă</button>` : ""}
-      ${S.paint && S.paintWhat === "personal" ? `
-        <input class="pl-ptitle" data-act="ptitle" maxlength="40" value="${esc(S.personalTitle)}"
-               placeholder="denumirea activității (ex. pregătire)" aria-label="Denumirea activității personale" />` : ""}
+      ${pen}
     </div>`;
 }
 
@@ -603,7 +620,7 @@ function render() {
         </p>
         <p class="pl-hint">${S.paint
           ? (S.paintWhat === "personal"
-            ? "Mod activitate personală: desenează în orar intervalul tău — cât tragi, atât durează. Blocurile gri rămân vii: le muți, le întinzi, iar un click le redenumește."
+            ? "Mod activitate personală: desenează în orar intervalul tău — cât tragi, atât durează, iar ritmul decide dacă se repetă săptămânal. Blocurile gri rămân vii: le muți, le întinzi de ambele capete, un click le redenumește."
             : "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră. Trage de marginile uneia existente ca să o ajustezi; × o închide.")
           : "Trage o bulină în orar ca să pui ora. Click pe bulină îi deschide setările. Ține cursorul pe un bloc ca să vezi al cui e."}</p>
       </div>` : ""}
@@ -960,7 +977,7 @@ function paintDrag(x, y) {
     d.bad = collides(rowToMs(d.dayIdx, d.rowA), d.endMin - d.startMin);
     g.classList.add("is-personal");
     g.classList.toggle("is-bad", d.bad);
-    g.innerHTML = `<b>✎ ${esc(S.personalTitle || "Activitate personală")}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>${d.bad ? "<i>ocupat</i>" : ""}`;
+    g.innerHTML = `<b>✎ ${esc(S.personalTitle || "Activitate personală")}${S.paintOnceP ? "" : " · 🔁 săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>${d.bad ? "<i>ocupat</i>" : ""}`;
     return;
   }
   g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}${S.paintOnce ? `, doar ${dayAt(d.dayIdx).getDate()} ${esc(MONTHS[dayAt(d.dayIdx).getMonth()].slice(0, 3))}` : ", săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
@@ -1045,9 +1062,26 @@ async function onUp() {
     if (d.bad) { showToast("Nu se poate: intervalul se suprapune cu o rezervare."); return; }
     const startMs = rowToMs(d.dayIdx, d.rowA);
     const minutes = d.endMin - d.startMin;
-    const res = await bookSlot({ startMs, minutes, kind: "personal", title: S.personalTitle || "" });
+    const title = S.personalTitle || "";
+    const what = title || "Activitate personală";
+    // Weekly rhythm plants a real series — the same materialised recurrence
+    // as pupils' lessons: N rows, one recurrence_id, vacations skipped, and
+    // cancelling one week never touches the others.
+    if (!S.paintOnceP) {
+      const r = await bookRecurring({ startMs, minutes, kind: "personal", title, weeks: REC_WEEKS, vacations: S.vacations });
+      if (!r.ok) showToast(r.message || "N-am putut crea seria.");
+      else {
+        const parts = [`${r.created} din ${REC_WEEKS} create`];
+        if (r.inVacation) parts.push(`${r.inVacation} în vacanță`);
+        if (r.clashed) parts.push(`${r.clashed} ocupate`);
+        showToast(`Serie săptămânală „${what}": ${parts.join(" · ")}.`, { kind: "success" });
+      }
+      await refresh();
+      return;
+    }
+    const res = await bookSlot({ startMs, minutes, kind: "personal", title });
     if (!res.ok) { showToast(res.message); await refresh(); return; }
-    showToast(`Notat: ${S.personalTitle || "Activitate personală"} — ${DAYS[d.dayIdx]}, ${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}.`, { kind: "success" });
+    showToast(`Notat: ${what} — ${DAYS[d.dayIdx]}, ${hhmm(startMs)}–${hhmm(startMs + minutes * 60000)}.`, { kind: "success" });
     await refresh();
     return;
   }
@@ -1137,7 +1171,11 @@ async function onClick(e) {
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
   if (act === "paint") { S.paint = !S.paint; if (!S.paint) S.renameId = null; render(); return; }
   if (act === "paint-what") { S.paintWhat = b.dataset.v; S.renameId = null; render(); return; }
-  if (act === "paint-scope") { S.paintOnce = b.dataset.v === "once"; render(); return; }
+  if (act === "paint-scope") {
+    const once = b.dataset.v === "once";
+    if (S.paintWhat === "personal") S.paintOnceP = once; else S.paintOnce = once;
+    render(); return;
+  }
   if (act === "avail-del") {
     const r = await deleteAvailabilityWindow(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
