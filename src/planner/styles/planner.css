@@ -604,7 +604,7 @@
   width: 2.85rem; height: 2.85rem; border-radius: 50%; cursor: grab;
   border: 2.5px solid color-mix(in srgb, var(--c) 70%, #000);
   background: var(--c); color: #fff;
-  display: grid; place-items: center; font-size: 1.4rem; line-height: 1;
+  display: grid; place-items: center; font-size: 1.2rem; line-height: 1;
   user-select: none; touch-action: none; position: relative;
 }
 .pl-dot:hover { transform: scale(1.12); }
@@ -684,7 +684,7 @@
 /* Simbolul elevului — DEASUPRA numelui: disc alb plin, circular, fără
    contur. Simplu și cu contrast garantat pe orice culoare de bloc. */
 .pl-cb__sym {
-  font-style: normal; font-size: 1.55rem; line-height: 1;
+  font-style: normal; font-size: 1.35rem; line-height: 1;
   width: 2.5rem; height: 2.5rem; border-radius: 50%;
   background: #fff;
   /* G1: margine neagră groasă (4px plini), apoi topire scurtă spre albul
