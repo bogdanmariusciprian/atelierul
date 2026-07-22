@@ -7,7 +7,7 @@
    Un elev care mută ceva de marți sâmbătă nu trebuie să numere coloane.
    ========================================================= */
 
-.pl-wrap { --pl-row: 26px; }
+.pl-wrap { --pl-row: 26px; --pl-head: 4.2rem; }
 
 /* ---- bara de sus: navigarea prin săptămâni ----
    O capsulă plutitoare, CENTRATĂ — săgeți rotunde de o parte și de alta,
@@ -138,7 +138,7 @@
 
 /* ---- grila ---- */
 .pl-grid { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; }
-.pl-rail { position: relative; flex: none; width: 3.1rem; margin-top: 3.4rem; }
+.pl-rail { position: relative; flex: none; width: 3.1rem; margin-top: var(--pl-head); }
 .pl-hour {
   position: absolute; right: 0.4rem; transform: translateY(-50%);
   font-size: 0.7rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums;
@@ -148,7 +148,7 @@
 .pl-col { min-width: 0; }
 /* Capul de coloană — cea mai tare informație de pe ecran. */
 .pl-colhead {
-  height: 3.4rem; display: flex; flex-direction: column; justify-content: center;
+  height: var(--pl-head); display: flex; flex-direction: column; justify-content: center;
   align-items: center; gap: 0.05rem; border-radius: 12px 12px 0 0;
   background: var(--color-surface);
 }
