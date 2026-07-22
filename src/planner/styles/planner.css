@@ -148,7 +148,10 @@
 .pl-col { min-width: 0; }
 /* Capul de coloană — cea mai tare informație de pe ecran. */
 .pl-colhead {
-  height: var(--pl-head); display: flex; flex-direction: column; justify-content: center;
+  /* Ancorat SUS, nu centrat: numele și data stau în același loc indiferent
+     dacă dedesubt apare sau nu insigna de vacanță/AZI. */
+  height: var(--pl-head); display: flex; flex-direction: column; justify-content: flex-start;
+  padding-top: 0.65rem;
   align-items: center; gap: 0.05rem; border-radius: 12px 12px 0 0;
   background: var(--color-surface);
 }
