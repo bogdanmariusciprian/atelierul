@@ -1743,3 +1743,14 @@ body.tgame-active .page-hero { max-height: 0; opacity: 0; margin-block: 0; paddi
 .tg-wrap {
   cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path fill='%23374151' stroke-linejoin='round' d='M5 2v16.5l4.3-3.7 2.6 6 2.9-1.2-2.6-6 5.8-.5z'/></svg>") 3 2, default;
 }
+
+/* Tăietura (strike) cu linia EXACT pe mijlocul literelor mici (x-height) —
+   fontul o pune unde vrea el, așa că o desenăm noi, ca fundal subțire.
+   Se aplică peste tot unde trăiește rich-text-ul itemilor: editorul de
+   admin (.tg-wrap) și jocul elevului (.tgame). Reglaj: procentul = poziția
+   pe verticală (mai mic = mai sus), 1.5px = grosimea liniei. */
+.tg-wrap s, .tg-wrap strike, .tg-wrap del,
+.tgame s, .tgame strike, .tgame del {
+  text-decoration: none;
+  background: linear-gradient(currentColor, currentColor) no-repeat left 0 top 55% / 100% 1.5px;
+}
