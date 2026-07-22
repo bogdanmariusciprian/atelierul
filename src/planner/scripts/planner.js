@@ -612,7 +612,7 @@ function gridHtml() {
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
         ${(isPast ? [] : winsFor(i)).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
+          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint && S.paintWhat === "avail" ? `
@@ -1446,6 +1446,64 @@ function onDockLeave(e) {
   }
 }
 
+// ---------- click-dreapta: meniul contextual ----------
+// Un singur meniu, construit din itemi — azi doar „Șterge", mâine ce mai vine.
+// Ștergerea unui BLOC nu execută direct: deschide confirmarea inline de pe
+// bloc (cu întrebarea de serie cu tot) — același flux ca ×, altă intrare.
+let ctxEl = null;
+function closeCtx() {
+  ctxEl?.remove(); ctxEl = null;
+  document.removeEventListener("pointerdown", onCtxAway, true);
+}
+function onCtxAway(e) { if (ctxEl && !ctxEl.contains(e.target)) closeCtx(); }
+function openCtx(x, y, items) {
+  closeCtx();
+  ctxEl = document.createElement("div");
+  ctxEl.className = "pl-ctx";
+  for (const it of items) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pl-ctx__it" + (it.danger ? " is-danger" : "");
+    b.textContent = it.label;
+    b.addEventListener("click", () => { closeCtx(); it.run(); });
+    ctxEl.appendChild(b);
+  }
+  document.body.appendChild(ctxEl);
+  const r = ctxEl.getBoundingClientRect();
+  ctxEl.style.left = `${Math.min(x, window.innerWidth - r.width - 8)}px`;
+  ctxEl.style.top = `${Math.min(y, window.innerHeight - r.height - 8)}px`;
+  document.addEventListener("pointerdown", onCtxAway, true);
+}
+function onCtxMenu(e) {
+  if (!isAdmin()) return;
+  const blk = e.target.closest(".pl-block--cell");
+  const win = blk ? null : e.target.closest(".pl-avail");
+  if (blk) {
+    const x = S.slots.find((q) => q.id === blk.dataset.id);
+    if (!x) return;
+    if (!(x.canEdit && x.end >= Date.now())) return; // trecutul e înghețat — meniul tace
+    e.preventDefault();
+    openCtx(e.clientX, e.clientY, [
+      { label: "🗑 Șterge", danger: true, run: () => { S.confirmId = x.id; render(); } },
+    ]);
+    return;
+  }
+  if (win) {
+    const id = win.dataset.availId;
+    if (!id) return;
+    e.preventDefault();
+    openCtx(e.clientX, e.clientY, [
+      { label: "🗑 Șterge fereastra", danger: true, run: async () => {
+          const r = await deleteAvailabilityWindow(id);
+          if (!r.ok) { showToast(r.message); return; }
+          S.avail = await fetchAvailability();
+          showToast("Fereastră închisă.");
+          render();
+        } },
+    ]);
+  }
+}
+
 // ---------- wiring ----------
 
 async function refresh() {
@@ -1499,6 +1557,7 @@ export async function initPlanner(mount) {
   });
   mount.addEventListener("mouseover", onDockHover);
   mount.addEventListener("mouseout", onDockLeave);
+  mount.addEventListener("contextmenu", onCtxMenu);
 
   async function boot() {
     const my = ++bootId;
@@ -1549,6 +1608,8 @@ export async function initPlanner(mount) {
     mount.removeEventListener("input", onTypeTitle);
     mount.removeEventListener("mouseover", onDockHover);
     mount.removeEventListener("mouseout", onDockLeave);
+    mount.removeEventListener("contextmenu", onCtxMenu);
+    closeCtx();
     window.removeEventListener("pointermove", onMove);
   };
 }

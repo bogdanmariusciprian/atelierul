@@ -139,6 +139,21 @@
 .pl-mypill.is-past { opacity: 0.65; filter: grayscale(0.4); }
 .pl-mypill__past { font-style: normal; font-size: 0.72rem; color: var(--color-text-muted); }
 
+/* Meniul de click-dreapta — mic, ferm, extensibil. */
+.pl-ctx {
+  position: fixed; z-index: 300; min-width: 10rem;
+  background: var(--color-surface); border: 1.5px solid var(--color-border);
+  border-radius: 12px; padding: 0.25rem;
+  box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.45);
+}
+.pl-ctx__it {
+  display: block; width: 100%; text-align: left; border: 0; background: none;
+  font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--color-text);
+  padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer;
+}
+.pl-ctx__it:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.pl-ctx__it.is-danger:hover { background: #fee2e2; color: #b91c1c; }
+
 /* ---- grila ---- */
 .pl-grid { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; }
 .pl-rail { position: relative; flex: none; width: 3.1rem; margin-top: var(--pl-head); }
@@ -489,7 +504,6 @@
 /* Regimul „activitate personală" al creionului: blocurile gri rămân vii —
    se mută, se întind, se redenumesc — iar ferestrele verzi devin decor. */
 .pl-body.is-paint-personal .pl-block.is-personal { pointer-events: auto; opacity: 1; }
-.pl-body.is-paint-personal .pl-avail { pointer-events: none; }
 .pl-avail__x {
   position: absolute; top: 2px; right: 2px; width: 1.2rem; height: 1.2rem;
   border: 0; border-radius: 50%; cursor: pointer; font-size: 0.85rem; line-height: 1;
@@ -722,8 +736,7 @@
 /* ---- marginile ferestrei devin mânere, în modul pensulă ----
    Ferestrele stau sub blocuri și nu prind cursorul în modul normal — altfel
    ar fura tragerile de așezare. În modul pensulă se trezesc. */
-.pl-avail { pointer-events: none; }
-.pl-body.is-paint .pl-avail { pointer-events: auto; }
+.pl-avail { pointer-events: auto; } /* click-dreapta are nevoie de țintă; drag-ul trece prin closest(.pl-lane) */
 .pl-avail__h {
   position: absolute; left: 15%; right: 15%; height: 12px;
   cursor: ns-resize; touch-action: none;
