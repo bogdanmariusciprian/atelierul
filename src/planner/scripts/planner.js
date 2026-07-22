@@ -1013,7 +1013,10 @@ const onMove = (e) => {
   if (S.drag.fromTray && !S.floater) makeFloater(e.clientX, e.clientY);
   if (S.floater) S.floater.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
   if (S.drag.availResize) availResizeDrag(e.clientX, e.clientY);
-  else if (S.drag.paint) paintDrag(e.clientX, e.clientY);
+  // BOTH sketches — window and personal block — belong to the paint engine.
+  // Routing paintP to moveDrag once sent it into NaN-land: no minutes on the
+  // drag, broken clock, and a „collision" toast that was lying about why.
+  else if (S.drag.paint || S.drag.paintP) paintDrag(e.clientX, e.clientY);
   else moveDrag(e.clientX, e.clientY);
   e.preventDefault();
 };
