@@ -84,6 +84,23 @@
 .pl-seg__b + .pl-seg__b { border-left: 1.5px solid var(--color-border); }
 .pl-seg__b.on { background: var(--color-primary); color: #fff; }
 .pl-seg__b:not(.on):hover { color: var(--color-primary); }
+/* Stările aprinse vorbesc limba legendei: verde-șablon cu contur întrerupt
+   (săptămânal / disponibilitate), chihlimbar cu contur plin (doar ziua),
+   hașurul gri al timpului personal. Butonul îți arată CE vei desena. */
+.pl-seg__b--avail.on, .pl-seg__b--week.on {
+  background: color-mix(in srgb, #22c55e 16%, var(--color-bg));
+  color: #166534;
+  outline: 1.5px dashed #16a34a; outline-offset: -3px;
+}
+.pl-seg__b--once.on {
+  background: color-mix(in srgb, #f59e0b 15%, var(--color-bg));
+  color: #b45309;
+  outline: 1.5px solid #d97706; outline-offset: -3px;
+}
+.pl-seg__b--personal.on {
+  background: repeating-linear-gradient(135deg, #cbd5e1 0 5px, #f1f5f9 5px 10px);
+  color: #1e293b; text-shadow: 0 1px 0 rgb(255 255 255 / 0.65);
+}
 .pl-ptitle {
   font: inherit; font-size: 0.8rem; padding: 0.3rem 0.7rem; min-width: 12rem;
   border: 1.5px solid var(--color-border); border-radius: 999px;

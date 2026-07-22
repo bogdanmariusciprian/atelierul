@@ -300,16 +300,16 @@ function toolsHtml() {
         <button type="button" class="pl-paint on" data-act="paint" title="Închide creionul.">🖌 creion</button>
         <span class="pl-pen__lab">desenezi</span>
         <span class="pl-seg" role="group" aria-label="Ce desenezi">
-          <button type="button" class="pl-seg__b${S.paintWhat === "avail" ? " on" : ""}" data-act="paint-what" data-v="avail"
+          <button type="button" class="pl-seg__b pl-seg__b--avail${S.paintWhat === "avail" ? " on" : ""}" data-act="paint-what" data-v="avail"
                   title="Pictează ferestrele în care elevii își pot alege ore.">disponibilitate</button>
-          <button type="button" class="pl-seg__b${S.paintWhat === "personal" ? " on" : ""}" data-act="paint-what" data-v="personal"
+          <button type="button" class="pl-seg__b pl-seg__b--personal${S.paintWhat === "personal" ? " on" : ""}" data-act="paint-what" data-v="personal"
                   title="Desenează direct în orar timpul tău: ședințe, pregătire, orice te face indisponibil.">activitate personală</button>
         </span>
         <span class="pl-pen__lab">ritm</span>
         <span class="pl-seg" role="group" aria-label="Ritmul">
-          <button type="button" class="pl-seg__b${once ? "" : " on"}" data-act="paint-scope" data-v="week"
+          <button type="button" class="pl-seg__b pl-seg__b--week${once ? "" : " on"}" data-act="paint-scope" data-v="week"
                   title="${esc(segT.week)}">în fiecare săptămână</button>
-          <button type="button" class="pl-seg__b${once ? " on" : ""}" data-act="paint-scope" data-v="once"
+          <button type="button" class="pl-seg__b pl-seg__b--once${once ? " on" : ""}" data-act="paint-scope" data-v="once"
                   title="${esc(segT.once)}">doar ziua aleasă</button>
         </span>
         ${S.paintWhat === "personal" ? `
