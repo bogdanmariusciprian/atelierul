@@ -687,9 +687,9 @@
   font-style: normal; font-size: 1.35rem; line-height: 1;
   width: 2.1rem; height: 2.1rem; border-radius: 50%;
   background: #fff;
-  /* N3: inel negru intens, simetric — gros (spread 3px), cu muchia abia
-     topită (blur 3px). Fără direcție, fără voal: negru concentrat. */
-  box-shadow: inset 0 0 3px 3px rgb(0 0 0 / 0.9);
+  /* G1: margine neagră groasă (4px plini), apoi topire scurtă spre albul
+     din centru — negru intens la buză, disc curat la mijloc. */
+  box-shadow: inset 0 0 6px 4px rgb(0 0 0 / 0.9);
   display: inline-grid; place-items: center;
 }
 .pl-cb__nm {
