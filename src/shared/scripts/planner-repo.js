@@ -199,7 +199,10 @@ export async function fetchMarkedPupils() {
 
 /** The teacher customises a pupil's chip. Nulls mean „back to the profile". */
 export async function savePupilPrefs(userId, { name, color, minutes, emoji, recurring }) {
-  const { error } = await supabase
+  // .select() makes silent RLS filtering VISIBLE: an update that matches zero
+  // rows is not a success, it is a policy problem wearing a success mask —
+  // that mask cost us a whole debugging round on planner_emoji.
+  const { data, error } = await supabase
     .from("planner_pupils")
     .update({
       planner_name: name?.trim() || null,
@@ -208,8 +211,10 @@ export async function savePupilPrefs(userId, { name, color, minutes, emoji, recu
       planner_emoji: emoji?.trim() || null,
       planner_recurring: !!recurring,
     })
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("user_id");
   if (error) return { ok: false, message: humanError(error) };
+  if (!data?.length) return { ok: false, message: "Salvarea n-a atins niciun rând (politică lipsă?). Spune-mi exact mesajul ăsta." };
   return { ok: true };
 }
 
