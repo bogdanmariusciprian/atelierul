@@ -29,7 +29,7 @@ import {
   DAY_START_H, DAY_END_H, SNAP_MIN, DURATIONS, DEFAULT_DURATION,
   weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, renameSlot, watchSlots,
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
-  fetchVacations, saveVacation, deleteVacation, bookRecurring, cancelSeries,
+  fetchVacations, saveVacation, deleteVacation, bookRecurring, makeRecurring, cancelSeries,
   fetchAvailability, saveAvailabilityWindow, deleteAvailabilityWindow, resizeAvailabilityWindow,
 } from "../../shared/scripts/planner-repo.js";
 import { CURRENT_USER, isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
@@ -559,6 +559,7 @@ function gridHtml() {
            </span>`
         : `<b class="pl-cb__nm">${s.kind === "lesson" && pupilEmoji(s.userId) ? `${esc(pupilEmoji(s.userId))} ` : ""}${esc(slotName(s))}</b>
            ${s.recurrenceId ? `<i class="pl-cb__rec" title="Parte dintr-o serie săptămânală. Mutată în alt interval, iese din serie; × poate anula toată seria.">🔁</i>` : ""}
+           ${alive && !s.recurrenceId ? `<button type="button" class="pl-block__rec" data-act="make-rec" data-id="${esc(s.id)}" title="Repetă săptămânal de aici înainte (${REC_WEEKS} săptămâni)" aria-label="Fă recurent">🔁</button>` : ""}
            ${alive ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
            ${alive && s.kind === "personal" ? `<span class="pl-block__rsz pl-block__rsz--top" data-act="rsz-top" data-id="${esc(s.id)}" title="Trage ca să muți începutul" aria-hidden="true"></span>` : ""}
            ${alive ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să ${s.kind === "personal" ? "muți sfârșitul" : "schimbi durata"}" aria-hidden="true"></span>` : ""}`;
@@ -724,7 +725,7 @@ function onDown(e) {
   // something for that day: an availability window, or a personal block.
   if (S.paint) {
     // Buttons and fields on the board stay CLICKS even in pencil mode.
-    if (e.target.closest('[data-act="avail-del"], [data-act="cancel"], [data-act="rename-ok"], [data-act="rename-no"], [data-role="rename"], .pl-block__confirm, .pl-mini')) return;
+    if (e.target.closest('[data-act="avail-del"], [data-act="cancel"], [data-act="make-rec"], [data-act="rename-ok"], [data-act="rename-no"], [data-role="rename"], .pl-block__confirm, .pl-mini')) return;
 
     // Regime „activitate personală": personal blocks stay ALIVE — the handle
     // resizes, a drag moves, a motionless press renames (see onUp). A press on
@@ -821,7 +822,7 @@ function onDown(e) {
   const grab = rsz ? null : e.target.closest('[data-act="grab"]');
   const lane = e.target.closest(".pl-lane");
   if (!rsz && !chip && !lane && !grab) return;
-  if (e.target.closest('[data-act="cancel"], .pl-block__confirm, .pl-mini')) return;
+  if (e.target.closest('[data-act="cancel"], [data-act="make-rec"], .pl-block__confirm, .pl-mini')) return;
 
   // RESIZE: the start stays put; only the length follows the pointer,
   // snapping to the three legal durations.
@@ -1252,6 +1253,24 @@ async function onClick(e) {
     if (!x) return;
     const r = await moveSlot(x.id, { startMs: x.start, minutes: +b.dataset.m });
     showToast(r.ok ? `Durata e acum ${durLabel(+b.dataset.m)}.` : r.message, r.ok ? { kind: "success" } : undefined);
+    await refresh(); return;
+  }
+
+  // 🔁 on a mounted block: the block becomes the head of a weekly series.
+  if (act === "make-rec") {
+    const s = S.slots.find((x) => x.id === b.dataset.id);
+    if (!s) return;
+    const r = await makeRecurring({
+      id: s.id, startMs: s.start, minutes: Math.round((s.end - s.start) / 60000),
+      userId: s.userId, kind: s.kind,
+      title: s.kind === "personal" ? (s.name === "Activitate personală" ? "" : s.name) : "",
+      weeks: REC_WEEKS, vacations: S.vacations,
+    });
+    if (!r.ok) { showToast(`${r.message || "N-am putut crea seria."}${r.created > 1 ? ` (${r.created} deja create)` : ""}`); await refresh(); return; }
+    const parts = [`${r.created} din ${REC_WEEKS}`];
+    if (r.inVacation) parts.push(`${r.inVacation} în vacanță`);
+    if (r.clashed) parts.push(`${r.clashed} ocupate`);
+    showToast(`De acum se repetă săptămânal: ${parts.join(" · ")}.`, { kind: "success" });
     await refresh(); return;
   }
 

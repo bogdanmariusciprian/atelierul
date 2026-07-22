@@ -355,12 +355,15 @@ export async function deleteVacation(id) {
  *  new machinery. Occurrences that fall in a vacation are skipped by design
  *  (the weekly rhythm pauses); occurrences that clash are skipped because the
  *  database refuses them. Both are counted and reported, not hidden. */
-export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vacations = [], kind = "lesson", title = "" }) {
-  const recurrenceId = crypto.randomUUID();
-  const WEEK = 7 * 86400000;
+/** One loop plants every occurrence of a series. Weeks step by CALENDAR days
+ *  (setDate), not by 7×24h of milliseconds — a series crossing the DST switch
+ *  keeps its wall-clock hour instead of drifting sixty minutes. */
+async function plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek }) {
   let created = 0, inVacation = 0, clashed = 0;
-  for (let w = 0; w < weeks; w++) {
-    const at = startMs + w * WEEK;
+  for (let w = fromWeek; w < weeks; w++) {
+    const d = new Date(startMs);
+    d.setDate(d.getDate() + w * 7);
+    const at = d.getTime();
     const dayIso = new Date(at).toISOString().slice(0, 10);
     if (vacations.some((v) => dayIso >= v.from && dayIso <= v.to)) { inVacation++; continue; }
     const r = await bookSlot({ startMs: at, minutes, userId, recurrenceId, kind, title });
@@ -368,7 +371,26 @@ export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vaca
     else if (r.code === "23P01") clashed++;
     else return { ok: false, message: r.message, created, inVacation, clashed };
   }
-  return { ok: created > 0, created, inVacation, clashed, recurrenceId };
+  return { ok: true, created, inVacation, clashed };
+}
+
+export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vacations = [], kind = "lesson", title = "" }) {
+  const recurrenceId = crypto.randomUUID();
+  const r = await plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek: 0 });
+  return { ...r, ok: r.ok && r.created > 0, recurrenceId };
+}
+
+/** Turn an ALREADY-PLACED block into the head of a weekly series: the block
+ *  itself receives the fresh recurrence id, then the following weeks are
+ *  planted after it. `created` includes the head, so the toast's „X din N"
+ *  arithmetic matches what the teacher sees on screen. */
+export async function makeRecurring({ id, startMs, minutes, userId, kind = "lesson", title = "", weeks = 12, vacations = [] }) {
+  const recurrenceId = crypto.randomUUID();
+  const { error } = await supabase
+    .from("tutoring_slots").update({ recurrence_id: recurrenceId }).eq("id", id);
+  if (error) return { ok: false, message: humanError(error) };
+  const r = await plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek: 1 });
+  return { ...r, created: r.created + 1, recurrenceId };
 }
 
 /** Cancel every FUTURE occurrence of a series. The past stays — it happened. */
