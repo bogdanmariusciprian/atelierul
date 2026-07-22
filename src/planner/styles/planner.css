@@ -684,8 +684,8 @@
 /* Simbolul elevului — DEASUPRA numelui: disc alb plin, circular, fără
    contur. Simplu și cu contrast garantat pe orice culoare de bloc. */
 .pl-cb__sym {
-  font-style: normal; font-size: 1.35rem; line-height: 1;
-  width: 2.1rem; height: 2.1rem; border-radius: 50%;
+  font-style: normal; font-size: 1.55rem; line-height: 1;
+  width: 2.5rem; height: 2.5rem; border-radius: 50%;
   background: #fff;
   /* G1: margine neagră groasă (4px plini), apoi topire scurtă spre albul
      din centru — negru intens la buză, disc curat la mijloc. */
