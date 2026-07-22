@@ -322,9 +322,15 @@ function toolsHtml() {
     <p class="pl-legend">
       <i class="pl-legend__k pl-legend__k--avail"></i> deschis săptămânal
       <i class="pl-legend__k pl-legend__k--once"></i> deschis doar în ziua aceea
-      <i class="pl-legend__k pl-legend__k--personal"></i> timpul tău
+      <i class="pl-legend__k pl-legend__k--vac"></i> vacanță (seriile o sar)
       <i class="pl-legend__k pl-legend__k--lesson"></i> ora unui elev (culoarea bulinei lui)
+      <i class="pl-legend__k pl-legend__k--personal"></i> timpul tău
+      <i class="pl-legend__k pl-legend__k--past"></i> trecut, înghețat
       <i class="pl-legend__k pl-legend__k--today"></i> azi
+      <i class="pl-legend__k pl-legend__k--now"></i> acum
+      <b class="pl-legend__rec">🔁</b> serie săptămânală
+      <b class="pl-legend__rec is-off">🔁</b> o singură dată
+      <i class="pl-legend__dot"></i> elev fără oră săptămâna asta
     </p>
     <div class="pl-tools">
       <span class="pl-dur__lab">Durata</span>${durs}
