@@ -124,20 +124,28 @@ async function load() {
 
 const byId = (id) => state.items.find((x) => x.id === id);
 
-function filtered() {
+/** The CURRENT SCOPE: session + search + „fără 2026". Deliberately WITHOUT
+ *  „ascunde verificații" — that one only hides rows from view; the tallies
+ *  must keep counting them, or hiding them would zero the very number that
+ *  tells you how far you got. */
+function inScope(it) {
+  if (state.session && it.session !== state.session) return false;
+  if (state.onlyNo2026 && it.correct2026) return false;
   const q = state.search.trim().toLowerCase();
-  return state.items.filter((it) => {
-    if (state.session && it.session !== state.session) return false;
-    if (state.hideVerified && it.verified) return false;
-    if (state.onlyNo2026 && it.correct2026) return false;
-    if (q) {
-      const hay = [it.question, it.options.A, it.options.B, it.options.C, it.options.D, it.observation]
-        .map((v) => stripRich(v).toLowerCase()).join(" ");
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
+  if (q) {
+    const hay = [it.question, it.options.A, it.options.B, it.options.C, it.options.D, it.observation]
+      .map((v) => stripRich(v).toLowerCase()).join(" ");
+    if (!hay.includes(q)) return false;
+  }
+  return true;
 }
+
+function filtered() {
+  return state.items.filter((it) => inScope(it) && !(state.hideVerified && it.verified));
+}
+
+/** Verified within the current scope — 18 for Iulie - G1, not the year's 68. */
+const verifiedInScope = () => state.items.filter((it) => inScope(it) && it.verified).length;
 
 // ---------- bold a whole column (current year) ----------
 function fieldVal(it, field) {
@@ -334,7 +342,7 @@ function render() {
       </span>
       <button type="button" class="tg-savebtn" data-action="save-all" title="Salvează tot ce e nesalvat">Salvează</button>
       <span class="tg-savestate" id="tg-save"></span>
-      <span class="tg-count">${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați</span>
+      <span class="tg-count">${rows.length} / ${state.items.length} · ${verifiedInScope()} verificați</span>
     </div>
 
     <div class="tg-toolbar tg-fr-row">
@@ -851,7 +859,7 @@ function scheduleHide(row, it) {
 
 function syncCount() {
   const count = root.querySelector(".tg-count");
-  if (count) count.textContent = `${filtered().length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați`;
+  if (count) count.textContent = `${filtered().length} / ${state.items.length} · ${verifiedInScope()} verificați`;
   const prog = root.querySelector(".tgm-progtxt"); // phone: refresh the „X verif." number too
   if (prog) prog.innerHTML = mProgHtml(filtered());
 }
@@ -872,7 +880,7 @@ function renderBodyOnly() {
   if (isMobile()) return mUpdateBody();    // phone: refresh only card + progress, keep the search focused
   const rows = filtered();
   const count = root.querySelector(".tg-count");
-  if (count) count.textContent = `${rows.length} / ${state.items.length} · ${state.items.filter((i) => i.verified).length} verificați`;
+  if (count) count.textContent = `${rows.length} / ${state.items.length} · ${verifiedInScope()} verificați`;
   const scroll = root.querySelector(".tg-scroll");
   if (!scroll) return;
   if (!rows.length) { scroll.innerHTML = `<div class="tg-empty">Niciun item pentru filtrele curente.</div>`; return; }
@@ -993,8 +1001,7 @@ function mBars() {
 }
 
 function mProgHtml(rows) {
-  const vCount = state.items.filter((i) => i.verified).length;
-  return `${rows.length ? state.mIndex + 1 : 0} / ${rows.length}<small> · ${vCount} verif.</small>`;
+  return `${rows.length ? state.mIndex + 1 : 0} / ${rows.length}<small> · ${verifiedInScope()} verif.</small>`;
 }
 
 function renderMobile() {
