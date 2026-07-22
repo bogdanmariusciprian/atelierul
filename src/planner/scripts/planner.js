@@ -114,6 +114,7 @@ const S = {
   personalTitle: "",
   editPupil: null,     // admin: pupil being customised (opened by CLICKING a dot)
   renameId: null,      // admin: personal block whose inline rename is open
+  moveAsk: null,       // series member just moved/resized: „O dată / Permanent?"
   visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
   vacOpen: false,      // admin: vacation form unfolded
   confirmId: null,     // block whose × was pressed — inline confirm shown
@@ -348,9 +349,8 @@ function paletteHtml() {
       ? `${p.name} — ${DAYS[dayIndexOf(st.first.start)]} ${hhmm(st.first.start)}, ${durLabel(st.min)}${st.min > 120 ? "+" : ""}`
       : `${p.name} — fără oră săptămâna asta`;
     return `<button type="button" class="pl-dot${st ? "" : " is-todo"}" data-act="pick" data-kind="lesson"
-        data-uid="${esc(p.id)}" data-hover-uid="${esc(p.id)}" data-name="${esc(tip)}${p.recurring ? " · săptămânal" : ""}"
-        style="--c:${esc(p.color)}" aria-label="${esc(tip)}">${esc(p.emoji || "")}${
-          p.recurring ? `<i class="pl-dot__rec" aria-hidden="true">🔁</i>` : ""}</button>`;
+        data-uid="${esc(p.id)}" data-hover-uid="${esc(p.id)}" data-name="${esc(tip)}"
+        style="--c:${esc(p.color)}" aria-label="${esc(tip)}">${esc(p.emoji || "")}</button>`;
   }).join("");
   return `<div class="pl-palette">
       ${dots}
@@ -381,11 +381,6 @@ function pupilEditorHtml() {
       </label>
       <div class="pl-cfg__f"><span>Culoare</span><div class="pl-cfg__sw">${sw}</div></div>
       <div class="pl-cfg__f"><span>Durata lui implicită</span><div>${durs}</div></div>
-      <div class="pl-cfg__f"><span>Ritm</span>
-        <button type="button" class="pl-dur${p.recurring ? " on" : ""}" data-act="cfg-rec">
-          ${p.recurring ? "🔁 săptămânal, " + REC_WEEKS + " săpt." : "doar când îl așez"}
-        </button>
-      </div>
       <div class="pl-cfg__acts">
         <button type="button" class="btn-mini btn-mini--ok" data-act="cfg-save">Salvează</button>
         <button type="button" class="btn-mini" data-act="cfg-close">Închide</button>
@@ -543,6 +538,7 @@ function gridHtml() {
       const alive = s.canEdit && (!over || s.kind === "personal");
       const confirming = S.confirmId === s.id;
       const renaming = S.renameId === s.id;
+      const asking = S.moveAsk?.id === s.id;
       const body = confirming
         ? `<b class="pl-block__who">Anulezi?</b>
            <span class="pl-block__confirm">
@@ -550,6 +546,15 @@ function gridHtml() {
              ${s.recurrenceId && s.canEdit && isAdmin()
                ? `<button type="button" class="pl-mini pl-mini--no" data-act="conf-series" data-id="${esc(s.id)}">Toată seria</button>` : ""}
              <button type="button" class="pl-mini" data-act="conf-no">Nu</button>
+           </span>`
+        : asking
+        ? `<b class="pl-block__who">${S.moveAsk.gesture === "move" ? "Mut:" : "Durata:"} ${esc(DAYS[S.moveAsk.dayIdx])} ${hhmm(S.moveAsk.startMs)}–${hhmm(S.moveAsk.startMs + S.moveAsk.minutes * 60000)}</b>
+           <span class="pl-block__confirm">
+             <button type="button" class="pl-mini" data-act="ask-once"
+                     title="Doar săptămâna asta — blocul iese din serie, restul săptămânilor rămân neatinse.">O dată</button>
+             <button type="button" class="pl-mini" data-act="ask-forever"
+                     title="Seria veche se oprește aici și continuă în noul interval, săptămână de săptămână.">Permanent</button>
+             <button type="button" class="pl-mini" data-act="ask-no" aria-label="Renunț">✕</button>
            </span>`
         : renaming
         ? `<span class="pl-block__ren">
@@ -571,10 +576,10 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.userId)}" data-name="${esc(tip)}"
-        aria-label="${esc(tip)}" ${alive && !confirming && !renaming ? 'data-act="grab"' : ""}>
+        aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
         ${body}
       </div>`;
     }).join("");
@@ -644,7 +649,7 @@ function render() {
           ? (S.paintWhat === "personal"
             ? "Mod activitate personală: desenează în orar intervalul tău — cât tragi, atât durează, iar ritmul decide dacă se repetă săptămânal. Blocurile gri rămân vii: le muți, le întinzi de ambele capete, un click le redenumește."
             : "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră. Trage de marginile uneia existente ca să o ajustezi; × o închide.")
-          : "Trage o bulină în orar ca să pui ora. Click pe bulină îi deschide setările. Ține cursorul pe un bloc ca să vezi al cui e."}</p>
+          : "Trage o bulină în orar ca să pui ora — o faci săptămânală din 🔁 de pe bloc. Click pe bulină îi deschide setările; scoaterea unui elev se face din Comunitate → membri."}</p>
       </div>` : ""}
       <div class="pl-live" data-role="live" hidden></div>`;
     return;
@@ -1149,45 +1154,28 @@ async function onUp() {
   if (d.resize || d.resizeTop) {
     const s0 = S.slots.find((x) => x.id === d.id);
     const changed = s0 && (s0.start !== d.startMs || Math.round((s0.end - s0.start) / 60000) !== d.minutes);
-    const detach = !!s0?.recurrenceId && changed;
-    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes, detach });
-    showToast(res.ok
-      ? `Durata e acum ${durLabel(d.minutes)} (${label}).${detach ? " Doar săptămâna asta se schimbă — scoasă din serie." : ""}`
-      : res.message, res.ok ? { kind: "success" } : undefined);
+    if (!changed) return;
+    if (s0.recurrenceId) { openMoveAsk(s0, d, "resize"); return; }
+    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes });
+    showToast(res.ok ? `Durata e acum ${durLabel(d.minutes)} (${label}).` : res.message,
+      res.ok ? { kind: "success" } : undefined);
     await refresh();
     return;
   }
 
   if (d.id) {
     const s0 = S.slots.find((x) => x.id === d.id);
-    const detach = !!s0?.recurrenceId && s0.start !== d.startMs;
-    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes, detach });
-    showToast(res.ok
-      ? `Mutat: ${label}${detach ? " · scoasă din seria săptămânală (restul săptămânilor rămân)" : ""}`
-      : res.message, res.ok ? { kind: "success" } : undefined);
+    if (s0 && s0.start === d.startMs && Math.round((s0.end - s0.start) / 60000) === d.minutes) return;
+    if (s0?.recurrenceId) { openMoveAsk(s0, d, "move"); return; }
+    const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes });
+    showToast(res.ok ? `Mutat: ${label}` : res.message, res.ok ? { kind: "success" } : undefined);
     await refresh();
     return;
   }
 
-  // New block. The rhythm belongs to the PUPIL: if their dot is set to
-  // weekly, dropping it plants the whole series; otherwise one lesson.
-  const srcPupil = S.pupils.find((x) => x.id === S.source?.userId);
-  if (isAdmin() && S.source?.kind === "lesson" && srcPupil?.recurring) {
-    const r = await bookRecurring({
-      startMs: d.startMs, minutes: d.minutes,
-      userId: S.source.userId, weeks: REC_WEEKS, vacations: S.vacations,
-    });
-    if (!r.ok) showToast(`${r.message || "N-am putut crea seria."}${r.created ? ` (${r.created} deja create)` : ""}`);
-    else {
-      const parts = [`${r.created} din ${REC_WEEKS} create`];
-      if (r.inVacation) parts.push(`${r.inVacation} în vacanță`);
-      if (r.clashed) parts.push(`${r.clashed} ocupate`);
-      showToast(`Serie săptămânală: ${parts.join(" · ")}.`, { kind: "success" });
-    }
-    await refresh();
-    return;
-  }
-
+  // A dot ALWAYS places ONE lesson — recurrence has a single owner, the 🔁
+  // toggle on the block. (The old per-pupil rhythm planted series straight
+  // from the drag: two mechanisms, and the drop surprised people.)
   const res = await bookSlot({
     startMs: d.startMs, minutes: d.minutes,
     userId: isAdmin() ? S.source?.userId : null,
@@ -1195,6 +1183,20 @@ async function onUp() {
   if (!res.ok) { showToast(res.message); await refresh(); return; }
   showToast(`Rezervat: ${label}`, { kind: "success" });
   await refresh();
+}
+
+/** A modified SERIES MEMBER asks on the block: one week, or from here on?
+ *  Everything the answer needs is snapshotted NOW — a realtime refresh between
+ *  the drop and the click must not change what the buttons will do. */
+function openMoveAsk(s0, d, gesture) {
+  S.moveAsk = {
+    id: s0.id, gesture,
+    dayIdx: d.dayIdx, startMs: d.startMs, minutes: d.minutes,
+    oldStartMs: s0.start, recurrenceId: s0.recurrenceId,
+    userId: s0.userId, slotKind: s0.kind,
+    title: s0.kind === "personal" ? (s0.name === "Activitate personală" ? "" : s0.name) : "",
+  };
+  render();
 }
 
 // ---------- clicks ----------
@@ -1267,6 +1269,39 @@ async function onClick(e) {
     await refresh(); return;
   }
 
+  if (act === "ask-no") { S.moveAsk = null; render(); return; }
+  if (act === "ask-once") {
+    const a = S.moveAsk; S.moveAsk = null;
+    if (!a) return;
+    const r = await moveSlot(a.id, { startMs: a.startMs, minutes: a.minutes, detach: true });
+    showToast(r.ok
+      ? "Schimbat doar pentru săptămâna asta — scos din serie; celelalte săptămâni rămân."
+      : r.message, r.ok ? { kind: "success" } : undefined);
+    await refresh(); return;
+  }
+  if (act === "ask-forever") {
+    const a = S.moveAsk; S.moveAsk = null;
+    if (!a) return;
+    // Three honest steps: the old series stops at this block, the block moves,
+    // the block becomes the head of the continuation. Each failure says
+    // exactly where it stopped and what to do next.
+    const s1 = await stopSeriesHere({ id: a.id, recurrenceId: a.recurrenceId, startMs: a.oldStartMs });
+    if (!s1.ok) { showToast(s1.message); await refresh(); return; }
+    const mv = await moveSlot(a.id, { startMs: a.startMs, minutes: a.minutes });
+    if (!mv.ok) { showToast(`${mv.message} Seria veche s-a oprit; blocul a rămas pe vechiul interval — trage-l din nou.`); await refresh(); return; }
+    const r = await makeRecurring({
+      id: a.id, startMs: a.startMs, minutes: a.minutes,
+      userId: a.userId, kind: a.slotKind, title: a.title,
+      weeks: REC_WEEKS, vacations: S.vacations,
+    });
+    if (!r.ok) { showToast(`${r.message || "Mutat, dar seria nouă n-a pornit."} Aprinde 🔁 pe bloc ca să reîncerci.`); await refresh(); return; }
+    const parts = [`${r.created} din ${REC_WEEKS}`];
+    if (r.inVacation) parts.push(`${r.inVacation} în vacanță`);
+    if (r.clashed) parts.push(`${r.clashed} ocupate`);
+    showToast(`Permanent: seria continuă ${DAYS[a.dayIdx]} la ${hhmm(a.startMs)} — ${parts.join(" · ")}.`, { kind: "success" });
+    await refresh(); return;
+  }
+
   // THE 🔁 TOGGLE — one rule, both directions. OFF→ON: this block becomes the
   // head of a weekly series. ON→OFF: recurrence stops HERE — the pressed block
   // stays (alone), everything after it is cancelled, earlier weeks untouched.
@@ -1277,7 +1312,9 @@ async function onClick(e) {
     if (s.recurrenceId) {
       const r = await stopSeriesHere({ id: s.id, recurrenceId: s.recurrenceId, startMs: s.start });
       showToast(r.ok
-        ? `Repetarea s-a oprit aici — blocul rămâne singur${r.stopped ? `, ${r.stopped} de după el anulate` : ""}.`
+        ? (r.stopped
+          ? `Repetarea s-a oprit aici — blocul rămâne singur, ${r.stopped} de după el anulate.`
+          : `Blocul e acum singur — nu era nimic de anulat după el. Aprinde 🔁 din nou ca să pornești alte ${REC_WEEKS} săptămâni de aici.`)
         : r.message, r.ok ? { kind: "success" } : undefined);
       await refresh(); return;
     }
@@ -1318,7 +1355,7 @@ async function onClick(e) {
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
   if (act === "cfg-close") { S.editPupil = null; render(); return; }
-  if (act === "cfg-color" || act === "cfg-min" || act === "cfg-rec") {
+  if (act === "cfg-color" || act === "cfg-min") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
     if (!p) return;
     // The name field holds uncommitted text; a re-render would rebuild it from
@@ -1328,8 +1365,7 @@ async function onClick(e) {
     const typedEmoji = S.root.querySelector('[data-act="cfg-emoji"]')?.value;
     if (typedEmoji !== undefined) p.emoji = typedEmoji.trim();
     if (act === "cfg-color") p.color = b.dataset.c;
-    else if (act === "cfg-min") p.minutes = +b.dataset.m;
-    else p.recurring = !p.recurring;
+    else p.minutes = +b.dataset.m;
     render();
     return;
   }

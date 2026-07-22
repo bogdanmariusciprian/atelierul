@@ -406,10 +406,27 @@ export async function stopSeriesHere({ id, recurrenceId, startMs }) {
     .update({ status: "cancelled" })
     .eq("recurrence_id", recurrenceId)
     .eq("status", "booked")
-    .gt("starts_at", new Date(startMs).toISOString())
+    // The boundary is the LATER of the pressed block and now: stopping a
+    // series from an old block must never cancel weeks that already happened.
+    .gt("starts_at", new Date(Math.max(startMs, Date.now())).toISOString())
     .select("id");
   if (e2) return { ok: false, message: humanError(e2) };
   return { ok: true, stopped: data?.length || 0 };
+}
+
+/** When the teacher un-marks a pupil (admin panel), the pupil's future hours
+ *  go with the access: a schedule full of lessons nobody may attend is a trap.
+ *  Past hours stay — they happened. Returns how many were cancelled. */
+export async function cancelFutureSlotsFor(userId) {
+  const { data, error } = await supabase
+    .from("tutoring_slots")
+    .update({ status: "cancelled" })
+    .eq("user_id", userId)
+    .eq("status", "booked")
+    .gt("starts_at", new Date().toISOString())
+    .select("id");
+  if (error) return { ok: false, message: humanError(error), cancelled: 0 };
+  return { ok: true, cancelled: data?.length || 0 };
 }
 
 /** Cancel every FUTURE occurrence of a series. The past stays — it happened. */

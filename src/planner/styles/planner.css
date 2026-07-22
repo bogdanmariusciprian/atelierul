@@ -616,11 +616,6 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
-.pl-dot__rec {
-  position: absolute; right: -4px; bottom: -4px; font-style: normal;
-  font-size: 0.72rem; background: var(--color-bg); border-radius: 50%;
-  padding: 1px; line-height: 1;
-}
 
 /* ---- fereastra de disponibilitate se prezintă singură ----
    Marius a întrebat „ce e zona verde hașurată?" — răspunsul corect nu e un

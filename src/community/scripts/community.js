@@ -41,6 +41,7 @@ import {
   wordOfToday, GROUP_ICONS, groupIcon, groupColor, BADGES,
 } from "../../shared/scripts/discover-data.js";
 import { grantEventAccess, revokeEventAccess } from "../../shared/scripts/events-repo.js";
+import { cancelFutureSlotsFor } from "../../shared/scripts/planner-repo.js";
 import {
   // aliased: a LOCAL function createGroup() (the composer handler) already
   // exists below — without the alias it would shadow this import and recurse.
@@ -4430,10 +4431,18 @@ export function renderCommunity(basePath = "") {
         const who = userById(uid)?.name || "membrul";
         if (had) state.eventAccessUuids.delete(uuid); else state.eventAccessUuids.add(uuid);
         render();
-        (had ? revokeEventAccess(uuid) : grantEventAccess(uuid)).then((r) => {
+        (had ? revokeEventAccess(uuid) : grantEventAccess(uuid)).then(async (r) => {
           if (r.ok) {
-            showToast(had ? `${who} nu mai are acces la meditații.` : `✓ ${who} are acum acces la meditații.`,
-              had ? undefined : { kind: "success" });
+            if (had) {
+              // Un-marking sweeps the pupil's FUTURE hours out of the planner
+              // too — Marius's rule: „dacă anulez marcarea, anulăm toate
+              // orele viitoare". The past stays, it happened.
+              const c = await cancelFutureSlotsFor(uuid);
+              showToast(`${who} nu mai are acces la meditații${c.cancelled
+                ? ` · ${c.cancelled} ${c.cancelled === 1 ? "oră viitoare anulată" : "ore viitoare anulate"}` : ""}.`);
+            } else {
+              showToast(`✓ ${who} are acum acces la meditații.`, { kind: "success" });
+            }
             return;
           }
           if (had) state.eventAccessUuids.add(uuid); else state.eventAccessUuids.delete(uuid);
