@@ -688,8 +688,10 @@
 .pl-cb__sym {
   font-style: normal; font-size: 1.5rem; line-height: 1.05;
   padding: 0.16rem 0.42rem; border-radius: 50%;
+  /* 50% = culoarea blocului se vede PRIN halou → „subțiere", nu disc alb.
+     Crește procentul pentru mai mult contrast, scade-l pentru mai subtil. */
   background: radial-gradient(closest-side,
-    color-mix(in srgb, var(--color-surface) 80%, transparent),
+    color-mix(in srgb, var(--color-surface) 50%, transparent),
     transparent 100%);
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.25));
 }
