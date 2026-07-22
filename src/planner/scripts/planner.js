@@ -303,7 +303,7 @@ function toolsHtml() {
           <button type="button" class="pl-seg__b${S.paintWhat === "avail" ? " on" : ""}" data-act="paint-what" data-v="avail"
                   title="Pictează ferestrele în care elevii își pot alege ore.">disponibilitate</button>
           <button type="button" class="pl-seg__b${S.paintWhat === "personal" ? " on" : ""}" data-act="paint-what" data-v="personal"
-                  title="Desenează direct în orar timpul tău: ședințe, pregătire, orice te face indisponibil.">✎ personală</button>
+                  title="Desenează direct în orar timpul tău: ședințe, pregătire, orice te face indisponibil.">activitate personală</button>
         </span>
         <span class="pl-pen__lab">ritm</span>
         <span class="pl-seg" role="group" aria-label="Ritmul">
