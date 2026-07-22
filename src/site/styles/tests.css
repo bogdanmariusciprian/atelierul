@@ -1722,3 +1722,11 @@ body.tgame-active .page-hero { max-height: 0; opacity: 0; margin-block: 0; paddi
   transition: opacity 0.15s;
   will-change: transform;
 }
+
+/* I-beam-ul, redesenat NEGRU și mai gros — cel nativ e o lamelă palidă.
+   Cursor SVG cu hotspot în centru (12 12); `text` rămâne rezerva. */
+.tg-wrap input,
+.tg-wrap textarea,
+.tg-wrap [contenteditable] {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M9 3h6M9 21h6M12 3v18' stroke='black' stroke-width='2.2' fill='none' stroke-linecap='round'/></svg>") 12 12, text;
+}
