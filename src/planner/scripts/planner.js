@@ -737,6 +737,9 @@ function markBad(d) {
 }
 
 function onDown(e) {
+  // Only the LEFT button drags. pointerdown fires for the right one too, and
+  // without this guard the pre-menu press was quietly placing pupil blocks.
+  if (e.button !== 0) return;
   if (!isLoggedIn()) return;
   // The pupil's world is taps now — nothing there is draggable, and a stray
   // press must never start a ghost.
