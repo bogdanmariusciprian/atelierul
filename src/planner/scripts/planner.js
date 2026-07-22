@@ -533,9 +533,10 @@ function gridHtml() {
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
-      // A past LESSON is shared history — frozen. A past PERSONAL block is the
-      // teacher's own note about his own time: stays fully editable.
-      const alive = s.canEdit && (!over || s.kind === "personal");
+      // The past is frozen for EVERYONE, personal blocks included — what
+      // happened, happened: no handles, no ×, no 🔁, no rename. Only the
+      // passive badge below still tells which blocks belonged to a series.
+      const alive = s.canEdit && !over;
       const confirming = S.confirmId === s.id;
       const renaming = S.renameId === s.id;
       const asking = S.moveAsk?.id === s.id;
