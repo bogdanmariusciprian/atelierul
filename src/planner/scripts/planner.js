@@ -65,6 +65,11 @@ const SWATCHES = ["#7c3aed", "#0891b2", "#16a34a", "#ea580c", "#be185d",
  *  members of a crowded pair move, and only while the crowd exists.
  *
  *  A colour the teacher picked by hand skips all of this and always wins. */
+// Twenty RARE symbols for pupil dots — distinct silhouettes and colours, no
+// worn-out footballs. Free typing stays possible; these are the quick picks.
+const SYMBOLS = ["🦉", "🦊", "🐙", "🦋", "🐝", "🐢", "🐺", "🐉", "🦄", "🪶",
+  "🧿", "🍄", "🍀", "🌵", "🌋", "🪐", "⚡", "❄️", "⚓", "🗝️"];
+
 const MIN_HUE_GAP = 18;
 function hashHue(id) {
   let h = 0;
@@ -391,8 +396,14 @@ function pupilEditorHtml() {
       </label>
       <label class="pl-cfg__f">Simbol
         <input class="pl-cfg__emoji" data-act="cfg-emoji" maxlength="8"
-               value="${esc(p.emoji || "")}" placeholder="ex. ⚽" />
+               value="${esc(p.emoji || "")}" placeholder="scrie sau alege" />
       </label>
+      <div class="pl-cfg__f"><span>Alege rapid</span>
+        <div class="pl-cfg__sym">${SYMBOLS.map((e) => `
+          <button type="button" class="pl-sym${p.emoji === e ? " on" : ""}" data-act="cfg-sym" data-e="${e}"
+                  title="${p.emoji === e ? "Apasă din nou ca să rămâi fără simbol" : "Simbolul bulinei"}">${e}</button>`).join("")}
+        </div>
+      </div>
       <div class="pl-cfg__f"><span>Culoare</span><div class="pl-cfg__sw">${sw}</div></div>
       <div class="pl-cfg__f"><span>Durata lui implicită</span><div>${durs}</div></div>
       <div class="pl-cfg__acts">
@@ -1373,7 +1384,7 @@ async function onClick(e) {
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
   if (act === "cfg-close") { S.editPupil = null; render(); return; }
-  if (act === "cfg-color" || act === "cfg-min") {
+  if (act === "cfg-color" || act === "cfg-min" || act === "cfg-sym") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
     if (!p) return;
     // The name field holds uncommitted text; a re-render would rebuild it from
@@ -1383,6 +1394,7 @@ async function onClick(e) {
     const typedEmoji = S.root.querySelector('[data-act="cfg-emoji"]')?.value;
     if (typedEmoji !== undefined) p.emoji = typedEmoji.trim();
     if (act === "cfg-color") p.color = b.dataset.c;
+    else if (act === "cfg-sym") p.emoji = p.emoji === b.dataset.e ? "" : b.dataset.e;
     else p.minutes = +b.dataset.m;
     render();
     return;

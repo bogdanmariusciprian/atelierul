@@ -139,6 +139,23 @@
 .pl-mypill.is-past { opacity: 0.65; filter: grayscale(0.4); }
 .pl-mypill__past { font-style: normal; font-size: 0.72rem; color: var(--color-text-muted); }
 
+/* Grila de simboluri rapide — glife mari, ca să se vadă ce alegi. */
+.pl-cfg__sym { display: flex; flex-wrap: wrap; gap: 0.3rem; max-width: 21rem; }
+.pl-sym {
+  width: 2.3rem; height: 2.3rem; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--color-border); background: var(--color-bg);
+  font-size: 1.35rem; line-height: 1; display: inline-flex;
+  align-items: center; justify-content: center; padding: 0;
+  transition: transform 0.12s, border-color 0.12s, background 0.12s;
+}
+.pl-sym:hover { transform: scale(1.12); border-color: var(--color-primary); }
+.pl-sym.on {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+.pl-cfg__emoji { font-size: 1.15rem; }
+
 /* Meniul de click-dreapta — mic, ferm, extensibil. */
 .pl-ctx {
   position: fixed; z-index: 300; min-width: 10rem;
@@ -587,7 +604,7 @@
   width: 2.4rem; height: 2.4rem; border-radius: 50%; cursor: grab;
   border: 2.5px solid color-mix(in srgb, var(--c) 70%, #000);
   background: var(--c); color: #fff;
-  display: grid; place-items: center; font-size: 1.05rem; line-height: 1;
+  display: grid; place-items: center; font-size: 1.2rem; line-height: 1;
   user-select: none; touch-action: none; position: relative;
 }
 .pl-dot:hover { transform: scale(1.12); }
