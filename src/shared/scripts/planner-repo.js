@@ -393,6 +393,25 @@ export async function makeRecurring({ id, startMs, minutes, userId, kind = "less
   return { ...r, created: r.created + 1, recurrenceId };
 }
 
+/** The OFF half of the 🔁 toggle: recurrence STOPS at this block. The block
+ *  itself survives, detached — „săptămâna asta rămâne" — and every occurrence
+ *  AFTER it is cancelled. Earlier ones are untouched: they already happened
+ *  or are due sooner, and stopping the future is not rewriting the past. */
+export async function stopSeriesHere({ id, recurrenceId, startMs }) {
+  const { error } = await supabase
+    .from("tutoring_slots").update({ recurrence_id: null }).eq("id", id);
+  if (error) return { ok: false, message: humanError(error) };
+  const { data, error: e2 } = await supabase
+    .from("tutoring_slots")
+    .update({ status: "cancelled" })
+    .eq("recurrence_id", recurrenceId)
+    .eq("status", "booked")
+    .gt("starts_at", new Date(startMs).toISOString())
+    .select("id");
+  if (e2) return { ok: false, message: humanError(e2) };
+  return { ok: true, stopped: data?.length || 0 };
+}
+
 /** Cancel every FUTURE occurrence of a series. The past stays — it happened. */
 export async function cancelSeries(recurrenceId) {
   const { error } = await supabase
