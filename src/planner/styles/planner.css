@@ -601,10 +601,10 @@
   background: var(--color-bg);
 }
 .pl-dot {
-  width: 2.4rem; height: 2.4rem; border-radius: 50%; cursor: grab;
+  width: 2.85rem; height: 2.85rem; border-radius: 50%; cursor: grab;
   border: 2.5px solid color-mix(in srgb, var(--c) 70%, #000);
   background: var(--c); color: #fff;
-  display: grid; place-items: center; font-size: 1.2rem; line-height: 1;
+  display: grid; place-items: center; font-size: 1.4rem; line-height: 1;
   user-select: none; touch-action: none; position: relative;
 }
 .pl-dot:hover { transform: scale(1.12); }
@@ -667,7 +667,7 @@
   margin: -1.2rem 0 0 -1.2rem; /* centrul bulinei chiar sub vârful cursorului */
 }
 .pl-floater__dot {
-  width: 2.4rem; height: 2.4rem; border-radius: 50%;
+  width: 2.85rem; height: 2.85rem; border-radius: 50%;
   border: 2.5px solid color-mix(in srgb, var(--c) 70%, #000);
   background: var(--c); color: #fff;
   display: grid; place-items: center; font-style: normal; font-size: 1.05rem;
