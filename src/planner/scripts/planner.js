@@ -447,10 +447,12 @@ function gridHtml() {
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
-      // The past is frozen for EVERYONE, personal blocks included — what
-      // happened, happened: no handles, no ×, no 🔁, no rename. Only the
-      // passive badge below still tells which blocks belonged to a series.
+      // The past is frozen for edits for EVERYONE — no handles, no 🔁, no
+      // rename. DELETION is the one carve-out, and only for the admin: he
+      // curates his own history; the pupil's past stays sealed (0061 enforces
+      // it server-side anyway).
       const alive = s.canEdit && !over;
+      const erasable = s.canEdit && (!over || isAdmin());
       const confirming = S.confirmId === s.id;
       const renaming = S.renameId === s.id;
       const asking = S.moveAsk?.id === s.id;
@@ -484,7 +486,7 @@ function gridHtml() {
                  : `Apasă ca să se repete săptămânal de aici înainte (${REC_WEEKS} săptămâni).`}"
                aria-pressed="${s.recurrenceId ? "true" : "false"}" aria-label="Repetare săptămânală">🔁</button>`
              : s.recurrenceId ? `<i class="pl-cb__rec" title="Oră care se repetă săptămânal">🔁</i>` : ""}
-           ${alive ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
+           ${erasable ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
            ${alive && s.kind === "personal" ? `<span class="pl-block__rsz pl-block__rsz--top" data-act="rsz-top" data-id="${esc(s.id)}" title="Trage ca să muți începutul" aria-hidden="true"></span>` : ""}
            ${alive ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să ${s.kind === "personal" ? "muți sfârșitul" : "schimbi durata"}" aria-hidden="true"></span>` : ""}`;
       // A full-colour CELL, straight from Marius's drawing: no text inside — the
@@ -667,10 +669,14 @@ function markBad(d) {
   // sub deget. Mutarea blocului existent în aceeași săptămână rămâne liberă
   // (el însuși nu se numără).
   if (!isAdmin() && !d.id) {
-    const mine = S.slots.filter((x) => x.mine && x.kind === "lesson").length;
-    if (mine >= S.myMax) {
+    const mine = S.slots.filter((x) => x.mine && x.kind === "lesson");
+    if (mine.length >= S.myMax) {
       d.bad = true;
-      d.badWhy = S.myMax === 1 ? "ai deja ora săptămânii" : "ai deja orele săptămânii";
+      // Numele vinovatului în mesaj — fără el, un bloc estompat în partea
+      // trecută a săptămânii face refuzul să pară o minciună.
+      const unde = mine.slice(0, 2)
+        .map((x) => `${DAYS[dayIndexOf(x.start)]} ${hhmm(x.start)}`).join(", ");
+      d.badWhy = `${S.myMax === 1 ? "ai deja ora săptămânii" : "ai deja orele săptămânii"} (${unde}${mine.length > 2 ? "…" : ""})`;
       return;
     }
   }
@@ -1396,7 +1402,7 @@ function onCtxMenu(e) {
   if (blk) {
     const x = S.slots.find((q) => q.id === blk.dataset.id);
     if (!x) return;
-    if (!(x.canEdit && x.end >= Date.now())) return; // trecutul e înghețat — meniul tace
+    if (!(x.canEdit && (x.end >= Date.now() || isAdmin()))) return; // elevul nu atinge trecutul; adminul îl poate șterge
     e.preventDefault();
     openCtx(e.clientX, e.clientY, [
       { label: "🗑 Șterge", danger: true, run: () => { S.confirmId = x.id; render(); } },
