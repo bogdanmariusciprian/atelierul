@@ -263,60 +263,26 @@ export async function fetchAvailability() {
 const sameScope = (w, weekday, onDate) =>
   onDate ? w.onDate === onDate : (!w.onDate && w.weekday === weekday);
 
-/** Add a window to one weekday — MERGING with whatever it touches. The windows
- *  on a day must be disjoint, and not for tidiness: the server guard demands a
- *  booking fit inside a SINGLE window, so two abutting windows (16–18, 18–20)
- *  would silently forbid the 17–19 lesson that plainly fits. Merging at write
- *  time makes that case impossible in the data rather than handled in code. */
+/** Add a window to one weekday — MERGING with whatever it touches, on the
+ *  SERVER, in one transaction. The old client-side version deleted the
+ *  touching windows and then inserted the merged one; a single failed insert
+ *  between the two ate windows silently until the table was empty. Atomic
+ *  now: all or nothing (migration 0064). */
 export async function saveAvailabilityWindow({ weekday, startMin, endMin, onDate = null }) {
-  const all = await fetchAvailability();
-  const day = all.filter((w) => sameScope(w, weekday, onDate));
-  const touching = day.filter((w) => startMin <= w.endMin && endMin >= w.startMin);
-  const merged = {
-    weekday,
-    on_date: onDate,
-    start_min: Math.min(startMin, ...touching.map((w) => w.startMin)),
-    end_min: Math.max(endMin, ...touching.map((w) => w.endMin)),
-  };
-  if (touching.length) {
-    const { error } = await supabase.from("planner_availability")
-      .delete().in("id", touching.map((w) => w.id));
-    if (error) return { ok: false, message: humanError(error) };
-  }
-  const { error } = await supabase.from("planner_availability").insert(merged);
+  const { error } = await supabase.rpc("replace_availability_window", {
+    p_weekday: weekday, p_start_min: startMin, p_end_min: endMin, p_on_date: onDate,
+  });
   if (error) return { ok: false, message: humanError(error) };
   return { ok: true };
 }
 
-/** Resize one window, keeping the day's invariant: windows stay disjoint.
- *  The row is updated in place first, THEN the day is re-normalised — if the
- *  stretched window now touches a neighbour, the two are merged into one.
- *  Without that pass, the server guard („fit inside a SINGLE window") would
- *  quietly refuse the lesson that straddles their former boundary. */
-export async function resizeAvailabilityWindow(id, { weekday, startMin, endMin, onDate = null }) {
-  const { error } = await supabase
-    .from("planner_availability")
-    .update({ start_min: startMin, end_min: endMin })
-    .eq("id", id);
+/** Resize one window — update + neighbour absorption in ONE transaction,
+ *  server-side (0064), for the same reason as above. */
+export async function resizeAvailabilityWindow(id, { startMin, endMin }) {
+  const { error } = await supabase.rpc("resize_availability_window", {
+    p_id: id, p_start_min: startMin, p_end_min: endMin,
+  });
   if (error) return { ok: false, message: humanError(error) };
-
-  const day = (await fetchAvailability()).filter((w) => sameScope(w, weekday, onDate));
-  const me = day.find((w) => w.id === id);
-  if (!me) return { ok: true };
-  const touching = day.filter((w) => me.startMin <= w.endMin && me.endMin >= w.startMin);
-  if (touching.length > 1) {
-    const merged = {
-      weekday,
-      on_date: onDate,
-      start_min: Math.min(...touching.map((w) => w.startMin)),
-      end_min: Math.max(...touching.map((w) => w.endMin)),
-    };
-    const { error: e2 } = await supabase.from("planner_availability")
-      .delete().in("id", touching.map((w) => w.id));
-    if (e2) return { ok: false, message: humanError(e2) };
-    const { error: e3 } = await supabase.from("planner_availability").insert(merged);
-    if (e3) return { ok: false, message: humanError(e3) };
-  }
   return { ok: true };
 }
 

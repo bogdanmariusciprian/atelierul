@@ -561,7 +561,7 @@ function render() {
   // THE PUPIL: the same board, his own powers. No palette, no pencil, no
   // vacations bar — just the grid, his duration chips, a small legend and
   // the one sentence that teaches the gesture.
-  if (!S.avail.length && !S.loading) {
+  if (!S.avail.length && !S.slots.length && !S.loading) {
     S.root.innerHTML = `
       ${headerHtml()}
       <div class="pl-locked">
@@ -1029,7 +1029,7 @@ async function onUp() {
   }
 
   if (d.availResize) {
-    const r = await resizeAvailabilityWindow(d.id, { weekday: d.dayIdx, startMin: d.startMin, endMin: d.endMin, onDate: d.onDate });
+    const r = await resizeAvailabilityWindow(d.id, { startMin: d.startMin, endMin: d.endMin });
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();
     showToast("Fereastră ajustată.", { kind: "success" });
