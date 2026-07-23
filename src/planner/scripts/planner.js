@@ -670,7 +670,7 @@ function swapModalsHtml() {
     const offers = S.swapOffers.filter((o) => o.wantSlot === S.swapMine);
     const rows = offers.length
       ? offers.map((o) => `<div class="pl-swaprow">
-          <span class="pl-swaprow__w">🔁 ${esc(slotWhen(o.start, o.end))}</span>
+          <span class="pl-swaprow__w">⇄ ${esc(slotWhen(o.start, o.end))}</span>
           <button type="button" class="pl-mini pl-mini--go" data-act="swap-accept" data-offer="${esc(o.offerId)}">Confirmă</button>
         </div>`).join("")
       : `<p class="cx-muted">Încă nicio ofertă. Când cineva vrea să schimbe, apare aici.</p>`;
