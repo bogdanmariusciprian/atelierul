@@ -814,6 +814,9 @@
 .pl-swap--q.on {
   top: 50%; left: 50%; right: auto; bottom: auto;
   transform-origin: center;
+  /* Centrarea stă AICI, ca bază — nu doar în keyframe-uri. Altfel, când
+     animația se oprește (has-offer), translate-ul dispărea și cercul sărea. */
+  transform: translate(-50%, -50%);
   width: 68%; height: auto; aspect-ratio: 1;
   border-radius: 50%; font-size: 2.1rem;
   background: rgba(245, 158, 11, 0.94);
