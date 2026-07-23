@@ -812,8 +812,8 @@
    ratat, vizibil și pentru ceilalți. Înainte de click rămâne mic în colț. */
 .pl-swap--q.on {
   top: 50%; left: 50%; right: auto; bottom: auto;
-  width: 78%; height: auto; aspect-ratio: 1;
-  border-radius: 50%; font-size: 2.4rem;
+  width: 68%; height: auto; aspect-ratio: 1;
+  border-radius: 50%; font-size: 2.1rem;
   background: rgba(245, 158, 11, 0.94);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
   animation: pl-swap-shake-c 1.4s ease-in-out infinite;
