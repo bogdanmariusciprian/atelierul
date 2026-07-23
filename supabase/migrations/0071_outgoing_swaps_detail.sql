@@ -7,9 +7,16 @@
 -- fix acea ofertă). Depinde de 0070. Sigură la re-rulare.
 -- =========================================================
 
-create or replace function public.my_outgoing_swaps()
+-- Schimbăm tipul de retur (0070 întorcea doar offer_slot) → Postgres cere
+-- DROP înainte; „create or replace" nu poate schimba semnătura de retur.
+drop function if exists public.my_outgoing_swaps();
+
+create function public.my_outgoing_swaps()
 returns table (offer_id uuid, want_slot uuid, offer_slot uuid)
 language sql security definer set search_path = public as $$
   select id, want_slot, offer_slot from public.planner_swap_offers
   where offerer = auth.uid() and status = 'open';
 $$;
+
+-- DROP a înlăturat și dreptul de execuție — îl redăm.
+grant execute on function public.my_outgoing_swaps() to authenticated;
