@@ -47,8 +47,9 @@
   justify-content: space-between;
   pointer-events: auto;
   gap: calc(var(--space-md) + var(--p) * 8px);
-  /* narrows toward a centered pill as p → 1 */
-  max-width: calc(var(--container-max-width) - var(--p) * 400px);
+  /* narrows toward a centered pill as p → 1 — mai puțin agresiv (280px, era
+     400px), ca navul adminului (Meditații + chip + logout) să încapă pe un rând */
+  max-width: calc(var(--container-max-width) - var(--p) * 280px);
   padding-block: calc(var(--space-md) - var(--p) * 10px);
   border-radius: calc(var(--p) * 30px);
 }
@@ -95,7 +96,10 @@
 
 .main-nav {
   display: flex;
-  gap: var(--space-lg);
+  flex-wrap: nowrap; /* totul pe UN rând — nu se împarte niciodată în două */
+  /* Spațiul dintre linkuri se strânge la scroll (--p moștenit din header),
+     ca navul mai bogat al adminului să încapă în pastila îngustată. */
+  gap: calc(var(--space-lg) - var(--p, 0) * 9px);
   align-items: center;
 }
 
