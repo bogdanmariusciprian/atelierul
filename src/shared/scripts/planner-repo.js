@@ -189,13 +189,13 @@ export async function fetchExternals() {
   if (!isAdmin()) return [];
   const { data, error } = await supabase
     .from("planner_externals")
-    .select("id, name, color, emoji, minutes")
+    .select("id, name, color, emoji, minutes, max_weekly")
     .order("name");
   if (error) { console.warn("fetchExternals:", error.message); return []; }
   return data || [];
 }
 
-export async function createExternal({ name, color = null, emoji = "", minutes = DEFAULT_DURATION }) {
+export async function createExternal({ name, color = null, emoji = "", minutes = DEFAULT_DURATION, maxWeekly = 1 }) {
   const { data, error } = await supabase
     .from("planner_externals")
     .insert({
@@ -203,6 +203,7 @@ export async function createExternal({ name, color = null, emoji = "", minutes =
       color: color || null,
       emoji: emoji?.trim() || null,
       minutes: DURATIONS.includes(minutes) ? minutes : DEFAULT_DURATION,
+      max_weekly: [1, 2, 3].includes(maxWeekly) ? maxWeekly : 1,
     })
     .select("id")
     .single();
@@ -210,7 +211,7 @@ export async function createExternal({ name, color = null, emoji = "", minutes =
   return { ok: true, id: data.id };
 }
 
-export async function updateExternal(id, { name, color, emoji, minutes }) {
+export async function updateExternal(id, { name, color, emoji, minutes, maxWeekly }) {
   const { data, error } = await supabase
     .from("planner_externals")
     .update({
@@ -218,6 +219,7 @@ export async function updateExternal(id, { name, color, emoji, minutes }) {
       color: color || null,
       emoji: emoji?.trim() || null,
       minutes: DURATIONS.includes(minutes) ? minutes : DEFAULT_DURATION,
+      max_weekly: [1, 2, 3].includes(maxWeekly) ? maxWeekly : 1,
     })
     .eq("id", id)
     .select("id");

@@ -414,6 +414,9 @@ function externalEditorHtml() {
       <div class="pl-cfg__f"><span>Alege rapid</span><div class="pl-cfg__sym">${syms}</div></div>
       <div class="pl-cfg__f"><span>Culoare</span><div class="pl-cfg__sw">${sw}</div></div>
       <div class="pl-cfg__f"><span>Durata lui implicită</span><div>${durs}</div></div>
+      <div class="pl-cfg__f"><span>Întâlniri pe săptămână</span><div>${[1, 2, 3].map((k) => `
+        <button type="button" class="pl-dur${(x.maxWeekly || 1) === k ? " on" : ""}" data-act="ext-max" data-k="${k}"
+                title="Câte întâlniri plănuiești cu el pe săptămână.">${k}</button>`).join("")}</div></div>
       <div class="pl-cfg__acts">
         <button type="button" class="btn-mini btn-mini--ok" data-act="ext-save">${isNew ? "Adaugă" : "Salvează"}</button>
         ${!isNew ? (S.extDelAsk
@@ -733,6 +736,22 @@ function markBad(d) {
   // finger, not after the drop.
   if (!isAdmin() && !inAvailability(d.dayIdx, d.startMs, d.minutes)) {
     d.bad = true; d.badWhy = "în afara orelor deschise"; return;
+  }
+  // Reperul externului: adminul așază, deci nu e o gardă de server, ci un
+  // opritor de UI — fantoma se face roșie când ai atins numărul plănuit de
+  // întâlniri pe săptămână. Blocul mutat nu se numără pe el însuși.
+  const extId = d.id
+    ? S.slots.find((x) => x.id === d.id)?.externalId
+    : S.source?.externalId;
+  if (isAdmin() && extId) {
+    const ext = S.externals.find((e) => e.id === extId);
+    const max = ext?.maxWeekly || 1;
+    const count = S.slots.filter((x) => x.externalId === extId && x.kind === "lesson" && x.id !== d.id).length;
+    if (count >= max) {
+      d.bad = true;
+      d.badWhy = `${ext?.name || "externul"} are deja ${max} ${max === 1 ? "întâlnire" : "întâlniri"} săptămâna asta`;
+      return;
+    }
   }
   // Cota săptămânală (0065): un bloc NOU peste numărul îngăduit se refuză
   // sub deget. Mutarea blocului existent în aceeași săptămână rămâne liberă
@@ -1372,12 +1391,12 @@ async function onClick(e) {
 
   // ---- elevii externi: + / editare / ștergere ----
   if (act === "ext-new") {
-    S.extDraft = { name: "", color: null, emoji: "", minutes: DEFAULT_DURATION };
+    S.extDraft = { name: "", color: null, emoji: "", minutes: DEFAULT_DURATION, maxWeekly: 1 };
     S.editExternal = S.editExternal === "new" ? null : "new";
     S.editPupil = null; S.extDelAsk = false;
     render(); return;
   }
-  if (act === "ext-color" || act === "ext-min" || act === "ext-sym") {
+  if (act === "ext-color" || act === "ext-min" || act === "ext-sym" || act === "ext-max") {
     const isNew = S.editExternal === "new";
     const x = isNew ? S.extDraft : S.externals.find((e) => e.id === S.editExternal);
     if (!x) return;
@@ -1388,6 +1407,7 @@ async function onClick(e) {
     if (typedEmoji !== undefined) x.emoji = typedEmoji.trim();
     if (act === "ext-color") x.color = b.dataset.c;
     else if (act === "ext-sym") x.emoji = x.emoji === b.dataset.e ? "" : b.dataset.e;
+    else if (act === "ext-max") x.maxWeekly = +b.dataset.k;
     else x.minutes = +b.dataset.m;
     render(); return;
   }
@@ -1588,6 +1608,7 @@ async function loadPupils() {
   S.externals = exts.map((x) => ({
     ...x,
     emoji: x.emoji || "",
+    maxWeekly: x.max_weekly || 1,
     color: x.color || `hsl(${Math.round(hueById.get(x.id))} 62% 40%)`,
   }));
 }
