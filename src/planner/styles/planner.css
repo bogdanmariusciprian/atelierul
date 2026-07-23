@@ -823,6 +823,15 @@
 /* Odată ce AM oferit aici, „?"-ul se liniștește (nu mai clipește) — și-a
    primit răspunsul; „!"-ul mic din interior spune restul. */
 .pl-swap--q.on.has-offer { animation: none; }
+/* Ideea lui Marius: la hover pe „?"-ul altcuiva, pointerul lui B devine un
+   „!" verde — „asta ofer". Doar pe cercul offerable (blocul altcuiva). */
+.pl-swap--offerable {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30'><circle cx='15' cy='15' r='12' fill='%2316a34a' stroke='white' stroke-width='2.5'/><text x='15' y='21' font-size='17' font-weight='900' fill='white' text-anchor='middle' font-family='system-ui,sans-serif'>!</text></svg>") 15 15, pointer;
+}
+/* „!"-ul din interior (retragere) își păstrează cursorul normal, ca să se
+   simtă că e altă acțiune decât oferirea. */
+.pl-swap__bang { cursor: pointer; }
+
 /* „!" mic LIPIT PE INTERIORUL cercului „?" (jos-centru) — „aici am oferit". */
 .pl-swap__bang {
   position: absolute; bottom: 9%; left: 50%; transform: translateX(-50%);

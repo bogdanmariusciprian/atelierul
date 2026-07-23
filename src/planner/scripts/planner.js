@@ -650,7 +650,7 @@ function blockSwapHtml(s) {
     // un „!" mic verde — „aici am pus oferta". Îl apăs pe „!" ca s-o retrag;
     // apăs pe restul „?"-ului ca să ofer alt bloc.
     const off = S.outgoingSwaps.find((o) => o.wantSlot === s.id);
-    return `<button type="button" class="pl-swap pl-swap--q on${off ? " has-offer" : ""}" data-act="swap-offer-open" data-want="${esc(s.id)}"
+    return `<button type="button" class="pl-swap pl-swap--q on pl-swap--offerable${off ? " has-offer" : ""}" data-act="swap-offer-open" data-want="${esc(s.id)}"
       title="${off ? "Ai oferit aici — apasă „!\" ca să retragi" : "Fă schimb: oferă una din orele tale"}">?${
         off ? `<i class="pl-swap__bang" data-act="swap-withdraw-offer" data-offer="${esc(off.offerId)}" title="Retrage oferta">!</i>` : ""}</button>`;
   }
@@ -1614,27 +1614,20 @@ async function onClick(e) {
     await refresh(); return;
   }
   if (act === "swap-offer-open") {
-    const mine = await fetchOfferableSlots();
-    // nu-mi ofer blocul-țintă însuși (dacă din vreun motiv apare)
-    S.swapChooser = { wantId: b.dataset.want, mine: mine.filter((m) => m.id !== b.dataset.want) };
+    const wantId = b.dataset.want;
+    const already = new Set(S.outgoingSwaps.filter((o) => o.wantSlot === wantId).map((o) => o.offerSlot));
+    const mine = (await fetchOfferableSlots())
+      .filter((m) => m.id !== wantId && !already.has(m.id)); // nu oferi de două ori același bloc
+    S.swapChooser = { wantId, mine };
     render(); return;
   }
   if (act === "swap-send") {
     const wantId = S.swapChooser?.wantId;
     const offerSlotId = b.dataset.offer;
     S.swapChooser = null;
-    // OPTIMIST: „!"-ul sare pe „?"-ul lui A imediat, fără să aștepte serverul.
-    // Dacă oferta pică, îl retragem la loc (lecția grantEventAccess: await+revert).
-    const optimistic = { offerId: "pending", wantSlot: wantId, offerSlot: offerSlotId };
-    S.outgoingSwaps = [...S.outgoingSwaps, optimistic];
-    render();
     const r = await offerSwap(wantId, offerSlotId);
-    if (!r.ok) {
-      S.outgoingSwaps = S.outgoingSwaps.filter((o) => o !== optimistic);
-      showToast(r.message); render(); return;
-    }
-    showToast('Ai trimis „!". Dacă acceptă, orele se schimbă.', { kind: "success" });
-    await refresh(); return;
+    showToast(r.ok ? 'Ai trimis „!". Dacă acceptă, orele se schimbă.' : r.message, r.ok ? { kind: "success" } : undefined);
+    await refresh(); return; // „!"-ul apare o singură dată, din datele reale
   }
   if (act === "swap-accept") {
     const r = await acceptSwap(b.dataset.offer);
