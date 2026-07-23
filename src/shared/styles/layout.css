@@ -104,23 +104,35 @@
    pentru admin/elevii marcați, singurii care-l văd. Textul complet trăiește
    în title/aria-label. */
 .main-nav a.nav-meditatii {
-  flex: none;
+  flex: none; position: relative;
   width: 2.1rem; height: 2.1rem;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  border: 1.5px solid var(--color-border);
+  border: 0; /* inelul îl desenează ::before, rotitor */
   background: var(--color-bg);
   font-weight: 800; font-size: 0.95rem; line-height: 1;
   color: var(--color-primary);
 }
-.main-nav a.nav-meditatii::before { content: none; } /* nu rezerva lățime bold */
+/* Inelul cu gradient care se ROTEȘTE la nesfârșit: un disc conic mai mare,
+   decupat în inel de o mască radială, învârtit din `rotate`. */
+.main-nav a.nav-meditatii::before {
+  content: ""; position: absolute; inset: -2.5px; border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    var(--color-primary), #22c55e, #f59e0b, #ec4899, var(--color-primary));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
+  animation: nav-med-spin 3.5s linear infinite;
+}
+@keyframes nav-med-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+  .main-nav a.nav-meditatii::before { animation: none; }
+}
 .main-nav a.nav-meditatii:hover {
-  border-color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
   color: var(--color-primary);
 }
 .main-nav a.nav-meditatii[aria-current="page"] {
-  background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+  background: var(--color-primary); color: #fff;
   padding: 0; /* anulează pastila de pagină-activă a linkurilor normale */
 }
 
