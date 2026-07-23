@@ -650,9 +650,13 @@ function blockSwapHtml(s) {
     // un „!" mic verde — „aici am pus oferta". Îl apăs pe „!" ca s-o retrag;
     // apăs pe restul „?"-ului ca să ofer alt bloc.
     const off = S.outgoingSwaps.find((o) => o.wantSlot === s.id);
-    return `<button type="button" class="pl-swap pl-swap--q on pl-swap--offerable${off ? " has-offer" : ""}" data-act="swap-offer-open" data-want="${esc(s.id)}"
-      title="${off ? "Ai oferit aici — apasă „!\" ca să retragi" : "Fă schimb: oferă una din orele tale"}">?${
-        off ? `<i class="pl-swap__bang" data-act="swap-withdraw-offer" data-offer="${esc(off.offerId)}" title="Retrage oferta">!</i>` : ""}</button>`;
+    if (off) {
+      // Am oferit deja aici — „?"-ul nu mai oferă (un singur „!" per „?");
+      // apăs pe „!"-ul interior ca să retrag și să pot oferi altă oră.
+      return `<span class="pl-swap pl-swap--q on has-offer" title="Ai oferit aici (o singură ofertă per schimb)">?<button type="button" class="pl-swap__bang" data-act="swap-withdraw-offer" data-offer="${esc(off.offerId)}" title="Retrage oferta">!</button></span>`;
+    }
+    return `<button type="button" class="pl-swap pl-swap--q on pl-swap--offerable" data-act="swap-offer-open" data-want="${esc(s.id)}"
+      title="Fă schimb: oferă una din orele tale">?</button>`;
   }
   return "";
 }
@@ -1615,9 +1619,10 @@ async function onClick(e) {
   }
   if (act === "swap-offer-open") {
     const wantId = b.dataset.want;
-    const already = new Set(S.outgoingSwaps.filter((o) => o.wantSlot === wantId).map((o) => o.offerSlot));
-    const mine = (await fetchOfferableSlots())
-      .filter((m) => m.id !== wantId && !already.has(m.id)); // nu oferi de două ori același bloc
+    // Același bloc POATE fi oferit către „?"-uri diferite — deci filtrăm doar
+    // blocul-țintă. „Un singur „!" per „?"" e impus pe server (0072) și în UI
+    // (odată oferit aici, „?"-ul nu mai deschide selectorul).
+    const mine = (await fetchOfferableSlots()).filter((m) => m.id !== wantId);
     S.swapChooser = { wantId, mine };
     render(); return;
   }
