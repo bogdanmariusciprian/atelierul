@@ -222,7 +222,11 @@ async function addPlannerLink() {
     if (canonicalPath("/meditatii/") === canonicalPath(window.location.pathname)) {
       a.setAttribute("aria-current", "page");
     }
-    nav.appendChild(a);
+    // BEFORE the user slot (chip + logout), so „Meditații" sits with the other
+    // nav links — not orphaned past the profile chip, where it broke the pill
+    // layout on scroll. appendChild put it dead last, after the slot.
+    const slot = nav.querySelector(".nav-user-slot");
+    if (slot) nav.insertBefore(a, slot); else nav.appendChild(a);
   } catch (e) {
     console.warn("[chrome] planner link:", e);
   }
