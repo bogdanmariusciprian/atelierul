@@ -52,7 +52,7 @@ export async function fetchWeek(from = weekStart()) {
   to.setDate(to.getDate() + 7);
   const { data, error } = await supabase
     .from("planner_slots")
-    .select("id, user_id, starts_at, ends_at, note, status, kind, title, recurrence_id, external_id, planner_externals(name, color, emoji), profiles!planner_slots_user_id_fkey(display_name, avatar_color)")
+    .select("id, user_id, starts_at, ends_at, note, status, kind, title, recurrence_id, external_id, swap_wanted, swapped_at, planner_externals(name, color, emoji), profiles!planner_slots_user_id_fkey(display_name, avatar_color)")
     .eq("status", "booked")
     .gte("starts_at", from.toISOString())
     .lt("starts_at", to.toISOString())
@@ -94,8 +94,88 @@ export async function fetchWeek(from = weekStart()) {
       end: new Date(r.ends_at).getTime(),
       note: mine || admin ? (r.note || "") : "",
       canEdit: mine || admin,
+      // „?" e un apel deschis — îl vede oricine (dar doar pe lecțiile altora
+      // e acționabil). „!"-ul de după schimb e între cei doi: doar proprietarul
+      // (sau adminul) îl vede, ca să nu se afle cine a schimbat cu cine.
+      swapWanted: !personal && !!r.swap_wanted,
+      swappedAt: (mine || admin) && r.swapped_at ? new Date(r.swapped_at).getTime() : null,
     };
   });
+}
+
+// ---- schimb de sloturi între elevi („?" / „!"), migrarea 0070 ----
+
+/** Elevul pune/scoate „?" pe blocul lui. */
+export async function setSwapWanted(slotId, on) {
+  const { error } = await supabase.rpc("set_swap_wanted", { p_slot: slotId, p_on: !!on });
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+/** Elevul B oferă blocul `offerSlotId` pentru „?"-ul lui A (`wantSlotId`). */
+export async function offerSwap(wantSlotId, offerSlotId) {
+  const { error } = await supabase.rpc("offer_swap", { p_want: wantSlotId, p_offer: offerSlotId });
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+/** B își retrage oferta. */
+export async function withdrawSwap(offerId) {
+  const { error } = await supabase.rpc("withdraw_swap", { p_offer: offerId });
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+/** B retrage ofertele trimise de pe un anumit bloc (are doar id-ul blocului). */
+export async function withdrawSwapFromSlot(slotId) {
+  const { error } = await supabase.rpc("withdraw_swap_from_slot", { p_slot: slotId });
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
+}
+
+/** A confirmă o ofertă → schimbul se face pe server. */
+export async function acceptSwap(offerId) {
+  const { data, error } = await supabase.rpc("accept_swap", { p_offer: offerId });
+  if (error) return { ok: false, message: humanError(error) };
+  if (data && data.ok === false) return { ok: false, message: data.error || "Schimbul n-a mers." };
+  return { ok: true };
+}
+
+/** Ofertele PRIMITE pe blocurile mele cu „?" (ce primesc la schimb, fără nume). */
+export async function fetchMySwapOffers() {
+  const { data, error } = await supabase.rpc("my_swap_offers");
+  if (error) { console.warn("my_swap_offers:", error.message); return []; }
+  return (data || []).map((r) => ({
+    offerId: r.offer_id,
+    wantSlot: r.want_slot,
+    start: new Date(r.offer_starts).getTime(),
+    end: new Date(r.offer_ends).getTime(),
+  }));
+}
+
+/** Orele MELE (viitoare, lecții) din săptămâna curentă + următoarea — pe care
+ *  le pot oferi la schimb. Fereastra de 2 săptămâni, ca în gardă. */
+export async function fetchOfferableSlots() {
+  const upper = weekStart();
+  upper.setDate(upper.getDate() + 14);
+  const { data, error } = await supabase
+    .from("planner_slots")
+    .select("id, starts_at, ends_at")
+    .eq("user_id", CURRENT_USER.authId).eq("status", "booked").eq("kind", "lesson")
+    .gt("starts_at", new Date().toISOString())
+    .lt("starts_at", upper.toISOString())
+    .order("starts_at");
+  if (error) { console.warn("fetchOfferableSlots:", error.message); return []; }
+  return (data || []).map((r) => ({
+    id: r.id, start: new Date(r.starts_at).getTime(), end: new Date(r.ends_at).getTime(),
+  }));
+}
+
+/** Blocurile mele de pe care am trimis o ofertă (pentru „!" pal). */
+export async function fetchMyOutgoingSwaps() {
+  const { data, error } = await supabase.rpc("my_outgoing_swaps");
+  if (error) { console.warn("my_outgoing_swaps:", error.message); return []; }
+  return new Set((data || []).map((r) => r.offer_slot));
 }
 
 /** Book. Returns { ok } or { ok:false, message } — never throws for a clash,

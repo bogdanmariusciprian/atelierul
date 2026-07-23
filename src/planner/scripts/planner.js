@@ -31,6 +31,8 @@ import {
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
   fetchVacations, saveVacation, deleteVacation, bookRecurring, makeRecurring, stopSeriesHere, cancelSeries,
   fetchExternals, createExternal, updateExternal, deleteExternal,
+  setSwapWanted, offerSwap, withdrawSwap, withdrawSwapFromSlot, acceptSwap,
+  fetchMySwapOffers, fetchMyOutgoingSwaps, fetchOfferableSlots,
   fetchAvailability, saveAvailabilityWindow, deleteAvailabilityWindow, resizeAvailabilityWindow,
 } from "../../shared/scripts/planner-repo.js";
 import { CURRENT_USER, isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
@@ -48,6 +50,7 @@ const SLOTS_PER_H = 60 / SNAP_MIN;
 const ROWS = HOURS * SLOTS_PER_H;   // half-hour rows
 const ROW_PX = 26;                   // one half hour on screen
 const REC_WEEKS = 12;                // how far a weekly series reaches
+const SWAP_FRESH_MS = 5 * 60 * 1000; // „!" post-schimb rămâne 5 minute
 
 // The palette the teacher picks pupil colours from. Ten, distinct, all dark
 // enough to carry white text — free typing a hex invites unreadable blocks.
@@ -130,6 +133,10 @@ const S = {
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
   fetchId: 0,          // guards racing week-fetches: the newest click wins
+  swapOffers: [],      // pupil: „!" received on my „?" blocks
+  outgoingSwaps: new Set(), // pupil: my blocks from which I sent a „!"
+  swapMine: null,      // pupil: slotId whose received-offers panel is open
+  swapChooser: null,   // pupil: { wantId, mine:[...] } — pick a block to offer
   unwatch: null,
   loading: true,
 };
@@ -173,6 +180,11 @@ const inHours = (startMs, minutes) => {
 // mirrors it for everyone's preview so the red shows up while dragging, not
 // after dropping. The teacher stays exempt — he may log a lesson already held.
 const inPast = (startMs) => !isAdmin() && startMs < Date.now() - 5 * 60000;
+
+const swapFresh = (s) => s.swappedAt && (Date.now() - s.swappedAt < SWAP_FRESH_MS);
+const weekOf = (ms) => { const d = new Date(ms); d.setHours(0,0,0,0); const wd=(d.getDay()+6)%7; d.setDate(d.getDate()-wd); return d.getTime(); };
+const weekWord = (ms) => weekOf(ms) === weekOf(Date.now()) ? "săpt. asta" : "săpt. viitoare";
+const slotWhen = (start, end) => `${DAYS[(new Date(start).getDay()+6)%7]} ${hhmm(start)}–${hhmm(end)}, ${weekWord(start)}`;
 
 const isoDay = (i) => {
   const d = dayAt(i);
@@ -560,7 +572,8 @@ function gridHtml() {
              : s.recurrenceId ? `<i class="pl-cb__rec" title="Oră care se repetă săptămânal">🔁</i>` : ""}
            ${erasable ? `<button type="button" class="pl-block__x" data-act="cancel" data-id="${esc(s.id)}" aria-label="Anulează">×</button>` : ""}
            ${alive && s.kind === "personal" ? `<span class="pl-block__rsz pl-block__rsz--top" data-act="rsz-top" data-id="${esc(s.id)}" title="Trage ca să muți începutul" aria-hidden="true"></span>` : ""}
-           ${alive ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să ${s.kind === "personal" ? "muți sfârșitul" : "schimbi durata"}" aria-hidden="true"></span>` : ""}`;
+           ${alive ? `<span class="pl-block__rsz" data-act="rsz" data-id="${esc(s.id)}" title="Trage ca să ${s.kind === "personal" ? "muți sfârșitul" : "schimbi durata"}" aria-hidden="true"></span>` : ""}
+           ${blockSwapHtml(s)}`;
       // A full-colour CELL, straight from Marius's drawing: no text inside — the
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
@@ -605,6 +618,74 @@ function gridHtml() {
     </div>`;
 }
 
+/** Swap marker on a block: „?" (up for swap / offer) or „!" (freshly swapped
+ *  / sent). For the OWNER it toggles + opens his offers; for OTHERS it opens
+ *  the „offer one of my blocks" chooser. The teacher sees „?" passively. */
+function blockSwapHtml(s) {
+  if (s.kind !== "lesson") return "";
+  if (swapFresh(s)) return `<i class="pl-swap pl-swap--done" title="Tocmai schimbat">!</i>`;
+  if (isAdmin()) return s.swapWanted ? `<i class="pl-swap pl-swap--q is-static" title="Elevul vrea să schimbe ora">?</i>` : "";
+  if (s.end < Date.now()) return "";
+  if (s.mine) {
+    if (s.swapWanted) {
+      const n = S.swapOffers.filter((o) => o.wantSlot === s.id).length;
+      return `<button type="button" class="pl-swap pl-swap--q on" data-act="swap-open-mine" data-id="${esc(s.id)}"
+        title="Oferit la schimb — vezi ofertele sau oprește">?${n ? `<b class="pl-swap__n">${n}</b>` : ""}</button>`;
+    }
+    if (S.outgoingSwaps.has(s.id)) {
+      return `<button type="button" class="pl-swap pl-swap--sent" data-act="swap-withdraw-blk" data-id="${esc(s.id)}"
+        title="Ai oferit blocul ăsta la schimb — apasă ca să retragi">!</button>`;
+    }
+    return `<button type="button" class="pl-swap pl-swap--q off" data-act="swap-want-on" data-id="${esc(s.id)}"
+      title="Nu poți în ziua asta? Oferă ora la schimb">?</button>`;
+  }
+  if (s.swapWanted) {
+    return `<button type="button" class="pl-swap pl-swap--q on" data-act="swap-offer-open" data-want="${esc(s.id)}"
+      title="Fă schimb: oferă una din orele tale">?</button>`;
+  }
+  return "";
+}
+
+/** The received-offers panel (owner A) and the offer-chooser (offerer B),
+ *  as a small centered card. Returns "" unless one is open. */
+function swapModalsHtml() {
+  if (S.swapMine) {
+    const s = S.slots.find((x) => x.id === S.swapMine);
+    const offers = S.swapOffers.filter((o) => o.wantSlot === S.swapMine);
+    const rows = offers.length
+      ? offers.map((o) => `<div class="pl-swaprow">
+          <span class="pl-swaprow__w">🔁 ${esc(slotWhen(o.start, o.end))}</span>
+          <button type="button" class="pl-mini pl-mini--go" data-act="swap-accept" data-offer="${esc(o.offerId)}">Confirmă</button>
+        </div>`).join("")
+      : `<p class="cx-muted">Încă nicio ofertă. Când cineva vrea să schimbe, apare aici.</p>`;
+    return `<div class="pl-modal" data-act="swap-close-bg"><div class="pl-modalcard" data-act="swap-stop">
+        <b class="pl-modalcard__t">Oferte pentru ora ta${s ? ` · ${esc(slotWhen(s.start, s.end))}` : ""}</b>
+        <p class="cx-muted" style="margin:.2rem 0 .6rem">Primești în schimb ce scrie pe fiecare rând. Alegi una — restul dispar.</p>
+        ${rows}
+        <div class="pl-modalcard__acts">
+          <button type="button" class="btn-mini" data-act="swap-want-off" data-id="${esc(S.swapMine)}">Nu mai ofer la schimb</button>
+          <button type="button" class="btn-mini" data-act="swap-close">Închide</button>
+        </div>
+      </div></div>`;
+  }
+  if (S.swapChooser) {
+    const mine = S.swapChooser.mine;
+    const rows = mine.length
+      ? mine.map((m) => `<div class="pl-swaprow">
+          <span class="pl-swaprow__w">${esc(slotWhen(m.start, m.end))}</span>
+          <button type="button" class="pl-mini pl-mini--go" data-act="swap-send" data-offer="${esc(m.id)}">Oferă asta</button>
+        </div>`).join("")
+      : `<p class="cx-muted">N-ai nicio oră de oferit în săptămâna asta sau următoarea.</p>`;
+    return `<div class="pl-modal" data-act="swap-close-bg"><div class="pl-modalcard" data-act="swap-stop">
+        <b class="pl-modalcard__t">Cu ce oră faci schimbul?</b>
+        <p class="cx-muted" style="margin:.2rem 0 .6rem">Oferi una din orele tale. Trimiți un „!", iar celălalt alege dacă acceptă.</p>
+        ${rows}
+        <div class="pl-modalcard__acts"><button type="button" class="btn-mini" data-act="swap-close">Renunț</button></div>
+      </div></div>`;
+  }
+  return "";
+}
+
 /** The red thread of „now", so today's column reads as alive, not just tinted. */
 function nowLineHtml() {
   const row = msToRow(Date.now());
@@ -633,6 +714,7 @@ function render() {
             : "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră. Trage de marginile uneia existente ca să o ajustezi; × o închide.")
           : "Trage o bulină în orar ca să pui ora — o faci săptămânală din 🔁 de pe bloc. Click pe bulină îi deschide setările; scoaterea unui elev se face din Comunitate → membri."}</p>
       </div>` : ""}
+      ${swapModalsHtml()}
       <div class="pl-live" data-role="live" hidden></div>`;
     return;
   }
@@ -669,6 +751,7 @@ function render() {
       <p class="pl-hint">Ai dreptul la ${S.myMax} ${S.myMax === 1 ? "oră" : "ore"} pe săptămână. Trage în zona deschisă ca să-ți pui ora — blocul tău îl muți, îl întinzi de mânerul de jos (1h · 1h30 · 2h) sau îl anulezi cu ×.${
         mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "oră" : "ore"} săptămâna asta.` : ""}</p>
     </div>` : ""}
+    ${swapModalsHtml()}
     <div class="pl-live" data-role="live" hidden></div>`;
 }
 
@@ -786,7 +869,7 @@ function onDown(e) {
   // something for that day: an availability window, or a personal block.
   if (S.paint) {
     // Buttons and fields on the board stay CLICKS even in pencil mode.
-    if (e.target.closest('[data-act="avail-del"], [data-act="cancel"], [data-act="rec-toggle"], [data-act="rename-ok"], [data-act="rename-no"], [data-role="rename"], .pl-block__confirm, .pl-mini')) return;
+    if (e.target.closest('[data-act="avail-del"], [data-act="cancel"], [data-act="rec-toggle"], [data-act="rename-ok"], [data-act="rename-no"], [data-role="rename"], .pl-swap, .pl-block__confirm, .pl-mini')) return;
 
     // Regime „activitate personală": personal blocks stay ALIVE — the handle
     // resizes, a drag moves, a motionless press renames (see onUp). A press on
@@ -883,7 +966,7 @@ function onDown(e) {
   const grab = rsz ? null : e.target.closest('[data-act="grab"]');
   const lane = e.target.closest(".pl-lane");
   if (!rsz && !chip && !lane && !grab) return;
-  if (e.target.closest('[data-act="cancel"], [data-act="rec-toggle"], [data-act="ext-new"], .pl-block__confirm, .pl-mini')) return;
+  if (e.target.closest('[data-act="cancel"], [data-act="rec-toggle"], [data-act="ext-new"], .pl-swap, .pl-block__confirm, .pl-mini')) return;
 
   // RESIZE: the start stays put; only the length follows the pointer,
   // snapping to the three legal durations.
@@ -1491,6 +1574,52 @@ async function onClick(e) {
     showToast("Vacanță ștearsă.");
     render(); return;
   }
+
+  // ---- schimb de sloturi între elevi („?" / „!") ----
+  if (act === "swap-want-on") {
+    const r = await setSwapWanted(b.dataset.id, true);
+    if (!r.ok) { showToast(r.message); return; }
+    showToast('Ora ta e acum oferită la schimb. Ceilalți văd un „?".', { kind: "success" });
+    await refresh(); return;
+  }
+  if (act === "swap-want-off") {
+    const r = await setSwapWanted(b.dataset.id, false);
+    if (!r.ok) { showToast(r.message); return; }
+    S.swapMine = null;
+    showToast("Nu mai oferi ora la schimb.");
+    await refresh(); return;
+  }
+  if (act === "swap-open-mine") { S.swapMine = b.dataset.id; render(); return; }
+  if (act === "swap-withdraw-blk") {
+    const r = await withdrawSwapFromSlot(b.dataset.id);
+    if (!r.ok) { showToast(r.message); return; }
+    showToast("Ofertă retrasă.");
+    await refresh(); return;
+  }
+  if (act === "swap-offer-open") {
+    const mine = await fetchOfferableSlots();
+    // nu-mi ofer blocul-țintă însuși (dacă din vreun motiv apare)
+    S.swapChooser = { wantId: b.dataset.want, mine: mine.filter((m) => m.id !== b.dataset.want) };
+    render(); return;
+  }
+  if (act === "swap-send") {
+    const { wantId } = S.swapChooser || {};
+    S.swapChooser = null;
+    const r = await offerSwap(wantId, b.dataset.offer);
+    showToast(r.ok ? 'Ai trimis „!". Dacă acceptă, orele se schimbă.' : r.message, r.ok ? { kind: "success" } : undefined);
+    await refresh(); return;
+  }
+  if (act === "swap-accept") {
+    const r = await acceptSwap(b.dataset.offer);
+    S.swapMine = null;
+    if (!r.ok) { showToast(r.message); await refresh(); return; }
+    showToast("Schimb făcut! Orele au trecut una în locul celeilalte.", { kind: "success" });
+    await refresh(); return;
+  }
+  if (act === "swap-stop") return; // click pe cardul modalului: nu închide
+  if (act === "swap-close" || act === "swap-close-bg") {
+    S.swapMine = null; S.swapChooser = null; render(); return;
+  }
 }
 
 function onTypeTitle(e) {
@@ -1583,10 +1712,28 @@ async function refresh() {
   // last and paint the WRONG week. The token makes the newest click win.
   const my = ++S.fetchId;
   const slots = await fetchWeek(S.week);
+  // Swap state travels with the slots for pupils: offers received, and which
+  // of my blocks have an outgoing „!". Cheap RPCs; skipped for the teacher.
+  const [offers, outgoing] = !isAdmin()
+    ? await Promise.all([fetchMySwapOffers(), fetchMyOutgoingSwaps()])
+    : [[], new Set()];
   if (my !== S.fetchId || !S.root) return;
   S.slots = slots;
+  S.swapOffers = offers;
+  S.outgoingSwaps = outgoing;
   S.loading = false;
   render();
+  scheduleSwapFadeout();
+}
+
+/** A freshly-swapped block shows „!" for 5 minutes; nothing else re-renders it
+ *  once the animation ends, so a lone timer clears the marker at the 5-min mark. */
+let swapFadeTimer = null;
+function scheduleSwapFadeout() {
+  clearTimeout(swapFadeTimer);
+  const fresh = S.slots.filter((s) => s.swappedAt).map((s) => s.swappedAt + SWAP_FRESH_MS - Date.now());
+  const next = fresh.filter((ms) => ms > 0).sort((a, b) => a - b)[0];
+  if (next != null) swapFadeTimer = setTimeout(() => { if (S.root) render(); }, next + 200);
 }
 
 /** One place computes the display colour, so the dock, the blocks and the
