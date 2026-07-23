@@ -639,13 +639,16 @@
   box-shadow: inset 0 0 5px 3px rgb(0 0 0 / 0.72);
   display: inline-grid; place-items: center;
 }
-/* Intervalul orar, discret, sub nume — pe fiecare bloc, la admin și la elev.
-   Nu-l arătăm pe blocurile prea scunde (o oră ocupă 4 rânduri; sub asta,
-   textul s-ar înghesui în chenar). */
+/* Intervalul orar, discret — ANCORAT JOS în bloc, poziționat absolut, ca să
+   nu se bată cu discul-simbol și numele centrate (ca al treilea rând de grid
+   era strivit între ele). La admin și la elev deopotrivă. */
 .pl-cb__time {
-  font-size: 0.62rem; line-height: 1.1; color: #fff; opacity: 0.82;
+  position: absolute; left: 0; right: 0; bottom: 3px;
+  text-align: center;
+  font-size: 0.62rem; line-height: 1.1; color: #fff; opacity: 0.85;
   font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
 }
 .pl-cb__nm {
   max-width: 100%; padding: 0 0.3rem;
