@@ -111,7 +111,7 @@
   border: 0; /* inelul îl desenează ::before, rotitor */
   background: var(--color-bg);
   font-weight: 800; font-size: 0.95rem; line-height: 1;
-  color: var(--color-primary);
+  color: #7c3aed; /* mov fix — coerent cu inelul AI, nu verdele temei */
 }
 /* Inelul cu gradient care se ROTEȘTE la nesfârșit: un disc conic mai mare,
    decupat în inel de o mască radială, învârtit din `rotate`. */
@@ -144,11 +144,11 @@
   .main-nav a.nav-meditatii::before { animation: none; }
 }
 .main-nav a.nav-meditatii:hover {
-  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  color: var(--color-primary);
+  background: color-mix(in srgb, #7c3aed 12%, transparent);
+  color: #6d28d9;
 }
 .main-nav a.nav-meditatii[aria-current="page"] {
-  background: var(--color-primary); color: #fff;
+  background: #7c3aed; color: #fff;
   padding: 0; /* anulează pastila de pagină-activă a linkurilor normale */
 }
 
