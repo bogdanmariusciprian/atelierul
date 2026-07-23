@@ -651,9 +651,10 @@ function blockSwapHtml(s) {
     // apăs pe restul „?"-ului ca să ofer alt bloc.
     const off = S.outgoingSwaps.find((o) => o.wantSlot === s.id);
     if (off) {
-      // Am oferit deja aici — „?"-ul nu mai oferă (un singur „!" per „?");
-      // apăs pe „!"-ul interior ca să retrag și să pot oferi altă oră.
-      return `<span class="pl-swap pl-swap--q on has-offer" title="Ai oferit aici (o singură ofertă per schimb)">?<button type="button" class="pl-swap__bang" data-act="swap-withdraw-offer" data-offer="${esc(off.offerId)}" title="Retrage oferta">!</button></span>`;
+      // Am oferit deja aici — „?"-ul poartă un „!" verde (::after) pe interior;
+      // click pe cerc = retrage oferta (un singur „!" per „?").
+      return `<button type="button" class="pl-swap pl-swap--q on has-offer" data-act="swap-withdraw-offer" data-offer="${esc(off.offerId)}"
+        title="Ai oferit aici — apasă ca să retragi oferta">?</button>`;
     }
     return `<button type="button" class="pl-swap pl-swap--q on pl-swap--offerable" data-act="swap-offer-open" data-want="${esc(s.id)}"
       title="Fă schimb: oferă una din orele tale">?</button>`;
