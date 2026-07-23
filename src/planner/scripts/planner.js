@@ -629,8 +629,14 @@ function blockSwapHtml(s) {
   if (s.mine) {
     if (s.swapWanted) {
       const n = S.swapOffers.filter((o) => o.wantSlot === s.id).length;
+      // Ai oferte → „!" (Pac!), la fel ca pe blocul celui care a oferit.
+      // Încă niciuna → „?" mare care se fâțâie („Hei! E cineva?").
+      if (n) {
+        return `<button type="button" class="pl-swap pl-swap--offer" data-act="swap-open-mine" data-id="${esc(s.id)}"
+          title="Ai ${n} ${n === 1 ? "ofertă" : "oferte"} de schimb — alege">!<b class="pl-swap__n">${n}</b></button>`;
+      }
       return `<button type="button" class="pl-swap pl-swap--q on" data-act="swap-open-mine" data-id="${esc(s.id)}"
-        title="Oferit la schimb — vezi ofertele sau oprește">?${n ? `<b class="pl-swap__n">${n}</b>` : ""}</button>`;
+        title="Oferit la schimb — vezi ofertele sau oprește">?</button>`;
     }
     if (S.outgoingSwaps.has(s.id)) {
       return `<button type="button" class="pl-swap pl-swap--sent" data-act="swap-withdraw-blk" data-id="${esc(s.id)}"

@@ -799,8 +799,13 @@
 .pl-swap--q { background: #f59e0b; }          /* „?" — chihlimbar, atrage atenția */
 .pl-swap--q.off { opacity: 0; }                /* apare la hover pe blocul propriu */
 .pl-block:hover .pl-swap--q.off { opacity: 0.85; }
-.pl-swap--sent, .pl-swap--done { background: #16a34a; } /* „!" — verde */
-.pl-swap--sent { opacity: 0.85; }
+.pl-swap--offer, .pl-swap--sent, .pl-swap--done { background: #16a34a; } /* „!" — verde */
+.pl-swap--sent { opacity: 0.9; }
+/* Stările active — mai mari, ca să sară în ochi. */
+.pl-swap--q.on, .pl-swap--offer, .pl-swap--sent, .pl-swap--done {
+  width: 1.65rem; height: 1.65rem; font-size: 1.05rem;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
 .pl-swap__n {
   position: absolute; top: -5px; right: -5px; min-width: 0.95rem; height: 0.95rem;
   padding: 0 3px; border-radius: 999px; background: #16a34a; color: #fff;
@@ -817,7 +822,7 @@
   75% { transform: translateX(0) rotate(0); }
 }
 /* „Pac!" — se umflă și se strânge (pe „!"). */
-.pl-swap--done, .pl-swap--sent { animation: pl-swap-pop 1.6s ease-in-out infinite; }
+.pl-swap--offer, .pl-swap--done, .pl-swap--sent { animation: pl-swap-pop 1.6s ease-in-out infinite; }
 @keyframes pl-swap-pop {
   0%, 70%, 100% { transform: scale(1); }
   20% { transform: scale(1.4); }
@@ -825,7 +830,7 @@
   50% { transform: scale(1.18); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pl-swap--q.on, .pl-swap--done, .pl-swap--sent { animation: none; }
+  .pl-swap--q.on, .pl-swap--offer, .pl-swap--done, .pl-swap--sent { animation: none; }
 }
 
 /* Modalul de schimb — card mic, centrat, peste un fundal întunecat. */
