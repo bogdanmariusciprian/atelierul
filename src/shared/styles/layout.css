@@ -641,6 +641,15 @@
 /* Guest-only links (the community sales pitch) vanish once you're in. */
 body.is-logged .nav-guest-only { display: none; }
 .nav-cta { flex: none; }
+/* Chipul + logout-ul, mereu pe ACELAȘI rând — slotul era un <span> inline,
+   iar la îngustarea pastilei (scroll) logout-ul se rupea sub chip. */
+.nav-user-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+}
+
 .nav-user {
   display: inline-flex;
   align-items: center;
