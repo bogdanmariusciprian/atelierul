@@ -72,7 +72,7 @@ export async function fetchWeek(from = weekStart()) {
     const label = personal
       ? (admin ? (r.title || "Activitate personală") : "Ocupat")
       : ext && admin ? (ext.name || "Extern")
-      : mine && !ext ? "Tu" : admin ? (r.profiles?.display_name || "Membru") : "Ocupat";
+      : mine && !ext ? "Eu" : admin ? (r.profiles?.display_name || "Membru") : "Ocupat";
     return {
       id: r.id,
       userId: r.user_id,
