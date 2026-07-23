@@ -843,8 +843,10 @@
 }
 .pl-swap__n {
   position: absolute; top: -5px; right: -5px; min-width: 0.95rem; height: 0.95rem;
-  padding: 0 3px; border-radius: 999px; background: #16a34a; color: #fff;
-  font-size: 0.6rem; line-height: 0.95rem; text-align: center; font-weight: 800;
+  padding: 0 3px; border-radius: 999px;
+  background: #fff; color: #dc2626; /* alb + număr roșu bold — vizibil pe orice bloc */
+  font-size: 0.62rem; line-height: 0.95rem; text-align: center; font-weight: 800;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 /* „Fâțâit" pentru cercul centrat — translate(-50%,-50%) rămâne în fiecare
    cadru, altfel s-ar smuci din centru. */
