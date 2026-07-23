@@ -116,29 +116,40 @@
 /* Inelul cu gradient care se ROTEȘTE la nesfârșit: un disc conic mai mare,
    decupat în inel de o mască radială, învârtit din `rotate`. */
 .main-nav a.nav-meditatii::before {
-  content: ""; position: absolute; inset: -2.5px; border-radius: 50%;
+  content: ""; position: absolute; inset: -3.5px;
+  /* formă de amibă: border-radius care se morfează (nu mai e cerc) */
+  border-radius: 70% 30% 46% 54% / 38% 62% 38% 62%;
   /* ANULĂM moștenirea din .main-nav a::before (height:0; visibility:hidden),
      altfel inelul se năștea invizibil. */
   height: auto; width: auto; overflow: visible; visibility: visible;
-  /* Paleta „AI": violet → indigo → purpuriu → fuchsia și înapoi (buclă lină,
-     prima și ultima culoare identice). */
+  /* Paleta „AI": violet → indigo → purpuriu → fuchsia și înapoi. */
   background: conic-gradient(from 0deg,
     #7c3aed, #6366f1, #a855f7, #d946ef, #8b5cf6, #7c3aed);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-  animation: nav-med-spin 9s infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 60%);
+  mask: radial-gradient(farthest-side, transparent 52%, #000 60%);
+  /* DOUĂ animații cu perioade nepotrivite (8.5s + 11s) — nu se sincronizează,
+     deci tiparul combinat se repetă abia după ~93s: ochiul nu prinde bucla. */
+  animation: nav-med-morph 8.5s ease-in-out infinite,
+             nav-med-squish 11s ease-in-out infinite;
 }
-/* Traseu care pare fără sens fix: înainte, înapoi, iar înainte, cu opriri
-   line la cotituri (ease-in-out per segment). Se termină la o tură completă,
-   ca bucla să fie fără cusătură. */
-@keyframes nav-med-spin {
-  0%   { transform: rotate(0deg);    animation-timing-function: ease-in-out; }
-  16%  { transform: rotate(135deg);  animation-timing-function: ease-in-out; }
-  30%  { transform: rotate(70deg);   animation-timing-function: ease-in-out; }
-  48%  { transform: rotate(255deg);  animation-timing-function: ease-in-out; }
-  64%  { transform: rotate(185deg);  animation-timing-function: ease-in-out; }
-  82%  { transform: rotate(340deg);  animation-timing-function: ease-in-out; }
-  100% { transform: rotate(360deg); }
+/* Forma (pseudopode neregulate). */
+@keyframes nav-med-morph {
+  0%   { border-radius: 70% 30% 46% 54% / 38% 62% 38% 62%; }
+  12%  { border-radius: 38% 62% 63% 37% / 58% 40% 60% 42%; }
+  27%  { border-radius: 55% 45% 34% 66% / 66% 55% 45% 34%; }
+  41%  { border-radius: 33% 67% 58% 42% / 44% 63% 37% 56%; }
+  58%  { border-radius: 62% 38% 44% 56% / 60% 33% 67% 40%; }
+  73%  { border-radius: 47% 53% 66% 34% / 36% 58% 42% 64%; }
+  88%  { border-radius: 58% 42% 36% 64% / 62% 48% 52% 38%; }
+  100% { border-radius: 70% 30% 46% 54% / 38% 62% 38% 62%; }
+}
+/* Strâns–întins + o urmă de răsucire, pe altă perioadă. */
+@keyframes nav-med-squish {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); }
+  22%      { transform: scale(1.07, 0.92) rotate(5deg); }
+  39%      { transform: scale(0.93, 1.08) rotate(-3deg); }
+  61%      { transform: scale(1.05, 0.96) rotate(6deg); }
+  80%      { transform: scale(0.97, 1.04) rotate(-4deg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .main-nav a.nav-meditatii::before { animation: none; }
