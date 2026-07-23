@@ -126,9 +126,20 @@
     #7c3aed, #6366f1, #a855f7, #d946ef, #8b5cf6, #7c3aed);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-  animation: nav-med-spin 3.5s linear infinite;
+  animation: nav-med-spin 9s infinite;
 }
-@keyframes nav-med-spin { to { transform: rotate(1turn); } }
+/* Traseu care pare fără sens fix: înainte, înapoi, iar înainte, cu opriri
+   line la cotituri (ease-in-out per segment). Se termină la o tură completă,
+   ca bucla să fie fără cusătură. */
+@keyframes nav-med-spin {
+  0%   { transform: rotate(0deg);    animation-timing-function: ease-in-out; }
+  16%  { transform: rotate(135deg);  animation-timing-function: ease-in-out; }
+  30%  { transform: rotate(70deg);   animation-timing-function: ease-in-out; }
+  48%  { transform: rotate(255deg);  animation-timing-function: ease-in-out; }
+  64%  { transform: rotate(185deg);  animation-timing-function: ease-in-out; }
+  82%  { transform: rotate(340deg);  animation-timing-function: ease-in-out; }
+  100% { transform: rotate(360deg); }
+}
 @media (prefers-reduced-motion: reduce) {
   .main-nav a.nav-meditatii::before { animation: none; }
 }
