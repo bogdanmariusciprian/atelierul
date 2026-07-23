@@ -790,11 +790,12 @@
    trimisă / proaspăt schimbat (animație „Pac!": se umflă și se strânge).
    ========================================================= */
 .pl-swap {
-  position: absolute; top: 2px; left: 3px; z-index: 3;
+  position: absolute; top: 4px; left: 4px; z-index: 3;
   width: 1.25rem; height: 1.25rem; padding: 0; border: 0; border-radius: 50%;
   display: inline-grid; place-items: center; cursor: pointer;
   font: 800 0.82rem/1 inherit; color: #fff;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  transform-origin: top left; /* orice scalare crește spre interiorul blocului */
 }
 .pl-swap--q { background: #f59e0b; }          /* „?" — chihlimbar, atrage atenția */
 .pl-swap--q.off { opacity: 0; }                /* apare la hover pe blocul propriu */
@@ -812,6 +813,7 @@
    ratat, vizibil și pentru ceilalți. Înainte de click rămâne mic în colț. */
 .pl-swap--q.on {
   top: 50%; left: 50%; right: auto; bottom: auto;
+  transform-origin: center;
   width: 68%; height: auto; aspect-ratio: 1;
   border-radius: 50%; font-size: 2.1rem;
   background: rgba(245, 158, 11, 0.94);
