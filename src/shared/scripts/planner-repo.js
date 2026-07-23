@@ -95,10 +95,10 @@ export async function fetchWeek(from = weekStart()) {
       note: mine || admin ? (r.note || "") : "",
       canEdit: mine || admin,
       // „?" e un apel deschis — îl vede oricine (dar doar pe lecțiile altora
-      // e acționabil). „!"-ul de după schimb e între cei doi: doar proprietarul
-      // (sau adminul) îl vede, ca să nu se afle cine a schimbat cu cine.
+      // e acționabil). „!"-ul gri de după schimb îl văd TOȚI, ca să înțeleagă
+      // că ora tocmai s-a schimbat și nu se mai fac oferte pe ea (5 min).
       swapWanted: !personal && !!r.swap_wanted,
-      swappedAt: (mine || admin) && r.swapped_at ? new Date(r.swapped_at).getTime() : null,
+      swappedAt: r.swapped_at ? new Date(r.swapped_at).getTime() : null,
     };
   });
 }

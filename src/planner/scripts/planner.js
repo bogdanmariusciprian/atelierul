@@ -623,7 +623,7 @@ function gridHtml() {
  *  the „offer one of my blocks" chooser. The teacher sees „?" passively. */
 function blockSwapHtml(s) {
   if (s.kind !== "lesson") return "";
-  if (swapFresh(s)) return `<i class="pl-swap pl-swap--done" title="Tocmai schimbat">!</i>`;
+  if (swapFresh(s)) return `<i class="pl-swap pl-swap--done" title="Oră tocmai schimbată — schimbul s-a încheiat, nu se mai fac oferte">!</i>`;
   if (isAdmin()) return s.swapWanted ? `<i class="pl-swap pl-swap--q is-static" title="Elevul vrea să schimbe ora">?</i>` : "";
   if (s.end < Date.now()) return "";
   if (s.mine) {

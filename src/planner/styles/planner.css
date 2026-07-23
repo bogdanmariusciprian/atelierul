@@ -800,8 +800,11 @@
 .pl-swap--q { background: #f59e0b; }          /* „?" — chihlimbar, atrage atenția */
 .pl-swap--q.off { opacity: 0; }                /* apare la hover pe blocul propriu */
 .pl-block:hover .pl-swap--q.off { opacity: 0.85; }
-.pl-swap--offer, .pl-swap--sent, .pl-swap--done { background: #16a34a; } /* „!" — verde */
+.pl-swap--offer, .pl-swap--sent { background: #16a34a; } /* „!" — verde */
 .pl-swap--sent { opacity: 0.9; }
+/* „Tocmai schimbat" — GRI, fără animație, vizibil TUTUROR: „schimbul s-a
+   făcut, nu se mai oferă" (rămâne 5 min). */
+.pl-swap--done { background: #94a3b8; opacity: 0.92; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
 /* „!"-urile (ofertă primită/trimisă/proaspăt schimbat) — badge de colț,
    doar un pic mai mari ca să sară în ochi. */
 .pl-swap--offer, .pl-swap--sent, .pl-swap--done {
@@ -859,7 +862,7 @@
   75% { transform: translate(-50%, -50%) rotate(0); }
 }
 /* „Pac!" — se umflă și se strânge (pe „!"). */
-.pl-swap--offer, .pl-swap--done, .pl-swap--sent {
+.pl-swap--offer, .pl-swap--sent {
   animation: pl-swap-pop 1.6s ease-in-out infinite; /* Pac! din centrul cercului */
 }
 @keyframes pl-swap-pop {
@@ -870,7 +873,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .pl-swap--q.on { animation: none; transform: translate(-50%, -50%); }
-  .pl-swap--offer, .pl-swap--done, .pl-swap--sent { animation: none; }
+  .pl-swap--offer, .pl-swap--sent { animation: none; }
 }
 
 /* Modalul de schimb — card mic, centrat, peste un fundal întunecat. */
