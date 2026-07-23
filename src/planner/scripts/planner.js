@@ -30,6 +30,7 @@ import {
   weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, renameSlot, watchSlots,
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
   fetchVacations, saveVacation, deleteVacation, bookRecurring, makeRecurring, stopSeriesHere, cancelSeries,
+  fetchExternals, createExternal, updateExternal, deleteExternal,
   fetchAvailability, saveAvailabilityWindow, deleteAvailabilityWindow, resizeAvailabilityWindow,
 } from "../../shared/scripts/planner-repo.js";
 import { CURRENT_USER, isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
@@ -106,6 +107,10 @@ const S = {
   week: weekStart(),
   slots: [],
   pupils: [],          // admin: marked pupils with custom name/colour/minutes
+  externals: [],       // admin: label-pupils without accounts (0068)
+  editExternal: null,  // external being edited; "new" = the + form
+  extDraft: null,      // the + form's uncommitted fields
+  extDelAsk: false,    // inline confirm for deleting an external
   vacations: [],
   avail: [],           // the teacher's weekly windows — the source of pupil slots
   paint: false,        // admin: the pencil — editing his own layer of the board
@@ -226,12 +231,14 @@ function neededVisH() {
 /** The teacher's nickname for a pupil beats the profile name on his screen. */
 function slotName(s) {
   if (isAdmin() && s.kind === "lesson") {
+    if (s.externalId) return S.externals.find((x) => x.id === s.externalId)?.name || s.name;
     return S.pupils.find((p) => p.id === s.userId)?.name || s.name;
   }
   return s.name;
 }
 function slotColor(s) {
   if (isAdmin() && s.kind === "lesson") {
+    if (s.externalId) return S.externals.find((x) => x.id === s.externalId)?.color || s.color;
     return S.pupils.find((p) => p.id === s.userId)?.color || s.color;
   }
   if (s.mine && S.myColor) return S.myColor;
@@ -353,9 +360,70 @@ function paletteHtml() {
         data-uid="${esc(p.id)}" data-hover-uid="${esc(p.id)}" data-name="${esc(tip)}"
         style="--c:${esc(p.color)}" aria-label="${esc(tip)}">${esc(p.emoji || "")}</button>`;
   }).join("");
+  const extStat = new Map();
+  for (const x of S.slots) {
+    if (!x.externalId) continue;
+    const cur = extStat.get(x.externalId) || { min: 0, first: null };
+    cur.min += Math.round((x.end - x.start) / 60000);
+    if (!cur.first || x.start < cur.first.start) cur.first = x;
+    extStat.set(x.externalId, cur);
+  }
+  const extDots = S.externals.map((x) => {
+    const st = extStat.get(x.id);
+    const tip = st
+      ? `${x.name} (extern) — ${DAYS[dayIndexOf(st.first.start)]} ${hhmm(st.first.start)}, ${durLabel(st.min)}${st.min > 120 ? "+" : ""}`
+      : `${x.name} (extern) — fără oră săptămâna asta`;
+    return `<button type="button" class="pl-dot pl-dot--ext${st ? "" : " is-todo"}" data-act="pick" data-ext="${esc(x.id)}"
+        data-hover-uid="${esc(x.id)}" data-name="${esc(tip)}"
+        style="--c:${esc(x.color)}" aria-label="${esc(tip)}">${esc(x.emoji || "")}</button>`;
+  }).join("");
   return `<div class="pl-palette">
       ${dots}
+      ${extDots}
+      <button type="button" class="pl-dot pl-dot--add" data-act="ext-new" title="Adaugă un elev extern (fără cont pe platformă)" aria-label="Adaugă elev extern">+</button>
       ${S.editPupil ? pupilEditorHtml() : ""}
+      ${S.editExternal ? externalEditorHtml() : ""}
+    </div>`;
+}
+
+/** The EXTERNAL editor — create („+") or edit a label-pupil. No Ritm, no
+ *  weekly quota: an external has no account, no view, no self-service; it is
+ *  a named block and nothing more (Marius's definition, word for word). */
+function externalEditorHtml() {
+  const isNew = S.editExternal === "new";
+  const x = isNew ? S.extDraft : S.externals.find((e) => e.id === S.editExternal);
+  if (!x) return "";
+  const sw = SWATCHES.map((c) => `
+    <button type="button" class="pl-sw${x.color === c ? " on" : ""}" data-act="ext-color"
+            data-c="${c}" style="--c:${c}" aria-label="Culoarea ${c}"></button>`).join("");
+  const durs = DURATIONS.map((m) => `
+    <button type="button" class="pl-dur${x.minutes === m ? " on" : ""}" data-act="ext-min" data-m="${m}">
+      ${esc(durLabel(m))}
+    </button>`).join("");
+  const syms = SYMBOLS.map((e) => `
+    <button type="button" class="pl-sym${x.emoji === e ? " on" : ""}" data-act="ext-sym" data-e="${e}">${e}</button>`).join("");
+  return `<div class="pl-cfg">
+      <label class="pl-cfg__f">Numele elevului extern
+        <input class="pl-cfg__name" data-act="ext-name" maxlength="40"
+               value="${esc(x.name || "")}" placeholder="ex. Andrei (meditații privat)" />
+      </label>
+      <label class="pl-cfg__f">Simbol
+        <input class="pl-cfg__emoji" data-act="ext-emoji" maxlength="8"
+               value="${esc(x.emoji || "")}" placeholder="scrie sau alege" />
+      </label>
+      <div class="pl-cfg__f"><span>Alege rapid</span><div class="pl-cfg__sym">${syms}</div></div>
+      <div class="pl-cfg__f"><span>Culoare</span><div class="pl-cfg__sw">${sw}</div></div>
+      <div class="pl-cfg__f"><span>Durata lui implicită</span><div>${durs}</div></div>
+      <div class="pl-cfg__acts">
+        <button type="button" class="btn-mini btn-mini--ok" data-act="ext-save">${isNew ? "Adaugă" : "Salvează"}</button>
+        ${!isNew ? (S.extDelAsk
+          ? `<span class="pl-block__confirm">Îi șterge și orele!
+               <button type="button" class="pl-mini pl-mini--no" data-act="ext-del-yes">Da, șterge</button>
+               <button type="button" class="pl-mini" data-act="ext-del-no">Nu</button></span>`
+          : `<button type="button" class="btn-mini" data-act="ext-del">Șterge elevul</button>`) : ""}
+        <button type="button" class="btn-mini" data-act="cfg-close">Închide</button>
+      </div>
+      <p class="pl-cfg__hint">Elev fără cont: nu are view, nu are cotă — e doar un bloc pe care îl denumești tu.</p>
     </div>`;
 }
 
@@ -479,7 +547,7 @@ function gridHtml() {
              <button type="button" class="pl-mini" data-act="rename-ok" data-id="${esc(s.id)}">✓</button>
              <button type="button" class="pl-mini" data-act="rename-no">×</button>
            </span>`
-        : `${s.kind === "lesson" && pupilEmoji(s.userId) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm">${esc(slotName(s))}</b>
+        : `${s.kind === "lesson" && (s.externalId ? s.extEmoji : pupilEmoji(s.userId)) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(s.externalId ? s.extEmoji : pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm">${esc(slotName(s))}</b>
            ${alive && isAdmin() ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
                title="${s.recurrenceId
                  ? "Se repetă săptămânal. Apasă ca să oprești repetarea de aici înainte — blocul ăsta rămâne, singur."
@@ -495,7 +563,7 @@ function gridHtml() {
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
       return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
-        data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.userId)}" data-name="${esc(tip)}"
+        data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
         ${body}
       </div>`;
@@ -606,6 +674,7 @@ function sourceLabel() {
   const s = S.source;
   if (!s) return "";
   if (!isAdmin()) return "Ora mea";
+  if (s.externalId) return S.externals.find((x) => x.id === s.externalId)?.name || "Extern";
   return S.pupils.find((p) => p.id === s.userId)?.name || "Elev";
 }
 
@@ -794,7 +863,7 @@ function onDown(e) {
   const grab = rsz ? null : e.target.closest('[data-act="grab"]');
   const lane = e.target.closest(".pl-lane");
   if (!rsz && !chip && !lane && !grab) return;
-  if (e.target.closest('[data-act="cancel"], [data-act="rec-toggle"], .pl-block__confirm, .pl-mini')) return;
+  if (e.target.closest('[data-act="cancel"], [data-act="rec-toggle"], [data-act="ext-new"], .pl-block__confirm, .pl-mini')) return;
 
   // RESIZE: the start stays put; only the length follows the pointer,
   // snapping to the three legal durations.
@@ -826,12 +895,18 @@ function onDown(e) {
   if (grab && !existing?.canEdit) return;
 
   if (chip) {
-    S.source = { kind: "lesson", userId: chip.dataset.uid || null, title: "" };
+    S.source = {
+      kind: "lesson",
+      userId: chip.dataset.uid || null,
+      externalId: chip.dataset.ext || null,
+      title: "",
+    };
 
-    // Picking a pupil's chip adopts THEIR default duration — the teacher set it
-    // per pupil for a reason, and this is where it pays off.
-    if (isAdmin() && S.source.kind === "lesson") {
-      const p = S.pupils.find((x) => x.id === S.source.userId);
+    // Picking a chip adopts ITS default duration — real pupil or external.
+    if (isAdmin()) {
+      const p = S.source.externalId
+        ? S.externals.find((x) => x.id === S.source.externalId)
+        : S.pupils.find((x) => x.id === S.source.userId);
       if (p) S.minutes = p.minutes;
     }
     chip.classList.add("is-held");
@@ -987,7 +1062,9 @@ function paintDrag(x, y) {
  *  would flash it for a frame. The lane ghost answers WHERE you'd land; this
  *  answers WHAT you're holding. */
 function makeFloater(x, y) {
-  const p = S.pupils.find((q) => q.id === S.source?.userId);
+  const p = S.source?.externalId
+    ? S.externals.find((q) => q.id === S.source.externalId)
+    : S.pupils.find((q) => q.id === S.source?.userId);
   const fl = document.createElement("div");
   fl.className = "pl-floater";
   fl.innerHTML = `<i class="pl-floater__dot" style="--c:${esc(p?.color || "#7c3aed")}">${esc(p?.emoji || "")}</i>
@@ -1028,7 +1105,13 @@ async function onUp() {
   // settings. One object, two gestures, told apart by the flag the drag
   // machinery already keeps for free.
   if (d.fromTray && !d.moved) {
-    if (S.source?.userId) S.editPupil = S.editPupil === S.source.userId ? null : S.source.userId;
+    if (S.source?.externalId) {
+      S.editExternal = S.editExternal === S.source.externalId ? null : S.source.externalId;
+      S.editPupil = null; S.extDelAsk = false;
+    } else if (S.source?.userId) {
+      S.editPupil = S.editPupil === S.source.userId ? null : S.source.userId;
+      S.editExternal = null;
+    }
     render();
     return;
   }
@@ -1142,6 +1225,7 @@ async function onUp() {
   const res = await bookSlot({
     startMs: d.startMs, minutes: d.minutes,
     userId: isAdmin() ? S.source?.userId : null,
+    externalId: isAdmin() ? S.source?.externalId || null : null,
   });
   if (!res.ok) { showToast(res.message); await refresh(); return; }
   showToast(`Rezervat: ${label}`, { kind: "success" });
@@ -1156,7 +1240,7 @@ function openMoveAsk(s0, d, gesture) {
     id: s0.id, gesture,
     dayIdx: d.dayIdx, startMs: d.startMs, minutes: d.minutes,
     oldStartMs: s0.start, recurrenceId: s0.recurrenceId,
-    userId: s0.userId, slotKind: s0.kind,
+    userId: s0.userId, slotKind: s0.kind, externalId: s0.externalId || null,
     title: s0.kind === "personal" ? (s0.name === "Activitate personală" ? "" : s0.name) : "",
   };
   render();
@@ -1225,7 +1309,7 @@ async function onClick(e) {
     if (!mv.ok) { showToast(`${mv.message} Seria veche s-a oprit; blocul a rămas pe vechiul interval — trage-l din nou.`); await refresh(); return; }
     const r = await makeRecurring({
       id: a.id, startMs: a.startMs, minutes: a.minutes,
-      userId: a.userId, kind: a.slotKind, title: a.title,
+      userId: a.userId, kind: a.slotKind, title: a.title, externalId: a.externalId,
       weeks: REC_WEEKS, vacations: S.vacations,
     });
     if (!r.ok) { showToast(`${r.message || "Mutat, dar seria nouă n-a pornit."} Aprinde 🔁 pe bloc ca să reîncerci.`); await refresh(); return; }
@@ -1254,7 +1338,7 @@ async function onClick(e) {
     }
     const r = await makeRecurring({
       id: s.id, startMs: s.start, minutes: Math.round((s.end - s.start) / 60000),
-      userId: s.userId, kind: s.kind,
+      userId: s.userId, kind: s.kind, externalId: s.externalId || null,
       title: s.kind === "personal" ? (s.name === "Activitate personală" ? "" : s.name) : "",
       weeks: REC_WEEKS, vacations: S.vacations,
     });
@@ -1286,9 +1370,55 @@ async function onClick(e) {
     refresh(); return;
   }
 
+  // ---- elevii externi: + / editare / ștergere ----
+  if (act === "ext-new") {
+    S.extDraft = { name: "", color: null, emoji: "", minutes: DEFAULT_DURATION };
+    S.editExternal = S.editExternal === "new" ? null : "new";
+    S.editPupil = null; S.extDelAsk = false;
+    render(); return;
+  }
+  if (act === "ext-color" || act === "ext-min" || act === "ext-sym") {
+    const isNew = S.editExternal === "new";
+    const x = isNew ? S.extDraft : S.externals.find((e) => e.id === S.editExternal);
+    if (!x) return;
+    // câmpurile tastate se salvează înainte de re-render (tiparul de la elevi)
+    const typedName = S.root.querySelector('[data-act="ext-name"]')?.value;
+    if (typedName !== undefined) x.name = typedName;
+    const typedEmoji = S.root.querySelector('[data-act="ext-emoji"]')?.value;
+    if (typedEmoji !== undefined) x.emoji = typedEmoji.trim();
+    if (act === "ext-color") x.color = b.dataset.c;
+    else if (act === "ext-sym") x.emoji = x.emoji === b.dataset.e ? "" : b.dataset.e;
+    else x.minutes = +b.dataset.m;
+    render(); return;
+  }
+  if (act === "ext-save") {
+    const isNew = S.editExternal === "new";
+    const x = isNew ? S.extDraft : S.externals.find((e) => e.id === S.editExternal);
+    if (!x) return;
+    x.name = (S.root.querySelector('[data-act="ext-name"]')?.value || "").trim();
+    x.emoji = (S.root.querySelector('[data-act="ext-emoji"]')?.value || "").trim();
+    if (!x.name) { showToast("Dă-i un nume elevului extern."); return; }
+    const r = isNew
+      ? await createExternal(x)
+      : await updateExternal(S.editExternal, x);
+    showToast(r.ok ? `Salvat: ${x.name} (extern).` : r.message, r.ok ? { kind: "success" } : undefined);
+    if (r.ok) { S.editExternal = null; S.extDraft = null; await loadPupils(); }
+    render(); return;
+  }
+  if (act === "ext-del") { S.extDelAsk = true; render(); return; }
+  if (act === "ext-del-no") { S.extDelAsk = false; render(); return; }
+  if (act === "ext-del-yes") {
+    const id = S.editExternal;
+    S.editExternal = null; S.extDelAsk = false;
+    const r = await deleteExternal(id);
+    showToast(r.ok ? "Elev extern șters, cu orele lui cu tot." : r.message, r.ok ? { kind: "success" } : undefined);
+    await loadPupils();
+    await refresh(); return;
+  }
+
   // pupil chip editor
   if (act === "cfg") { S.editPupil = S.editPupil === b.dataset.uid ? null : b.dataset.uid; render(); return; }
-  if (act === "cfg-close") { S.editPupil = null; render(); return; }
+  if (act === "cfg-close") { S.editPupil = null; S.editExternal = null; S.extDraft = null; S.extDelAsk = false; render(); return; }
   if (act === "cfg-color" || act === "cfg-min" || act === "cfg-sym" || act === "cfg-max") {
     const p = S.pupils.find((x) => x.id === S.editPupil);
     if (!p) return;
@@ -1442,12 +1572,23 @@ async function refresh() {
  *  editor can never disagree about what colour a pupil is. */
 async function loadPupils() {
   const raw = await fetchMarkedPupils();
-  const auto = raw.filter((p) => !p.customColor).map((p) => ({ id: p.id, h: hashHue(p.id) }));
+  const exts = await fetchExternals();
+  // Hue-urile se împrăștie PE TOATĂ trupa — elevi reali + externi laolaltă,
+  // ca două buline fără culoare aleasă să nu se calce pe nuanță.
+  const auto = [
+    ...raw.filter((p) => !p.customColor).map((p) => ({ id: p.id, h: hashHue(p.id) })),
+    ...exts.filter((x) => !x.color).map((x) => ({ id: x.id, h: hashHue(x.id) })),
+  ];
   spreadHues(auto);
   const hueById = new Map(auto.map((a) => [a.id, a.h]));
   S.pupils = raw.map((p) => ({
     ...p,
     color: p.customColor || `hsl(${Math.round(hueById.get(p.id))} 62% 40%)`,
+  }));
+  S.externals = exts.map((x) => ({
+    ...x,
+    emoji: x.emoji || "",
+    color: x.color || `hsl(${Math.round(hueById.get(x.id))} 62% 40%)`,
   }));
 }
 

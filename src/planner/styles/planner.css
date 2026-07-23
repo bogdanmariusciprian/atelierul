@@ -753,3 +753,22 @@
 .pl-block--cell.is-mine:not(.is-personal) .pl-cb__nm {
   font-weight: 800; font-size: 0.85rem; letter-spacing: 0.02em;
 }
+
+/* Bulinele elevilor EXTERNI: aceeași bulină, dar cu conturul întrerupt —
+   semnul discret că eticheta n-are cont în spate. */
+.pl-dot--ext { border-style: dashed; }
+
+/* Cercul „+" — gol, punctat, invitația de a adăuga un elev extern. */
+.pl-dot--add {
+  --c: transparent;
+  width: 2.85rem; height: 2.85rem; border-radius: 50%; cursor: pointer;
+  border: 2.5px dashed var(--color-border);
+  background: var(--color-bg); color: var(--color-text-muted);
+  display: grid; place-items: center; font-size: 1.5rem; line-height: 1;
+  user-select: none;
+  transition: transform 0.12s, border-color 0.12s, color 0.12s;
+}
+.pl-dot--add:hover {
+  transform: scale(1.1);
+  border-color: var(--color-primary); color: var(--color-primary);
+}

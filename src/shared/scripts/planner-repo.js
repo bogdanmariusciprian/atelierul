@@ -52,7 +52,7 @@ export async function fetchWeek(from = weekStart()) {
   to.setDate(to.getDate() + 7);
   const { data, error } = await supabase
     .from("planner_slots")
-    .select("id, user_id, starts_at, ends_at, note, status, kind, title, recurrence_id, profiles!planner_slots_user_id_fkey(display_name, avatar_color)")
+    .select("id, user_id, starts_at, ends_at, note, status, kind, title, recurrence_id, external_id, planner_externals(name, color, emoji), profiles!planner_slots_user_id_fkey(display_name, avatar_color)")
     .eq("status", "booked")
     .gte("starts_at", from.toISOString())
     .lt("starts_at", to.toISOString())
@@ -63,11 +63,16 @@ export async function fetchWeek(from = weekStart()) {
   return (data || []).map((r) => {
     const mine = r.user_id === CURRENT_USER.authId;
     const personal = r.kind === "personal";
+    // Un extern e „al profesorului" ca proprietar, dar poartă eticheta lui.
+    // Embed-ul planner_externals e admin-only prin RLS: la elev vine null,
+    // deci numele externilor nu pleacă din bancă — rămâne „Ocupat".
+    const ext = r.external_id ? r.planner_externals : null;
     // A personal block is the teacher's own time. To a pupil it is simply an
     // hour that isn't available — they have no business knowing what it holds.
     const label = personal
       ? (admin ? (r.title || "Activitate personală") : "Ocupat")
-      : mine ? "Tu" : admin ? (r.profiles?.display_name || "Membru") : "Ocupat";
+      : ext && admin ? (ext.name || "Extern")
+      : mine && !ext ? "Tu" : admin ? (r.profiles?.display_name || "Membru") : "Ocupat";
     return {
       id: r.id,
       userId: r.user_id,
@@ -77,11 +82,14 @@ export async function fetchWeek(from = weekStart()) {
       // The rhythm of a STRANGER's hour is the teacher's scheduling, not the
       // pupil's business — masked, like the name, the note and the kind.
       recurrenceId: admin || mine ? (r.recurrence_id || null) : null,
-      mine,
+      mine: mine && !ext,
       name: label,
       color: personal
         ? (admin ? "#475569" : "#94a3b8")
+        : ext ? (admin ? (ext.color || "#7c3aed") : "#94a3b8")
         : mine || admin ? (r.profiles?.avatar_color || "#7c3aed") : "#94a3b8",
+      externalId: r.external_id || null,
+      extEmoji: admin && ext ? (ext.emoji || "") : "",
       start: new Date(r.starts_at).getTime(),
       end: new Date(r.ends_at).getTime(),
       note: mine || admin ? (r.note || "") : "",
@@ -92,7 +100,7 @@ export async function fetchWeek(from = weekStart()) {
 
 /** Book. Returns { ok } or { ok:false, message } — never throws for a clash,
  *  because a clash isn't exceptional, it's Tuesday. */
-export async function bookSlot({ startMs, minutes, userId = null, note = "", kind = "lesson", title = "", recurrenceId = null }) {
+export async function bookSlot({ startMs, minutes, userId = null, note = "", kind = "lesson", title = "", recurrenceId = null, externalId = null }) {
   // A personal block belongs to whoever is placing it — the teacher.
   const uid = kind === "personal" ? CURRENT_USER.authId : (userId || CURRENT_USER.authId);
   if (!uid) return { ok: false, message: "Trebuie să fii autentificat." };
@@ -108,6 +116,7 @@ export async function bookSlot({ startMs, minutes, userId = null, note = "", kin
       kind,
       title: kind === "personal" ? (title || "Activitate personală") : null,
       recurrence_id: recurrenceId,
+      external_id: externalId,
       created_by: CURRENT_USER.authId,
     })
     .select("id")
@@ -172,6 +181,56 @@ export async function hasPlannerAccess() {
     .from("planner_pupils").select("user_id").eq("user_id", CURRENT_USER.authId).maybeSingle();
   if (error) { console.warn("hasPlannerAccess:", error.message); return false; }
   return !!data;
+}
+
+// ---- elevii EXTERNI (etichete fără cont; vezi migrarea 0068) ----
+
+export async function fetchExternals() {
+  if (!isAdmin()) return [];
+  const { data, error } = await supabase
+    .from("planner_externals")
+    .select("id, name, color, emoji, minutes")
+    .order("name");
+  if (error) { console.warn("fetchExternals:", error.message); return []; }
+  return data || [];
+}
+
+export async function createExternal({ name, color = null, emoji = "", minutes = DEFAULT_DURATION }) {
+  const { data, error } = await supabase
+    .from("planner_externals")
+    .insert({
+      name: (name || "").trim(),
+      color: color || null,
+      emoji: emoji?.trim() || null,
+      minutes: DURATIONS.includes(minutes) ? minutes : DEFAULT_DURATION,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true, id: data.id };
+}
+
+export async function updateExternal(id, { name, color, emoji, minutes }) {
+  const { data, error } = await supabase
+    .from("planner_externals")
+    .update({
+      name: (name || "").trim(),
+      color: color || null,
+      emoji: emoji?.trim() || null,
+      minutes: DURATIONS.includes(minutes) ? minutes : DEFAULT_DURATION,
+    })
+    .eq("id", id)
+    .select("id");
+  if (error) return { ok: false, message: humanError(error) };
+  if (!data?.length) return { ok: false, message: "Salvarea n-a atins niciun rând." };
+  return { ok: true };
+}
+
+/** Deleting the label CASCADES into their hours (see 0068) — the UI warns. */
+export async function deleteExternal(id) {
+  const { error } = await supabase.from("planner_externals").delete().eq("id", id);
+  if (error) return { ok: false, message: humanError(error) };
+  return { ok: true };
 }
 
 /** The teacher's pupils, with his own customisations layered over the profile:
@@ -334,7 +393,7 @@ export async function deleteVacation(id) {
 /** One loop plants every occurrence of a series. Weeks step by CALENDAR days
  *  (setDate), not by 7×24h of milliseconds — a series crossing the DST switch
  *  keeps its wall-clock hour instead of drifting sixty minutes. */
-async function plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek }) {
+async function plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek, externalId = null }) {
   let created = 0, inVacation = 0, clashed = 0;
   for (let w = fromWeek; w < weeks; w++) {
     const d = new Date(startMs);
@@ -342,7 +401,7 @@ async function plantSeries({ startMs, minutes, userId, kind, title, weeks, vacat
     const at = d.getTime();
     const dayIso = new Date(at).toISOString().slice(0, 10);
     if (vacations.some((v) => dayIso >= v.from && dayIso <= v.to)) { inVacation++; continue; }
-    const r = await bookSlot({ startMs: at, minutes, userId, recurrenceId, kind, title });
+    const r = await bookSlot({ startMs: at, minutes, userId, recurrenceId, kind, title, externalId });
     if (r.ok) created++;
     else if (r.code === "23P01") clashed++;
     else return { ok: false, message: r.message, created, inVacation, clashed };
@@ -350,9 +409,9 @@ async function plantSeries({ startMs, minutes, userId, kind, title, weeks, vacat
   return { ok: true, created, inVacation, clashed };
 }
 
-export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vacations = [], kind = "lesson", title = "" }) {
+export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vacations = [], kind = "lesson", title = "", externalId = null }) {
   const recurrenceId = crypto.randomUUID();
-  const r = await plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek: 0 });
+  const r = await plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek: 0, externalId });
   return { ...r, ok: r.ok && r.created > 0, recurrenceId };
 }
 
@@ -360,12 +419,12 @@ export async function bookRecurring({ startMs, minutes, userId, weeks = 12, vaca
  *  itself receives the fresh recurrence id, then the following weeks are
  *  planted after it. `created` includes the head, so the toast's „X din N"
  *  arithmetic matches what the teacher sees on screen. */
-export async function makeRecurring({ id, startMs, minutes, userId, kind = "lesson", title = "", weeks = 12, vacations = [] }) {
+export async function makeRecurring({ id, startMs, minutes, userId, kind = "lesson", title = "", weeks = 12, vacations = [], externalId = null }) {
   const recurrenceId = crypto.randomUUID();
   const { error } = await supabase
     .from("planner_slots").update({ recurrence_id: recurrenceId }).eq("id", id);
   if (error) return { ok: false, message: humanError(error) };
-  const r = await plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek: 1 });
+  const r = await plantSeries({ startMs, minutes, userId, kind, title, weeks, vacations, recurrenceId, fromWeek: 1, externalId });
   return { ...r, created: r.created + 1, recurrenceId };
 }
 
