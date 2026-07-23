@@ -1622,10 +1622,20 @@ async function onClick(e) {
     render(); return;
   }
   if (act === "swap-send") {
-    const { wantId } = S.swapChooser || {};
+    const wantId = S.swapChooser?.wantId;
+    const offerSlotId = b.dataset.offer;
     S.swapChooser = null;
-    const r = await offerSwap(wantId, b.dataset.offer);
-    showToast(r.ok ? 'Ai trimis „!". Dacă acceptă, orele se schimbă.' : r.message, r.ok ? { kind: "success" } : undefined);
+    // OPTIMIST: „!"-ul sare pe „?"-ul lui A imediat, fără să aștepte serverul.
+    // Dacă oferta pică, îl retragem la loc (lecția grantEventAccess: await+revert).
+    const optimistic = { offerId: "pending", wantSlot: wantId, offerSlot: offerSlotId };
+    S.outgoingSwaps = [...S.outgoingSwaps, optimistic];
+    render();
+    const r = await offerSwap(wantId, offerSlotId);
+    if (!r.ok) {
+      S.outgoingSwaps = S.outgoingSwaps.filter((o) => o !== optimistic);
+      showToast(r.message); render(); return;
+    }
+    showToast('Ai trimis „!". Dacă acceptă, orele se schimbă.', { kind: "success" });
     await refresh(); return;
   }
   if (act === "swap-accept") {
