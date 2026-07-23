@@ -738,3 +738,18 @@
   background: color-mix(in srgb, #f59e0b 9%, transparent);
 }
 .pl-avail.is-once .pl-avail__tag { color: #b45309; }
+
+/* Blocul ELEVULUI („ora ta"), PRONUNȚAT: culoarea lui e adâncită cu o
+   picătură de slate (palidele capătă corp, închisele abia se mișcă), primește
+   inel alb interior, umbră de ridicare și numele mai apăsat. „Tu" nu se mai
+   pierde între ferestrele deschise și Ocupat-urile gri. */
+.pl-block--cell.is-mine:not(.is-personal) {
+  background: color-mix(in srgb, var(--c) 78%, #0f172a);
+  box-shadow:
+    0 8px 18px -8px rgb(0 0 0 / 0.5),
+    inset 0 0 0 2.5px rgb(255 255 255 / 0.85);
+  z-index: 1;
+}
+.pl-block--cell.is-mine:not(.is-personal) .pl-cb__nm {
+  font-weight: 800; font-size: 0.85rem; letter-spacing: 0.02em;
+}
