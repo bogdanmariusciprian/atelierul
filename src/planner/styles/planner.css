@@ -811,14 +811,22 @@
 
 /* „?" APĂSAT (oferit la schimb) — cerc MARE în mijlocul blocului, imposibil de
    ratat, vizibil și pentru ceilalți. Înainte de click rămâne mic în colț. */
-.pl-swap--q.on {
+.pl-swap--q.on, .pl-swap--offered {
   top: 50%; left: 50%; right: auto; bottom: auto;
   transform-origin: center;
   width: 68%; height: auto; aspect-ratio: 1;
   border-radius: 50%; font-size: 2.1rem;
-  background: rgba(245, 158, 11, 0.94);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-  animation: pl-swap-shake-c 1.4s ease-in-out infinite;
+}
+.pl-swap--q.on { background: rgba(245, 158, 11, 0.94); animation: pl-swap-shake-c 1.4s ease-in-out infinite; }
+/* „!" MARE = „aici am oferit" (doar pentru cel care a oferit). Verde, Pac!
+   din centru, peste cercul „?". */
+.pl-swap--offered { background: rgba(22, 163, 74, 0.95); animation: pl-swap-pop-c 1.6s ease-in-out infinite; }
+@keyframes pl-swap-pop-c {
+  0%, 70%, 100% { transform: translate(-50%, -50%) scale(1); }
+  20% { transform: translate(-50%, -50%) scale(1.22); }
+  35% { transform: translate(-50%, -50%) scale(0.9); }
+  50% { transform: translate(-50%, -50%) scale(1.1); }
 }
 .pl-swap__n {
   position: absolute; top: -5px; right: -5px; min-width: 0.95rem; height: 0.95rem;
@@ -846,7 +854,7 @@
   50% { transform: scale(1.18); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pl-swap--q.on { animation: none; transform: translate(-50%, -50%); }
+  .pl-swap--q.on, .pl-swap--offered { animation: none; transform: translate(-50%, -50%); }
   .pl-swap--offer, .pl-swap--done, .pl-swap--sent { animation: none; }
 }
 

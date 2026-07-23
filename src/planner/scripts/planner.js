@@ -134,7 +134,7 @@ const S = {
   drag: null,
   fetchId: 0,          // guards racing week-fetches: the newest click wins
   swapOffers: [],      // pupil: „!" received on my „?" blocks
-  outgoingSwaps: new Set(), // pupil: my blocks from which I sent a „!"
+  outgoingSwaps: [],   // pupil: my open offers {offerId, wantSlot, offerSlot}
   swapMine: null,      // pupil: slotId whose received-offers panel is open
   swapChooser: null,   // pupil: { wantId, mine:[...] } — pick a block to offer
   unwatch: null,
@@ -638,7 +638,7 @@ function blockSwapHtml(s) {
       return `<button type="button" class="pl-swap pl-swap--q on" data-act="swap-open-mine" data-id="${esc(s.id)}"
         title="Oferit la schimb — vezi ofertele sau oprește">?</button>`;
     }
-    if (S.outgoingSwaps.has(s.id)) {
+    if (S.outgoingSwaps.some((o) => o.offerSlot === s.id)) {
       return `<button type="button" class="pl-swap pl-swap--sent" data-act="swap-withdraw-blk" data-id="${esc(s.id)}"
         title="Ai oferit blocul ăsta la schimb — apasă ca să retragi">!</button>`;
     }
@@ -646,6 +646,13 @@ function blockSwapHtml(s) {
       title="Nu poți în ziua asta? Oferă ora la schimb">?</button>`;
   }
   if (s.swapWanted) {
+    // Am oferit deja aici? „?"-ul devine, DOAR pentru mine, un „!" mare —
+    // „aici am pus oferta, aștept răspunsul". Îl apăs ca s-o retrag.
+    const off = S.outgoingSwaps.find((o) => o.wantSlot === s.id);
+    if (off) {
+      return `<button type="button" class="pl-swap pl-swap--offered" data-act="swap-withdraw-offer" data-offer="${esc(off.offerId)}"
+        title="Ai oferit la acest schimb — apasă ca să retragi oferta">!</button>`;
+    }
     return `<button type="button" class="pl-swap pl-swap--q on" data-act="swap-offer-open" data-want="${esc(s.id)}"
       title="Fă schimb: oferă una din orele tale">?</button>`;
   }
@@ -1602,6 +1609,12 @@ async function onClick(e) {
     showToast("Ofertă retrasă.");
     await refresh(); return;
   }
+  if (act === "swap-withdraw-offer") {
+    const r = await withdrawSwap(b.dataset.offer);
+    if (!r.ok) { showToast(r.message); return; }
+    showToast("Ofertă retrasă.");
+    await refresh(); return;
+  }
   if (act === "swap-offer-open") {
     const mine = await fetchOfferableSlots();
     // nu-mi ofer blocul-țintă însuși (dacă din vreun motiv apare)
@@ -1722,7 +1735,7 @@ async function refresh() {
   // of my blocks have an outgoing „!". Cheap RPCs; skipped for the teacher.
   const [offers, outgoing] = !isAdmin()
     ? await Promise.all([fetchMySwapOffers(), fetchMyOutgoingSwaps()])
-    : [[], new Set()];
+    : [[], []];
   if (my !== S.fetchId || !S.root) return;
   S.slots = slots;
   S.swapOffers = offers;

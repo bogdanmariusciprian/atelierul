@@ -171,11 +171,13 @@ export async function fetchOfferableSlots() {
   }));
 }
 
-/** Blocurile mele de pe care am trimis o ofertă (pentru „!" pal). */
+/** Ofertele MELE deschise: id-ul, blocul-țintă („?") și blocul oferit („!"). */
 export async function fetchMyOutgoingSwaps() {
   const { data, error } = await supabase.rpc("my_outgoing_swaps");
   if (error) { console.warn("my_outgoing_swaps:", error.message); return []; }
-  return new Set((data || []).map((r) => r.offer_slot));
+  return (data || []).map((r) => ({
+    offerId: r.offer_id, wantSlot: r.want_slot, offerSlot: r.offer_slot,
+  }));
 }
 
 /** Book. Returns { ok } or { ok:false, message } — never throws for a clash,
