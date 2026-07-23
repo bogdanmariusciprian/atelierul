@@ -47,9 +47,8 @@
   justify-content: space-between;
   pointer-events: auto;
   gap: calc(var(--space-md) + var(--p) * 8px);
-  /* narrows toward a centered pill as p → 1 — mai puțin agresiv (280px, era
-     400px), ca navul adminului (Meditații + chip + logout) să încapă pe un rând */
-  max-width: calc(var(--container-max-width) - var(--p) * 280px);
+  /* narrows toward a centered pill as p → 1 */
+  max-width: calc(var(--container-max-width) - var(--p) * 400px);
   padding-block: calc(var(--space-md) - var(--p) * 10px);
   border-radius: calc(var(--p) * 30px);
 }
@@ -97,10 +96,32 @@
 .main-nav {
   display: flex;
   flex-wrap: nowrap; /* totul pe UN rând — nu se împarte niciodată în două */
-  /* Spațiul dintre linkuri se strânge la scroll (--p moștenit din header),
-     ca navul mai bogat al adminului să încapă în pastila îngustată. */
-  gap: calc(var(--space-lg) - var(--p, 0) * 9px);
+  gap: var(--space-lg);
   align-items: center;
+}
+
+/* „Meditații" = un „M" într-un cerc, compact — ține navul îngust chiar și
+   pentru admin/elevii marcați, singurii care-l văd. Textul complet trăiește
+   în title/aria-label. */
+.main-nav a.nav-meditatii {
+  flex: none;
+  width: 2.1rem; height: 2.1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg);
+  font-weight: 800; font-size: 0.95rem; line-height: 1;
+  color: var(--color-primary);
+}
+.main-nav a.nav-meditatii::before { content: none; } /* nu rezerva lățime bold */
+.main-nav a.nav-meditatii:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+.main-nav a.nav-meditatii[aria-current="page"] {
+  background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+  padding: 0; /* anulează pastila de pagină-activă a linkurilor normale */
 }
 
 .main-nav a {

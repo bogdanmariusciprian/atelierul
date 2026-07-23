@@ -216,9 +216,10 @@ async function addPlannerLink() {
     if (!nav || nav.querySelector('[data-label="Meditații"]')) return;
     const a = document.createElement("a");
     a.href = "/meditatii/";
-    a.textContent = "Meditații";
-    a.title = "Îți alegi ora de meditație";
-    a.dataset.label = "Meditații";
+    a.className = "nav-meditatii"; // „M" într-un cerc — compact, nu îngroașă navul
+    a.textContent = "M";
+    a.title = "Meditații — îți alegi ora";
+    a.setAttribute("aria-label", "Meditații");
     if (canonicalPath("/meditatii/") === canonicalPath(window.location.pathname)) {
       a.setAttribute("aria-current", "page");
     }
