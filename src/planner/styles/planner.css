@@ -801,25 +801,37 @@
 .pl-block:hover .pl-swap--q.off { opacity: 0.85; }
 .pl-swap--offer, .pl-swap--sent, .pl-swap--done { background: #16a34a; } /* „!" — verde */
 .pl-swap--sent { opacity: 0.9; }
-/* Stările active — mai mari, ca să sară în ochi. */
-.pl-swap--q.on, .pl-swap--offer, .pl-swap--sent, .pl-swap--done {
+/* „!"-urile (ofertă primită/trimisă/proaspăt schimbat) — badge de colț,
+   doar un pic mai mari ca să sară în ochi. */
+.pl-swap--offer, .pl-swap--sent, .pl-swap--done {
   width: 1.65rem; height: 1.65rem; font-size: 1.05rem;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* „?" APĂSAT (oferit la schimb) — cerc MARE în mijlocul blocului, imposibil de
+   ratat, vizibil și pentru ceilalți. Înainte de click rămâne mic în colț. */
+.pl-swap--q.on {
+  top: 50%; left: 50%; right: auto; bottom: auto;
+  width: 78%; height: auto; aspect-ratio: 1;
+  border-radius: 50%; font-size: 2.4rem;
+  background: rgba(245, 158, 11, 0.94);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  animation: pl-swap-shake-c 1.4s ease-in-out infinite;
 }
 .pl-swap__n {
   position: absolute; top: -5px; right: -5px; min-width: 0.95rem; height: 0.95rem;
   padding: 0 3px; border-radius: 999px; background: #16a34a; color: #fff;
   font-size: 0.6rem; line-height: 0.95rem; text-align: center; font-weight: 800;
 }
-/* „Fâțâit" — se agită stânga-dreapta, entuziast (pe „?" activ). */
-.pl-swap--q.on:not(.is-static) { animation: pl-swap-shake 1.4s ease-in-out infinite; }
-@keyframes pl-swap-shake {
-  0%, 100% { transform: translateX(0) rotate(0); }
-  15% { transform: translateX(-2px) rotate(-11deg); }
-  30% { transform: translateX(2px) rotate(11deg); }
-  45% { transform: translateX(-1.5px) rotate(-7deg); }
-  60% { transform: translateX(1.5px) rotate(5deg); }
-  75% { transform: translateX(0) rotate(0); }
+/* „Fâțâit" pentru cercul centrat — translate(-50%,-50%) rămâne în fiecare
+   cadru, altfel s-ar smuci din centru. */
+@keyframes pl-swap-shake-c {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0); }
+  15% { transform: translate(calc(-50% - 3px), -50%) rotate(-9deg); }
+  30% { transform: translate(calc(-50% + 3px), -50%) rotate(9deg); }
+  45% { transform: translate(calc(-50% - 2px), -50%) rotate(-6deg); }
+  60% { transform: translate(calc(-50% + 2px), -50%) rotate(4deg); }
+  75% { transform: translate(-50%, -50%) rotate(0); }
 }
 /* „Pac!" — se umflă și se strânge (pe „!"). */
 .pl-swap--offer, .pl-swap--done, .pl-swap--sent { animation: pl-swap-pop 1.6s ease-in-out infinite; }
@@ -830,7 +842,8 @@
   50% { transform: scale(1.18); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pl-swap--q.on, .pl-swap--offer, .pl-swap--done, .pl-swap--sent { animation: none; }
+  .pl-swap--q.on { animation: none; transform: translate(-50%, -50%); }
+  .pl-swap--offer, .pl-swap--done, .pl-swap--sent { animation: none; }
 }
 
 /* Modalul de schimb — card mic, centrat, peste un fundal întunecat. */
