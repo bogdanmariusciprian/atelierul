@@ -27,7 +27,7 @@
 // =========================================================
 import {
   DAY_START_H, DAY_END_H, SNAP_MIN, DURATIONS, DEFAULT_DURATION,
-  weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, uncancelSlot, uncancelSlots, renameSlot, watchSlots,
+  weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, renameSlot, watchSlots,
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
   fetchVacations, saveVacation, deleteVacation, bookRecurring, makeRecurring, stopSeriesHere, cancelSeries,
   fetchExternals, createExternal, updateExternal, deleteExternal,
@@ -42,16 +42,41 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const DAYS = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"];
+// Phone-only column heads. „Ma"/„Mi" and „S"/„D" stay two- and one-letter so
+// the seven columns read as a week at a glance in ~46px of width.
+const DAYS_SHORT = ["L", "Ma", "Mi", "J", "V", "S", "D"];
 const MONTHS = ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie",
   "iulie", "august", "septembrie", "octombrie", "noiembrie", "decembrie"];
 
 const HOURS = DAY_END_H - DAY_START_H;
 const SLOTS_PER_H = 60 / SNAP_MIN;
 const ROWS = HOURS * SLOTS_PER_H;   // half-hour rows
-const DESKTOP_ROW_PX = 26;
-let ROW_PX = DESKTOP_ROW_PX;                   // one half hour on screen
 const REC_WEEKS = 12;                // how far a weekly series reaches
 const SWAP_FRESH_MS = 5 * 60 * 1000; // „!" post-schimb rămâne 5 minute
+
+// ---------- how tall one half hour is ----------
+// On the DESK it is a constant, and it always was. On a PHONE it cannot be:
+// the whole week has to fit on screen with NO scrolling — a scroll is how an
+// entry gets deleted by accident with a stylus — so the row height is derived
+// from the width actually available. Bounded on both sides: under 11px a block
+// stops being touchable, over 18px the day grows taller than the screen.
+// The 600px breakpoint is the same one planner.css uses; change both together.
+const ROW_PX_DESK = 26;
+const PHONE_MAX = 600;
+let ROW_PX = ROW_PX_DESK;
+
+const isPhone = () => window.matchMedia(`(max-width: ${PHONE_MAX}px)`).matches;
+// The phone adaptation is the TEACHER's board only — everything gated on this
+// leaves the pupil's experience byte-identical to what it is today.
+const phoneAdmin = () => isPhone() && isAdmin();
+
+function computeRowPx() {
+  if (!isPhone()) return ROW_PX_DESK;
+  const w = S.root?.clientWidth || document.documentElement.clientWidth || 360;
+  // Seven columns and a narrow rail: w/26 keeps the grid roughly SQUARE, which
+  // is what Marius asked for — a week you take in at a glance, not a scroll.
+  return Math.max(11, Math.min(18, Math.round(w / 26)));
+}
 
 // The palette the teacher picks pupil colours from. Ten, distinct, all dark
 // enough to carry white text — free typing a hex invites unreadable blocks.
@@ -106,16 +131,6 @@ const hhmm = (ms) => {
 const durLabel = (m) => (m === 60 ? "1 oră" : m === 90 ? "1h 30" : m === 120 ? "2 ore"
   : m < 60 ? `${m} min` : m % 60 === 0 ? `${m / 60} ore` : `${Math.floor(m / 60)}h ${m % 60}`);
 
-// The phone layout: on a phone the ADMIN sees all seven days AND the whole
-// 8–22 day on one screen, with no scroll – rows compress to the viewport (a
-// stylus and small text make tight rows workable). Pupils/guests keep the
-// normal scrolling grid, untouched.
-const MOBILE_MAX_PX = 600;
-const MOBILE_ROW_MIN = 10;        // rows never thinner than this
-const MOBILE_BOTTOM_RESERVE = 72; // room under the grid for the fixed admin bar + floating buttons
-const isPhone = () => window.matchMedia(`(max-width: ${MOBILE_MAX_PX}px)`).matches;
-const phoneAdmin = () => isPhone() && isAdmin();
-
 const S = {
   root: null,
   week: weekStart(),
@@ -143,12 +158,13 @@ const S = {
   vacOpen: false,      // admin: vacation form unfolded
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
-  sel: null,            // phone: tapped block, reveals name + buttons (no hover there)
   fetchId: 0,          // guards racing week-fetches: the newest click wins
   swapOffers: [],      // pupil: „!" received on my „?" blocks
   outgoingSwaps: [],   // pupil: my open offers {offerId, wantSlot, offerSlot}
   swapMine: null,      // pupil: slotId whose received-offers panel is open
   swapChooser: null,   // pupil: { wantId, mine:[...] } — pick a block to offer
+  sheet: null,         // phone: id of the block whose action sheet is open
+  undo: null,          // { label, run } — one step back, armed only on success
   unwatch: null,
   loading: true,
 };
@@ -401,7 +417,7 @@ function paletteHtml() {
         data-hover-uid="${esc(x.id)}" data-name="${esc(tip)}"
         style="--c:${esc(x.color)}" aria-label="${esc(tip)}">${esc(x.emoji || "")}</button>`;
   }).join("");
-  return `<div class="pl-palette${S.editPupil || S.editExternal ? " has-editor" : ""}">
+  return `<div class="pl-palette">
       ${dots}
       ${extDots}
       <button type="button" class="pl-dot pl-dot--add" data-act="ext-new" title="Adaugă un elev extern (fără cont pe platformă)" aria-label="Adaugă elev extern">+</button>
@@ -524,12 +540,8 @@ function vacationsHtml() {
 function gridHtml() {
   const today = new Date().setHours(0, 0, 0, 0);
   const now = Date.now();
-  // On a phone the admin sees the ENTIRE working day at once (no scroll); the
-  // desktop grid still grows only as far as the latest block needs.
-  const fullDay = phoneAdmin();
-  const visH = fullDay ? HOURS : Math.max(S.visH, neededVisH());
-  if (!fullDay) S.visH = visH;
-  const visPx = visH * SLOTS_PER_H * ROW_PX;
+  S.visH = Math.max(S.visH, neededVisH());
+  const visPx = S.visH * SLOTS_PER_H * ROW_PX;
 
   // Hour labels sit centred IN their row, like a school timetable, not on the
   // boundary lines. Rows past the base ten render dimmed.
@@ -552,9 +564,14 @@ function gridHtml() {
       // it server-side anyway).
       const alive = s.canEdit && !over;
       const erasable = s.canEdit && (!over || isAdmin());
-      const confirming = S.confirmId === s.id;
-      const renaming = S.renameId === s.id;
-      const asking = S.moveAsk?.id === s.id;
+      // When the phone sheet is open, the confirm lives THERE, not on the
+      // block: a 14px-tall block cannot hold „Anulezi? Da / Toată seria / Nu".
+      const confirming = S.confirmId === s.id && !S.sheet;
+      // Same reason for all three: „Anulezi? Da/Nu", „O dată / Permanent" and
+      // the rename input do not fit in a phone block. When the sheet is open
+      // it is the sheet that asks — see sheetHtml().
+      const renaming = S.renameId === s.id && !S.sheet;
+      const asking = S.moveAsk?.id === s.id && !S.sheet;
       const body = confirming
         ? `<b class="pl-block__who">Anulezi?</b>
            <span class="pl-block__confirm">
@@ -594,7 +611,7 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}${S.sel === s.id ? " is-sel" : ""}"
+      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}${S.sheet === s.id ? " is-sheet" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
@@ -604,7 +621,8 @@ function gridHtml() {
 
     return `<div class="pl-col${isToday ? " is-today" : ""}${isPast ? " is-past" : ""}${vac ? " is-vac" : ""}" data-day="${i}">
       <div class="pl-colhead">
-        <b class="pl-colhead__d"><span class="pl-colhead__full">${esc(label)}</span><span class="pl-colhead__abbr">${esc(label.slice(0, 2))}</span></b>
+        <b class="pl-colhead__d">${esc(label)}</b>
+        <b class="pl-colhead__s" aria-hidden="true">${esc(DAYS_SHORT[i])}</b>
         <span class="pl-colhead__n">${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}</span>
         ${isToday ? `<i class="pl-colhead__today">AZI</i>` : ""}
         ${vac ? `<i class="pl-colhead__vac" title="${esc(vac.label)}">🏖 vacanță</i>` : ""}
@@ -726,10 +744,144 @@ function nowLineHtml() {
   return `<span class="pl-now" style="top:${Math.max(0, Math.min(ROWS * ROW_PX, y)).toFixed(0)}px"></span>`;
 }
 
+// ---------- one step back ----------
+// Marius asked for an Undo instead of more confirmations, and he was right:
+// on a phone a second „ești sigur?" is just a second chance to mis-tap.
+//
+// Undo is offered ONLY for the three writes that have an EXACT inverse:
+//   booking      → cancel that same row (bookSlot hands back its id);
+//   move/resize  → put the start and the length back where they were;
+//   cancelling   → book it again with the same pupil, kind and title.
+// Series, availability windows and vacations are deliberately left out: their
+// inverse is approximate, and a button that undoes approximately is worse than
+// no button. A recurring block is skipped for the same reason — moving one
+// detaches it from its series, and no inverse re-attaches it.
+//
+// It is armed only AFTER the server said yes, so a refused action never leaves
+// a button promising to undo something that never happened.
+const UNDO_MS = 12000;
+let undoTimer = null;
+
+function clearUndo() {
+  clearTimeout(undoTimer);
+  undoTimer = null;
+  S.undo = null;
+}
+
+/** Closing the phone sheet closes every question that was being asked IN it.
+ *  Walking away from „O dată / Permanent" is not a loss: that write never
+ *  happened, so the block simply stays where it was — the same thing „Renunț"
+ *  does. Keeping the four flags in one place is why the sheet can never be
+ *  shut while a half-answered question stays armed behind it. */
+function closeSheet() {
+  S.sheet = null;
+  S.confirmId = null;
+  S.moveAsk = null;
+  S.renameId = null;
+}
+
+function armUndo(label, run) {
+  S.undo = { label, run };
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    if (!S.undo) return;
+    S.undo = null;
+    // Never redraw under a moving finger — the ghost lives in the DOM.
+    if (!S.drag) render();
+  }, UNDO_MS);
+}
+
+async function runUndo() {
+  const u = S.undo;
+  if (!u) return;
+  clearUndo();
+  render();
+  const r = await u.run();
+  const failed = r && r.ok === false;
+  showToast(failed ? (r.message || "N-am putut da înapoi ultima acțiune.") : "Am revenit la starea anterioară.",
+    failed ? undefined : { kind: "success" });
+  await refresh();
+}
+
+function undoHtml() {
+  if (!S.undo) return "";
+  return `<div class="pl-undobar" role="status">
+    <span class="pl-undobar__t">${esc(S.undo.label)}</span>
+    <button type="button" class="pl-undobar__b" data-act="undo">↶ Dă înapoi</button>
+  </div>`;
+}
+
+/** PHONE ONLY — the block's own controls, moved to a sheet at the bottom.
+ *
+ *  On the desk × , 🔁 and the name tooltip appear on :hover. A finger has no
+ *  hover and a 14px-tall block has no room for three buttons, so a TAP on a
+ *  block opens the same actions down where the thumb already is. Same
+ *  data-act values as the buttons on the block: one action table, one set of
+ *  rules, only the place you press them changes. */
+function sheetHtml() {
+  if (!S.sheet) return "";
+  const s = S.slots.find((x) => x.id === S.sheet);
+  if (!s) return "";
+  const i = dayIndexOf(s.start);
+  const over = s.end < Date.now();
+  const alive = s.canEdit && !over;
+  const erasable = s.canEdit && (!over || isAdmin());
+  const confirming = S.confirmId === s.id;
+  const asking = S.moveAsk?.id === s.id;
+  const renaming = S.renameId === s.id;
+
+  // The three questions the desk asks INSIDE the block. A phone block is about
+  // 46×28px, so each one comes down HERE instead — same buttons, same data-act
+  // values, only somewhere they fit and the thumb already is.
+  let acts;
+  if (asking) {
+    const a = S.moveAsk;
+    acts = `
+      <b class="pl-sheet__q">${a.gesture === "move" ? "Mut" : "Durata"}: ${esc(DAYS[a.dayIdx])} ${hhmm(a.startMs)}–${hhmm(a.startMs + a.minutes * 60000)}</b>
+      <button type="button" class="pl-mini" data-act="ask-once">Doar o dată</button>
+      <button type="button" class="pl-mini" data-act="ask-forever">Permanent</button>
+      <button type="button" class="pl-mini pl-mini--no" data-act="ask-no">Renunț</button>`;
+  } else if (renaming) {
+    acts = `<span class="pl-block__ren">
+        <input data-role="rename" maxlength="40" value="${esc(s.name)}" aria-label="Denumirea activității" />
+        <button type="button" class="pl-mini" data-act="rename-ok" data-id="${esc(s.id)}">✓</button>
+        <button type="button" class="pl-mini" data-act="rename-no">×</button>
+      </span>`;
+  } else if (confirming) {
+    acts = `
+      <b class="pl-sheet__q">Anulezi ora?</b>
+      <button type="button" class="pl-mini pl-mini--no" data-act="conf-yes" data-id="${esc(s.id)}">Da</button>
+      ${s.recurrenceId && s.canEdit && isAdmin()
+        ? `<button type="button" class="pl-mini pl-mini--no" data-act="conf-series" data-id="${esc(s.id)}">Toată seria</button>` : ""}
+      <button type="button" class="pl-mini" data-act="conf-no">Nu</button>`;
+  } else {
+    acts = `
+      ${alive && isAdmin() ? `<button type="button" class="pl-mini${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}">
+        🔁 ${s.recurrenceId ? "Oprește repetarea" : "Repetă săptămânal"}</button>` : ""}
+      ${erasable ? `<button type="button" class="pl-mini" data-act="cancel" data-id="${esc(s.id)}">✕ Anulează</button>` : ""}
+      ${!alive && !erasable ? `<span class="pl-sheet__q">Oră trecută — nu mai poate fi modificată.</span>` : ""}`;
+  }
+
+  return `<div class="pl-sheet" role="group" aria-label="Acțiuni pentru blocul selectat">
+    <div class="pl-sheet__hd">
+      <i class="pl-sheet__c" style="--c:${esc(slotColor(s))}" aria-hidden="true"></i>
+      <b class="pl-sheet__nm">${esc(slotName(s))}</b>
+      <span class="pl-sheet__wh">${esc(DAYS[i] || "")} ${hhmm(s.start)}–${hhmm(s.end)}</span>
+      <button type="button" class="pl-mini pl-sheet__x" data-act="sheet-close" aria-label="Închide">✕</button>
+    </div>
+    <div class="pl-sheet__acts">${acts}</div>
+    <span class="pl-sheet__hint">${asking
+      ? `„Doar o dată" scoate ora asta din serie; „Permanent" mută seria de aici înainte.`
+      : "Ca să o muți sau să-i schimbi durata, ține apăsat pe bloc și trage."}</span>
+  </div>`;
+}
+
 function render() {
   if (!S.root) return;
+  // Width decides the row height, and the role decides the phone layout —
+  // both before a single pixel of grid is produced.
+  ROW_PX = computeRowPx();
   S.root.classList.toggle("is-admin", isAdmin());
-  scheduleFit();
   const mineCount = S.slots.filter((s) => s.mine).length;
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
@@ -748,6 +900,8 @@ function render() {
             : "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră. Trage de marginile uneia existente ca să o ajustezi; × o închide.")
           : "Trage o bulină în orar ca să pui ora — o faci săptămânală din 🔁 de pe bloc. Click pe bulină îi deschide setările; scoaterea unui elev se face din Comunitate → membri."}</p>
       </div>` : ""}
+      ${sheetHtml()}
+      ${undoHtml()}
       ${swapModalsHtml()}
       <div class="pl-live" data-role="live" hidden></div>`;
     return;
@@ -785,68 +939,9 @@ function render() {
       <p class="pl-hint">Ai dreptul la ${S.myMax} ${S.myMax === 1 ? "oră" : "ore"} pe săptămână. Trage în zona deschisă ca să-ți pui ora — blocul tău îl muți, îl întinzi de mânerul de jos (1h · 1h30 · 2h) sau îl anulezi cu ×.${
         mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "oră" : "ore"} săptămâna asta.` : ""}</p>
     </div>` : ""}
+    ${undoHtml()}
     ${swapModalsHtml()}
     <div class="pl-live" data-role="live" hidden></div>`;
-}
-
-// ---------- phone fit: the admin's whole week on one screen ----------
-
-// A re-render is scheduled once per frame; after the DOM is in place we measure
-// the lane and, on a phone, shrink ROW_PX so the full 8–22 day fits with no
-// scroll. Change-detection means at most ONE extra render when the size shifts.
-let fitScheduled = false;
-function scheduleFit() {
-  if (fitScheduled) return;
-  fitScheduled = true;
-  requestAnimationFrame(() => { fitScheduled = false; fitMobileRows(); });
-}
-
-function fitMobileRows() {
-  if (!S.root || S.loading) return;
-  // While something is mid-flight (a drag, an open editor, a confirm) the grid
-  // must stay put – refitting under the user's hand is disorienting.
-  const busy = S.drag || S.editPupil || S.editExternal || S.vacOpen
-    || S.confirmId || S.moveAsk || S.renameId || S.swapMine || S.swapChooser;
-  if (phoneAdmin()) {
-    if (busy) return;
-    const grid = S.root.querySelector(".pl-grid");
-    const lane = S.root.querySelector(".pl-lane");
-    if (!grid || !lane) return;
-    const rows = HOURS * SLOTS_PER_H;
-    // Compact, close to a SQUARE – not a tall strip that pushes the tools far
-    // down the page. Row height tracks the grid's WIDTH (square-ish whole grid),
-    // capped by what still fits above the fixed bottom bar + buttons.
-    const squarePx = grid.getBoundingClientRect().width / rows;
-    const top = lane.getBoundingClientRect().top;
-    const fitPx = (window.innerHeight - top - MOBILE_BOTTOM_RESERVE) / rows;
-    const px = Math.max(MOBILE_ROW_MIN,
-      Math.min(DESKTOP_ROW_PX, Math.floor(Math.min(squarePx, fitPx))));
-    if (px !== ROW_PX) { ROW_PX = px; render(); }
-    return;
-  }
-  // Desktop or pupil: full-size rows. Reset if we were just on a phone.
-  if (ROW_PX !== DESKTOP_ROW_PX) { ROW_PX = DESKTOP_ROW_PX; render(); }
-}
-
-/** Offer a one-step Undo for a destructive action: a toast that lingers with a
- *  „↩ Pune la loc" button. Pressing it runs `undoFn`, then reloads windows,
- *  vacations and slots so the board reflects the reversal. If the reversal is
- *  itself refused (the interval was taken back), the message stays honest. */
-function offerUndo(message, undoFn) {
-  showToast(message, {
-    kind: "success",
-    action: {
-      label: "↩ Pune la loc",
-      onClick: async () => {
-        const r = await undoFn();
-        if (r && r.ok === false) { showToast(r.message || "Nu s-a putut pune la loc."); return; }
-        S.avail = await fetchAvailability();
-        S.vacations = await fetchVacations();
-        showToast("Am pus la loc.", { kind: "success" });
-        await refresh();
-      },
-    },
-  });
 }
 
 // ---------- dragging: place, move, resize ----------
@@ -949,11 +1044,20 @@ function markBad(d) {
   d.bad = false; d.badWhy = "";
 }
 
+// ACCIDENTAL-TOUCH GUARD. A finger or a stylus resting on the glass wobbles a
+// few pixels; without a threshold that wobble IS a drag, and a drag that ends
+// one row lower moves somebody's lesson. Nothing counts as movement until the
+// pointer has actually travelled DRAG_SLOP. Harmless on a mouse (every drag
+// implementation has a slop), decisive with a stylus.
+const DRAG_SLOP = 9;
+let downX = 0, downY = 0, slopPassed = false;
+
 function onDown(e) {
   // Only the LEFT button drags. pointerdown fires for the right one too, and
   // without this guard the pre-menu press was quietly placing pupil blocks.
   if (e.button !== 0) return;
   if (!isLoggedIn()) return;
+  downX = e.clientX; downY = e.clientY; slopPassed = false;
   // SAME experience for the pupil: he drags too. His powers are trimmed by
   // the pieces that simply don't exist for him — no pencil (S.paint stays
   // false), no palette dots, grab/resize only on blocks he canEdit (his own),
@@ -1120,20 +1224,29 @@ function onDown(e) {
   const { dayIdx, row } = chip ? { dayIdx: 0, row: 0 } : pointToSlot(e.clientX, e.clientY);
   const offsetRows = existing ? msToRow(existing.start) - pointToSlot(e.clientX, e.clientY).row : 0;
 
+  // Which block the press landed on, editable or not. A PAST lesson has no
+  // grab handle, yet the teacher may still delete it — and on the desk that ×
+  // only exists on :hover. On the phone the tap has to reach it somehow.
+  const tapEl = e.target.closest(".pl-block");
+
   S.drag = {
     id: existing?.id || null,
+    tapId: tapEl?.dataset.id || null,
     fromTray: !!chip,
     minutes,
     dayIdx,
     offsetRows,
     startMs: rowToMs(dayIdx, Math.max(0, row + offsetRows)),
-    ghost: host ? placeGhost(host) : null,
+    // PHONE (teacher): no ghost and no preview until the finger has actually
+    // travelled. A tap must leave the board exactly as it found it — it opens
+    // the block's action sheet instead (see onUp). On the desk nothing changes.
+    ghost: host && !phoneAdmin() ? placeGhost(host) : null,
     moved: false,
   };
   if (existing) grab.classList.add("is-dragging");
   S.root.classList.add("is-dragging");
   e.preventDefault();
-  if (host) moveDrag(e.clientX, e.clientY);
+  if (host && !phoneAdmin()) moveDrag(e.clientX, e.clientY);
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp, { once: true });
   window.addEventListener("pointercancel", onUp, { once: true });
@@ -1193,7 +1306,6 @@ function moveDrag(x, y) {
  *  heights are poked directly because a re-render mid-drag would destroy the
  *  ghost under the pointer. */
 function growIfAtBottom(row) {
-  if (phoneAdmin()) return; // the whole day is already on screen
   if (row < S.visH * SLOTS_PER_H - 1 || S.visH >= HOURS) return;
   S.visH++;
   const px = `${S.visH * SLOTS_PER_H * ROW_PX}px`;
@@ -1274,6 +1386,15 @@ function makeFloater(x, y) {
 
 const onMove = (e) => {
   if (!S.drag) return;
+  // Below the slop the gesture is still undecided: no preview moves, no
+  // `moved` flag is set, so releasing here is a TAP, not a drop.
+  if (!slopPassed) {
+    if (Math.abs(e.clientX - downX) < DRAG_SLOP && Math.abs(e.clientY - downY) < DRAG_SLOP) {
+      e.preventDefault();
+      return;
+    }
+    slopPassed = true;
+  }
   if (S.drag.fromTray && !S.floater) makeFloater(e.clientX, e.clientY);
   if (S.floater) S.floater.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
   if (S.drag.availResize) availResizeDrag(e.clientX, e.clientY);
@@ -1314,27 +1435,36 @@ async function onUp() {
     return;
   }
   if (!d.moved) {
-    // In the pencil's personal regime, a motionless press on a grey block opens
-    // its inline rename.
+    // Third use of the same click-vs-drag flag: in the pencil's personal
+    // regime, a motionless press on a grey block opens its inline rename.
     if (d.id && S.paint && S.paintWhat === "personal") {
       const x = S.slots.find((q) => q.id === d.id);
       if (x?.kind === "personal") {
         S.renameId = S.renameId === d.id ? null : d.id;
+        // Phone: the input lives in the sheet, so the two open and close together.
+        if (phoneAdmin()) S.sheet = S.renameId;
         render();
         const inp = S.root.querySelector('[data-role="rename"]');
         inp?.focus(); inp?.select();
       }
-      return;
-    }
-    // The phone has no hover, so a TAP selects a block – revealing its name and
-    // its buttons (×, 🔁, resize). Tap it again, or tap empty space, to clear.
-    if (phoneAdmin() && !S.paint) {
-      S.sel = d.id && S.sel !== d.id ? d.id : null;
-      render();
-      return;
-    }
-    if (d.paintP || d.paint) {
+    } else if (d.paintP || d.paint) {
       showToast("Ca să desenezi, ține apăsat și trage pe verticală.");
+    } else if (phoneAdmin() && (d.id || d.tapId)) {
+      // PHONE: a tap on a block opens the sheet with everything that lives on
+      // :hover on the desk — × , 🔁 and the full name. Tapping the same block
+      // again closes it, so the gesture is its own way out.
+      const tid = d.id || d.tapId;
+      const same = S.sheet === tid;
+      closeSheet();
+      if (!same) S.sheet = tid;
+      render();
+    } else if (phoneAdmin() && S.sheet) {
+      closeSheet();
+      render();
+    } else if (phoneAdmin() && S.source) {
+      // The dot was picked but nothing was dragged. Say so — a silent no-op
+      // after a deliberate tap reads as „e stricat".
+      showToast("Ca să pui ora: ține apăsat pe bulină și trage-o în orar.");
     }
     return;
   }
@@ -1409,9 +1539,13 @@ async function onUp() {
     const changed = s0 && (s0.start !== d.startMs || Math.round((s0.end - s0.start) / 60000) !== d.minutes);
     if (!changed) return;
     if (s0.recurrenceId && isAdmin()) { openMoveAsk(s0, d, "resize"); return; }
+    const back = { startMs: s0.start, minutes: Math.round((s0.end - s0.start) / 60000) };
     const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes, detach: !!s0.recurrenceId });
     showToast(res.ok ? `Durata e acum ${durLabel(d.minutes)} (${label}).` : res.message,
       res.ok ? { kind: "success" } : undefined);
+    // Not for a series member: the write detaches it, and putting the hours
+    // back would not put it back in the series. Better no undo than a lie.
+    if (res.ok && !s0.recurrenceId) armUndo(`Durata: ${durLabel(d.minutes)} · ${label}`, () => moveSlot(d.id, back));
     await refresh();
     return;
   }
@@ -1420,8 +1554,10 @@ async function onUp() {
     const s0 = S.slots.find((x) => x.id === d.id);
     if (s0 && s0.start === d.startMs && Math.round((s0.end - s0.start) / 60000) === d.minutes) return;
     if (s0?.recurrenceId && isAdmin()) { openMoveAsk(s0, d, "move"); return; }
+    const back = s0 ? { startMs: s0.start, minutes: Math.round((s0.end - s0.start) / 60000) } : null;
     const res = await moveSlot(d.id, { startMs: d.startMs, minutes: d.minutes, detach: !!s0?.recurrenceId });
     showToast(res.ok ? `Mutat: ${label}` : res.message, res.ok ? { kind: "success" } : undefined);
+    if (res.ok && back && !s0.recurrenceId) armUndo(`Mutat: ${label}`, () => moveSlot(d.id, back));
     await refresh();
     return;
   }
@@ -1436,6 +1572,8 @@ async function onUp() {
   });
   if (!res.ok) { showToast(res.message); await refresh(); return; }
   showToast(`Rezervat: ${label}`, { kind: "success" });
+  // The exact inverse: bookSlot hands back the id it just wrote.
+  if (res.id) armUndo(`Rezervat: ${label}`, () => cancelSlot(res.id));
   await refresh();
 }
 
@@ -1450,6 +1588,9 @@ function openMoveAsk(s0, d, gesture) {
     userId: s0.userId, slotKind: s0.kind, externalId: s0.externalId || null,
     title: s0.kind === "personal" ? (s0.name === "Activitate personală" ? "" : s0.name) : "",
   };
+  // On a phone the question cannot be asked on the block — it is asked in the
+  // sheet, so opening the question means opening the sheet.
+  if (phoneAdmin()) S.sheet = s0.id;
   render();
 }
 
@@ -1459,6 +1600,9 @@ async function onClick(e) {
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act;
+
+  if (act === "undo") { await runUndo(); return; }
+  if (act === "sheet-close") { closeSheet(); render(); return; }
 
   // Navigation never blanks the screen: the new week is drawn NOW from what
   // we already know (header, rails, template windows — all local), and the
@@ -1478,27 +1622,25 @@ async function onClick(e) {
     render(); return;
   }
   if (act === "avail-del") {
-    const w = S.avail.find((x) => x.id === b.dataset.id);
     const r = await deleteAvailabilityWindow(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();
-    if (w) offerUndo("Fereastră închisă.", () => saveAvailabilityWindow({ weekday: w.weekday, startMin: w.startMin, endMin: w.endMin, onDate: w.onDate }));
-    else showToast("Fereastră închisă.");
+    showToast("Fereastră închisă.");
     render(); return;
   }
 
   if (act === "rename-ok") {
     const v = (S.root.querySelector('[data-role="rename"]')?.value || "").trim();
-    S.renameId = null;
+    closeSheet();
     const r = await renameSlot(b.dataset.id, v);
     showToast(r.ok ? "Activitate redenumită." : r.message, r.ok ? { kind: "success" } : undefined);
     await refresh(); return;
   }
-  if (act === "rename-no") { S.renameId = null; render(); return; }
+  if (act === "rename-no") { closeSheet(); render(); return; }
 
-  if (act === "ask-no") { S.moveAsk = null; render(); return; }
+  if (act === "ask-no") { closeSheet(); render(); return; }
   if (act === "ask-once") {
-    const a = S.moveAsk; S.moveAsk = null;
+    const a = S.moveAsk; closeSheet();
     if (!a) return;
     const r = await moveSlot(a.id, { startMs: a.startMs, minutes: a.minutes, detach: true });
     showToast(r.ok
@@ -1507,7 +1649,7 @@ async function onClick(e) {
     await refresh(); return;
   }
   if (act === "ask-forever") {
-    const a = S.moveAsk; S.moveAsk = null;
+    const a = S.moveAsk; closeSheet();
     if (!a) return;
     // Three honest steps: the old series stops at this block, the block moves,
     // the block becomes the head of the continuation. Each failure says
@@ -1566,18 +1708,32 @@ async function onClick(e) {
   if (act === "conf-no") { S.confirmId = null; render(); return; }
   if (act === "conf-yes") {
     const id = b.dataset.id; S.confirmId = null;
+    const s0 = S.slots.find((x) => x.id === id);
     const r = await cancelSlot(id);
-    if (r.ok) offerUndo("Rezervare anulată.", () => uncancelSlot(id));
-    else showToast(r.message);
+    showToast(r.ok ? "Rezervare anulată." : r.message, r.ok ? { kind: "success" } : undefined);
+    // Undoing a cancel means booking the SAME hour back, with the same pupil,
+    // kind and title. Skipped for a series member: the row that comes back is
+    // a new one, outside the series, which is not what „înapoi" means.
+    if (r.ok && s0 && !s0.recurrenceId) {
+      const back = {
+        startMs: s0.start,
+        minutes: Math.round((s0.end - s0.start) / 60000),
+        userId: isAdmin() ? (s0.userId || null) : null,
+        externalId: s0.externalId || null,
+        kind: s0.kind,
+        title: s0.kind === "personal" ? (s0.name === "Activitate personală" ? "" : s0.name) : "",
+      };
+      armUndo(`Anulat: ${slotName(s0)} · ${DAYS[dayIndexOf(s0.start)]} ${hhmm(s0.start)}`, () => bookSlot(back));
+    }
+    S.sheet = null;
     refresh(); return;
   }
   if (act === "conf-series") {
     const s = S.slots.find((x) => x.id === b.dataset.id);
-    S.confirmId = null;
+    S.confirmId = null; S.sheet = null;
     if (!s?.recurrenceId) return;
     const r = await cancelSeries(s.recurrenceId);
-    if (r.ok) offerUndo("Toată seria viitoare a fost anulată.", () => uncancelSlots(r.ids));
-    else showToast(r.message);
+    showToast(r.ok ? "Toată seria viitoare a fost anulată." : r.message, r.ok ? { kind: "success" } : undefined);
     refresh(); return;
   }
 
@@ -1676,12 +1832,10 @@ async function onClick(e) {
     render(); return;
   }
   if (act === "vac-del") {
-    const v = S.vacations.find((x) => x.id === b.dataset.id);
     const r = await deleteVacation(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
     S.vacations = await fetchVacations();
-    if (v) offerUndo("Vacanță ștearsă.", () => saveVacation({ from: v.from, to: v.to, label: v.label }));
-    else showToast("Vacanță ștearsă.");
+    showToast("Vacanță ștearsă.");
     render(); return;
   }
 
@@ -1815,12 +1969,10 @@ function onCtxMenu(e) {
     e.preventDefault();
     openCtx(e.clientX, e.clientY, [
       { label: "🗑 Șterge fereastra", danger: true, run: async () => {
-          const w = S.avail.find((x) => x.id === id);
           const r = await deleteAvailabilityWindow(id);
           if (!r.ok) { showToast(r.message); return; }
           S.avail = await fetchAvailability();
-          if (w) offerUndo("Fereastră închisă.", () => saveAvailabilityWindow({ weekday: w.weekday, startMin: w.startMin, endMin: w.endMin, onDate: w.onDate }));
-          else showToast("Fereastră închisă.");
+          showToast("Fereastră închisă.");
           render();
         } },
     ]);
@@ -1912,14 +2064,24 @@ export async function initPlanner(mount) {
   mount.addEventListener("mouseout", onDockLeave);
   mount.addEventListener("contextmenu", onCtxMenu);
 
-  // A phone rotating or a window resizing changes how many rows fit – re-render
-  // (debounced) so ROW_PX is recomputed. Desktop just re-lays-out at 26px.
-  let resizeTimer = null;
+  // The half-hour row height is DERIVED from the width on a phone, so it has to
+  // be recomputed when the width changes — rotating the phone is exactly that.
+  // Debounced, never mid-drag (the ghost lives in the DOM), never when the row
+  // height would come out the same (so a desk resize costs nothing), and never
+  // when there is no board on screen — „intră în cont" and „pe invitație" are
+  // written straight into the mount and must survive a resize.
+  let relayout = null;
   const onResize = () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (!disposed && S.root && !S.loading) render(); }, 150);
+    clearTimeout(relayout);
+    relayout = setTimeout(() => {
+      if (disposed || S.drag) return;
+      if (!S.root?.querySelector(".pl-grid")) return;
+      if (ROW_PX === computeRowPx()) return;
+      render();
+    }, 120);
   };
   window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", onResize);
 
   async function boot() {
     const my = ++bootId;
@@ -1965,6 +2127,11 @@ export async function initPlanner(mount) {
   return () => {
     disposed = true;
     S.unwatch?.();
+    clearTimeout(relayout);
+    clearUndo();
+    closeSheet();
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("orientationchange", onResize);
     window.removeEventListener("atelier:role", onRole);
     mount.removeEventListener("pointerdown", onDown);
     mount.removeEventListener("click", onClick);
@@ -1972,8 +2139,6 @@ export async function initPlanner(mount) {
     mount.removeEventListener("mouseover", onDockHover);
     mount.removeEventListener("mouseout", onDockLeave);
     mount.removeEventListener("contextmenu", onCtxMenu);
-    window.removeEventListener("resize", onResize);
-    clearTimeout(resizeTimer);
     closeCtx();
     window.removeEventListener("pointermove", onMove);
   };
