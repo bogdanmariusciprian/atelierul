@@ -111,7 +111,8 @@ const durLabel = (m) => (m === 60 ? "1 oră" : m === 90 ? "1h 30" : m === 120 ? 
 // stylus and small text make tight rows workable). Pupils/guests keep the
 // normal scrolling grid, untouched.
 const MOBILE_MAX_PX = 600;
-const MOBILE_ROW_MIN = 12;   // rows never thinner than this; below it, the page may scroll
+const MOBILE_ROW_MIN = 10;        // rows never thinner than this
+const MOBILE_BOTTOM_RESERVE = 72; // room under the grid for the fixed admin bar + floating buttons
 const isPhone = () => window.matchMedia(`(max-width: ${MOBILE_MAX_PX}px)`).matches;
 const phoneAdmin = () => isPhone() && isAdmin();
 
@@ -807,12 +808,18 @@ function fitMobileRows() {
     || S.confirmId || S.moveAsk || S.renameId || S.swapMine || S.swapChooser;
   if (phoneAdmin()) {
     if (busy) return;
+    const grid = S.root.querySelector(".pl-grid");
     const lane = S.root.querySelector(".pl-lane");
-    if (!lane) return;
+    if (!grid || !lane) return;
+    const rows = HOURS * SLOTS_PER_H;
+    // Compact, close to a SQUARE – not a tall strip that pushes the tools far
+    // down the page. Row height tracks the grid's WIDTH (square-ish whole grid),
+    // capped by what still fits above the fixed bottom bar + buttons.
+    const squarePx = grid.getBoundingClientRect().width / rows;
     const top = lane.getBoundingClientRect().top;
-    const avail = window.innerHeight - top - 8;
-    const px = Math.max(MOBILE_ROW_MIN, Math.min(DESKTOP_ROW_PX,
-      Math.floor(avail / (HOURS * SLOTS_PER_H))));
+    const fitPx = (window.innerHeight - top - MOBILE_BOTTOM_RESERVE) / rows;
+    const px = Math.max(MOBILE_ROW_MIN,
+      Math.min(DESKTOP_ROW_PX, Math.floor(Math.min(squarePx, fitPx))));
     if (px !== ROW_PX) { ROW_PX = px; render(); }
     return;
   }

@@ -941,7 +941,7 @@
      scrollul de aici nu poate șterge nimic din grilă. */
   .pl-wrap.is-admin .pl-palette {
     flex-wrap: nowrap; overflow-x: auto; overflow-y: visible;
-    margin: 1.3rem 0 0.5rem; padding: 0.35rem 0.45rem; gap: 0.4rem;
+    margin: 0.5rem 0 0.4rem; padding: 0.35rem 0.45rem; gap: 0.4rem;
   }
   .pl-wrap.is-admin .pl-palette.has-editor { flex-wrap: wrap; overflow: visible; }
   .pl-wrap.is-admin .pl-dot,
@@ -981,5 +981,8 @@
   .pl-wrap.is-admin .pl-block__ren input { font-size: 0.95rem; padding: 0.3rem 0.5rem; }
 
   /* Uneltele de sub orar rămân sub grilă, doar mai strânse. */
-  .pl-wrap.is-admin .pl-below { margin-top: 0.5rem; gap: 0.45rem; }
+  .pl-wrap.is-admin .pl-below { margin-top: 0.5rem; gap: 0.4rem; }
+  .pl-wrap.is-admin .pl-bar { margin-bottom: 0.4rem; }
+  .pl-wrap.is-admin .pl-legend { display: none; }   /* legenda ocupă mult pe verticală */
+  .pl-wrap.is-admin .pl-hint { font-size: 0.72rem; margin: 0; }
 }
