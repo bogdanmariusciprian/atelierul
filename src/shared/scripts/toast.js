@@ -20,23 +20,46 @@ function ensureHost() {
   return host;
 }
 
-/** Show a toast. kind: "info" (default) | "success" | "error". */
-export function showToast(message, { kind = "info", duration = 2600 } = {}) {
+/** Show a toast. kind: "info" (default) | "success" | "error".
+ *  Optional `action: { label, onClick }` adds a button (e.g. „Pune la loc"
+ *  for Undo); when present, the toast lingers longer so it can be pressed. */
+export function showToast(message, { kind = "info", duration = 2600, action = null } = {}) {
   const h = ensureHost();
-  // Keep at most 3 on screen — drop the oldest.
+  // Keep at most 3 on screen – drop the oldest.
   while (h.children.length >= 3) h.firstElementChild.remove();
 
   const t = document.createElement("div");
-  t.className = `toast toast--${kind}`;
-  t.textContent = message;
-  h.appendChild(t);
-  requestAnimationFrame(() => t.classList.add("is-in"));
+  t.className = `toast toast--${kind}${action ? " toast--action" : ""}`;
 
   const close = () => {
     t.classList.remove("is-in");
     setTimeout(() => t.remove(), 250);
   };
+
+  if (action && action.label) {
+    // An action toast is two parts: the message, and a button that must NOT be
+    // swallowed by the pill's click-to-dismiss (hence stopPropagation).
+    const msg = document.createElement("span");
+    msg.className = "toast__msg";
+    msg.textContent = message;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "toast__action";
+    btn.textContent = action.label;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      close();
+      try { action.onClick?.(); } catch { /* the caller owns its errors */ }
+    });
+    t.append(msg, btn);
+  } else {
+    t.textContent = message;
+  }
+
+  h.appendChild(t);
+  requestAnimationFrame(() => t.classList.add("is-in"));
   t.addEventListener("click", close);
-  setTimeout(close, duration);
+  // A pressable action needs breathing room; a plain toast keeps its short life.
+  setTimeout(close, action ? Math.max(duration, 7000) : duration);
   return t;
 }

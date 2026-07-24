@@ -27,7 +27,7 @@
 // =========================================================
 import {
   DAY_START_H, DAY_END_H, SNAP_MIN, DURATIONS, DEFAULT_DURATION,
-  weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, renameSlot, watchSlots,
+  weekStart, fetchWeek, bookSlot, moveSlot, cancelSlot, uncancelSlot, uncancelSlots, renameSlot, watchSlots,
   hasPlannerAccess, fetchMarkedPupils, savePupilPrefs, fetchMyPlannerPrefs,
   fetchVacations, saveVacation, deleteVacation, bookRecurring, makeRecurring, stopSeriesHere, cancelSeries,
   fetchExternals, createExternal, updateExternal, deleteExternal,
@@ -48,7 +48,8 @@ const MONTHS = ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie",
 const HOURS = DAY_END_H - DAY_START_H;
 const SLOTS_PER_H = 60 / SNAP_MIN;
 const ROWS = HOURS * SLOTS_PER_H;   // half-hour rows
-const ROW_PX = 26;                   // one half hour on screen
+const DESKTOP_ROW_PX = 26;
+let ROW_PX = DESKTOP_ROW_PX;                   // one half hour on screen
 const REC_WEEKS = 12;                // how far a weekly series reaches
 const SWAP_FRESH_MS = 5 * 60 * 1000; // „!" post-schimb rămâne 5 minute
 
@@ -104,6 +105,15 @@ const hhmm = (ms) => {
 };
 const durLabel = (m) => (m === 60 ? "1 oră" : m === 90 ? "1h 30" : m === 120 ? "2 ore"
   : m < 60 ? `${m} min` : m % 60 === 0 ? `${m / 60} ore` : `${Math.floor(m / 60)}h ${m % 60}`);
+
+// The phone layout: on a phone the ADMIN sees all seven days AND the whole
+// 8–22 day on one screen, with no scroll – rows compress to the viewport (a
+// stylus and small text make tight rows workable). Pupils/guests keep the
+// normal scrolling grid, untouched.
+const MOBILE_MAX_PX = 600;
+const MOBILE_ROW_MIN = 12;   // rows never thinner than this; below it, the page may scroll
+const isPhone = () => window.matchMedia(`(max-width: ${MOBILE_MAX_PX}px)`).matches;
+const phoneAdmin = () => isPhone() && isAdmin();
 
 const S = {
   root: null,
@@ -389,7 +399,7 @@ function paletteHtml() {
         data-hover-uid="${esc(x.id)}" data-name="${esc(tip)}"
         style="--c:${esc(x.color)}" aria-label="${esc(tip)}">${esc(x.emoji || "")}</button>`;
   }).join("");
-  return `<div class="pl-palette">
+  return `<div class="pl-palette${S.editPupil || S.editExternal ? " has-editor" : ""}">
       ${dots}
       ${extDots}
       <button type="button" class="pl-dot pl-dot--add" data-act="ext-new" title="Adaugă un elev extern (fără cont pe platformă)" aria-label="Adaugă elev extern">+</button>
@@ -512,8 +522,12 @@ function vacationsHtml() {
 function gridHtml() {
   const today = new Date().setHours(0, 0, 0, 0);
   const now = Date.now();
-  S.visH = Math.max(S.visH, neededVisH());
-  const visPx = S.visH * SLOTS_PER_H * ROW_PX;
+  // On a phone the admin sees the ENTIRE working day at once (no scroll); the
+  // desktop grid still grows only as far as the latest block needs.
+  const fullDay = phoneAdmin();
+  const visH = fullDay ? HOURS : Math.max(S.visH, neededVisH());
+  if (!fullDay) S.visH = visH;
+  const visPx = visH * SLOTS_PER_H * ROW_PX;
 
   // Hour labels sit centred IN their row, like a school timetable, not on the
   // boundary lines. Rows past the base ten render dimmed.
@@ -588,7 +602,7 @@ function gridHtml() {
 
     return `<div class="pl-col${isToday ? " is-today" : ""}${isPast ? " is-past" : ""}${vac ? " is-vac" : ""}" data-day="${i}">
       <div class="pl-colhead">
-        <b class="pl-colhead__d">${esc(label)}</b>
+        <b class="pl-colhead__d"><span class="pl-colhead__full">${esc(label)}</span><span class="pl-colhead__abbr">${esc(label.slice(0, 2))}</span></b>
         <span class="pl-colhead__n">${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}</span>
         ${isToday ? `<i class="pl-colhead__today">AZI</i>` : ""}
         ${vac ? `<i class="pl-colhead__vac" title="${esc(vac.label)}">🏖 vacanță</i>` : ""}
@@ -712,6 +726,8 @@ function nowLineHtml() {
 
 function render() {
   if (!S.root) return;
+  S.root.classList.toggle("is-admin", isAdmin());
+  scheduleFit();
   const mineCount = S.slots.filter((s) => s.mine).length;
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
@@ -769,6 +785,60 @@ function render() {
     </div>` : ""}
     ${swapModalsHtml()}
     <div class="pl-live" data-role="live" hidden></div>`;
+}
+
+// ---------- phone fit: the admin's whole week on one screen ----------
+
+// A re-render is scheduled once per frame; after the DOM is in place we measure
+// the lane and, on a phone, shrink ROW_PX so the full 8–22 day fits with no
+// scroll. Change-detection means at most ONE extra render when the size shifts.
+let fitScheduled = false;
+function scheduleFit() {
+  if (fitScheduled) return;
+  fitScheduled = true;
+  requestAnimationFrame(() => { fitScheduled = false; fitMobileRows(); });
+}
+
+function fitMobileRows() {
+  if (!S.root || S.loading) return;
+  // While something is mid-flight (a drag, an open editor, a confirm) the grid
+  // must stay put – refitting under the user's hand is disorienting.
+  const busy = S.drag || S.editPupil || S.editExternal || S.vacOpen
+    || S.confirmId || S.moveAsk || S.renameId || S.swapMine || S.swapChooser;
+  if (phoneAdmin()) {
+    if (busy) return;
+    const lane = S.root.querySelector(".pl-lane");
+    if (!lane) return;
+    const top = lane.getBoundingClientRect().top;
+    const avail = window.innerHeight - top - 8;
+    const px = Math.max(MOBILE_ROW_MIN, Math.min(DESKTOP_ROW_PX,
+      Math.floor(avail / (HOURS * SLOTS_PER_H))));
+    if (px !== ROW_PX) { ROW_PX = px; render(); }
+    return;
+  }
+  // Desktop or pupil: full-size rows. Reset if we were just on a phone.
+  if (ROW_PX !== DESKTOP_ROW_PX) { ROW_PX = DESKTOP_ROW_PX; render(); }
+}
+
+/** Offer a one-step Undo for a destructive action: a toast that lingers with a
+ *  „↩ Pune la loc" button. Pressing it runs `undoFn`, then reloads windows,
+ *  vacations and slots so the board reflects the reversal. If the reversal is
+ *  itself refused (the interval was taken back), the message stays honest. */
+function offerUndo(message, undoFn) {
+  showToast(message, {
+    kind: "success",
+    action: {
+      label: "↩ Pune la loc",
+      onClick: async () => {
+        const r = await undoFn();
+        if (r && r.ok === false) { showToast(r.message || "Nu s-a putut pune la loc."); return; }
+        S.avail = await fetchAvailability();
+        S.vacations = await fetchVacations();
+        showToast("Am pus la loc.", { kind: "success" });
+        await refresh();
+      },
+    },
+  });
 }
 
 // ---------- dragging: place, move, resize ----------
@@ -1115,6 +1185,7 @@ function moveDrag(x, y) {
  *  heights are poked directly because a re-render mid-drag would destroy the
  *  ghost under the pointer. */
 function growIfAtBottom(row) {
+  if (phoneAdmin()) return; // the whole day is already on screen
   if (row < S.visH * SLOTS_PER_H - 1 || S.visH >= HOURS) return;
   S.visH++;
   const px = `${S.visH * SLOTS_PER_H * ROW_PX}px`;
@@ -1390,10 +1461,12 @@ async function onClick(e) {
     render(); return;
   }
   if (act === "avail-del") {
+    const w = S.avail.find((x) => x.id === b.dataset.id);
     const r = await deleteAvailabilityWindow(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();
-    showToast("Fereastră închisă.");
+    if (w) offerUndo("Fereastră închisă.", () => saveAvailabilityWindow({ weekday: w.weekday, startMin: w.startMin, endMin: w.endMin, onDate: w.onDate }));
+    else showToast("Fereastră închisă.");
     render(); return;
   }
 
@@ -1477,7 +1550,8 @@ async function onClick(e) {
   if (act === "conf-yes") {
     const id = b.dataset.id; S.confirmId = null;
     const r = await cancelSlot(id);
-    showToast(r.ok ? "Rezervare anulată." : r.message, r.ok ? { kind: "success" } : undefined);
+    if (r.ok) offerUndo("Rezervare anulată.", () => uncancelSlot(id));
+    else showToast(r.message);
     refresh(); return;
   }
   if (act === "conf-series") {
@@ -1485,7 +1559,8 @@ async function onClick(e) {
     S.confirmId = null;
     if (!s?.recurrenceId) return;
     const r = await cancelSeries(s.recurrenceId);
-    showToast(r.ok ? "Toată seria viitoare a fost anulată." : r.message, r.ok ? { kind: "success" } : undefined);
+    if (r.ok) offerUndo("Toată seria viitoare a fost anulată.", () => uncancelSlots(r.ids));
+    else showToast(r.message);
     refresh(); return;
   }
 
@@ -1584,10 +1659,12 @@ async function onClick(e) {
     render(); return;
   }
   if (act === "vac-del") {
+    const v = S.vacations.find((x) => x.id === b.dataset.id);
     const r = await deleteVacation(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
     S.vacations = await fetchVacations();
-    showToast("Vacanță ștearsă.");
+    if (v) offerUndo("Vacanță ștearsă.", () => saveVacation({ from: v.from, to: v.to, label: v.label }));
+    else showToast("Vacanță ștearsă.");
     render(); return;
   }
 
@@ -1721,10 +1798,12 @@ function onCtxMenu(e) {
     e.preventDefault();
     openCtx(e.clientX, e.clientY, [
       { label: "🗑 Șterge fereastra", danger: true, run: async () => {
+          const w = S.avail.find((x) => x.id === id);
           const r = await deleteAvailabilityWindow(id);
           if (!r.ok) { showToast(r.message); return; }
           S.avail = await fetchAvailability();
-          showToast("Fereastră închisă.");
+          if (w) offerUndo("Fereastră închisă.", () => saveAvailabilityWindow({ weekday: w.weekday, startMin: w.startMin, endMin: w.endMin, onDate: w.onDate }));
+          else showToast("Fereastră închisă.");
           render();
         } },
     ]);
@@ -1816,6 +1895,15 @@ export async function initPlanner(mount) {
   mount.addEventListener("mouseout", onDockLeave);
   mount.addEventListener("contextmenu", onCtxMenu);
 
+  // A phone rotating or a window resizing changes how many rows fit – re-render
+  // (debounced) so ROW_PX is recomputed. Desktop just re-lays-out at 26px.
+  let resizeTimer = null;
+  const onResize = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (!disposed && S.root && !S.loading) render(); }, 150);
+  };
+  window.addEventListener("resize", onResize);
+
   async function boot() {
     const my = ++bootId;
     const stale = () => disposed || my !== bootId;
@@ -1867,6 +1955,8 @@ export async function initPlanner(mount) {
     mount.removeEventListener("mouseover", onDockHover);
     mount.removeEventListener("mouseout", onDockLeave);
     mount.removeEventListener("contextmenu", onCtxMenu);
+    window.removeEventListener("resize", onResize);
+    clearTimeout(resizeTimer);
     closeCtx();
     window.removeEventListener("pointermove", onMove);
   };

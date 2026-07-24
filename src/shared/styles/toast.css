@@ -33,6 +33,15 @@
 .toast.is-in { opacity: 1; transform: translateY(0); }
 .toast--success { background: linear-gradient(135deg, #15803d, #16a34a); }
 .toast--error { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+/* Action toast (e.g. Undo): message + a button on the same pill. */
+.toast--action { display: inline-flex; align-items: center; gap: 0.75rem; padding-right: 0.4rem; }
+.toast__msg { white-space: normal; }
+.toast__action {
+  flex: none; border: 0; border-radius: 999px; cursor: pointer;
+  padding: 0.32rem 0.85rem; font: inherit; font-size: 0.82rem; font-weight: 800;
+  color: #fff; background: rgba(255, 255, 255, 0.24);
+}
+.toast__action:hover { background: rgba(255, 255, 255, 0.38); }
 
 @media (prefers-reduced-motion: reduce) {
   .toast { transform: none; transition: opacity 0.22s ease; }
