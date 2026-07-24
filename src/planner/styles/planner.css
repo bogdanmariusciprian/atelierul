@@ -940,7 +940,7 @@
   /* Paleta: bandă subțire, derulabilă pe orizontală. E docul, nu orarul –
      scrollul de aici nu poate șterge nimic din grilă. */
   .pl-wrap.is-admin .pl-palette {
-    flex-wrap: nowrap; overflow-x: auto; overflow-y: visible;
+    flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
     margin: 0.5rem 0 0.4rem; padding: 0.35rem 0.45rem; gap: 0.4rem;
   }
   .pl-wrap.is-admin .pl-palette.has-editor { flex-wrap: wrap; overflow: visible; }
@@ -963,6 +963,15 @@
   .pl-wrap.is-admin .pl-block { border-radius: 5px; }
   .pl-wrap.is-admin .pl-block__x { width: 1.35rem; height: 1.35rem; font-size: 1rem; }
   .pl-wrap.is-admin .pl-block__rec { width: 1.05rem; height: 1.05rem; }
+
+  /* fără hover pe telefon: blocul ATINS se selectează și își arată numele +
+     butoanele (×, 🔁, mânerele de redimensionare) */
+  .pl-wrap.is-admin .pl-block--cell.is-sel { box-shadow: 0 0 0 2.5px var(--color-primary); z-index: 6; }
+  .pl-wrap.is-admin .pl-block--cell.is-sel::before { opacity: 1; }
+  .pl-wrap.is-admin .pl-block--cell.is-sel .pl-block__x,
+  .pl-wrap.is-admin .pl-block--cell.is-sel .pl-block__rec { opacity: 1; }
+  .pl-wrap.is-admin .pl-block--cell.is-sel .pl-block__rsz::after,
+  .pl-wrap.is-admin .pl-block--cell.is-sel .pl-block__rsz--top::after { opacity: 1; }
 
   /* Dialogurile care stăteau ÎN celulă (confirmarea de anulare, furculița de
      serie, redenumirea) n-au loc într-un bloc de ~45px: pe telefon devin o fișă

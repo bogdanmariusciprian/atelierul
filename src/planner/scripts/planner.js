@@ -143,6 +143,7 @@ const S = {
   vacOpen: false,      // admin: vacation form unfolded
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
+  sel: null,            // phone: tapped block, reveals name + buttons (no hover there)
   fetchId: 0,          // guards racing week-fetches: the newest click wins
   swapOffers: [],      // pupil: „!" received on my „?" blocks
   outgoingSwaps: [],   // pupil: my open offers {offerId, wantSlot, offerSlot}
@@ -593,7 +594,7 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}${S.sel === s.id ? " is-sel" : ""}"
         style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
@@ -1313,8 +1314,8 @@ async function onUp() {
     return;
   }
   if (!d.moved) {
-    // Third use of the same click-vs-drag flag: in the pencil's personal
-    // regime, a motionless press on a grey block opens its inline rename.
+    // In the pencil's personal regime, a motionless press on a grey block opens
+    // its inline rename.
     if (d.id && S.paint && S.paintWhat === "personal") {
       const x = S.slots.find((q) => q.id === d.id);
       if (x?.kind === "personal") {
@@ -1323,7 +1324,16 @@ async function onUp() {
         const inp = S.root.querySelector('[data-role="rename"]');
         inp?.focus(); inp?.select();
       }
-    } else if (d.paintP || d.paint) {
+      return;
+    }
+    // The phone has no hover, so a TAP selects a block – revealing its name and
+    // its buttons (×, 🔁, resize). Tap it again, or tap empty space, to clear.
+    if (phoneAdmin() && !S.paint) {
+      S.sel = d.id && S.sel !== d.id ? d.id : null;
+      render();
+      return;
+    }
+    if (d.paintP || d.paint) {
       showToast("Ca să desenezi, ține apăsat și trage pe verticală.");
     }
     return;
