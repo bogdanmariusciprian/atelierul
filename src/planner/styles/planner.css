@@ -907,11 +907,25 @@
 @media (max-width: 600px) {
   .pl-wrap.is-admin { --pl-head: 2.05rem; }
 
+  /* CSS orfan de la vechiul "doc" (media ≤980px) punea .pl-body pe
+     flex-direction:column-reverse pentru un doc pe care nu-l mai desenăm; cu
+     align-items:flex-start, grila devenea axa transversală și NU se mai
+     întindea — toată săptămâna se strângea la lățimea minimă, lipită stânga.
+     O readucem la o coloană pe toată lățimea pentru vederea de admin. */
+  .pl-wrap.is-admin .pl-body { flex-direction: column; align-items: stretch; }
+
   /* Cele 7 zile împart lățimea; zero scroll orizontal. */
   .pl-wrap.is-admin .pl-grid { overflow-x: hidden; gap: 2px; padding-bottom: 0; }
   .pl-wrap.is-admin .pl-cols { min-width: 0; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
   .pl-wrap.is-admin .pl-rail { width: 1.5rem; }
   .pl-wrap.is-admin .pl-hour { font-size: 0.56rem; right: 0.15rem; font-weight: 700; }
+  /* orele târzii nu se mai estompează pe telefon – ziua e oricum toată pe ecran */
+  .pl-wrap.is-admin .pl-hour.is-dim,
+  .pl-wrap.is-admin .pl-line.is-dim { opacity: 1; }
+  /* eticheta ferestrei ("deschis 08:00–11:00") nu încape la ~40px și se taie urât;
+     o ascundem – ora se citește din riglă, iar tipul ferestrei se vede din contur
+     (punctat verde = săptămânal, plin chihlimbar = doar ziua) */
+  .pl-wrap.is-admin .pl-avail__tag { display: none; }
 
   /* Capul de coloană: literă scurtă + data. Azi = cap colorat, vacanța = hașura
      din coloană – scoatem insignele care furau înălțime. */
