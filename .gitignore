@@ -21,6 +21,7 @@ node_modules/
 SUPABASE_SCHEMA.md
 PROMPT_ANALIZA.md
 MEMORIE_SITE.md
+DEPENDENTE.md
 
 # Private audit report + reusable analysis playbook — local only
 AUDIT.md

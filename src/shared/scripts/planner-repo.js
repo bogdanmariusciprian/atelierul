@@ -233,25 +233,6 @@ export async function cancelSlot(id) {
   return { ok: true };
 }
 
-/** Put a cancelled slot back to 'booked' – the Undo of cancelSlot. The guard
- *  trigger and the exclusion constraint run again, so if the interval was taken
- *  in the meantime the refusal is honest (23P01 → a human sentence). */
-export async function uncancelSlot(id) {
-  const { error } = await supabase
-    .from("planner_slots").update({ status: "booked" }).eq("id", id);
-  if (error) return { ok: false, message: humanError(error) };
-  return { ok: true };
-}
-
-/** Put a whole set of cancelled slots back – the Undo of cancelSeries. */
-export async function uncancelSlots(ids = []) {
-  if (!ids.length) return { ok: true };
-  const { error } = await supabase
-    .from("planner_slots").update({ status: "booked" }).in("id", ids);
-  if (error) return { ok: false, message: humanError(error) };
-  return { ok: true };
-}
-
 /** Rename a personal block in place. Times untouched, so the hours-guard
  *  trigger lets it through even for a block already in the past. */
 export async function renameSlot(id, title) {
@@ -567,16 +548,13 @@ export async function cancelFutureSlotsFor(userId) {
   return { ok: true, cancelled: data?.length || 0 };
 }
 
-/** Cancel every FUTURE occurrence of a series. The past stays — it happened.
- *  Returns the ids it cancelled, so an Undo can put exactly those back. */
+/** Cancel every FUTURE occurrence of a series. The past stays — it happened. */
 export async function cancelSeries(recurrenceId) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("planner_slots")
     .update({ status: "cancelled" })
     .eq("recurrence_id", recurrenceId)
-    .eq("status", "booked")
-    .gte("starts_at", new Date().toISOString())
-    .select("id");
+    .gte("starts_at", new Date().toISOString());
   if (error) return { ok: false, message: humanError(error) };
-  return { ok: true, ids: (data || []).map((r) => r.id) };
+  return { ok: true };
 }
