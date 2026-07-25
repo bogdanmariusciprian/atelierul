@@ -134,10 +134,41 @@ button {
   border-radius: 4px;
 }
 
-/* Pages breathe in instead of popping — subtle, modern, cheap. */
+/* Pages breathe in instead of popping — subtle, modern, cheap.
+
+   ⚠️ `backwards`, NU `both`. Aici e o capcană care nu se vede cu ochiul liber.
+
+   `both` = `backwards` + `forwards`. Partea de `forwards` lasă ultimul cadru
+   al animației aplicat PERMANENT, chiar și după ce animația s-a terminat. Adică
+   `<main>` rămâne pe veci cu `transform: translateY(0)`, care se calculează ca
+   `matrix(1, 0, 0, 1, 0, 0)`. E matricea identitate — nu mișcă nimic vizual,
+   deci pare inofensivă. Nu e.
+
+   Regula CSS (Transforms, §containing block): orice element cu `transform`
+   diferit de `none` devine BLOC-CONTAINER pentru toți descendenții lui cu
+   `position: fixed`. Consecința: tot ce credeam că e „lipit de ecran" înăuntrul
+   lui `<main>` se lipea de fapt de `<main>`. Un overlay cu `inset: 0` acoperea
+   doar cutia lui `<main>` (headerul rămânea descoperit) și, mai rău, se ancora
+   la VÂRFUL conținutului — deci pe o pagină lungă, derulat în jos, apăreai
+   deasupra foldului și părea că „apeși și nu se întâmplă nimic".
+
+   Trei locuri erau atinse, singurele elemente fixe randate în `<main>`:
+     · `.pl-modal`    — modalul de schimb din planner (meditatii/)
+     · `.cx-lightbox` — lightboxul de imagini din forum (comunitate/)
+     · `.tgm-nav`     — bara de navigare de jos din editorul de teste (<700px)
+   Restul elementelor fixe din site sunt montate pe `document.body`, deci n-au
+   fost niciodată afectate.
+
+   `backwards` umple doar starea DINAINTE de start, deci animația de intrare
+   arată exact la fel, dar la final `transform` revine la `none`.
+
+   Verificare rapidă în consolă, dacă bănuiești vreodată o recidivă:
+     getComputedStyle(document.querySelector('main')).transform
+   Trebuie să răspundă `none`. Dacă răspunde `matrix(...)`, cineva a pus la loc
+   `both` (sau `forwards`) și cele trei de mai sus s-au stricat din nou. */
 @media (prefers-reduced-motion: no-preference) {
   main {
-    animation: page-in 0.28s ease both;
+    animation: page-in 0.28s ease backwards;
   }
   @keyframes page-in {
     from { opacity: 0; transform: translateY(6px); }
