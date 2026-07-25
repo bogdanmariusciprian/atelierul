@@ -32,6 +32,15 @@ CHECKLIST_SPECIALIST.md
 supabase/seed/*.xlsx
 supabase/seed/*.sql
 
+# Subiecte offline: fișiere HTML de sine stătătoare, generate din tests_items,
+# plus generatorul lor. Conțin cheia de răspuns și observațiile profesorului —
+# NU ajung niciodată în repo (e public) și nici pe site.
+Subiecte/
+# Orice .csv, oriunde: un export al băncii de itemi conține cheile de răspuns,
+# iar regula largă e intenționată — mai bine refuzăm din start decât să scape
+# unul într-un commit. Dacă vreodată chiar vrei un .csv în repo: git add -f.
+*.csv
+
 # Scratch folder: anything needed while working — icons downloaded,
 # screenshots, drafts, PDFs to check. Never published.
 Diverse/
