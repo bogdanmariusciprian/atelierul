@@ -866,15 +866,23 @@
   /* Ce se întindea pe lățimea benzii se întinde acum pe înălțimea ei. */
   .pl-line { left: auto; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
   .pl-now  { left: auto; right: auto; top: 0; bottom: 0; width: 2px; height: auto; }
-  /* Fereastra se lipește de marginea benzii, iar conturul ei punctat se
-     desenează spre interior (box-sizing). Așa, cei 1px ai blocului rămân un
-     gol adevărat de 1px față de linia verde, nu se mănâncă între ei. */
+  /* Nivelul 1: fereastra săptămânală, 1px de gridlines. Conturul se desenează
+     spre interior, ca golul de sub el să fie un gol adevărat. */
   .pl-avail {
-    left: auto; right: auto; top: 0; bottom: 0; margin-left: 0;
+    left: auto; right: auto; top: 1px; bottom: 1px; margin-left: 1px;
     box-sizing: border-box;
     border: 1.5px dashed color-mix(in srgb, #16a34a 45%, transparent);
     border-radius: 6px;
   }
+  /* Nivelul 2: excepția de-o-zi, 1px în interiorul verdelui. */
+  .pl-avail.is-once {
+    top: 3px; bottom: 3px; margin-left: 3px;
+    border-style: solid;
+    border-color: color-mix(in srgb, #d97706 55%, transparent);
+    border-radius: 5px;
+  }
+  /* Nivelul 3, cazul adânc: blocul dinăuntrul unei ferestre de-o-zi. */
+  .pl-block--cell.is-in-once { top: 5px; bottom: 5px; margin-left: 5px; }
   /* Un pixel de aer față de gridlines, de jur împrejur: 1px sus și jos din
      poziționare, 1px stânga-dreapta din axGap (care scade 2px din lungime) plus
      deplasarea cu un pixel. Blocul rămâne aliniat la ora lui, dar nu se mai
@@ -882,12 +890,22 @@
      Fără bordură groasă sus: pe desktop marginea colorată din stânga e accentul
      care spune „aici începe"; culcată, devenea o dungă lată peste tot blocul,
      fără să mai însemne nimic. Culoarea plină spune deja al cui e blocul. */
-  /* Exact 1px de jur împrejur, egal pe toate patru laturile: sus și jos din
-     poziționare, stânga și dreapta din axGap (2px scăzuți din lungime) plus
-     deplasarea cu unu. Marginea blocului rămâne pe ora lui. */
+  /* ---- CUIBĂRIRE PE TREI NIVELURI ----
+     Fiecare nivel păstrează 1px față de conturul celui care îl cuprinde.
+     Conturul ferestrelor e de 1.5px, deci pasul de la un nivel la altul e
+     1.5 + 1 = 2.5px, rotunjit la 2.
+
+       0px  marginea benzii (gridlines)
+       1px  fereastra verde — săptămânal
+       3px  fereastra portocalie — doar ziua aceea
+       3px  blocul elevului, când stă direct în verde
+       5px  blocul elevului, când stă într-o portocalie (clasa .is-in-once,
+            pusă din JS: frații poziționați absolut nu se cuprind în DOM,
+            deci CSS-ul n-ar avea de unde ști)
+  */
   .pl-block, .pl-ghost {
-    left: auto; right: auto; top: 1px; bottom: 1px;
-    margin-left: 1px;
+    left: auto; right: auto; top: 3px; bottom: 3px;
+    margin-left: 3px;
     border: 0; box-shadow: none;
     padding: 0.15rem 0.3rem; border-radius: 6px;
     display: flex; align-items: center; overflow: hidden;

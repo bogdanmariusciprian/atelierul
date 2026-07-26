@@ -641,6 +641,13 @@ function gridHtml() {
     const isPast = d.getTime() < today;
     const vac = vacationFor(i);
     const blocks = S.slots.filter((s) => dayIndexOf(s.start) === i).map((s) => {
+      // CUIBARIRE. Ferestrele si blocurile sunt frati pozitionati absolut in
+      // aceeasi banda, nu cutii una in alta, deci CSS-ul singur n-are cum sa
+      // stie ce sta in ce. Aflam aici: daca blocul cade intr-o fereastra de-o-zi
+      // (portocalie), el e cu un nivel mai adanc si trebuie retras cu inca un
+      // pas, ca sa pastreze acelasi 1px fata de conturul care il cuprinde.
+      const _a = minOf(s.start), _b = minOf(s.end);
+      const inOnce = winsFor(i).some((w) => w.onDate && w.startMin <= _a && w.endMin >= _b);
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
@@ -697,7 +704,7 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell${inOnce ? " is-in-once" : ""}${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx())}; ${axSize(rows * rowPx() - axGap())}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
