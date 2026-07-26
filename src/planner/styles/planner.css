@@ -817,7 +817,12 @@
   /* Ziua: capul la stânga, banda în dreapta lui. */
   .pl-col { display: flex; align-items: stretch; gap: 0.3rem; }
   .pl-colhead {
-    flex: none; width: 2.6rem; padding: 0.15rem 0.2rem;
+    /* `height: auto` NU e decorativ: pe desktop capul are height: var(--pl-head)
+       = 4.2rem, iar pe axa culcată el devine cel mai înalt lucru din rând și
+       întinde toată ziua la ~90px. Fără linia asta, șapte zile nu mai încap pe
+       ecran, oricât de subțiri ar fi benzile. */
+    height: auto; min-height: 0;
+    flex: none; width: 3.1rem; padding: 0.15rem 0.2rem;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; border-radius: 8px; gap: 0;
   }
@@ -826,7 +831,7 @@
   .pl-colhead__today, .pl-colhead__vac { font-size: 0.55rem; }
 
   .pl-lane {
-    flex: 1; min-width: 0; height: 2.6rem;
+    flex: 1; min-width: 0; height: 3rem;
     border-radius: 8px; border: 1.5px solid var(--color-border);
   }
 
