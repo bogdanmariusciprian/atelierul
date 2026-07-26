@@ -651,7 +651,12 @@ function gridHtml() {
       const confirming = S.confirmId === s.id;
       const renaming = S.renameId === s.id;
       const asking = S.moveAsk?.id === s.id;
-      const body = confirming
+      // Pe telefon intrebarile NU mai stau in bloc: nu incap (o ora = 26px) si
+      // acopera tocmai ora despre care intreaba. Pleaca in foaia de jos
+      // (sheetHtml). Blocul ramane cum e, doar marcat, ca sa stii la care
+      // dintre ele se refera foaia.
+      const inBloc = VERT;
+      const body = (confirming && inBloc)
         ? `<b class="pl-block__who">Anulezi?</b>
            <span class="pl-block__confirm">
              <button type="button" class="pl-mini pl-mini--no" data-act="conf-yes" data-id="${esc(s.id)}">Da</button>
@@ -659,7 +664,7 @@ function gridHtml() {
                ? `<button type="button" class="pl-mini pl-mini--no" data-act="conf-series" data-id="${esc(s.id)}">Toată seria</button>` : ""}
              <button type="button" class="pl-mini" data-act="conf-no">Nu</button>
            </span>`
-        : asking
+        : (asking && inBloc)
         ? `<b class="pl-block__who">${S.moveAsk.gesture === "move" ? "Mut:" : "Durata:"} ${esc(DAYS[S.moveAsk.dayIdx])} ${hhmm(S.moveAsk.startMs)}–${hhmm(S.moveAsk.startMs + S.moveAsk.minutes * 60000)}</b>
            <span class="pl-block__confirm">
              <button type="button" class="pl-mini" data-act="ask-once"
@@ -668,7 +673,7 @@ function gridHtml() {
                      title="Seria veche se oprește aici și continuă în noul interval, săptămână de săptămână.">Permanent</button>
              <button type="button" class="pl-mini" data-act="ask-no" aria-label="Renunț">✕</button>
            </span>`
-        : renaming
+        : (renaming && inBloc)
         ? `<span class="pl-block__ren">
              <input data-role="rename" maxlength="40" value="${esc(s.name)}" aria-label="Denumirea activității" />
              <button type="button" class="pl-mini" data-act="rename-ok" data-id="${esc(s.id)}">✓</button>
@@ -690,7 +695,7 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx())}; ${axSize(rows * rowPx() - axGap())}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
@@ -856,6 +861,7 @@ function render() {
            <button type="button" class="pl-drawer__h" data-act="drawer" aria-label="Deschide uneltele"></button>
            <div class="pl-drawer__in">${pal}${below}</div>
          </div>` : ""}
+         ${sheetHtml()}
          ${swapModalsHtml()}
          <div class="pl-live" data-role="live" hidden></div>`;
     if (!VERT) fitDrawer();
@@ -896,6 +902,51 @@ function render() {
     </div>` : ""}
     ${swapModalsHtml()}
     <div class="pl-live" data-role="live" hidden></div>`;
+}
+
+/** FOAIA DE JOS — intrebarile care nu incap in bloc.
+ *
+ *  Anularea, alegerea „o data / permanent" si redenumirea traiau inauntrul
+ *  blocului. Pe desktop merge: blocul e mare. Pe telefon un bloc de o ora are
+ *  26 de pixeli, iar intrebarea plus butoanele cer de zece ori atat — textul
+ *  se taia („zi? Da") si, mai rau, acoperea exact ora despre care intreba.
+ *
+ *  Aceleasi butoane, aceleasi `data-act`, deci logica din spate ramane
+ *  neatinsa; doar locul se schimba. */
+function sheetHtml() {
+  if (VERT) return "";
+  const id = S.confirmId || S.moveAsk?.id || S.renameId;
+  if (!id) return "";
+  const s = S.slots.find((x) => x.id === id);
+  if (!s) return "";
+  const cand = `${DAYS[dayIndexOf(s.start)]} ${hhmm(s.start)}–${hhmm(s.end)}`;
+
+  let titlu = "", corp = "";
+  if (S.confirmId) {
+    titlu = `Anulezi ora lui ${esc(slotName(s))}?`;
+    corp = `<button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="conf-yes" data-id="${esc(s.id)}">Da, anulează</button>
+      ${s.recurrenceId && s.canEdit && isAdmin()
+        ? `<button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="conf-series" data-id="${esc(s.id)}">Toată seria viitoare</button>` : ""}
+      <button type="button" class="pl-sheet__b" data-act="conf-no">Renunț</button>`;
+  } else if (S.moveAsk) {
+    const a = S.moveAsk;
+    titlu = `${a.gesture === "move" ? "Mut la" : "Durata devine"} ${esc(DAYS[a.dayIdx])} ${hhmm(a.startMs)}–${hhmm(a.startMs + a.minutes * 60000)}`;
+    corp = `<button type="button" class="pl-sheet__b" data-act="ask-once">Doar săptămâna asta</button>
+      <button type="button" class="pl-sheet__b" data-act="ask-forever">Permanent, în fiecare săptămână</button>
+      <button type="button" class="pl-sheet__b" data-act="ask-no">Renunț</button>`;
+  } else {
+    titlu = "Denumirea activității";
+    corp = `<input class="pl-sheet__in" data-role="rename" maxlength="40" value="${esc(s.name)}" aria-label="Denumirea activității" />
+      <button type="button" class="pl-sheet__b" data-act="rename-ok" data-id="${esc(s.id)}">Salvez</button>
+      <button type="button" class="pl-sheet__b" data-act="rename-no">Renunț</button>`;
+  }
+  return `<div class="pl-sheet" role="dialog" aria-modal="true" data-act="sheet-close">
+    <div class="pl-sheet__card" data-act="sheet-stop">
+      <b class="pl-sheet__t">${titlu}</b>
+      <span class="pl-sheet__w">${esc(cand)}</span>
+      ${corp}
+    </div>
+  </div>`;
 }
 
 /** Sertarul de pe telefon: trei trepte, ca să nu fie nici mereu în drum, nici
@@ -1619,6 +1670,11 @@ async function onClick(e) {
   if (act === "today") { S.week = weekStart(); render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
   if (act === "drawer") { cycleDrawer(0); return; }
+  if (act === "sheet-stop") return;                       // clic in card: nu inchide
+  if (act === "sheet-close") {                            // clic pe fundal: inchide
+    S.confirmId = null; S.moveAsk = null; S.renameId = null;
+    render(); return;
+  }
 
   if (act === "paint") { S.paint = !S.paint; if (!S.paint) S.renameId = null; render(); return; }
   if (act === "paint-what") { S.paintWhat = b.dataset.v; S.renameId = null; render(); return; }
