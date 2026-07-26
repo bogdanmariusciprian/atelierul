@@ -50,6 +50,24 @@ const SLOTS_PER_H = 60 / SNAP_MIN;
 const ROWS = HOURS * SLOTS_PER_H;   // half-hour rows
 const ROW_PX = 26;                   // one half hour on screen, desktop
 const ROW_PX_NARROW = 22;            // ...and on a phone, where width is the scarce axis
+/** GOLUL si BORDURA — singura sursa de adevar pentru toate retragerile.
+ *
+ *  Cifrele 1 / 3 / 5 care apar in orar NU se scriu de mana nicaieri: sunt
+ *  rezultatul formulei de mai jos. Daca maine bordura ferestrelor se
+ *  ingroasa, sau daca vrei golul de 2px in loc de 1, schimbi AICI si se
+ *  reaseaza tot — inclusiv regulile din CSS, care primesc aceleasi valori ca
+ *  variabile.
+ *
+ *  Grosimea gridline-ului nu intra in socoteala, si e bine ca nu intra:
+ *  gridline-ul e desenat PE granita orei, iar retragerea se masoara de la
+ *  granita, nu de la marginea liniei. Poti ingrosa liniile fara sa strici
+ *  alinierea blocurilor la ore. */
+const PL_GAP = 1;    // golul cerut intre doua contururi vecine
+const PL_HAIR = 1;   // grosimea bordurii unei ferestre
+/** Retragerea de la granita orei, pentru un element cuprins de `n` ferestre.
+ *  Drumul e: gol, bordura, gol, bordura, ... , gol. */
+const plInset = (n) => (n + 1) * PL_GAP + n * PL_HAIR;
+
 const RAIL_NARROW_PX = 46;           // capul zilei (2.5rem) + goluri, scăzute din lățimea utilă
 
 // AXA TIMPULUI. Pe desktop timpul curge în JOS: ziua e o coloană, ora e o
@@ -690,9 +708,12 @@ function gridHtml() {
       //
       // PE VERTICALA nu se pune problema: fereastra ocupa toata inaltimea
       // benzii, deci daca blocul e in ea, o atinge si sus si jos.
-      const _niv = _w ? (inOnce ? 5 : 3) : 1;
-      const insetL = _w && _w.startMin === _a ? _niv : 1;
-      const insetR = _w && _w.endMin === _b ? _niv : 1;
+      // Cate ferestre il cuprind: 0, 1 (doar verde) sau 2 (verde + portocaliu).
+      const _adanc = _w ? (inOnce ? 2 : 1) : 0;
+      const _niv = plInset(_adanc);
+      const _liber = plInset(0);   // langa un gridline gol
+      const insetL = _w && _w.startMin === _a ? _niv : _liber;
+      const insetR = _w && _w.endMin === _b ? _niv : _liber;
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
@@ -768,7 +789,7 @@ function gridHtml() {
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="${axPos(h * SLOTS_PER_H * rowPx())}"></span>`).join("")}
         ${(isPast ? [] : winsFor(i)).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(w.onDate ? 3 : 1))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - axGap(w.onDate ? 3 : 1))}"
+          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(plInset(w.onDate ? 1 : 0)))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - 2 * axInset(plInset(w.onDate ? 1 : 0)))}"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint && S.paintWhat === "avail" ? `
@@ -1054,6 +1075,13 @@ function fitDrawer() {
   // apăsabil) — le ridicăm cu exact cât ocupă sertarul, printr-o variabilă pe
   // care CSS-ul lor o citește. În rest de site rămâne 0 și nu se schimbă nimic.
   document.documentElement.style.setProperty("--pl-drawer-h", `${h}px`);
+  // Aceleasi retrageri, si pentru CSS: verticala se face din reguli, nu din JS,
+  // dar trebuie sa foloseasca EXACT aceleasi numere.
+  const r = document.documentElement.style;
+  r.setProperty("--pl-hair", `${PL_HAIR}px`);
+  r.setProperty("--pl-in-0", `${plInset(0)}px`);
+  r.setProperty("--pl-in-1", `${plInset(1)}px`);
+  r.setProperty("--pl-in-2", `${plInset(2)}px`);
   // Marcăm pagina: cât timp lucrezi în planner pe telefon, butoanele plutitoare
   // ale site-ului se dau la o parte cu totul. Ridicate, ajungeau peste orar.
   document.body.classList.add("pl-phone");
@@ -1097,6 +1125,13 @@ function installDrawerDrag(mount) {
     const h = Math.max(min, Math.min(max, h0 + dy));
     d.style.height = `${h}px`;
     document.documentElement.style.setProperty("--pl-drawer-h", `${h}px`);
+  // Aceleasi retrageri, si pentru CSS: verticala se face din reguli, nu din JS,
+  // dar trebuie sa foloseasca EXACT aceleasi numere.
+  const r = document.documentElement.style;
+  r.setProperty("--pl-hair", `${PL_HAIR}px`);
+  r.setProperty("--pl-in-0", `${plInset(0)}px`);
+  r.setProperty("--pl-in-1", `${plInset(1)}px`);
+  r.setProperty("--pl-in-2", `${plInset(2)}px`);
   });
 
   const gata = () => {

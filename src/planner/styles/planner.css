@@ -869,22 +869,22 @@
   /* Nivelul 1: fereastra săptămânală, 1px de gridlines. Conturul se desenează
      spre interior, ca golul de sub el să fie un gol adevărat. */
   .pl-avail {
-    left: auto; right: auto; top: 1px; bottom: 1px;
+    left: auto; right: auto; top: var(--pl-in-0, 1px); bottom: var(--pl-in-0, 1px);
     box-sizing: border-box;
-    border: 1px dashed color-mix(in srgb, #16a34a 55%, transparent);
+    border: var(--pl-hair, 1px) dashed color-mix(in srgb, #16a34a 55%, transparent);
     border-radius: 6px;
   }
   /* Nivelul 2: excepția de-o-zi, 1px în interiorul verdelui. */
   .pl-avail.is-once {
-    top: 3px; bottom: 3px;
+    top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px);
     border-style: solid;
     border-color: color-mix(in srgb, #d97706 55%, transparent);
     border-radius: 5px;
   }
   /* Nivelul 3, cazul adânc: blocul dinăuntrul unei ferestre de-o-zi. */
-  .pl-block--cell.is-in-once { top: 5px; bottom: 5px; }
+  .pl-block--cell.is-in-once { top: var(--pl-in-2, 5px); bottom: var(--pl-in-2, 5px); }
   /* Blocul fără nicio fereastră stă la 1px de gridline (cazul 1 din desen). */
-  .pl-block--cell.is-bare { top: 1px; bottom: 1px; }
+  .pl-block--cell.is-bare { top: var(--pl-in-0, 1px); bottom: var(--pl-in-0, 1px); }
   /* Un pixel de aer față de gridlines, de jur împrejur: 1px sus și jos din
      poziționare, 1px stânga-dreapta din axGap (care scade 2px din lungime) plus
      deplasarea cu un pixel. Blocul rămâne aliniat la ora lui, dar nu se mai
@@ -909,7 +909,7 @@
      blocul e în ea, o atinge și sus și jos — acolo vecinul e mereu bordura.
      Orizontala se calculează per latură, în JS (vezi comentariul de acolo). */
   .pl-block, .pl-ghost {
-    left: auto; right: auto; top: 3px; bottom: 3px;
+    left: auto; right: auto; top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px);
     border: 0; box-shadow: none;
     padding: 0.15rem 0.3rem; border-radius: 6px;
     display: flex; align-items: center; overflow: hidden;
