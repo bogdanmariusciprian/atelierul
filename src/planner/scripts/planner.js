@@ -673,12 +673,18 @@ function gridHtml() {
       const _cuprinde = winsFor(i).filter((w) => w.startMin <= _a && w.endMin >= _b);
       const _w = _cuprinde.find((w) => w.onDate) || _cuprinde[0] || null;
       const inOnce = !!(_w && _w.onDate);
-      // ACELASI numar pe toate patru laturile. Incercasem sa-l fac per latura —
-      // 1px de gridline acolo unde blocul nu atinge bordura ferestrei — dar
-      // rezultatul se citeste ca inegal: ochiul compara laturile blocului intre
-      // ele, nu fiecare latura cu vecinul ei. Egal peste tot arata corect.
-      const _niv = _w ? (inOnce ? 5 : 3) : 1;   // fara fereastra: direct pe gridline
-      const insetL = _niv, insetR = _niv;
+      // BLOCUL STA MEREU LA 1px DE GRIDLINE, oricat de adanc ar fi cuibarit.
+      //
+      // Incercasem sa-l retrag cu cate un nivel pentru fiecare fereastra care
+      // il cuprinde (3px in verde, 5px in portocaliu). Pe hartie e curat; pe
+      // ecran distruge exact lucrul care conteaza. O jumatate de ora are ~13px
+      // aici, deci un bloc de doua ore are 52. Luandu-i 5px din fiecare parte
+      // ramane 42 — cu o cincime mai scurt — si nu mai ARATA ca ocupa orele 9-11,
+      // desi acolo e. Ochiul citeste marginile blocului, nu datele din spate.
+      //
+      // Ferestrele sunt regiuni de fundal: pe ele cuibarirea nu costa nimic,
+      // fiindca nimeni nu le citeste capetele la minut. Blocul, da.
+      const insetL = 1, insetR = 1;
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
