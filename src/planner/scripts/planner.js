@@ -1212,7 +1212,6 @@ async function onUp() {
   S.drag = null;
   S.root.classList.remove("is-dragging");
   S.root.querySelector(".pl-block.is-dragging")?.classList.remove("is-dragging");
-  S.root.querySelector(".pl-chip.is-held")?.classList.remove("is-held");
   S.floater?.remove();
   S.floater = null;
   d?.ghost?.remove();
