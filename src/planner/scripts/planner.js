@@ -242,6 +242,7 @@ const S = {
   vacOpen: false,      // admin: vacation form unfolded
   drawerSnap: 0,       // telefon: 0 = doar paleta, 1 = uneltele, 2 = tot
   sheetFor: null,      // telefon: blocul pentru care e deschisa foaia de actiuni
+  sheetAt: 0,          // cand s-a deschis foaia: fereastra de garda contra clicului de la ridicarea degetului
   armed: null,         // telefon: ce ai luat in mana -- {kind:'dot'} sau {kind:'block',id,minutes}
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
@@ -1682,11 +1683,20 @@ function openMoveAsk(s0, d, gesture) {
     title: s0.kind === "personal" ? (s0.name === "Activitate personală" ? "" : s0.name) : "",
   };
   render();
+  S.sheetAt = Date.now();
 }
 
 // ---------- clicks ----------
 
 async function onClick(e) {
+  // FOAIA APARE SUB DEGET. Apasarea lunga o deschide cat degetul e inca jos;
+  // la ridicare, browserul trimite un `click` fix acolo unde s-a ridicat —
+  // adica pe foaia proaspat aparuta. Nimereste fundalul (si se inchide pe loc,
+  // parand ca n-a aparut niciodata) sau, si mai rau, primul buton de sub deget.
+  // O fereastra scurta de garda rezolva tot: cateva sute de milisecunde in care
+  // foaia nu asculta atingeri.
+  if (S.sheetAt && Date.now() - S.sheetAt < 420 && e.target.closest(".pl-sheet")) return;
+
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act;
@@ -1718,10 +1728,10 @@ async function onClick(e) {
     render(); return;
   }
   if (act === "sheet-rename") {
-    S.renameId = b.dataset.id; S.sheetFor = null; render(); return;
+    S.renameId = b.dataset.id; S.sheetFor = null; S.sheetAt = Date.now(); render(); return;
   }
   if (act === "sheet-cancel") {
-    S.sheetFor = null; S.confirmId = b.dataset.id; render(); return;
+    S.sheetFor = null; S.confirmId = b.dataset.id; S.sheetAt = Date.now(); render(); return;
   }
   if (act === "sheet-cancel-series") {
     const x = S.slots.find((q) => q.id === b.dataset.id);
@@ -2111,7 +2121,7 @@ function installLongPress(mount) {
       // lunga -- acelasi loc unde sta si meniul blocurilor.
       const bloc = src.closest && src.closest(".pl-block--cell");
       if (bloc && !VERT && bloc.dataset.id) {
-        S.armed = null; S.sheetFor = bloc.dataset.id;
+        S.armed = null; S.sheetFor = bloc.dataset.id; S.sheetAt = Date.now();
         render(); src = null; return;
       }
       const dot = src.closest && src.closest(".pl-dot");
