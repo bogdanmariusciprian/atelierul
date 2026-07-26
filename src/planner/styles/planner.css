@@ -867,19 +867,24 @@
   }
   .pl-ghost { border-top-color: var(--color-primary); }
 
-  /* Mânerele de întindere trec pe marginile stânga/dreapta: pe axa culcată,
-     începutul e la stânga blocului, sfârșitul la dreapta. */
-  .pl-block__rsz, .pl-avail__h--bot {
-    top: 0; bottom: 0; right: 0; left: auto; width: 12px; height: auto; cursor: ew-resize;
-  }
-  .pl-block__rsz--top, .pl-avail__h--top {
-    top: 0; bottom: 0; left: 0; right: auto; width: 12px; height: auto; cursor: ew-resize;
-  }
+  /* MÂNERELE BLOCULUI DISPAR. Mutate pe marginea din dreapta, dungulița lor
+     de prindere — 3px lățime, 26px înălțime, lipită de margine — arată exact
+     ca o bară de derulare în miniatură înăuntrul blocului. Iar sunt oricum de
+     prisos: durata se schimbă din pastilele foii de acțiuni, mult mai ușor de
+     nimerit decât 12 pixeli. */
+  .pl-block__rsz, .pl-block__rsz--top { display: none !important; }
 
-  /* Dungulița de prindere a mânerului se culcă și ea. */
-  .pl-block__rsz::after, .pl-avail__h::after {
+  /* Ferestrele verzi ÎȘI PĂSTREAZĂ mânerele: în modul creion le tragi de
+     margini ca să ajustezi intervalul deschis, și n-au alt drum. */
+  .pl-avail__h--bot {
+    top: 0; bottom: 0; right: 0; left: auto; width: 14px; height: auto; cursor: ew-resize;
+  }
+  .pl-avail__h--top {
+    top: 0; bottom: 0; left: 0; right: auto; width: 14px; height: auto; cursor: ew-resize;
+  }
+  .pl-avail__h::after {
     left: 50%; bottom: auto; top: 50%;
-    width: 3px; height: 26px; transform: translate(-50%, -50%);
+    width: 3px; height: 22px; transform: translate(-50%, -50%);
   }
 
   /* Eticheta ferestrei verzi ar rupe rândul pe lat — o scoatem, culoarea spune destul. */
