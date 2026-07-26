@@ -955,6 +955,14 @@
     -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
   }
 
+  /* GESTUL SE HOTĂRĂȘTE DUPĂ ELEMENTUL PE CARE ÎNCEPE ATINGEREA.
+     `touch-action: none` era pus doar pe bandă, cu un comentariu care spune
+     exact de ce: „altfel degetul derulează pagina în loc să tragă blocul".
+     Dar blocul n-avea regula, iar pe el pui degetul cel mai des — așa că
+     browserul rămânea liber să deruleze pagina în loc să te lase să iei
+     blocul. Se simte fix ca un scroller pornit din bloc. */
+  .pl-block--cell, .pl-block--cell * { touch-action: none; }
+
   /* ---- ce ai luat in mana ----
      Gestul in doi timpi are nevoie de un semn ferm intre timpul unu si timpul
      doi: altfel nu stii daca ai apucat ceva sau doar ai atins ecranul. Inel
