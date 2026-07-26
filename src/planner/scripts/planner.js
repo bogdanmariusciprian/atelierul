@@ -89,7 +89,20 @@ const axShift = (px) => (VERT ? `translateY(${px}px)` : `translateX(${px}px)`);
  *  culcată aceiași 3px scurtează blocul, iar marginea lui din dreapta cade
  *  înaintea liniei orei: începutul pică exact, sfârșitul nu. Aici lungimea
  *  trebuie să fie exactă, iar separarea o fac conturul și colțurile rotunde. */
-const axGap = () => (VERT ? 3 : 2);   // pe telefon: cate 1px de fiecare parte
+/** Retragerea unui element fata de banda, pe axa timpului.
+ *
+ *  `margin-left` NU e buna aici: muta elementul la dreapta fara sa-l si
+ *  scurteze, deci golul din stanga creste iar dreapta iese peste linie. Ca sa
+ *  fie 1px egal de jur imprejur, retragerea trebuie scazuta de DOUA ori din
+ *  lungime si adunata o data la pozitie.
+ *
+ *  Nivelurile (pasul e 1.5px contur + 1px aer, rotunjit la 2):
+ *    1 = fereastra saptamanala, fata de gridlines
+ *    3 = fereastra de-o-zi, fata de conturul verde
+ *    3 = blocul elevului cand sta direct in verde
+ *    5 = blocul elevului cand sta intr-o fereastra de-o-zi */
+const axInset = (nivel) => (VERT ? 0 : nivel);
+const axGap = (nivel = 1) => (VERT ? 3 : 2 * nivel);
 
 /** Litera cu care încape TOT numele în blocul dat.
  *
@@ -705,7 +718,7 @@ function gridHtml() {
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
       return `<div class="pl-block pl-block--cell${inOnce ? " is-in-once" : ""}${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
-        style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx())}; ${axSize(rows * rowPx() - axGap())}"
+        style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx() + axInset(inOnce ? 5 : 3))}; ${axSize(rows * rowPx() - axGap(inOnce ? 5 : 3))}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
         ${body}
@@ -723,7 +736,7 @@ function gridHtml() {
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="${axPos(h * SLOTS_PER_H * rowPx())}"></span>`).join("")}
         ${(isPast ? [] : winsFor(i)).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx())}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx())}"
+          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(w.onDate ? 3 : 1))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - axGap(w.onDate ? 3 : 1))}"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint && S.paintWhat === "avail" ? `

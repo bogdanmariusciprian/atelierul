@@ -869,20 +869,20 @@
   /* Nivelul 1: fereastra săptămânală, 1px de gridlines. Conturul se desenează
      spre interior, ca golul de sub el să fie un gol adevărat. */
   .pl-avail {
-    left: auto; right: auto; top: 1px; bottom: 1px; margin-left: 1px;
+    left: auto; right: auto; top: 1px; bottom: 1px;
     box-sizing: border-box;
     border: 1.5px dashed color-mix(in srgb, #16a34a 45%, transparent);
     border-radius: 6px;
   }
   /* Nivelul 2: excepția de-o-zi, 1px în interiorul verdelui. */
   .pl-avail.is-once {
-    top: 3px; bottom: 3px; margin-left: 3px;
+    top: 3px; bottom: 3px;
     border-style: solid;
     border-color: color-mix(in srgb, #d97706 55%, transparent);
     border-radius: 5px;
   }
   /* Nivelul 3, cazul adânc: blocul dinăuntrul unei ferestre de-o-zi. */
-  .pl-block--cell.is-in-once { top: 5px; bottom: 5px; margin-left: 5px; }
+  .pl-block--cell.is-in-once { top: 5px; bottom: 5px; }
   /* Un pixel de aer față de gridlines, de jur împrejur: 1px sus și jos din
      poziționare, 1px stânga-dreapta din axGap (care scade 2px din lungime) plus
      deplasarea cu un pixel. Blocul rămâne aliniat la ora lui, dar nu se mai
@@ -905,7 +905,6 @@
   */
   .pl-block, .pl-ghost {
     left: auto; right: auto; top: 3px; bottom: 3px;
-    margin-left: 3px;
     border: 0; box-shadow: none;
     padding: 0.15rem 0.3rem; border-radius: 6px;
     display: flex; align-items: center; overflow: hidden;
