@@ -1200,6 +1200,22 @@ function onDown(e) {
     };
   }
 
+  // TACEREA E CEL MAI PROST RASPUNS. Un bloc din trecut nu are `data-act=grab`
+  // (alive = canEdit && !over), deci atingerea lui nu facea absolut nimic — si
+  // asta se citeste ca „aplicatia e stricata", nu ca „regula e alta". Ii spunem
+  // de ce. Stergerea ramane posibila din apasarea lunga, ca si pana acum.
+  if (!VERT && !grab && !chip && !S.paint) {
+    const blocAtins = e.target.closest(".pl-block--cell");
+    if (blocAtins) {
+      const b = S.slots.find((x) => x.id === blocAtins.dataset.id);
+      if (b && b.end < Date.now()) {
+        showToast("Ora a trecut — nu se mai mută. Ține apăsat ca s-o anulezi.");
+        return;
+      }
+      if (b && !b.canEdit) { showToast("Ora asta nu-i a ta."); return; }
+    }
+  }
+
   // TELEFON: nu se aseaza NIMIC pe orar decat daca ai ales anume un cerc de
   // elev. Pana acum `S.source` ramanea din sesiunea trecuta, ba chiar cadea pe
   // primul elev din lista, asa ca o atingere pe banda planta o ora fara ca
@@ -1367,7 +1383,7 @@ function makeFloater(x, y) {
   S.floater = fl;
 }
 
-const TAP_SLOP_PX = 10;
+const TAP_SLOP_PX = 12;   // degetul e mai putin precis decat mouse-ul
 const onMove = (e) => {
   if (!S.drag) return;
   // `moved` inseamna „geometria s-a schimbat fata de starea initiala" si e pus
