@@ -918,10 +918,16 @@
      ieșea la o simplă apăsare, exact unde Marius voia să ia blocul în mână.
      Pe telefon dispare cu totul: anularea stă în meniul de apăsare lungă. */
   .pl-block__x { display: none !important; }
-  /* Comutatorul 🔁 se arată doar pe blocul luat în mână — altfel s-ar aprinde
-     tot din hoverul emulat, peste numele elevului. */
-  .pl-block__rec { display: none; }
-  .pl-block--cell.is-armed .pl-block__rec { display: block; opacity: 1; }
+  /* Comutatorul 🔁 nu mai există pe telefon: era un buton de 1.15rem peste
+     numele elevului, care se aprindea din hoverul emulat și pe care oricum nu
+     puteai să-l nimerești. Comutarea trăiește în foaia de acțiuni, scrisă în
+     cuvinte. În colț rămâne DOAR semnul că blocul se repetă — indicator, nu
+     comandă. */
+  .pl-block__rec { display: none !important; }
+  .pl-cb__rec {
+    position: absolute; left: 2px; top: 1px;
+    font-size: 0.5rem; opacity: 0.9; pointer-events: none;
+  }
 
   /* Confirmarea inline nu mai are ce căuta aici (o ora înseamnă 26px, iar
      întrebarea plus trei butoane cer de zece ori atât), dar dacă starea

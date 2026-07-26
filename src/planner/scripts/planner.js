@@ -682,7 +682,7 @@ function gridHtml() {
            </span>`
         : `${s.kind === "lesson" && (s.externalId ? s.extEmoji : pupilEmoji(s.userId)) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(s.externalId ? s.extEmoji : pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm"${autoNume(slotName(s), rows)}>${esc(slotName(s))}</b>
            <span class="pl-cb__time">${hhmm(s.start)}–${hhmm(s.end)}</span>
-           ${alive && isAdmin() ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
+           ${alive && isAdmin() && VERT ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
                title="${s.recurrenceId
                  ? "Se repetă săptămânal. Apasă ca să oprești repetarea de aici înainte — blocul ăsta rămâne, singur."
                  : `Apasă ca să se repete săptămânal de aici înainte (${REC_WEEKS} săptămâni).`}"
@@ -859,7 +859,8 @@ function render() {
          <div class="pl-live" data-role="live" hidden></div>`
       : `${headerHtml()}${body}
          ${!S.loading ? `<div class="pl-drawer" data-snap="${S.drawerSnap}">
-           <button type="button" class="pl-drawer__h" data-act="drawer" aria-label="Deschide uneltele"></button>
+           <button type="button" class="pl-drawer__h" data-act="drawer"
+                   aria-label="Deschide uneltele"><span>🖌 unelte</span></button>
            <div class="pl-drawer__in">${pal}${below}</div>
          </div>` : ""}
          ${sheetHtml()}
