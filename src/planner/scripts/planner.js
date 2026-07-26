@@ -89,7 +89,7 @@ const axShift = (px) => (VERT ? `translateY(${px}px)` : `translateX(${px}px)`);
  *  culcată aceiași 3px scurtează blocul, iar marginea lui din dreapta cade
  *  înaintea liniei orei: începutul pică exact, sfârșitul nu. Aici lungimea
  *  trebuie să fie exactă, iar separarea o fac conturul și colțurile rotunde. */
-const axGap = () => (VERT ? 3 : 0);
+const axGap = () => (VERT ? 3 : 2);   // pe telefon: cate 1px de fiecare parte
 
 /** Litera cu care încape TOT numele în blocul dat.
  *
