@@ -1963,9 +1963,28 @@ function onCtxMenu(e) {
     if (!x) return;
     if (!(x.canEdit && (x.end >= Date.now() || isAdmin()))) return; // elevul nu atinge trecutul; adminul îl poate șterge
     e.preventDefault();
-    openCtx(e.clientX, e.clientY, [
-      { label: "🗑 Șterge", danger: true, run: () => { S.confirmId = x.id; render(); } },
-    ]);
+    // Pe telefon confirmarea inline nu incape in banda (blocul de o ora are
+    // 26px, iar intrebarea plus trei butoane cer de zece ori atat), iar pe
+    // atingere „×"-ul apare singur din hoverul emulat. Deci anularea traieste
+    // AICI, in meniu: are loc sa scrie intreg si nu ajungi la ea din greseala.
+    const itemi = !VERT
+      ? [
+          { label: "🗑 Anulează ora", danger: true, run: async () => {
+              const r = await cancelSlot(x.id);
+              showToast(r.ok ? "Rezervare anulată." : r.message, r.ok ? { kind: "success" } : undefined);
+              refresh();
+            } },
+          ...(x.recurrenceId && isAdmin() ? [
+            { label: "🗑 Anulează toată seria", danger: true, run: async () => {
+                const r = await cancelSeries(x.recurrenceId);
+                showToast(r.ok ? "Toată seria viitoare a fost anulată." : r.message,
+                  r.ok ? { kind: "success" } : undefined);
+                refresh();
+              } },
+          ] : []),
+        ]
+      : [{ label: "🗑 Șterge", danger: true, run: () => { S.confirmId = x.id; render(); } }];
+    openCtx(e.clientX, e.clientY, itemi);
     return;
   }
   if (win) {
