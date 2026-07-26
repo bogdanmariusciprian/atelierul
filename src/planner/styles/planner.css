@@ -808,7 +808,9 @@
 
   /* Rigla orelor urcă deasupra grilei, ca antet orizontal. */
   .pl-rail {
-    width: auto; height: 1.1rem !important; margin: 0 0 0.15rem 2.9rem;
+    /* Marginea din stânga trebuie să fie EXACT capul zilei plus golul,
+       altfel orele se decalează față de banda pe care o numerotează. */
+    height: 1.1rem !important; margin: 0 0 0.15rem calc(3.1rem + 0.3rem);
   }
   .pl-hour {
     right: auto; bottom: 0; transform: translateX(-50%);
@@ -831,9 +833,18 @@
   .pl-colhead__today, .pl-colhead__vac { font-size: 0.55rem; }
 
   .pl-lane {
-    flex: 1; min-width: 0; height: 3rem;
+    /* `flex: none`, NU `flex: 1`. Lățimea benzii vine din JS și reprezintă
+       exact intervalul orar; întinsă de flex, banda depășește rigla și
+       ultimele ore rămân spațiu mort în care poți scăpa un bloc „în afara
+       timpului". Se vede imediat în poză: orele se opreau pe la 65%. */
+    flex: none; height: 3rem;
     border-radius: 8px; border: 1.5px solid var(--color-border);
+    /* Un fundal propriu, nu doar contur: pe un rând subțire și estompat
+       (zilele trecute au opacity 0.55) o linie de 1.5px dispare de tot. */
+    background: color-mix(in srgb, var(--color-text) 4%, var(--color-bg));
   }
+  /* Trecutul rămâne stins, dar citibil — bugetul de contrast e mai mic aici. */
+  .pl-col.is-past .pl-colhead, .pl-col.is-past .pl-lane { opacity: 0.75; }
 
   /* Ce se întindea pe lățimea benzii se întinde acum pe înălțimea ei. */
   .pl-line { left: auto; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
