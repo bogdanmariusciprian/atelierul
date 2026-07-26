@@ -64,9 +64,25 @@ const ROW_PX_NARROW = 22;            // ...and on a phone, where width is the sc
  *  alinierea blocurilor la ore. */
 const PL_GAP = 1;    // golul cerut intre doua contururi vecine
 const PL_HAIR = 1;   // grosimea bordurii unei ferestre
-/** Retragerea de la granita orei, pentru un element cuprins de `n` ferestre.
- *  Drumul e: gol, bordura, gol, bordura, ... , gol. */
-const plInset = (n) => (n + 1) * PL_GAP + n * PL_HAIR;
+const PL_GRID = 1;   // grosimea gridline-ului
+
+/** Retragerea fata de granita orei, pentru un element cuprins de `n` ferestre.
+ *
+ *  Drumul e: gol, bordura, gol, bordura, ... , gol.
+ *
+ *  DAR gridline-ul se deseneaza DUPA granita, adica ocupa primul pixel al orei
+ *  care incepe acolo. Deci in STANGA el fura un pixel si trebuie sarit; in
+ *  DREAPTA nu fura nimic, fiindca el aparține deja orei urmatoare.
+ *
+ *  De-aia cele doua capete nu au acelasi numar, si nu e o inconsecventa: e
+ *  consecinta faptului ca o linie de 1px asezata pe o granita apartine
+ *  neaparat unei singure parti. Marius a desenat exact asa pe hartia
+ *  milimetrica: bloc liber de la 24 la 42, cu gridline-ul la 22 si la 44.
+ *
+ *  Masurate de la granita:  n=0 → 2 si 1 · n=1 → 4 si 3 · n=2 → 6 si 5. */
+const plChain = (n) => (n + 1) * PL_GAP + n * PL_HAIR;
+const plInsetL = (n) => PL_GRID + plChain(n);
+const plInsetR = (n) => plChain(n);
 
 const RAIL_NARROW_PX = 46;           // capul zilei (2.5rem) + goluri, scăzute din lățimea utilă
 
@@ -710,10 +726,9 @@ function gridHtml() {
       // benzii, deci daca blocul e in ea, o atinge si sus si jos.
       // Cate ferestre il cuprind: 0, 1 (doar verde) sau 2 (verde + portocaliu).
       const _adanc = _w ? (inOnce ? 2 : 1) : 0;
-      const _niv = plInset(_adanc);
-      const _liber = plInset(0);   // langa un gridline gol
-      const insetL = _w && _w.startMin === _a ? _niv : _liber;
-      const insetR = _w && _w.endMin === _b ? _niv : _liber;
+      // Lipit de capatul ferestrei → adancimea ei. Liber → doar gridline plus gol.
+      const insetL = plInsetL(_w && _w.startMin === _a ? _adanc : 0);
+      const insetR = plInsetR(_w && _w.endMin === _b ? _adanc : 0);
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
@@ -789,7 +804,7 @@ function gridHtml() {
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="${axPos(h * SLOTS_PER_H * rowPx())}"></span>`).join("")}
         ${(isPast ? [] : winsFor(i)).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(plInset(w.onDate ? 1 : 0)))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - 2 * axInset(plInset(w.onDate ? 1 : 0)))}"
+          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(plInsetL(w.onDate ? 1 : 0)))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - axInset(plInsetL(w.onDate ? 1 : 0)) - axInset(plInsetR(w.onDate ? 1 : 0)))}"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint && S.paintWhat === "avail" ? `
@@ -1136,9 +1151,11 @@ function fitDrawer() {
   // dar trebuie sa foloseasca EXACT aceleasi numere.
   const r = document.documentElement.style;
   r.setProperty("--pl-hair", `${PL_HAIR}px`);
-  r.setProperty("--pl-in-0", `${plInset(0)}px`);
-  r.setProperty("--pl-in-1", `${plInset(1)}px`);
-  r.setProperty("--pl-in-2", `${plInset(2)}px`);
+  // Pe verticala nu exista gridline care sa fure un pixel, deci acolo se
+  // foloseste lantul curat, fara PL_GRID.
+  r.setProperty("--pl-in-0", `${plChain(0)}px`);
+  r.setProperty("--pl-in-1", `${plChain(1)}px`);
+  r.setProperty("--pl-in-2", `${plChain(2)}px`);
   // Marcăm pagina: cât timp lucrezi în planner pe telefon, butoanele plutitoare
   // ale site-ului se dau la o parte cu totul. Ridicate, ajungeau peste orar.
   document.body.classList.add("pl-phone");
@@ -1186,9 +1203,11 @@ function installDrawerDrag(mount) {
   // dar trebuie sa foloseasca EXACT aceleasi numere.
   const r = document.documentElement.style;
   r.setProperty("--pl-hair", `${PL_HAIR}px`);
-  r.setProperty("--pl-in-0", `${plInset(0)}px`);
-  r.setProperty("--pl-in-1", `${plInset(1)}px`);
-  r.setProperty("--pl-in-2", `${plInset(2)}px`);
+  // Pe verticala nu exista gridline care sa fure un pixel, deci acolo se
+  // foloseste lantul curat, fara PL_GRID.
+  r.setProperty("--pl-in-0", `${plChain(0)}px`);
+  r.setProperty("--pl-in-1", `${plChain(1)}px`);
+  r.setProperty("--pl-in-2", `${plChain(2)}px`);
   });
 
   const gata = () => {
