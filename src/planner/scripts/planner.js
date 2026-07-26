@@ -2146,6 +2146,35 @@ function installLongPress(mount) {
 
 function onCtxMenu(e) {
   if (!isLoggedIn()) return;
+
+  // DOUA CAI CARE SE BAT. Pe Android apasarea lunga declanseaza SINGURA
+  // evenimentul nativ `contextmenu`, la ~500ms — dupa temporizatorul nostru de
+  // 400ms. Deci foaia se deschidea corect, iar imediat dupa ea venea meniul mic
+  // de dinainte si o acoperea: din afara arata ca „la long tap apare doar
+  // Anuleaza ora". Le unificam — orice cale ar veni prima, ajunge in acelasi
+  // loc, iar a doua nu mai are ce face.
+  if (!VERT) {
+    const b = e.target.closest(".pl-block--cell");
+    if (b && b.dataset.id) {
+      e.preventDefault();
+      if (S.sheetFor !== b.dataset.id) {
+        S.armed = null; S.sheetFor = b.dataset.id; S.sheetAt = Date.now();
+        render();
+      }
+      return;
+    }
+    const d = e.target.closest(".pl-dot");
+    if (d) {
+      e.preventDefault();
+      S.armed = null;
+      if (d.dataset.ext) { S.editExternal = d.dataset.ext; S.editPupil = null; }
+      else if (d.dataset.uid) { S.editPupil = d.dataset.uid; S.editExternal = null; }
+      S.sheetAt = Date.now();
+      render();
+      return;
+    }
+  }
+
   const blk = e.target.closest(".pl-block--cell");
   const win = blk ? null : (isAdmin() ? e.target.closest(".pl-avail") : null);
   if (blk) {

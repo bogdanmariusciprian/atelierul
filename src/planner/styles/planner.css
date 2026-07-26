@@ -947,6 +947,12 @@
   /* Pastila de anunț era cât un buton — pe telefon e doar o șoaptă. */
   .pl-live { font-size: 0.62rem; padding: 0.2rem 0.5rem; }
 
+  /* Android scoate propriul meniu de sistem la apăsare lungă (copiere,
+     selectare). Peste al nostru, arată ca o defecțiune. */
+  .pl-block--cell, .pl-dot, .pl-lane {
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  }
+
   /* ---- ce ai luat in mana ----
      Gestul in doi timpi are nevoie de un semn ferm intre timpul unu si timpul
      doi: altfel nu stii daca ai apucat ceva sau doar ai atins ecranul. Inel
