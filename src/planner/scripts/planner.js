@@ -1012,6 +1012,62 @@ function clearDrawerVar() {
   document.documentElement.style.removeProperty("--pl-drawer-h");
   document.body.classList.remove("pl-phone");
 }
+/** Tragerea sertarului: urci cu degetul, se desface; cobori, se strânge.
+ *
+ *  La ridicare se fixează pe treapta cea mai apropiată — nu rămâne la o
+ *  înălțime oarecare, pentru că treptele nu-s decorative: la 0 se vede doar
+ *  paleta, la 1 apar uneltele, la 2 se desfășoară tot. O poziție intermediară
+ *  ar tăia un rând la jumătate.
+ *
+ *  Sub pragul de mișcare, gestul rămâne o simplă atingere și trece mai departe
+ *  la handlerul de click, care ciclează treptele — cine preferă să apese, poate.
+ */
+function installDrawerDrag(mount) {
+  let y0 = 0, h0 = 0, activ = false, tras = false;
+
+  mount.addEventListener("pointerdown", (e) => {
+    const h = e.target.closest(".pl-drawer__h");
+    if (!h || VERT) return;
+    const d = S.root.querySelector(".pl-drawer");
+    if (!d) return;
+    y0 = e.clientY; h0 = d.offsetHeight; activ = true; tras = false;
+    d.style.transition = "none";            // cât tragem, urmărește degetul exact
+    h.setPointerCapture?.(e.pointerId);
+  });
+
+  mount.addEventListener("pointermove", (e) => {
+    if (!activ) return;
+    const d = S.root.querySelector(".pl-drawer");
+    if (!d) return;
+    const dy = y0 - e.clientY;              // în sus = pozitiv = se desface
+    if (Math.abs(dy) > 6) tras = true;
+    const min = DRAWER_SNAP[0], max = DRAWER_SNAP[DRAWER_SNAP.length - 1];
+    const h = Math.max(min, Math.min(max, h0 + dy));
+    d.style.height = `${h}px`;
+    document.documentElement.style.setProperty("--pl-drawer-h", `${h}px`);
+  });
+
+  const gata = () => {
+    if (!activ) return;
+    activ = false;
+    const d = S.root.querySelector(".pl-drawer");
+    if (!d) return;
+    d.style.transition = "";
+    if (!tras) return;                      // atingere scurtă: o duce clickul
+    const h = d.offsetHeight;
+    let best = 0;
+    for (let i = 1; i < DRAWER_SNAP.length; i++) {
+      if (Math.abs(DRAWER_SNAP[i] - h) < Math.abs(DRAWER_SNAP[best] - h)) best = i;
+    }
+    S.drawerSnap = best;
+    d.dataset.snap = String(best);
+    fitDrawer();
+    S.drawerJustDragged = Date.now();       // ca să nu ciclez și din click
+  };
+  mount.addEventListener("pointerup", gata);
+  mount.addEventListener("pointercancel", gata);
+}
+
 function cycleDrawer(dir) {
   S.drawerSnap = Math.max(0, Math.min(DRAWER_SNAP.length - 1,
     dir === 0 ? (S.drawerSnap + 1) % DRAWER_SNAP.length : S.drawerSnap + dir));
@@ -1714,7 +1770,12 @@ async function onClick(e) {
   }
   if (act === "today") { S.week = weekStart(); render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
-  if (act === "drawer") { cycleDrawer(0); return; }
+  if (act === "drawer") {
+    // Tragerea a hotarat deja treapta; clickul care vine dupa ridicarea
+    // degetului n-are ce sa mai schimbe.
+    if (S.drawerJustDragged && Date.now() - S.drawerJustDragged < 400) return;
+    cycleDrawer(0); return;
+  }
   if (act === "sheet-stop") return;                       // clic in card: nu inchide
   if (act === "sheet-close") {                            // clic pe fundal: inchide
     S.confirmId = null; S.moveAsk = null; S.renameId = null; S.sheetFor = null;
@@ -2310,6 +2371,7 @@ export async function initPlanner(mount) {
   mount.addEventListener("mouseout", onDockLeave);
   mount.addEventListener("contextmenu", onCtxMenu);
   installLongPress(mount);
+  installDrawerDrag(mount);
 
   async function boot() {
     const my = ++bootId;
