@@ -673,9 +673,12 @@ function gridHtml() {
       const _cuprinde = winsFor(i).filter((w) => w.startMin <= _a && w.endMin >= _b);
       const _w = _cuprinde.find((w) => w.onDate) || _cuprinde[0] || null;
       const inOnce = !!(_w && _w.onDate);
+      // ACELASI numar pe toate patru laturile. Incercasem sa-l fac per latura —
+      // 1px de gridline acolo unde blocul nu atinge bordura ferestrei — dar
+      // rezultatul se citeste ca inegal: ochiul compara laturile blocului intre
+      // ele, nu fiecare latura cu vecinul ei. Egal peste tot arata corect.
       const _niv = _w ? (inOnce ? 5 : 3) : 1;   // fara fereastra: direct pe gridline
-      const insetL = _w && _w.startMin === _a ? _niv : 1;
-      const insetR = _w && _w.endMin === _b ? _niv : 1;
+      const insetL = _niv, insetR = _niv;
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
