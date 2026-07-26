@@ -1151,8 +1151,16 @@ function fitDrawer() {
   // dar trebuie sa foloseasca EXACT aceleasi numere.
   const r = document.documentElement.style;
   r.setProperty("--pl-hair", `${PL_HAIR}px`);
-  // Pe verticala nu exista gridline care sa fure un pixel, deci acolo se
-  // foloseste lantul curat, fara PL_GRID.
+  // Pe verticala NU se sare peste nicio linie, spre deosebire de orizontala.
+  // Nu pentru ca banda n-ar avea margini, ci pentru ca marginile ei sunt o
+  // `border` CSS, iar un element pozitionat absolut se masoara din padding box
+  // — adica deja din interiorul bordurii. `top: 1px` inseamna deja un pixel de
+  // gol DUPA linie. Gridline-ul, in schimb, e un `<span>` desenat inauntru si
+  // chiar ocupa un pixel din spatiul in care asezam blocul.
+  //
+  // (Am incercat sa adaug +1 si aici, dupa masuratorile de pe hartia
+  // milimetrica; era gresit: hartia deseneaza marginea benzii ca pixel
+  // obisnuit, nu ca border, si de-aia cerea un pixel in plus.)
   r.setProperty("--pl-in-0", `${plChain(0)}px`);
   r.setProperty("--pl-in-1", `${plChain(1)}px`);
   r.setProperty("--pl-in-2", `${plChain(2)}px`);
@@ -1203,8 +1211,16 @@ function installDrawerDrag(mount) {
   // dar trebuie sa foloseasca EXACT aceleasi numere.
   const r = document.documentElement.style;
   r.setProperty("--pl-hair", `${PL_HAIR}px`);
-  // Pe verticala nu exista gridline care sa fure un pixel, deci acolo se
-  // foloseste lantul curat, fara PL_GRID.
+  // Pe verticala NU se sare peste nicio linie, spre deosebire de orizontala.
+  // Nu pentru ca banda n-ar avea margini, ci pentru ca marginile ei sunt o
+  // `border` CSS, iar un element pozitionat absolut se masoara din padding box
+  // — adica deja din interiorul bordurii. `top: 1px` inseamna deja un pixel de
+  // gol DUPA linie. Gridline-ul, in schimb, e un `<span>` desenat inauntru si
+  // chiar ocupa un pixel din spatiul in care asezam blocul.
+  //
+  // (Am incercat sa adaug +1 si aici, dupa masuratorile de pe hartia
+  // milimetrica; era gresit: hartia deseneaza marginea benzii ca pixel
+  // obisnuit, nu ca border, si de-aia cerea un pixel in plus.)
   r.setProperty("--pl-in-0", `${plChain(0)}px`);
   r.setProperty("--pl-in-1", `${plChain(1)}px`);
   r.setProperty("--pl-in-2", `${plChain(2)}px`);

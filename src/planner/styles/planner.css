@@ -795,7 +795,23 @@
    calculează JS-ul. CSS-ul se ocupă doar de axa perpendiculară.
    ========================================================= */
 @media (max-width: 700px) {
-  .pl-grid { flex-direction: column; gap: 0.3rem; overflow-x: visible; }
+  /* ---- TOT CE TINE DE GRILA STA PE PIXELI INTREGI ----
+     Capul zilei are 40px, dar golul dintre el si banda era `0.3rem` = 4.8px,
+     iar bordura benzii 1.5px. Banda incepea deci la 46.3px, si toate
+     gridlines si toate blocurile mosteneau acel „.3".
+
+     O linie de 1px asezata la 46.3 nu incape intr-un pixel fizic: browserul o
+     intinde pe doi, fiecare la jumatate de intensitate. Iese mai groasa si mai
+     spalacita pe o latura decat pe cealalta — exact „parca nu e egal la stanga
+     fata de dreapta", desi `getBoundingClientRect` raporta 1.000px curat.
+     Masuratoarea si ochiul spuneau amandoua adevarul, despre lucruri diferite.
+
+     Pe verticala la fel: golul dintre zile fiind 4.8px, fiecare zi pornea de
+     la alta fractiune (0, 52.8, 105.6...) si nu se vedeau la fel intre ele.
+
+     Deci: niciun rem si nicio jumatate de pixel pe caile care duc la pozitia
+     unui gridline sau a unui bloc. Doar numere intregi de pixeli. */
+  .pl-grid { flex-direction: column; gap: 4px; overflow-x: visible; }
   /* Nimic din orar nu are voie să lățească pagina. */
   .pl-wrap { overflow-x: clip; }
 
@@ -804,7 +820,7 @@
      .pl-grid mută doar rigla, iar zilele rămân coloane late care ies din
      ecran. (Găsit uitându-mă la pagina randată, nu citind codul.) */
   .pl-cols {
-    display: flex; flex-direction: column; gap: 0.3rem;
+    display: flex; flex-direction: column; gap: 4px;
     min-width: 0; grid-template-columns: none;
   }
 
@@ -812,7 +828,7 @@
   .pl-rail {
     /* Marginea din stânga trebuie să fie EXACT capul zilei plus golul,
        altfel orele se decalează față de banda pe care o numerotează. */
-    height: 0.72rem !important; margin: 0 0 0.02rem calc(2.5rem + 0.3rem);
+    height: 0.72rem !important; margin: 0 0 0 calc(2.5rem + 4px);
   }
   /* Cifrele orelor: mult mai mici și coborâte până aproape de gridlines, ca
      să se citească drept etichete ale liniilor, nu ca un rând de sine
@@ -823,7 +839,7 @@
   }
 
   /* Ziua: capul la stânga, banda în dreapta lui. */
-  .pl-col { display: flex; align-items: stretch; gap: 0.3rem; }
+  .pl-col { display: flex; align-items: stretch; gap: 4px; }
   .pl-colhead {
     /* `height: auto` NU e decorativ: pe desktop capul are height: var(--pl-head)
        = 4.2rem, iar pe axa culcată el devine cel mai înalt lucru din rând și
@@ -854,10 +870,10 @@
        exact intervalul orar; întinsă de flex, banda depășește rigla și
        ultimele ore rămân spațiu mort în care poți scăpa un bloc „în afara
        timpului". Se vede imediat în poză: orele se opreau pe la 65%. */
-    flex: none; height: 3rem;
-    border-radius: 8px; border: 1.5px solid var(--color-border);
+    flex: none; height: 48px;
+    border-radius: 8px; border: 1px solid var(--color-border);
     /* Un fundal propriu, nu doar contur: pe un rând subțire și estompat
-       (zilele trecute au opacity 0.55) o linie de 1.5px dispare de tot. */
+       (zilele trecute au opacity 0.55) o linie subțire dispare de tot. */
     background: color-mix(in srgb, var(--color-text) 4%, var(--color-bg));
   }
   /* Trecutul rămâne stins, dar citibil — bugetul de contrast e mai mic aici. */
@@ -894,8 +910,8 @@
      fără să mai însemne nimic. Culoarea plină spune deja al cui e blocul. */
   /* ---- CUIBĂRIRE PE TREI NIVELURI ----
      Fiecare nivel păstrează 1px față de conturul celui care îl cuprinde.
-     Conturul ferestrelor e de 1.5px, deci pasul de la un nivel la altul e
-     1.5 + 1 = 2.5px, rotunjit la 2.
+     Conturul ferestrelor e de 1px (`--pl-hair`), deci pasul de la un nivel la
+     altul e 1 + 1 = 2px, fix, fără rotunjiri.
 
        0px  marginea benzii (gridlines)
        1px  fereastra verde — săptămânal
