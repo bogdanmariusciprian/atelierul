@@ -975,3 +975,26 @@ body.is-logged .nav-guest-only { display: none; }
 @media (max-width: 700px) {
   body.pl-phone .msgr { display: none; }
 }
+
+/* =========================================================
+   PLANNER PE TELEFON (body.pl-phone) — cromul site-ului se dă la o parte
+   =========================================================
+   Clasa e pusă de planner.js exact în cazul cerut: pagina de meditații, cont
+   de admin, ecran îngust. În altă parte nu există, deci nimic din blocul ăsta
+   nu se aplică nicăieri altundeva.
+
+   Motivul: orarul are nevoie de fiecare pixel pe verticală, iar antetul cu
+   logo de 48px și footerul cu patru coloane consumă un sfert de ecran ca să
+   spună lucruri pe care, în timp ce muți ore, nu le citește nimeni. */
+body.pl-phone .site-header__inner { padding-block: 0.2rem; }
+body.pl-phone .site-header__logo { height: 30px !important; width: 30px !important; }
+body.pl-phone .site-header__brand { font-size: 0.85rem; gap: 0.35rem; }
+body.pl-phone .site-header__nav a,
+body.pl-phone .site-header__nav button { font-size: 0.78rem; padding: 0.2rem 0.4rem; }
+
+body.pl-phone .site-footer { margin-top: 0.6rem; }
+body.pl-phone .site-footer__inner { padding-block: 0.5rem; }
+body.pl-phone .site-footer__col { font-size: 0.68rem; }
+body.pl-phone .site-footer h3,
+body.pl-phone .site-footer__t { font-size: 0.7rem; margin-bottom: 0.15rem; }
+body.pl-phone .site-footer a, body.pl-phone .site-footer p { font-size: 0.68rem; line-height: 1.3; }

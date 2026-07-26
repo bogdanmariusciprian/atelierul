@@ -1062,12 +1062,12 @@
     background: rgba(15, 23, 42, 0.42);
   }
   .pl-sheet__card {
-    width: 100%; padding: 0.9rem 0.9rem 1.1rem;
+    width: 100%; padding: 0.6rem 0.7rem 0.8rem;
     background: var(--color-bg);
     border-radius: 18px 18px 0 0;
     border-top: 1.5px solid var(--color-border);
     box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25);
-    display: flex; flex-direction: column; gap: 0.4rem;
+    display: flex; flex-direction: column; gap: 0.28rem;
     animation: pl-sheet-up 0.18s ease backwards;
   }
   /* `backwards`, nu `both` — vezi base.css: `forwards` ar lăsa un transform
@@ -1076,19 +1076,19 @@
   @keyframes pl-sheet-up {
     from { transform: translateY(14px); opacity: 0; }
   }
-  .pl-sheet__t { font-size: 0.95rem; line-height: 1.25; }
+  .pl-sheet__t { font-size: 0.82rem; line-height: 1.2; }
   .pl-sheet__w {
-    font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 0.3rem;
+    font-size: 0.66rem; color: var(--color-text-muted); margin-bottom: 0.15rem;
   }
   .pl-sheet__b {
-    width: 100%; padding: 0.6rem 0.8rem; border-radius: 10px;
+    width: 100%; padding: 0.38rem 0.6rem; border-radius: 8px;
     border: 1.5px solid var(--color-border); background: var(--color-bg);
-    font: inherit; font-size: 0.88rem; font-weight: 700; cursor: pointer;
+    font: inherit; font-size: 0.74rem; font-weight: 700; cursor: pointer;
     color: var(--color-text); text-align: left;
   }
   .pl-sheet__b--no { border-color: #fca5a5; color: #b91c1c; }
   .pl-sheet__in {
-    width: 100%; font: inherit; font-size: 0.9rem; padding: 0.5rem 0.7rem;
+    width: 100%; font: inherit; font-size: 0.78rem; padding: 0.35rem 0.55rem;
     border: 1.5px solid var(--color-border); border-radius: 10px;
     background: var(--color-bg); color: var(--color-text);
   }
@@ -1104,11 +1104,11 @@
     display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
     padding: 0.15rem 0;
   }
-  .pl-sheet__lab { font-size: 0.8rem; color: var(--color-text-muted); }
+  .pl-sheet__lab { font-size: 0.68rem; color: var(--color-text-muted); }
   .pl-sheet__dur {
-    padding: 0.4rem 0.8rem; border-radius: 999px; cursor: pointer;
+    padding: 0.26rem 0.6rem; border-radius: 999px; cursor: pointer;
     border: 1.5px solid var(--color-border); background: var(--color-bg);
-    font: inherit; font-size: 0.85rem; font-weight: 700; color: var(--color-text-muted);
+    font: inherit; font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted);
   }
   .pl-sheet__dur.on {
     background: var(--color-primary); border-color: var(--color-primary); color: #fff;
