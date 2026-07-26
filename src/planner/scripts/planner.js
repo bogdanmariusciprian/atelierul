@@ -705,8 +705,12 @@ function gridHtml() {
       // mai mare decat cel din dreapta, fara motiv vizibil.
       const _a = minOf(s.start), _b = minOf(s.end);
       const _cuprinde = winsFor(i).filter((w) => w.startMin <= _a && w.endMin >= _b);
-      const _w = _cuprinde.find((w) => w.onDate) || _cuprinde[0] || null;
-      const inOnce = !!(_w && _w.onDate);
+      // Pe verticala fereastra ocupa toata banda, deci fiecare fereastra care
+      // cuprinde blocul ii pune cate o bordura si sus si jos: adancimea e pur
+      // si simplu cate sunt. (Clasa se numea `is-in-once`, dupa culoare, si
+      // mintea ei era „portocaliu = adanc 2" — fals pentru o portocalie de
+      // sine statatoare, care are o singura bordura.)
+      const _adancV = _cuprinde.length;
       // 1px FATA DE CE E EFECTIV LANGA LATURA AIA.
       //
       // Nivelurile, cu borduri de 1px la ferestre:
@@ -724,11 +728,20 @@ function gridHtml() {
       //
       // PE VERTICALA nu se pune problema: fereastra ocupa toata inaltimea
       // benzii, deci daca blocul e in ea, o atinge si sus si jos.
-      // Cate ferestre il cuprind: 0, 1 (doar verde) sau 2 (verde + portocaliu).
-      const _adanc = _w ? (inOnce ? 2 : 1) : 0;
-      // Lipit de capatul ferestrei → adancimea ei. Liber → doar gridline plus gol.
-      const insetL = plInsetL(_w && _w.startMin === _a ? _adanc : 0);
-      const insetR = plInsetR(_w && _w.endMin === _b ? _adanc : 0);
+      //
+      // ADANCIMEA SE NUMARA, NU SE GHICESTE DIN CULOARE. Varianta veche zicea
+      // „e intr-o portocalie → adancime 2", presupunand tacit ca orice
+      // portocalie sta intr-o verde. O portocalie desenata singura are o
+      // singura bordura, nu doua, si blocul dinauntru iesea retras cu 2px in
+      // plus fata de gridline.
+      //
+      // Numaram cate borduri stau efectiv intre gridline si latura asta: o
+      // fereastra pune bordura langa bloc doar daca incepe (respectiv se
+      // termina) exact acolo unde incepe (se termina) blocul.
+      const _adancL = _cuprinde.filter((w) => w.startMin === _a).length;
+      const _adancR = _cuprinde.filter((w) => w.endMin === _b).length;
+      const insetL = plInsetL(_adancL);
+      const insetR = plInsetR(_adancR);
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
@@ -785,7 +798,7 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${inOnce ? " is-in-once" : ""}${_w ? "" : " is-bare"}${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell is-adanc-${_adancV}${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx() + axInset(insetL))}; ${axSize(rows * rowPx() - axInset(insetL) - axInset(insetR))}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
@@ -804,7 +817,22 @@ function gridHtml() {
         ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="${axPos(h * SLOTS_PER_H * rowPx())}"></span>`).join("")}
         ${(isPast ? [] : winsFor(i)).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(plInsetL(w.onDate ? 1 : 0)))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - axInset(plInsetL(w.onDate ? 1 : 0)) - axInset(plInsetR(w.onDate ? 1 : 0)))}"
+          // ACEEASI REGULA PER LATURA CA LA BLOCURI. Ferestrele portocalii
+          // primeau adancimea 1 pe amandoua laturile, indiferent de realitate:
+          // si cand nu erau in nicio fereastra verde, si cand erau in una dar
+          // fara sa-i atinga marginea. De-aia o portocalie desenata singura
+          // parea retrasa degeaba, iar una din verde se aseza corect abia dupa
+          // ce o intindeai pana la marginea verdelui.
+          //
+          // Retragerea in plus e datorata unei borduri, deci se pune numai pe
+          // latura unde chiar exista o bordura de sarit; in rest, 1px de
+          // gridline, ca orice alt lucru desenat direct in banda.
+          const _verde = w.onDate
+            ? winsFor(i).find((o) => !o.onDate && o.startMin <= w.startMin && o.endMin >= w.endMin)
+            : null;
+          const _inL = plInsetL(_verde && _verde.startMin === w.startMin ? 1 : 0);
+          const _inR = plInsetR(_verde && _verde.endMin === w.endMin ? 1 : 0);
+          return `<span class="pl-avail${w.onDate ? " is-once" : ""} is-adanc-${_verde ? 1 : 0}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(_inL))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - axInset(_inL) - axInset(_inR))}"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint && S.paintWhat === "avail" ? `

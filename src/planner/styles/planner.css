@@ -892,15 +892,19 @@
   }
   /* Nivelul 2: excepția de-o-zi, 1px în interiorul verdelui. */
   .pl-avail.is-once {
-    top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px);
     border-style: solid;
     border-color: color-mix(in srgb, #d97706 55%, transparent);
     border-radius: 5px;
   }
-  /* Nivelul 3, cazul adânc: blocul dinăuntrul unei ferestre de-o-zi. */
-  .pl-block--cell.is-in-once { top: var(--pl-in-2, 5px); bottom: var(--pl-in-2, 5px); }
-  /* Blocul fără nicio fereastră stă la 1px de gridline (cazul 1 din desen). */
-  .pl-block--cell.is-bare { top: var(--pl-in-0, 1px); bottom: var(--pl-in-0, 1px); }
+  /* ADÂNCIMEA, nu culoarea: `is-adanc-N` spune câte borduri de fereastră stau
+     între gridline și lucrul desenat. O fereastră portocalie de sine stătătoare
+     e la adâncimea 0 ca orice altă fereastră; una așezată într-o verde e la 1.
+     La fel pentru blocuri, care pot fi la 0, 1 sau 2. */
+  .pl-avail.is-adanc-1,
+  .pl-block--cell.is-adanc-1 { top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px); }
+  .pl-block--cell.is-adanc-2 { top: var(--pl-in-2, 5px); bottom: var(--pl-in-2, 5px); }
+  .pl-avail.is-adanc-0,
+  .pl-block--cell.is-adanc-0 { top: var(--pl-in-0, 1px); bottom: var(--pl-in-0, 1px); }
   /* Un pixel de aer față de gridlines, de jur împrejur: 1px sus și jos din
      poziționare, 1px stânga-dreapta din axGap (care scade 2px din lungime) plus
      deplasarea cu un pixel. Blocul rămâne aliniat la ora lui, dar nu se mai
@@ -917,7 +921,7 @@
        1px  fereastra verde — săptămânal
        3px  fereastra portocalie — doar ziua aceea
        3px  blocul elevului, când stă direct în verde
-       5px  blocul elevului, când stă într-o portocalie (clasa .is-in-once,
+       5px  blocul elevului, când stă într-o portocalie (clasa .is-adanc-N,
             pusă din JS: frații poziționați absolut nu se cuprind în DOM,
             deci CSS-ul n-ar avea de unde ști)
   */
