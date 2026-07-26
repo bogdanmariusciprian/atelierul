@@ -241,6 +241,7 @@ const S = {
   visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
   vacOpen: false,      // admin: vacation form unfolded
   drawerSnap: 0,       // telefon: 0 = doar paleta, 1 = uneltele, 2 = tot
+  armed: null,         // telefon: ce ai luat in mana -- {kind:'dot'} sau {kind:'block',id,minutes}
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
   fetchId: 0,          // guards racing week-fetches: the newest click wins
@@ -479,7 +480,7 @@ function paletteHtml() {
     const tip = st
       ? `${p.name} — ${DAYS[dayIndexOf(st.first.start)]} ${hhmm(st.first.start)}, ${durLabel(st.min)}${st.min > 120 ? "+" : ""}`
       : `${p.name} — fără oră săptămâna asta`;
-    return `<button type="button" class="pl-dot${st ? "" : " is-todo"}" data-act="pick" data-kind="lesson"
+    return `<button type="button" class="pl-dot${st ? "" : " is-todo"}${S.armed && S.armed.kind === "dot" && S.source && (S.source.userId === p.id || S.source.externalId === p.id) ? " is-armed" : ""}" data-act="pick" data-kind="lesson"
         data-uid="${esc(p.id)}" data-hover-uid="${esc(p.id)}" data-name="${esc(tip)}"
         style="--c:${esc(p.color)}" aria-label="${esc(tip)}">${esc(p.emoji || "")}</button>`;
   }).join("");
@@ -689,7 +690,7 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx())}; ${axSize(rows * rowPx() - axGap())}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
@@ -1381,6 +1382,37 @@ async function onUp() {
   if (live) live.hidden = true;
   if (!d) return;
 
+  // ===== TELEFON: atinge ca sa iei, atinge ca sa pui =====
+  // Tragerea continua ramane, dar cu degetul e nesigura: pornesti de pe un
+  // bloc de 50px si trebuie sa nimeresti alta banda fara sa ridici. Gestul in
+  // doi timpi separa ALEGEREA de DESTINATIE, deci poti derula intre ele, te
+  // poti razgandi, nu ratezi tinta.
+  //
+  // Refolosim exact aceeasi aterizare ca la tragere: umplem `d` cu ce ar fi
+  // avut dupa drop si lasam codul de mai jos sa faca restul -- validari,
+  // intrebarea despre serie, toasturi, reincarcare.
+  const gestSimplu = !d.resize && !d.resizeTop && !d.paint && !d.paintP && !d.availResize;
+  if (!VERT && !d.moved && gestSimplu) {
+    const a = S.armed;
+    if (d.fromTray) {
+      S.armed = a && a.kind === "dot" ? null : { kind: "dot" };
+      render(); return;
+    }
+    if (d.id) {
+      S.armed = a && a.id === d.id
+        ? null
+        : { kind: "block", id: d.id, minutes: d.minutes };
+      render(); return;
+    }
+    if (a) {
+      if (a.kind === "block") { d.id = a.id; d.minutes = a.minutes; }
+      S.armed = null;
+      d.moved = true;   // de aici incolo e exact ca un drop
+    } else {
+      return;           // banda atinsa cu mana goala
+    }
+  }
+
   // A press on a dot that never moved is a CLICK — and a click opens the dot's
   // settings. One object, two gestures, told apart by the flag the drag
   // machinery already keeps for free.
@@ -1891,7 +1923,7 @@ function installLongPress(mount) {
   mount.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "mouse") return;      // mouse-ul are buton drept
     if (e.button !== 0) return;
-    const tgt = e.target.closest(".pl-block--cell, .pl-avail");
+    const tgt = e.target.closest(".pl-block--cell, .pl-avail, .pl-dot");
     if (!tgt) return;
     sx = e.clientX; sy = e.clientY; src = e.target;
     t = setTimeout(() => {
@@ -1899,6 +1931,16 @@ function installLongPress(mount) {
       // Tragerea pornită între timp trebuie oprită curat, altfel apăsarea ar
       // lăsa în urmă o fantomă și, la ridicare, ar așeza un bloc nedorit.
       mount.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
+      // Pe telefon clicul pe bulina o ia in mana, deci editorul ei (nume,
+      // culoare, simbol, durata) si-ar pierde gestul. Il mutam pe apasarea
+      // lunga -- acelasi loc unde sta si meniul blocurilor.
+      const dot = src.closest && src.closest(".pl-dot");
+      if (dot && !VERT) {
+        S.armed = null;
+        if (dot.dataset.ext) { S.editExternal = dot.dataset.ext; S.editPupil = null; }
+        else if (dot.dataset.uid) { S.editPupil = dot.dataset.uid; S.editExternal = null; }
+        render(); src = null; return;
+      }
       onCtxMenu({ target: src, clientX: sx, clientY: sy, preventDefault() {} });
       src = null;
     }, LONGPRESS_MS);

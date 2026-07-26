@@ -914,14 +914,36 @@
   .pl-cb__time { display: none; }
   .pl-cb__rec { position: static; order: -1; flex: none; }
 
-  /* Confirmarea de anulare se așeza pe coloană și ieșea din bandă („Anulezi /
-     Da" atârnând peste rândul de luni, în captură). Pe lat trebuie să încapă
-     în înălțimea benzii. */
+  /* Confirmarea de anulare trebuie sa incapa in banda, nu sa atarne peste
+     randul de deasupra. Textul e foarte mic aici: e o intrebare de o clipa,
+     nu ceva de citit pe indelete. */
   .pl-block--cell.is-confirm {
-    flex-direction: row; align-items: center; gap: 0.2rem; padding: 0 0.25rem;
+    flex-direction: row; align-items: center; justify-content: center;
+    gap: 1px; padding: 0 1px; font-size: 0.42rem; line-height: 1.05;
   }
-  .pl-block__confirm { flex-wrap: nowrap; gap: 0.2rem; }
-  .pl-mini { font-size: 0.62rem; padding: 0.05rem 0.4rem; }
+  .pl-block__confirm { flex-wrap: nowrap; gap: 1px; }
+  .pl-mini {
+    font-size: 0.42rem; padding: 0 0.2rem; border-width: 1px;
+    line-height: 1.3; border-radius: 4px;
+  }
+
+  /* ---- ce ai luat in mana ----
+     Gestul in doi timpi are nevoie de un semn ferm intre timpul unu si timpul
+     doi: altfel nu stii daca ai apucat ceva sau doar ai atins ecranul. Inel
+     gros, aceeasi limba pentru bloc si pentru bulina. */
+  .pl-block--cell.is-armed {
+    outline: 2.5px solid var(--color-text); outline-offset: 1px; z-index: 5;
+    filter: none; opacity: 1;
+  }
+  .pl-dot.is-armed {
+    outline: 3px solid var(--color-text); outline-offset: 2px;
+    transform: scale(1.1);
+  }
+  /* Cat timp tii ceva in mana, benzile se ofera: cursorul si un fundal cald
+     spun ca urmatoarea atingere aseaza. */
+  .pl-wrap:has(.is-armed) .pl-lane {
+    background: color-mix(in srgb, var(--color-primary) 8%, var(--color-bg));
+  }
 
   /* Tooltipul din data-name trăiește pe hover — pe atingere nu apare niciodată,
      dar stă în layout cu white-space: nowrap și poate lăți rândul degeaba. */
