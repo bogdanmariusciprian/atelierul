@@ -1358,6 +1358,10 @@ function makeFloater(x, y) {
 
 const onMove = (e) => {
   if (!S.drag) return;
+  // `moved` inseamna „geometria s-a schimbat fata de starea initiala" si e pus
+  // deja la apasare de moveDrag, ca sa apara fantoma sub deget. Pentru gestul
+  // in doi timpi ne trebuie altceva: daca DEGETUL a calatorit cu adevarat.
+  S.drag.pointerMoved = true;
   if (S.drag.fromTray && !S.floater) makeFloater(e.clientX, e.clientY);
   if (S.floater) S.floater.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
   if (S.drag.availResize) availResizeDrag(e.clientX, e.clientY);
@@ -1392,7 +1396,7 @@ async function onUp() {
   // avut dupa drop si lasam codul de mai jos sa faca restul -- validari,
   // intrebarea despre serie, toasturi, reincarcare.
   const gestSimplu = !d.resize && !d.resizeTop && !d.paint && !d.paintP && !d.availResize;
-  if (!VERT && !d.moved && gestSimplu) {
+  if (!VERT && !d.pointerMoved && gestSimplu) {
     const a = S.armed;
     if (d.fromTray) {
       S.armed = a && a.kind === "dot" ? null : { kind: "dot" };
@@ -1921,7 +1925,11 @@ function installLongPress(mount) {
   const stop = () => { if (t) { clearTimeout(t); t = null; } src = null; };
 
   mount.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse") return;      // mouse-ul are buton drept
+    // Poarta e LATIMEA, nu tipul de pointer: in emularea din DevTools pointerul
+    // poate fi raportat drept „mouse" si gestul ar disparea exact acolo unde e
+    // testat. Pe desktop `VERT` e adevarat, deci apasarea lunga nu se activeaza
+    // si clic-dreapta ramane singurul drum, ca pana acum.
+    if (VERT) return;
     if (e.button !== 0) return;
     const tgt = e.target.closest(".pl-block--cell, .pl-avail, .pl-dot");
     if (!tgt) return;
