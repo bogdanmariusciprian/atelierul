@@ -48,7 +48,37 @@ const MONTHS = ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie",
 const HOURS = DAY_END_H - DAY_START_H;
 const SLOTS_PER_H = 60 / SNAP_MIN;
 const ROWS = HOURS * SLOTS_PER_H;   // half-hour rows
-const ROW_PX = 26;                   // one half hour on screen
+const ROW_PX = 26;                   // one half hour on screen, desktop
+const ROW_PX_NARROW = 22;            // ...and on a phone, where width is the scarce axis
+
+// AXA TIMPULUI. Pe desktop timpul curge în JOS: ziua e o coloană, ora e o
+// poziție pe verticală. Pe telefon curge spre DREAPTA: ziua devine rând, ora
+// devine coloană — singurul fel în care săptămâna întreagă încape pe lățime.
+//
+// Toată geometria trece prin helperele de mai jos, ca schimbarea de axă să fie
+// o singură decizie citită la fiecare randare, nu o a doua randare paralelă
+// care s-ar desincroniza de prima la prima corectură.
+let VERT = true;
+function readAxis() {
+  VERT = !(window.matchMedia && window.matchMedia("(max-width: 700px)").matches);
+  return VERT;
+}
+const rowPx = () => (VERT ? ROW_PX : ROW_PX_NARROW);
+/** Poziția de-a lungul axei timpului. */
+const axPos = (px) => (VERT ? `top:${px}px` : `left:${px}px`);
+/** Întinderea de-a lungul axei timpului. */
+const axSize = (px) => (VERT ? `height:${px}px` : `width:${px}px`);
+/** Deplasarea fantomei trase, pe aceeași axă. */
+const axShift = (px) => (VERT ? `translateY(${px}px)` : `translateX(${px}px)`);
+/** Cât de departe pe axa timpului a ajuns degetul, față de marginea benzii. */
+const axFrom = (rect, clientX, clientY) => (VERT ? clientY - rect.top : clientX - rect.left);
+/** Degetul e în interiorul acestei zile? Ziua stă pe axa PERPENDICULARĂ
+ *  timpului: coloană pe desktop, rând pe telefon. */
+const axInDay = (rect, clientX, clientY) =>
+  (VERT ? clientX >= rect.left && clientX <= rect.right
+        : clientY >= rect.top && clientY <= rect.bottom);
+/** Degetul a ieșit înaintea primei zile? */
+const axBeforeDay = (rect, clientX, clientY) => (VERT ? clientX < rect.left : clientY < rect.top);
 const REC_WEEKS = 12;                // how far a weekly series reaches
 const SWAP_FRESH_MS = 5 * 60 * 1000; // „!" post-schimb rămâne 5 minute
 
@@ -513,12 +543,12 @@ function gridHtml() {
   const today = new Date().setHours(0, 0, 0, 0);
   const now = Date.now();
   S.visH = Math.max(S.visH, neededVisH());
-  const visPx = S.visH * SLOTS_PER_H * ROW_PX;
+  const visPx = S.visH * SLOTS_PER_H * rowPx();
 
   // Hour labels sit centred IN their row, like a school timetable, not on the
   // boundary lines. Rows past the base ten render dimmed.
   const rail = Array.from({ length: HOURS }, (_, h) =>
-    `<span class="pl-hour${h >= 10 ? " is-dim" : ""}" style="top:${(h + 0.5) * SLOTS_PER_H * ROW_PX}px">${DAY_START_H + h}</span>`
+    `<span class="pl-hour${h >= 10 ? " is-dim" : ""}" style="${axPos((h + 0.5) * SLOTS_PER_H * rowPx())}">${DAY_START_H + h}</span>`
   ).join("");
 
   const cols = DAYS.map((label, i) => {
@@ -579,7 +609,7 @@ function gridHtml() {
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
       return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
-        style="--c:${esc(slotColor(s))}; top:${row * ROW_PX}px; height:${rows * ROW_PX - 3}px"
+        style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx())}; ${axSize(rows * rowPx() - 3)}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
         ${body}
@@ -593,11 +623,11 @@ function gridHtml() {
         ${isToday ? `<i class="pl-colhead__today">AZI</i>` : ""}
         ${vac ? `<i class="pl-colhead__vac" title="${esc(vac.label)}">🏖 vacanță</i>` : ""}
       </div>
-      <div class="pl-lane" data-day="${i}" style="height:${visPx}px">
-        ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="top:${h * SLOTS_PER_H * ROW_PX}px"></span>`).join("")}
+      <div class="pl-lane" data-day="${i}" style="${axSize(visPx)}">
+        ${Array.from({ length: HOURS }, (_, h) => `<span class="pl-line${h >= 10 ? " is-dim" : ""}" style="${axPos(h * SLOTS_PER_H * rowPx())}"></span>`).join("")}
         ${(isPast ? [] : winsFor(i)).map((w) => {
           const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="top:${((w.startMin - DAY_START_H * 60) / SNAP_MIN) * ROW_PX}px; height:${((w.endMin - w.startMin) / SNAP_MIN) * ROW_PX}px"
+          return `<span class="pl-avail${w.onDate ? " is-once" : ""}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx())}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx())}"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
             ${S.paint && S.paintWhat === "avail" ? `
@@ -613,7 +643,7 @@ function gridHtml() {
   }).join("");
 
   return `<div class="pl-grid">
-      <div class="pl-rail" style="height:${visPx}px">${rail}</div>
+      <div class="pl-rail" style="${axSize(visPx)}">${rail}</div>
       <div class="pl-cols">${cols}</div>
     </div>`;
 }
@@ -706,12 +736,13 @@ function swapModalsHtml() {
 function nowLineHtml() {
   const row = msToRow(Date.now());
   if (row < 0 || row > ROWS) return "";
-  const y = ((Date.now() - rowToMs(dayIndexOf(Date.now()), 0)) / (SNAP_MIN * 60000)) * ROW_PX;
-  return `<span class="pl-now" style="top:${Math.max(0, Math.min(ROWS * ROW_PX, y)).toFixed(0)}px"></span>`;
+  const y = ((Date.now() - rowToMs(dayIndexOf(Date.now()), 0)) / (SNAP_MIN * 60000)) * rowPx();
+  return `<span class="pl-now" style="${axPos(Math.max(0, Math.min(ROWS * rowPx(), y)).toFixed(0))}"></span>`;
 }
 
 function render() {
   if (!S.root) return;
+  readAxis();   // înainte de orice calcul de geometrie
   const mineCount = S.slots.filter((s) => s.mine).length;
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
@@ -792,8 +823,8 @@ function updateGhost() {
   const g = S.drag?.ghost;
   if (!g) return;
   const { dayIdx, startMs, minutes, bad, badWhy, resize } = S.drag;
-  g.style.transform = `translateY(${msToRow(startMs) * ROW_PX}px)`;
-  g.style.height = `${(minutes / SNAP_MIN) * ROW_PX - 3}px`;
+  g.style.transform = axShift(msToRow(startMs) * rowPx());
+  g.style[VERT ? "height" : "width"] = `${(minutes / SNAP_MIN) * rowPx() - 3}px`;
   g.classList.toggle("is-bad", !!bad);
   const rsz = resize || S.drag.resizeTop;
   const who = S.drag.id && !rsz ? "" : rsz ? durLabel(minutes) : sourceLabel();
@@ -815,15 +846,15 @@ function pointToSlot(clientX, clientY) {
   let lane = null, dayIdx = 0;
   for (const c of cols) {
     const r = c.getBoundingClientRect();
-    if (clientX >= r.left && clientX <= r.right) { lane = c; dayIdx = +c.dataset.day; break; }
+    if (axInDay(r, clientX, clientY)) { lane = c; dayIdx = +c.dataset.day; break; }
   }
   if (!lane) {
     const r0 = cols[0].getBoundingClientRect();
-    lane = clientX < r0.left ? cols[0] : cols[cols.length - 1];
+    lane = axBeforeDay(r0, clientX, clientY) ? cols[0] : cols[cols.length - 1];
     dayIdx = +lane.dataset.day;
   }
   const r = lane.getBoundingClientRect();
-  const row = Math.max(0, Math.round((clientY - r.top) / ROW_PX));
+  const row = Math.max(0, Math.round(axFrom(r, clientX, clientY) / rowPx()));
   return { lane, dayIdx, row };
 }
 
@@ -1117,10 +1148,11 @@ function moveDrag(x, y) {
 function growIfAtBottom(row) {
   if (row < S.visH * SLOTS_PER_H - 1 || S.visH >= HOURS) return;
   S.visH++;
-  const px = `${S.visH * SLOTS_PER_H * ROW_PX}px`;
-  for (const el of S.root.querySelectorAll(".pl-lane")) el.style.height = px;
+  const px = `${S.visH * SLOTS_PER_H * rowPx()}px`;
+  const lat = VERT ? "height" : "width";
+  for (const el of S.root.querySelectorAll(".pl-lane")) el.style[lat] = px;
   const rail = S.root.querySelector(".pl-rail");
-  if (rail) rail.style.height = px;
+  if (rail) rail.style[lat] = px;
 }
 
 function availResizeDrag(x, y) {
@@ -1138,8 +1170,8 @@ function availResizeDrag(x, y) {
   const rowB = (d.endMin - DAY_START_H * 60) / SNAP_MIN;
   const mm = (v) => `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
   g.classList.add("is-paint");
-  g.style.transform = `translateY(${rowA * ROW_PX}px)`;
-  g.style.height = `${(rowB - rowA) * ROW_PX - 3}px`;
+  g.style.transform = axShift(rowA * rowPx());
+  g.style[VERT ? "height" : "width"] = `${(rowB - rowA) * rowPx() - 3}px`;
   g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}${d.onDate ? ", doar ziua asta" : ", săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
 }
 
@@ -1158,8 +1190,8 @@ function paintDrag(x, y) {
   d.moved = true;
   const g = d.ghost;
   g.classList.add("is-paint");
-  g.style.transform = `translateY(${d.rowA * ROW_PX}px)`;
-  g.style.height = `${(d.rowB - d.rowA) * ROW_PX - 3}px`;
+  g.style.transform = axShift(d.rowA * rowPx());
+  g.style[VERT ? "height" : "width"] = `${(d.rowB - d.rowA) * rowPx() - 3}px`;
   const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   if (d.paintP) {
     // Sketching MY time: clashes must show while the pointer is still down —
