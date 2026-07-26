@@ -888,18 +888,24 @@
      ancorată jos. În banda de 48px de aici, discul de 2.5rem umple singur tot
      blocul, iar numele și ora se suprapun peste el — se vede în captură ca un
      amestec ilizibil. Aceleași trei informații, așezate în rând. */
+  /* Simbolul DEASUPRA numelui, nu lângă el: așa numele primește toată lățimea
+     blocului și poate curge pe mai multe rânduri. Pe un bloc de o oră (26px)
+     un rând nu ține nimic; trei rânduri îl fac folosibil. */
   .pl-block--cell {
-    display: flex; flex-direction: row; align-items: center;
-    justify-content: flex-start; gap: 0.25rem;
-    padding: 0 0.3rem; row-gap: 0;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0; padding: 1px 2px; row-gap: 0;
   }
   .pl-cb__sym {
-    width: 0.95rem; height: 0.95rem; font-size: 0.56rem;
-    box-shadow: inset 0 0 2px 1.2px rgb(0 0 0 / 0.55); flex: none;
+    width: 0.8rem; height: 0.8rem; font-size: 0.5rem;
+    box-shadow: inset 0 0 2px 1px rgb(0 0 0 / 0.55); flex: none;
   }
   .pl-cb__nm {
-    font-size: 0.58rem; min-width: 0; flex: 1;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    /* Corpul vine din JS (autoNume); aici doar îi dăm voie să se rupă pe
+       rânduri și îi punem plasa de siguranță la numărul de rânduri calculat. */
+    min-width: 0; width: 100%; padding: 0; text-align: center;
+    white-space: normal; word-break: break-word; line-height: 1.12;
+    display: -webkit-box; -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--pl-nume-randuri, 2); overflow: hidden;
   }
   /* Ora dispare de pe bloc. Nu e o pierdere: pe axa culcată POZIȚIA blocului
      pe riglă chiar este ora, iar eticheta o repeta consumând exact lățimea de

@@ -105,25 +105,42 @@ const axGap = () => (VERT ? 3 : 0);
  *
  *  Sub NUME_MIN_PX textul devine ilizibil chiar și pentru un ochi obișnuit cu
  *  densitate mare, așa că acolo ne oprim și lăsăm tăierea să-și facă treaba. */
-const NUME_MAX_PX = 9.5;   // ≈ 0.58rem, cât aveam fix
-const NUME_MIN_PX = 6;
-const MARGINI_PX = 11;     // padding stânga-dreapta al blocului
-const SIMBOL_PX = 19;      // discul + spațiul de după el
-/** Blocul e destul de lat cât să merite și discul-simbol?
- *
- *  Sub pragul ăsta discul ar mânca jumătate din bloc, iar numele ar coborî la
- *  5px. Renunțăm la el: CULOAREA identifică deja elevul, discul e a doua marcă
- *  de identitate, iar dintre două informații redundante o păstrăm pe cea care
- *  se citește. */
-const incapeSimbolul = (rows) => rows * rowPx() >= 78;
+const NUME_MAX_PX = 9.5;      // ≈ 0.58rem, corpul „normal" de aici
+const NUME_MIN_PX = 5.5;
+const BLOC_H_PX = 42;         // banda de 3rem minus insetul de 3px sus și jos
+const SIMBOL_H_PX = 13;       // discul, când e afișat
+const MARGINI_PX = 5;         // paddingul orizontal al blocului
 
+/** Blocul e destul de lat cât să merite și discul-simbol?
+ *  Sub prag renunțăm la el și dăm numelui tot blocul — culoarea identifică
+ *  deja elevul, discul e a doua marcă, iar dintre două informații redundante
+ *  o păstrăm pe cea care se citește. */
+const incapeSimbolul = (rows) => rows * rowPx() >= 62;
+
+/** Corpul de literă la care numele încape ÎNTREG în bloc.
+ *
+ *  Simbolul stă acum DEASUPRA numelui, nu lângă el (ideea lui Marius), ceea ce
+ *  schimbă socoteala în bine: numele primește toată lățimea blocului și poate
+ *  curge pe mai multe rânduri. Un bloc de o oră are 26px lățime — pe un rând
+ *  n-ar încăpea nimic, pe trei devine folosibil.
+ *
+ *  Două limite se bat între ele și o luăm pe cea mai strânsă: LĂȚIMEA (câte
+ *  caractere intră pe un rând, înmulțit cu numărul de rânduri) și ÎNĂLȚIMEA
+ *  (câte rânduri încap în bloc după ce scădem discul). 0.52 e lățimea medie a
+ *  unui caracter raportată la corp; `-webkit-line-clamp` rămâne plasa de
+ *  siguranță pentru numele neobișnuit de late. */
 function autoNume(text, rows) {
   if (VERT) return "";
-  const latime = rows * rowPx() - axGap() - MARGINI_PX
-    - (incapeSimbolul(rows) ? SIMBOL_PX : 0);
+  const cuSimbol = incapeSimbolul(rows);
+  const latime = Math.max(8, rows * rowPx() - axGap() - MARGINI_PX);
+  const inaltime = BLOC_H_PX - (cuSimbol ? SIMBOL_H_PX : 0);
+  const randuri = cuSimbol ? 2 : 3;
+
   const n = Math.max(1, String(text || "").length);
-  const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, latime / (n * 0.52)));
-  return ` style="font-size:${px.toFixed(1)}px"`;
+  const dinLatime = (latime * randuri) / (n * 0.52);
+  const dinInaltime = inaltime / (randuri * 1.12);   // 1.12 = interlinie
+  const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, dinLatime, dinInaltime));
+  return ` style="font-size:${px.toFixed(1)}px;--pl-nume-randuri:${randuri}"`;
 }
 /** Cât de departe pe axa timpului a ajuns degetul, față de marginea benzii. */
 const axFrom = (rect, clientX, clientY) => (VERT ? clientY - rect.top : clientX - rect.left);
