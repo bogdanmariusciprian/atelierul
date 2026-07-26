@@ -941,6 +941,7 @@ function render() {
          ${swapModalsHtml()}
          <div class="pl-live" data-role="live" hidden></div>`;
     if (!VERT) fitDrawer();
+    masoara();
     return;
   }
   // THE PUPIL: the same board, his own powers. No palette, no pencil, no
@@ -1053,6 +1054,62 @@ function sheetHtml() {
       ${corp}
     </div>
   </div>`;
+}
+
+/** RIGLA — instrument temporar de măsurat, pornit cu ?masor în adresă.
+ *
+ *  Nu ghicim distanțele dintr-o captură: le citim din DOM, cu
+ *  getBoundingClientRect, care dă exact ce a desenat browserul, cu zecimale.
+ *  Scrie pe ecran, pentru fiecare bloc de elev, cât e golul până la vecinul
+ *  din stânga și din dreapta și ce anume e vecinul ăla.
+ *
+ *  Se scoate după ce se lămurește socoteala — de-aia stă în spatele unui flag,
+ *  nu într-o setare. */
+function masoara() {
+  if (!/[?&]masor/.test(location.search)) return;
+  const vechi = document.getElementById("pl-masor");
+  if (vechi) vechi.remove();
+  const out = document.createElement("div");
+  out.id = "pl-masor";
+  out.style.cssText = "position:fixed;left:4px;top:4px;z-index:99999;max-width:96vw;"
+    + "background:#111;color:#0f0;font:10px/1.35 monospace;padding:6px 8px;"
+    + "border-radius:6px;white-space:pre;pointer-events:none";
+
+  const linii = [];
+  const r = (el) => el.getBoundingClientRect();
+  const f = (n) => n.toFixed(3);
+
+  for (const lane of S.root.querySelectorAll(".pl-lane")) {
+    const zi = lane.dataset.day;
+    const bloc = lane.querySelector(".pl-block--cell");
+    if (!bloc) continue;
+    const B = r(bloc), L = r(lane);
+    const fer = [...lane.querySelectorAll(".pl-avail")]
+      .map((w) => ({ el: w, R: r(w), once: w.classList.contains("is-once") }))
+      .filter((w) => w.R.left <= B.left + 0.5 && w.R.right >= B.right - 0.5)
+      .sort((a, b) => (a.R.right - a.R.left) - (b.R.right - b.R.left));
+    const w = fer[0] || null;
+
+    // gridline-ul cel mai apropiat de fiecare latura
+    const linii_h = [...lane.querySelectorAll(".pl-line")].map((x) => r(x));
+    const apr = (x) => linii_h.reduce((best, g) =>
+      Math.abs(g.left - x) < Math.abs(best - x) ? g.left : best, Infinity);
+
+    linii.push(`ziua ${zi}  banda ${f(L.width)}px`);
+    linii.push(`  bloc      L=${f(B.left - L.left)}  R=${f(B.right - L.left)}  lat=${f(B.width)}`);
+    if (w) {
+      const W = w.R;
+      const bs = getComputedStyle(w.el);
+      linii.push(`  fereastra ${w.once ? "PORTOCALIE" : "verde"}  L=${f(W.left - L.left)}  R=${f(W.right - L.left)}  bordura=${bs.borderLeftWidth}`);
+      linii.push(`  gol bloc-fereastra:  stanga=${f(B.left - (W.left + parseFloat(bs.borderLeftWidth)))}  dreapta=${f((W.right - parseFloat(bs.borderRightWidth)) - B.right)}`);
+    } else {
+      linii.push("  fereastra: niciuna");
+    }
+    const gs = apr(B.left), gd = apr(B.right);
+    linii.push(`  gol bloc-gridline:   stanga=${f(B.left - gs)}  dreapta=${f(gd - B.right)}`);
+  }
+  out.textContent = linii.length ? linii.join("\n") : "niciun bloc de masurat";
+  document.body.appendChild(out);
 }
 
 /** Sertarul de pe telefon: trei trepte, ca să nu fie nici mereu în drum, nici
