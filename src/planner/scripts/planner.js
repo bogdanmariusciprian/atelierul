@@ -160,6 +160,7 @@ const S = {
   moveAsk: null,       // series member just moved/resized: „O dată / Permanent?"
   visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
   vacOpen: false,      // admin: vacation form unfolded
+  drawerSnap: 0,       // telefon: 0 = doar paleta, 1 = uneltele, 2 = tot
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
   fetchId: 0,          // guards racing week-fetches: the newest click wins
@@ -748,11 +749,8 @@ function render() {
     ? `<p class="cx-muted">Se încarcă…</p>`
     : `<div class="pl-body${S.paint ? ` is-paint is-paint-${S.paintWhat}` : ""}">${gridHtml()}</div>`;
   if (isAdmin()) {
-    S.root.innerHTML = `
-      ${!S.loading ? paletteHtml() : ""}
-      ${headerHtml()}
-      ${body}
-      ${!S.loading ? `<div class="pl-below">
+    const pal = !S.loading ? paletteHtml() : "";
+    const below = !S.loading ? `<div class="pl-below">
         ${toolsHtml()}
         ${vacationsHtml()}
         <p class="pl-hint">${S.paint
@@ -760,9 +758,25 @@ function render() {
             ? "Mod activitate personală: desenează în orar intervalul tău — cât tragi, atât durează, iar ritmul decide dacă se repetă săptămânal. Blocurile gri rămân vii: le muți, le întinzi de ambele capete, un click le redenumește."
             : "Mod disponibilitate: trage pe o coloană ca să deschizi o fereastră. Trage de marginile uneia existente ca să o ajustezi; × o închide.")
           : "Trage o bulină în orar ca să pui ora — o faci săptămânală din 🔁 de pe bloc. Click pe bulină îi deschide setările; scoaterea unui elev se face din Comunitate → membri."}</p>
-      </div>` : ""}
-      ${swapModalsHtml()}
-      <div class="pl-live" data-role="live" hidden></div>`;
+      </div>` : "";
+
+    // ACEEAȘI CONȚINUT, ALTĂ AȘEZARE. Pe desktop paleta stă deasupra
+    // orarului, unde e loc. Pe telefon lățimea e prea prețioasă ca s-o
+    // cheltui pe unelte care stau degeaba, așa că paleta și bara de dedesubt
+    // coboară împreună într-un sertar cu trei trepte. Nu randăm nimic de două
+    // ori — doar reasamblăm aceleași bucăți.
+    S.root.innerHTML = VERT
+      ? `${pal}${headerHtml()}${body}${below}
+         ${swapModalsHtml()}
+         <div class="pl-live" data-role="live" hidden></div>`
+      : `${headerHtml()}${body}
+         ${!S.loading ? `<div class="pl-drawer" data-snap="${S.drawerSnap}">
+           <button type="button" class="pl-drawer__h" data-act="drawer" aria-label="Deschide uneltele"></button>
+           <div class="pl-drawer__in">${pal}${below}</div>
+         </div>` : ""}
+         ${swapModalsHtml()}
+         <div class="pl-live" data-role="live" hidden></div>`;
+    if (!VERT) fitDrawer();
     return;
   }
   // THE PUPIL: the same board, his own powers. No palette, no pencil, no
@@ -800,6 +814,27 @@ function render() {
     </div>` : ""}
     ${swapModalsHtml()}
     <div class="pl-live" data-role="live" hidden></div>`;
+}
+
+/** Sertarul de pe telefon: trei trepte, ca să nu fie nici mereu în drum, nici
+ *  mereu ascuns. Treapta 0 lasă la vedere doar paleta de buline — atât cât să
+ *  pui o oră nouă fără să deschizi nimic. Grila primește exact atâta spațiu
+ *  cât rămâne, ca sertarul să n-o acopere niciodată. */
+const DRAWER_SNAP = [78, 208, 344];
+function fitDrawer() {
+  const d = S.root.querySelector(".pl-drawer");
+  if (!d) return;
+  const h = DRAWER_SNAP[S.drawerSnap] || DRAWER_SNAP[0];
+  d.style.height = `${h}px`;
+  const b = S.root.querySelector(".pl-body");
+  if (b) b.style.paddingBottom = `${h + 10}px`;
+}
+function cycleDrawer(dir) {
+  S.drawerSnap = Math.max(0, Math.min(DRAWER_SNAP.length - 1,
+    dir === 0 ? (S.drawerSnap + 1) % DRAWER_SNAP.length : S.drawerSnap + dir));
+  const d = S.root.querySelector(".pl-drawer");
+  if (d) d.dataset.snap = String(S.drawerSnap);
+  fitDrawer();
 }
 
 // ---------- dragging: place, move, resize ----------
@@ -1413,6 +1448,8 @@ async function onClick(e) {
   }
   if (act === "today") { S.week = weekStart(); render(); refresh(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
+  if (act === "drawer") { cycleDrawer(0); return; }
+
   if (act === "paint") { S.paint = !S.paint; if (!S.paint) S.renameId = null; render(); return; }
   if (act === "paint-what") { S.paintWhat = b.dataset.v; S.renameId = null; render(); return; }
   if (act === "paint-scope") {
@@ -1732,6 +1769,54 @@ function openCtx(x, y, items) {
   ctxEl.style.top = `${Math.min(y, window.innerHeight - r.height - 8)}px`;
   document.addEventListener("pointerdown", onCtxAway, true);
 }
+/** APĂSAREA LUNGĂ — meniul contextual pentru degete.
+ *
+ *  Pe desktop meniul vine din clic-dreapta. Cu S Pen vine tot de-acolo: butonul
+ *  lateral al stylusului declanșează `contextmenu`, care e deja legat, deci
+ *  pentru tine nu se schimbă nimic. Rămâne degetul, care n-are buton drept.
+ *
+ *  E instalat ca observator SEPARAT, nu ca ramură în `onDown`. Motivul e
+ *  prudența: `onDown` ține toată logica de tragere, desen și redimensionare,
+ *  iar o condiție nouă strecurată acolo ar putea schimba tăcut un caz pe care
+ *  nu-l am în minte. Așa, dacă apăsarea lungă supără, se scoate o linie.
+ *
+ *  Regula de arbitraj între apăsare și tragere: mișcarea câștigă. Peste 10px
+ *  anulăm temporizatorul și lăsăm tragerea în pace — tragerea nu așteaptă
+ *  niciodată cele 400ms, altfel s-ar simți lentă.
+ *
+ *  Ținta e aceeași ca la clic-dreapta: un bloc sau o fereastră deschisă.
+ *  Pe banda goală `onCtxMenu` iese singur, deci apăsarea lungă nu face nimic
+ *  acolo — exact ca pe desktop. */
+const LONGPRESS_MS = 400;
+const LONGPRESS_SLOP = 10;
+function installLongPress(mount) {
+  let t = null, sx = 0, sy = 0, src = null;
+  const stop = () => { if (t) { clearTimeout(t); t = null; } src = null; };
+
+  mount.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse") return;      // mouse-ul are buton drept
+    if (e.button !== 0) return;
+    const tgt = e.target.closest(".pl-block--cell, .pl-avail");
+    if (!tgt) return;
+    sx = e.clientX; sy = e.clientY; src = e.target;
+    t = setTimeout(() => {
+      t = null;
+      // Tragerea pornită între timp trebuie oprită curat, altfel apăsarea ar
+      // lăsa în urmă o fantomă și, la ridicare, ar așeza un bloc nedorit.
+      mount.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
+      onCtxMenu({ target: src, clientX: sx, clientY: sy, preventDefault() {} });
+      src = null;
+    }, LONGPRESS_MS);
+  }, true);
+
+  mount.addEventListener("pointermove", (e) => {
+    if (t && Math.hypot(e.clientX - sx, e.clientY - sy) > LONGPRESS_SLOP) stop();
+  }, true);
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"]) {
+    mount.addEventListener(ev, stop, true);
+  }
+}
+
 function onCtxMenu(e) {
   if (!isLoggedIn()) return;
   const blk = e.target.closest(".pl-block--cell");
@@ -1846,6 +1931,7 @@ export async function initPlanner(mount) {
   mount.addEventListener("mouseover", onDockHover);
   mount.addEventListener("mouseout", onDockLeave);
   mount.addEventListener("contextmenu", onCtxMenu);
+  installLongPress(mount);
 
   async function boot() {
     const my = ++bootId;

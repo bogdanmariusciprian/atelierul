@@ -852,3 +852,52 @@
   /* Eticheta ferestrei verzi ar rupe rândul pe lat — o scoatem, culoarea spune destul. */
   .pl-avail__tag { display: none; }
 }
+
+/* ---- TELEFON: sertarul de unelte ----
+   Trei trepte, comutate din mâner. Treapta 0 arată doar paleta de buline;
+   1 adaugă creionul, durata și vacanțele; 2 le desfășoară pe toate.
+   `position: fixed` e sigur aici DOAR pentru că <main> nu mai are transform —
+   vezi comentariul din base.css. Dacă cineva pune la loc `both` pe animația
+   paginii, sertarul aterizează sub fold și pare că nu se deschide. */
+@media (max-width: 700px) {
+  .pl-drawer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: var(--color-bg);
+    border-top: 1.5px solid var(--color-border);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.12);
+    transition: height 0.18s ease;
+    display: flex; flex-direction: column;
+  }
+  .pl-drawer__h {
+    flex: none; border: 0; background: transparent; cursor: pointer;
+    padding: 0.55rem 0; touch-action: none;
+  }
+  .pl-drawer__h::before {
+    content: ""; display: block; width: 2.4rem; height: 4px; margin: 0 auto;
+    border-radius: 999px; background: var(--color-border);
+  }
+  .pl-drawer__in {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: 0 0.7rem 0.7rem;
+  }
+
+  /* Treapta 0: doar paleta. Restul e acolo, dar tăiat de overflow — nu-l
+     ascundem cu display:none, ca sertarul să poată aluneca lin peste el. */
+  .pl-drawer[data-snap="0"] .pl-drawer__in { overflow: hidden; }
+  .pl-drawer[data-snap="0"] .pl-below { opacity: 0; }
+
+  /* Uneltele se strâng: pe lat aveau loc să respire, aici nu. */
+  .pl-drawer .pl-legend { display: none; }
+  .pl-drawer[data-snap="2"] .pl-legend {
+    display: flex; flex-wrap: wrap; gap: 0.2rem 0.5rem; font-size: 0.62rem;
+  }
+  .pl-drawer .pl-hint { display: none; }
+  .pl-drawer[data-snap="2"] .pl-hint { display: block; font-size: 0.68rem; }
+  .pl-drawer .pl-tools { margin: 0.35rem 0; }
+  .pl-drawer .pl-pen { flex-wrap: wrap; gap: 0.3rem; }
+
+  /* Paleta: bulinele cresc, ca să fie ținte bune și pentru deget, nu doar
+     pentru stylus. */
+  .pl-drawer .pl-dot { width: 1.7rem; height: 1.7rem; }
+}
