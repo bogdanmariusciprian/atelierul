@@ -866,8 +866,12 @@
   /* Ce se întindea pe lățimea benzii se întinde acum pe înălțimea ei. */
   .pl-line { left: auto; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
   .pl-now  { left: auto; right: auto; top: 0; bottom: 0; width: 2px; height: auto; }
+  /* Fereastra se lipește de marginea benzii, iar conturul ei punctat se
+     desenează spre interior (box-sizing). Așa, cei 1px ai blocului rămân un
+     gol adevărat de 1px față de linia verde, nu se mănâncă între ei. */
   .pl-avail {
-    left: auto; right: auto; top: 1px; bottom: 1px; margin-left: 1px;
+    left: auto; right: auto; top: 0; bottom: 0; margin-left: 0;
+    box-sizing: border-box;
     border: 1.5px dashed color-mix(in srgb, #16a34a 45%, transparent);
     border-radius: 6px;
   }
@@ -878,12 +882,11 @@
      Fără bordură groasă sus: pe desktop marginea colorată din stânga e accentul
      care spune „aici începe"; culcată, devenea o dungă lată peste tot blocul,
      fără să mai însemne nimic. Culoarea plină spune deja al cui e blocul. */
-  /* 3px pe verticală, nu 1: fereastra verde e ea însăși retrasă 1px de la
-     marginea benzii și are un contur punctat de 1.5px, deci un bloc la 1px
-     cădea exact peste linie. 1 + 1.5 + 1 de aer = 3.5, rotunjit la 3.
-     Pe orizontală rămâne 1px, ca marginea blocului să stea pe ora lui. */
+  /* Exact 1px de jur împrejur, egal pe toate patru laturile: sus și jos din
+     poziționare, stânga și dreapta din axGap (2px scăzuți din lungime) plus
+     deplasarea cu unu. Marginea blocului rămâne pe ora lui. */
   .pl-block, .pl-ghost {
-    left: auto; right: auto; top: 3px; bottom: 3px;
+    left: auto; right: auto; top: 1px; bottom: 1px;
     margin-left: 1px;
     border: 0; box-shadow: none;
     padding: 0.15rem 0.3rem; border-radius: 6px;
