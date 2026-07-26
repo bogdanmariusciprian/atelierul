@@ -50,6 +50,7 @@ const SLOTS_PER_H = 60 / SNAP_MIN;
 const ROWS = HOURS * SLOTS_PER_H;   // half-hour rows
 const ROW_PX = 26;                   // one half hour on screen, desktop
 const ROW_PX_NARROW = 22;            // ...and on a phone, where width is the scarce axis
+const RAIL_NARROW_PX = 56;           // capul zilei + goluri, scăzute din lățimea utilă
 
 // AXA TIMPULUI. Pe desktop timpul curge în JOS: ziua e o coloană, ora e o
 // poziție pe verticală. Pe telefon curge spre DREAPTA: ziua devine rând, ora
@@ -63,7 +64,19 @@ function readAxis() {
   VERT = !(window.matchMedia && window.matchMedia("(max-width: 700px)").matches);
   return VERT;
 }
-const rowPx = () => (VERT ? ROW_PX : ROW_PX_NARROW);
+/** Jumătatea de oră, în pixeli.
+ *
+ *  Pe desktop e o constantă: lățimea e generoasă, înălțimea curge. Pe telefon
+ *  se inversează raportul — lățimea e FIXĂ și scumpă, iar orele trebuie să
+ *  încapă în ea. Deci n-o alegem, o calculăm din spațiul rămas după capul
+ *  zilei. Cu o valoare fixă (22px) zece ore cer 440px pe un ecran de 412 și
+ *  grila iese din el; așa se potrivește singură pe orice telefon. */
+const rowPx = () => {
+  if (VERT) return ROW_PX;
+  const w = (S.root ? S.root.clientWidth : window.innerWidth) - RAIL_NARROW_PX;
+  const sloturi = Math.max(1, S.visH) * SLOTS_PER_H;
+  return Math.max(9, Math.min(ROW_PX_NARROW, Math.floor(w / sloturi)));
+};
 /** Poziția de-a lungul axei timpului. */
 const axPos = (px) => (VERT ? `top:${px}px` : `left:${px}px`);
 /** Întinderea de-a lungul axei timpului. */

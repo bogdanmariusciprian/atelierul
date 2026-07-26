@@ -797,6 +797,15 @@
 @media (max-width: 700px) {
   .pl-grid { flex-direction: column; gap: 0.3rem; overflow-x: visible; }
 
+  /* Zilele NU stau direct în .pl-grid, ci într-un .pl-cols intermediar —
+     o grilă de 7 coloane cu min-width: 46rem. Fără linia asta, întorsul lui
+     .pl-grid mută doar rigla, iar zilele rămân coloane late care ies din
+     ecran. (Găsit uitându-mă la pagina randată, nu citind codul.) */
+  .pl-cols {
+    display: flex; flex-direction: column; gap: 0.3rem;
+    min-width: 0; grid-template-columns: none;
+  }
+
   /* Rigla orelor urcă deasupra grilei, ca antet orizontal. */
   .pl-rail {
     width: auto; height: 1.1rem !important; margin: 0 0 0.15rem 2.9rem;
