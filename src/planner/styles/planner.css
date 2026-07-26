@@ -811,7 +811,14 @@
 
      Deci: niciun rem si nicio jumatate de pixel pe caile care duc la pozitia
      unui gridline sau a unui bloc. Doar numere intregi de pixeli. */
-  .pl-grid { flex-direction: column; gap: 4px; overflow-x: visible; }
+  /* ---- UN SINGUR COLT PENTRU TOT ORARUL ----
+     Erau patru valori alese pe rand — banda 8, verde 6, portocaliu 5, bloc 6 —
+     si se vedea: un bloc avea alt colt decat fereastra din care facea parte.
+     Acum toate pleaca din `--pl-r`. Schimbi o cifra, se schimba tot orarul. */
+  .pl-grid {
+    --pl-r: 4px;
+    flex-direction: column; gap: 4px; overflow-x: visible;
+  }
   /* Nimic din orar nu are voie să lățească pagina. */
   .pl-wrap { overflow-x: clip; }
 
@@ -848,7 +855,7 @@
     height: auto; min-height: 0;
     flex: none; width: 2.5rem; padding: 0.2rem 0.12rem;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    text-align: center; border-radius: 8px; gap: 0;
+    text-align: center; border-radius: var(--pl-r); gap: 0;
   }
   /* Marius citește bine textul mic și preferă densitatea: fiecare zecime de
      rem economisită aici se duce în lățimea orarului.
@@ -871,7 +878,7 @@
        ultimele ore rămân spațiu mort în care poți scăpa un bloc „în afara
        timpului". Se vede imediat în poză: orele se opreau pe la 65%. */
     flex: none; height: 48px;
-    border-radius: 8px; border: 1px solid var(--color-border);
+    border-radius: var(--pl-r); border: 1px solid var(--color-border);
     /* Un fundal propriu, nu doar contur: pe un rând subțire și estompat
        (zilele trecute au opacity 0.55) o linie subțire dispare de tot. */
     background: color-mix(in srgb, var(--color-text) 4%, var(--color-bg));
@@ -888,13 +895,12 @@
     left: auto; right: auto; top: var(--pl-in-0, 1px); bottom: var(--pl-in-0, 1px);
     box-sizing: border-box;
     border: var(--pl-hair, 1px) dashed color-mix(in srgb, #16a34a 55%, transparent);
-    border-radius: 6px;
+    border-radius: var(--pl-r);
   }
   /* Nivelul 2: excepția de-o-zi, 1px în interiorul verdelui. */
   .pl-avail.is-once {
     border-style: solid;
     border-color: color-mix(in srgb, #d97706 55%, transparent);
-    border-radius: 5px;
   }
   /* ADÂNCIMEA, nu culoarea: `is-adanc-N` spune câte borduri de fereastră stau
      între gridline și lucrul desenat. O fereastră portocalie de sine stătătoare
@@ -931,7 +937,7 @@
   .pl-block, .pl-ghost {
     left: auto; right: auto; top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px);
     border: 0; box-shadow: none;
-    padding: 0.15rem 0.3rem; border-radius: 6px;
+    padding: 0.15rem 0.3rem; border-radius: var(--pl-r);
     display: flex; align-items: center; overflow: hidden;
   }
   .pl-ghost { border: 2px dashed var(--color-primary); }
