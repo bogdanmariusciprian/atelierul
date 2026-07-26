@@ -222,3 +222,13 @@
   font-size: 0.72rem;
   color: var(--color-text-muted);
 }
+
+
+/* Pe telefon, sertarul de unelte al plannerului ocupă marginea de jos. Ca să
+   nu se calce în picioare, chenarul de admin și panoul 🛡 urcă exact cât e
+   sertarul de înalt. `--pl-drawer-h` e pusă de planner.js și lipsește peste
+   tot altundeva, deci fallbackul de 0px păstrează comportamentul de acum. */
+@media (max-width: 700px) {
+  .admin-frame__tag { bottom: calc(5px + var(--pl-drawer-h, 0px)); }
+  .admin-quick { bottom: calc(26px + var(--pl-drawer-h, 0px)); }
+}

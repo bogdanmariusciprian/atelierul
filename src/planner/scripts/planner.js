@@ -841,6 +841,16 @@ function fitDrawer() {
   d.style.height = `${h}px`;
   const b = S.root.querySelector(".pl-body");
   if (b) b.style.paddingBottom = `${h + 10}px`;
+  // Chenarul de admin și butoanele plutitoare stau lipite de marginea de jos a
+  // ecranului, adică fix peste sertar. Nu le acoperim (chatul trebuie să rămână
+  // apăsabil) — le ridicăm cu exact cât ocupă sertarul, printr-o variabilă pe
+  // care CSS-ul lor o citește. În rest de site rămâne 0 și nu se schimbă nimic.
+  document.documentElement.style.setProperty("--pl-drawer-h", `${h}px`);
+}
+/** La ieșirea din planner curtea trebuie eliberată, altfel butoanele rămân
+ *  ridicate pe toate celelalte pagini. */
+function clearDrawerVar() {
+  document.documentElement.style.removeProperty("--pl-drawer-h");
 }
 function cycleDrawer(dir) {
   S.drawerSnap = Math.max(0, Math.min(DRAWER_SNAP.length - 1,
@@ -1997,6 +2007,7 @@ export async function initPlanner(mount) {
     mount.removeEventListener("mouseover", onDockHover);
     mount.removeEventListener("mouseout", onDockLeave);
     mount.removeEventListener("contextmenu", onCtxMenu);
+    clearDrawerVar();
     closeCtx();
     window.removeEventListener("pointermove", onMove);
   };
