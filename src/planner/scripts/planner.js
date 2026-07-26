@@ -673,18 +673,26 @@ function gridHtml() {
       const _cuprinde = winsFor(i).filter((w) => w.startMin <= _a && w.endMin >= _b);
       const _w = _cuprinde.find((w) => w.onDate) || _cuprinde[0] || null;
       const inOnce = !!(_w && _w.onDate);
-      // BLOCUL STA MEREU LA 1px DE GRIDLINE, oricat de adanc ar fi cuibarit.
+      // 1px FATA DE CE E EFECTIV LANGA LATURA AIA.
       //
-      // Incercasem sa-l retrag cu cate un nivel pentru fiecare fereastra care
-      // il cuprinde (3px in verde, 5px in portocaliu). Pe hartie e curat; pe
-      // ecran distruge exact lucrul care conteaza. O jumatate de ora are ~13px
-      // aici, deci un bloc de doua ore are 52. Luandu-i 5px din fiecare parte
-      // ramane 42 — cu o cincime mai scurt — si nu mai ARATA ca ocupa orele 9-11,
-      // desi acolo e. Ochiul citeste marginile blocului, nu datele din spate.
+      // Nivelurile, cu borduri de 1px la ferestre:
+      //    0  gridline (marginea benzii sau linia orei)
+      //    1  fereastra verde   — bordura ei ocupa 1..2
+      //    3  fereastra portocalie — bordura ei ocupa 3..4
+      //    3  blocul, cand vecinul e bordura verde
+      //    5  blocul, cand vecinul e bordura portocalie
       //
-      // Ferestrele sunt regiuni de fundal: pe ele cuibarirea nu costa nimic,
-      // fiindca nimeni nu le citeste capetele la minut. Blocul, da.
-      const insetL = 1, insetR = 1;
+      // PE ORIZONTALA vecinul difera de la o latura la alta: un bloc de la 10
+      // la 11, asezat la mijlocul unei ferestre 9-12, n-are nicio bordura nici
+      // in stanga nici in dreapta — are gridlines, deci 1px. Acelasi bloc, daca
+      // ar incepe la 9, ar avea bordura ferestrei in stanga si gridline in
+      // dreapta: 3px si 1px.
+      //
+      // PE VERTICALA nu se pune problema: fereastra ocupa toata inaltimea
+      // benzii, deci daca blocul e in ea, o atinge si sus si jos.
+      const _niv = _w ? (inOnce ? 5 : 3) : 1;
+      const insetL = _w && _w.startMin === _a ? _niv : 1;
+      const insetR = _w && _w.endMin === _b ? _niv : 1;
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
@@ -741,7 +749,7 @@ function gridHtml() {
       // colour is the identity, and the name arrives on hover, as a tooltip
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
-      return `<div class="pl-block pl-block--cell${inOnce ? " is-in-once" : ""}${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
+      return `<div class="pl-block pl-block--cell${inOnce ? " is-in-once" : ""}${_w ? "" : " is-bare"}${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
         style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx() + axInset(insetL))}; ${axSize(rows * rowPx() - axInset(insetL) - axInset(insetR))}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
