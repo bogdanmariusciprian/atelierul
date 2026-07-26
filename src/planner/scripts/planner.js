@@ -90,6 +90,41 @@ const axShift = (px) => (VERT ? `translateY(${px}px)` : `translateX(${px}px)`);
  *  înaintea liniei orei: începutul pică exact, sfârșitul nu. Aici lungimea
  *  trebuie să fie exactă, iar separarea o fac conturul și colțurile rotunde. */
 const axGap = () => (VERT ? 3 : 0);
+
+/** Litera cu care încape TOT numele în blocul dat.
+ *
+ *  Pe telefon un bloc de două ore are ~50px, din care discul-simbol și
+ *  spațierea iau vreo 30. La corp fix, „Cristina" devine „C..". În loc să
+ *  tăiem numele, îl strângem: calculăm din lățimea reală a blocului corpul la
+ *  care textul intră întreg.
+ *
+ *  0.52 e lățimea medie a unui caracter raportată la corpul literei, pentru
+ *  fontul de interfață. Nu e exactă pentru fiecare literă în parte („i" e
+ *  îngust, „m" e lat), dar e destul de aproape, iar `text-overflow: ellipsis`
+ *  rămâne plasa de siguranță pentru numele neobișnuit de late.
+ *
+ *  Sub NUME_MIN_PX textul devine ilizibil chiar și pentru un ochi obișnuit cu
+ *  densitate mare, așa că acolo ne oprim și lăsăm tăierea să-și facă treaba. */
+const NUME_MAX_PX = 9.5;   // ≈ 0.58rem, cât aveam fix
+const NUME_MIN_PX = 6;
+const MARGINI_PX = 11;     // padding stânga-dreapta al blocului
+const SIMBOL_PX = 19;      // discul + spațiul de după el
+/** Blocul e destul de lat cât să merite și discul-simbol?
+ *
+ *  Sub pragul ăsta discul ar mânca jumătate din bloc, iar numele ar coborî la
+ *  5px. Renunțăm la el: CULOAREA identifică deja elevul, discul e a doua marcă
+ *  de identitate, iar dintre două informații redundante o păstrăm pe cea care
+ *  se citește. */
+const incapeSimbolul = (rows) => rows * rowPx() >= 78;
+
+function autoNume(text, rows) {
+  if (VERT) return "";
+  const latime = rows * rowPx() - axGap() - MARGINI_PX
+    - (incapeSimbolul(rows) ? SIMBOL_PX : 0);
+  const n = Math.max(1, String(text || "").length);
+  const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, latime / (n * 0.52)));
+  return ` style="font-size:${px.toFixed(1)}px"`;
+}
 /** Cât de departe pe axa timpului a ajuns degetul, față de marginea benzii. */
 const axFrom = (rect, clientX, clientY) => (VERT ? clientY - rect.top : clientX - rect.left);
 /** Degetul e în interiorul acestei zile? Ziua stă pe axa PERPENDICULARĂ
@@ -613,7 +648,7 @@ function gridHtml() {
              <button type="button" class="pl-mini" data-act="rename-ok" data-id="${esc(s.id)}">✓</button>
              <button type="button" class="pl-mini" data-act="rename-no">×</button>
            </span>`
-        : `${s.kind === "lesson" && (s.externalId ? s.extEmoji : pupilEmoji(s.userId)) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(s.externalId ? s.extEmoji : pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm">${esc(slotName(s))}</b>
+        : `${s.kind === "lesson" && (s.externalId ? s.extEmoji : pupilEmoji(s.userId)) && (VERT || incapeSimbolul(rows)) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(s.externalId ? s.extEmoji : pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm"${autoNume(slotName(s), rows)}>${esc(slotName(s))}</b>
            <span class="pl-cb__time">${hhmm(s.start)}–${hhmm(s.end)}</span>
            ${alive && isAdmin() ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
                title="${s.recurrenceId
