@@ -109,20 +109,45 @@ const NUME_MAX_PX = 9.5;      // ≈ 0.58rem, corpul „normal" de aici
 const NUME_MIN_PX = 4;        // Marius citește foarte mic și preferă întregul
 const MARGINI_PX = 5;         // paddingul orizontal al blocului
 
+/** Lățimea reală a unui text, MĂSURATĂ, nu estimată.
+ *
+ *  Prima versiune înmulțea numărul de caractere cu o lățime medie de 0.52 din
+ *  corpul literei. Media aia e calibrată pe text cu litere mici și cade exact
+ *  acolo unde nu trebuie: „TUDOR Șoldan" are 12 caractere — mai puține decât
+ *  „Cristina Cimpoesu" cu 17 — deci primea literă mai mare, dar cele cinci
+ *  majuscule (~0.68 fiecare, față de ~0.30 pentru „i" sau „l") îl făceau cu
+ *  vreo 10% mai lat decât zicea formula, și se tăia.
+ *
+ *  Un canvas măsoară exact, cu fontul real, majusculele și diacriticele
+ *  incluse. Măsurăm o dată la un corp de referință și scalăm liniar — lățimea
+ *  textului e proporțională cu corpul literei. */
+const NUME_REF_PX = 20;       // corp de referință, destul de mare cât să nu conteze rotunjirile
+let _masura = null;
+/** Reîmprospătăm fontul de măsurare o dată pe randare, nu o dată pe viață:
+ *  tema se schimbă, fontul web se încarcă târziu, iar o măsurătoare făcută cu
+ *  fontul de rezervă ar rămâne greșită pentru totdeauna. O citire per randare,
+ *  nu una per bloc. */
+function pregatesteMasura() {
+  if (!_masura) _masura = document.createElement("canvas").getContext("2d");
+  const el = S.root && S.root.querySelector(".pl-cb__nm");
+  const cs = getComputedStyle(el || document.body);
+  _masura.font = `${el ? cs.fontWeight : 700} ${NUME_REF_PX}px ${cs.fontFamily}`;
+}
+function latimeText(text) {
+  if (!_masura) pregatesteMasura();
+  return _masura.measureText(String(text || "")).width;
+}
+
 /** Corpul de literă la care numele încape ÎNTREG, pe UN SINGUR RÂND.
  *
- *  Ruperea pe mai multe rânduri părea o idee bună — „Cristina Cimpoesu" pe
- *  trei rânduri încape la corp mai mare — dar arată ca un cuvânt spart:
- *  „Cristina / Cimpoes / u". Marius preferă litera mică și numele întreg, pe
- *  o linie, și vede bine. Deci singura limită care contează e LĂȚIMEA.
- *
- *  Simbolul stă deasupra, nu lângă nume, așa că nu mai fură din ea.
- *  0.52 e lățimea medie a unui caracter raportată la corpul literei. */
+ *  Ruperea pe mai multe rânduri dădea corp mai mare, dar sparge cuvântul
+ *  („Cristina / Cimpoes / u"). Marius preferă litera mică și numele întreg.
+ *  Simbolul stă deasupra, deci nu fură din lățime. */
 function autoNume(text, rows) {
   if (VERT) return "";
   const latime = Math.max(8, rows * rowPx() - axGap() - MARGINI_PX);
-  const n = Math.max(1, String(text || "").length);
-  const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, latime / (n * 0.52)));
+  const laRef = latimeText(text) || 1;
+  const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, (latime * NUME_REF_PX) / laRef));
   return ` style="font-size:${px.toFixed(1)}px"`;
 }
 /** Cât de departe pe axa timpului a ajuns degetul, față de marginea benzii. */
@@ -798,7 +823,8 @@ function nowLineHtml() {
 
 function render() {
   if (!S.root) return;
-  readAxis();   // înainte de orice calcul de geometrie
+  readAxis();          // înainte de orice calcul de geometrie
+  if (!VERT) pregatesteMasura();   // fontul cu care măsurăm numele
   const mineCount = S.slots.filter((s) => s.mine).length;
   const body = S.loading
     ? `<p class="cx-muted">Se încarcă…</p>`
