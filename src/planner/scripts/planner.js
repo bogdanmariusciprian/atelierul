@@ -659,8 +659,23 @@ function gridHtml() {
       // stie ce sta in ce. Aflam aici: daca blocul cade intr-o fereastra de-o-zi
       // (portocalie), el e cu un nivel mai adanc si trebuie retras cu inca un
       // pas, ca sa pastreze acelasi 1px fata de conturul care il cuprinde.
+      // CUIBARIRE, PER LATURA. Ferestrele si blocurile sunt frati pozitionati
+      // absolut, nu cutii una in alta, deci CSS-ul n-are de unde sti ce sta in
+      // ce — aflam aici.
+      //
+      // Si nu e destul sa stim CA blocul e intr-o fereastra: conteaza pe care
+      // laturi o ATINGE. Un bloc lipit de marginea din stanga a ferestrei
+      // trebuie sa lase 1px fata de bordura ei; acelasi bloc, daca sta la
+      // mijlocul ferestrei, n-are nicio bordura langa el si atunci 1px se
+      // masoara fata de gridline. Altfel golul din stanga arata de trei ori
+      // mai mare decat cel din dreapta, fara motiv vizibil.
       const _a = minOf(s.start), _b = minOf(s.end);
-      const inOnce = winsFor(i).some((w) => w.onDate && w.startMin <= _a && w.endMin >= _b);
+      const _cuprinde = winsFor(i).filter((w) => w.startMin <= _a && w.endMin >= _b);
+      const _w = _cuprinde.find((w) => w.onDate) || _cuprinde[0] || null;
+      const inOnce = !!(_w && _w.onDate);
+      const _niv = _w ? (inOnce ? 5 : 3) : 1;   // fara fereastra: direct pe gridline
+      const insetL = _w && _w.startMin === _a ? _niv : 1;
+      const insetR = _w && _w.endMin === _b ? _niv : 1;
       const row = msToRow(s.start);
       const rows = Math.round((s.end - s.start) / (SNAP_MIN * 60000));
       const over = s.end < now;
@@ -718,7 +733,7 @@ function gridHtml() {
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
       return `<div class="pl-block pl-block--cell${inOnce ? " is-in-once" : ""}${S.armed && S.armed.id === s.id ? " is-armed" : ""}${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${(confirming || asking) && inBloc ? " is-confirm" : ""}${(confirming || asking || renaming) && !inBloc ? " is-asked" : ""}${renaming ? " is-renaming" : ""}"
-        style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx() + axInset(inOnce ? 5 : 3))}; ${axSize(rows * rowPx() - axGap(inOnce ? 5 : 3))}"
+        style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx() + axInset(insetL))}; ${axSize(rows * rowPx() - axInset(insetL) - axInset(insetR))}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
         ${body}

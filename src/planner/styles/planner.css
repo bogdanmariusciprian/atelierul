@@ -882,6 +882,9 @@
     border-radius: 5px;
   }
   /* Nivelul 3, cazul adânc: blocul dinăuntrul unei ferestre de-o-zi. */
+  /* Pe verticală fereastra ocupă toată înălțimea benzii, deci blocul o atinge
+     mereu sus și jos — acolo retragerea rămâne pe niveluri. Pe orizontală se
+     calculează per latură, în JS. */
   .pl-block--cell.is-in-once { top: 5px; bottom: 5px; }
   /* Un pixel de aer față de gridlines, de jur împrejur: 1px sus și jos din
      poziționare, 1px stânga-dreapta din axGap (care scade 2px din lungime) plus
