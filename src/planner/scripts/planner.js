@@ -241,6 +241,7 @@ const S = {
   visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
   vacOpen: false,      // admin: vacation form unfolded
   drawerSnap: 0,       // telefon: 0 = doar paleta, 1 = uneltele, 2 = tot
+  sheetFor: null,      // telefon: blocul pentru care e deschisa foaia de actiuni
   armed: null,         // telefon: ce ai luat in mana -- {kind:'dot'} sau {kind:'block',id,minutes}
   confirmId: null,     // block whose × was pressed — inline confirm shown
   drag: null,
@@ -915,6 +916,36 @@ function render() {
  *  neatinsa; doar locul se schimba. */
 function sheetHtml() {
   if (VERT) return "";
+
+  // TOATE actiunile blocului, intr-un singur loc. Meniul mic de clic-dreapta
+  // incapea doar cu „Sterge"; restul (recurenta, durata, redenumirea) traiau
+  // ca butoane minuscule PE bloc, adica pe 26 de pixeli, unde nu se puteau nici
+  // vedea, nici nimeri. Aici au loc sa se numeasca.
+  if (S.sheetFor) {
+    const s = S.slots.find((x) => x.id === S.sheetFor);
+    if (!s) return "";
+    const viitor = s.end >= Date.now();
+    const durata = Math.round((s.end - s.start) / 60000);
+    const durs = DURATIONS.map((m) => `<button type="button"
+        class="pl-sheet__dur${m === durata ? " on" : ""}" data-act="sheet-dur"
+        data-id="${esc(s.id)}" data-m="${m}">${durLabel(m)}</button>`).join("");
+    return `<div class="pl-sheet" role="dialog" aria-modal="true" data-act="sheet-close">
+      <div class="pl-sheet__card" data-act="sheet-stop">
+        <b class="pl-sheet__t">${esc(slotName(s))}</b>
+        <span class="pl-sheet__w">${esc(DAYS[dayIndexOf(s.start)])} ${hhmm(s.start)}–${hhmm(s.end)}${
+          s.recurrenceId ? " · se repetă săptămânal" : ""}</span>
+        ${viitor ? `<button type="button" class="pl-sheet__b" data-act="sheet-move" data-id="${esc(s.id)}">✥ Mută — apoi atinge unde</button>` : ""}
+        ${viitor && isAdmin() ? `<button type="button" class="pl-sheet__b" data-act="rec-toggle" data-id="${esc(s.id)}">${
+          s.recurrenceId ? "🔁 Oprește repetarea de aici" : "🔁 Repetă săptămânal"}</button>` : ""}
+        ${viitor && s.kind === "personal" ? `<button type="button" class="pl-sheet__b" data-act="sheet-rename" data-id="${esc(s.id)}">✎ Redenumește</button>` : ""}
+        ${viitor ? `<div class="pl-sheet__durs"><span class="pl-sheet__lab">Durata</span>${durs}</div>` : ""}
+        <button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="sheet-cancel" data-id="${esc(s.id)}">🗑 Anulează ora</button>
+        ${s.recurrenceId && isAdmin() ? `<button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="sheet-cancel-series" data-id="${esc(s.id)}">🗑 Anulează toată seria viitoare</button>` : ""}
+        <button type="button" class="pl-sheet__b" data-act="sheet-close">Închide</button>
+      </div>
+    </div>`;
+  }
+
   const id = S.confirmId || S.moveAsk?.id || S.renameId;
   if (!id) return "";
   const s = S.slots.find((x) => x.id === id);
@@ -1672,8 +1703,48 @@ async function onClick(e) {
   if (act === "drawer") { cycleDrawer(0); return; }
   if (act === "sheet-stop") return;                       // clic in card: nu inchide
   if (act === "sheet-close") {                            // clic pe fundal: inchide
-    S.confirmId = null; S.moveAsk = null; S.renameId = null;
+    S.confirmId = null; S.moveAsk = null; S.renameId = null; S.sheetFor = null;
     render(); return;
+  }
+  if (act === "sheet-move") {
+    const id = b.dataset.id;
+    S.sheetFor = null;
+    S.armed = { kind: "block", id, minutes: (() => {
+      const x = S.slots.find((q) => q.id === id);
+      return x ? Math.round((x.end - x.start) / 60000) : S.minutes;
+    })() };
+    showToast("Atinge banda unde vrei ora.");
+    render(); return;
+  }
+  if (act === "sheet-rename") {
+    S.renameId = b.dataset.id; S.sheetFor = null; render(); return;
+  }
+  if (act === "sheet-cancel") {
+    S.sheetFor = null; S.confirmId = b.dataset.id; render(); return;
+  }
+  if (act === "sheet-cancel-series") {
+    const x = S.slots.find((q) => q.id === b.dataset.id);
+    S.sheetFor = null;
+    if (!x?.recurrenceId) return;
+    const r = await cancelSeries(x.recurrenceId);
+    showToast(r.ok ? "Toată seria viitoare a fost anulată." : r.message,
+      r.ok ? { kind: "success" } : undefined);
+    refresh(); return;
+  }
+  if (act === "sheet-dur") {
+    const x = S.slots.find((q) => q.id === b.dataset.id);
+    S.sheetFor = null;
+    if (!x) return;
+    const minutes = +b.dataset.m;
+    if (Math.round((x.end - x.start) / 60000) === minutes) { render(); return; }
+    if (x.recurrenceId && isAdmin()) {
+      openMoveAsk(x, { id: x.id, startMs: x.start, minutes, dayIdx: dayIndexOf(x.start) }, "resize");
+      return;
+    }
+    const r = await moveSlot(x.id, { startMs: x.start, minutes, detach: !!x.recurrenceId });
+    showToast(r.ok ? `Durata e acum ${durLabel(minutes)}.` : r.message,
+      r.ok ? { kind: "success" } : undefined);
+    refresh(); return;
   }
 
   if (act === "paint") { S.paint = !S.paint; if (!S.paint) S.renameId = null; render(); return; }
@@ -2037,6 +2108,11 @@ function installLongPress(mount) {
       // Pe telefon clicul pe bulina o ia in mana, deci editorul ei (nume,
       // culoare, simbol, durata) si-ar pierde gestul. Il mutam pe apasarea
       // lunga -- acelasi loc unde sta si meniul blocurilor.
+      const bloc = src.closest && src.closest(".pl-block--cell");
+      if (bloc && !VERT && bloc.dataset.id) {
+        S.armed = null; S.sheetFor = bloc.dataset.id;
+        render(); src = null; return;
+      }
       const dot = src.closest && src.closest(".pl-dot");
       if (dot && !VERT) {
         S.armed = null;
