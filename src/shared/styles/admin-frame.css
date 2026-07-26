@@ -229,6 +229,10 @@
    sertarul de înalt. `--pl-drawer-h` e pusă de planner.js și lipsește peste
    tot altundeva, deci fallbackul de 0px păstrează comportamentul de acum. */
 @media (max-width: 700px) {
-  .admin-frame__tag { bottom: calc(5px + var(--pl-drawer-h, 0px)); }
-  .admin-quick { bottom: calc(26px + var(--pl-drawer-h, 0px)); }
+  /* Ridicate, ajungeau peste orar — mai rău decât la început. În planner, pe
+     telefon, se retrag de tot: ecranul e prea mic pentru două chestii care se
+     ceartă pe același colț. Rama roșie rămâne, deci semnalul „ești admin" nu
+     se pierde. */
+  body.pl-phone .admin-quick,
+  body.pl-phone .admin-frame__tag { display: none; }
 }

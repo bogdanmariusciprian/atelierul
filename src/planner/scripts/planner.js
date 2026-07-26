@@ -50,7 +50,7 @@ const SLOTS_PER_H = 60 / SNAP_MIN;
 const ROWS = HOURS * SLOTS_PER_H;   // half-hour rows
 const ROW_PX = 26;                   // one half hour on screen, desktop
 const ROW_PX_NARROW = 22;            // ...and on a phone, where width is the scarce axis
-const RAIL_NARROW_PX = 56;           // capul zilei + goluri, scăzute din lățimea utilă
+const RAIL_NARROW_PX = 46;           // capul zilei (2.5rem) + goluri, scăzute din lățimea utilă
 
 // AXA TIMPULUI. Pe desktop timpul curge în JOS: ziua e o coloană, ora e o
 // poziție pe verticală. Pe telefon curge spre DREAPTA: ziua devine rând, ora
@@ -846,11 +846,15 @@ function fitDrawer() {
   // apăsabil) — le ridicăm cu exact cât ocupă sertarul, printr-o variabilă pe
   // care CSS-ul lor o citește. În rest de site rămâne 0 și nu se schimbă nimic.
   document.documentElement.style.setProperty("--pl-drawer-h", `${h}px`);
+  // Marcăm pagina: cât timp lucrezi în planner pe telefon, butoanele plutitoare
+  // ale site-ului se dau la o parte cu totul. Ridicate, ajungeau peste orar.
+  document.body.classList.add("pl-phone");
 }
 /** La ieșirea din planner curtea trebuie eliberată, altfel butoanele rămân
  *  ridicate pe toate celelalte pagini. */
 function clearDrawerVar() {
   document.documentElement.style.removeProperty("--pl-drawer-h");
+  document.body.classList.remove("pl-phone");
 }
 function cycleDrawer(dir) {
   S.drawerSnap = Math.max(0, Math.min(DRAWER_SNAP.length - 1,

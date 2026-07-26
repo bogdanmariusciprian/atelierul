@@ -973,5 +973,5 @@ body.is-logged .nav-guest-only { display: none; }
 /* Vezi comentariul din admin-frame.css: mesageria urcă deasupra sertarului
    de unelte al plannerului, ca să nu stea peste el. */
 @media (max-width: 700px) {
-  .msgr { bottom: calc(26px + var(--pl-drawer-h, 0px)); }
+  body.pl-phone .msgr { display: none; }
 }
