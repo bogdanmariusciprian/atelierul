@@ -1034,6 +1034,7 @@ function markBad(d) {
 }
 
 function onDown(e) {
+  S.pressAt = { x: e.clientX, y: e.clientY };
   // Only the LEFT button drags. pointerdown fires for the right one too, and
   // without this guard the pre-menu press was quietly placing pupil blocks.
   if (e.button !== 0) return;
@@ -1199,6 +1200,16 @@ function onDown(e) {
     };
   }
 
+  // TELEFON: nu se aseaza NIMIC pe orar decat daca ai ales anume un cerc de
+  // elev. Pana acum `S.source` ramanea din sesiunea trecuta, ba chiar cadea pe
+  // primul elev din lista, asa ca o atingere pe banda planta o ora fara ca
+  // nimeni sa fi cerut-o. Al doilea tap pe cerc il lasa din mana si atunci
+  // banda redevine inerta.
+  if (!VERT && !S.paint && !grab && !chip
+      && !(S.armed && (S.armed.kind === "dot" || S.armed.kind === "block"))) {
+    return;
+  }
+
   const minutes = existing ? Math.round((existing.end - existing.start) / 60000) : S.minutes;
   const host = grab ? grab.closest(".pl-lane") : lane;
   const { dayIdx, row } = chip ? { dayIdx: 0, row: 0 } : pointToSlot(e.clientX, e.clientY);
@@ -1356,12 +1367,24 @@ function makeFloater(x, y) {
   S.floater = fl;
 }
 
+const TAP_SLOP_PX = 10;
 const onMove = (e) => {
   if (!S.drag) return;
   // `moved` inseamna „geometria s-a schimbat fata de starea initiala" si e pus
   // deja la apasare de moveDrag, ca sa apara fantoma sub deget. Pentru gestul
   // in doi timpi ne trebuie altceva: daca DEGETUL a calatorit cu adevarat.
-  S.drag.pointerMoved = true;
+  //
+  // Si cu PRAG, nu la orice deplasare: pe un ecran tactil niciun tap nu e
+  // perfect nemiscat — degetul aluneca doi-trei pixeli si, fara prag, fiecare
+  // atingere trecea drept tragere. De-aia gestul in doi timpi parea ca nu
+  // exista pe telefon, desi mergea in emulare, unde clicul de mouse chiar sta
+  // pe loc.
+  if (S.pressAt) {
+    const dx = e.clientX - S.pressAt.x, dy = e.clientY - S.pressAt.y;
+    if (Math.hypot(dx, dy) > TAP_SLOP_PX) S.drag.pointerMoved = true;
+  } else {
+    S.drag.pointerMoved = true;
+  }
   if (S.drag.fromTray && !S.floater) makeFloater(e.clientX, e.clientY);
   if (S.floater) S.floater.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
   if (S.drag.availResize) availResizeDrag(e.clientX, e.clientY);

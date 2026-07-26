@@ -949,10 +949,17 @@
     outline: 2.5px solid var(--color-text); outline-offset: 1px; z-index: 5;
     filter: none; opacity: 1;
   }
+  /* Cercul ales trebuie sa strige, nu sa sopteasca: el e singurul lucru care
+     face banda „scriibila". Cat timp niciun cerc nu e ales, o atingere pe orar
+     nu aseaza nimic — deci diferenta dintre cele doua stari trebuie sa fie
+     imposibil de ratat. */
   .pl-dot.is-armed {
-    outline: 3px solid var(--color-text); outline-offset: 2px;
-    transform: scale(1.1);
+    outline: 3px solid var(--color-text); outline-offset: 3px;
+    transform: scale(1.14);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-primary) 25%, transparent);
   }
+  /* Cand ai un cerc in mana, celelalte se dau la o parte din atentie. */
+  .pl-palette:has(.is-armed) .pl-dot:not(.is-armed) { opacity: 0.45; }
   /* Cat timp tii ceva in mana, benzile se ofera: cursorul si un fundal cald
      spun ca urmatoarea atingere aseaza. */
   .pl-wrap:has(.is-armed) .pl-lane {
