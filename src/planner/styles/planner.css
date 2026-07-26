@@ -876,6 +876,40 @@
 
   /* Eticheta ferestrei verzi ar rupe rândul pe lat — o scoatem, culoarea spune destul. */
   .pl-avail__tag { display: none; }
+
+  /* ---- conținutul blocului, pe orizontală ----
+     Pe desktop blocul e o coloană: disc-simbol mare, numele dedesubt, ora
+     ancorată jos. În banda de 48px de aici, discul de 2.5rem umple singur tot
+     blocul, iar numele și ora se suprapun peste el — se vede în captură ca un
+     amestec ilizibil. Aceleași trei informații, așezate în rând. */
+  .pl-block--cell {
+    display: flex; flex-direction: row; align-items: center;
+    justify-content: flex-start; gap: 0.25rem;
+    padding: 0 0.3rem; row-gap: 0;
+  }
+  .pl-cb__sym {
+    width: 1.45rem; height: 1.45rem; font-size: 0.8rem;
+    box-shadow: inset 0 0 3px 2px rgb(0 0 0 / 0.6); flex: none;
+  }
+  .pl-cb__nm { font-size: 0.72rem; min-width: 0; }
+  .pl-cb__time {
+    position: static; margin-left: auto; padding-left: 0.2rem;
+    font-size: 0.6rem; text-align: right; flex: none;
+  }
+  .pl-cb__rec { position: static; order: -1; flex: none; }
+
+  /* Confirmarea de anulare se așeza pe coloană și ieșea din bandă („Anulezi /
+     Da" atârnând peste rândul de luni, în captură). Pe lat trebuie să încapă
+     în înălțimea benzii. */
+  .pl-block--cell.is-confirm {
+    flex-direction: row; align-items: center; gap: 0.2rem; padding: 0 0.25rem;
+  }
+  .pl-block__confirm { flex-wrap: nowrap; gap: 0.2rem; }
+  .pl-mini { font-size: 0.62rem; padding: 0.05rem 0.4rem; }
+
+  /* Tooltipul din data-name trăiește pe hover — pe atingere nu apare niciodată,
+     dar stă în layout cu white-space: nowrap și poate lăți rândul degeaba. */
+  .pl-dot::before, .pl-block--cell::before { display: none; }
 }
 
 /* ---- TELEFON: sertarul de unelte ----
@@ -922,7 +956,11 @@
   .pl-drawer .pl-tools { margin: 0.35rem 0; }
   .pl-drawer .pl-pen { flex-wrap: wrap; gap: 0.3rem; }
 
-  /* Paleta: bulinele cresc, ca să fie ținte bune și pentru deget, nu doar
-     pentru stylus. */
-  .pl-drawer .pl-dot { width: 1.7rem; height: 1.7rem; }
+  /* Paleta are pe desktop `margin-top: 2.6rem`, curtea rezervată tooltipurilor
+     care răsar deasupra bulinelor. În sertarul de 78px al treptei 0, marginea
+     aia împinge paleta afară din vedere — sertarul pare gol. */
+  .pl-drawer .pl-palette {
+    margin: 0; padding: 0.35rem 0.45rem; border-width: 1.5px; border-radius: 10px;
+  }
+  .pl-drawer .pl-dot { width: 2.1rem; height: 2.1rem; font-size: 0.9rem; }
 }
