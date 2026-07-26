@@ -878,8 +878,12 @@
      Fără bordură groasă sus: pe desktop marginea colorată din stânga e accentul
      care spune „aici începe"; culcată, devenea o dungă lată peste tot blocul,
      fără să mai însemne nimic. Culoarea plină spune deja al cui e blocul. */
+  /* 3px pe verticală, nu 1: fereastra verde e ea însăși retrasă 1px de la
+     marginea benzii și are un contur punctat de 1.5px, deci un bloc la 1px
+     cădea exact peste linie. 1 + 1.5 + 1 de aer = 3.5, rotunjit la 3.
+     Pe orizontală rămâne 1px, ca marginea blocului să stea pe ora lui. */
   .pl-block, .pl-ghost {
-    left: auto; right: auto; top: 1px; bottom: 1px;
+    left: auto; right: auto; top: 3px; bottom: 3px;
     margin-left: 1px;
     border: 0; box-shadow: none;
     padding: 0.15rem 0.3rem; border-radius: 6px;
