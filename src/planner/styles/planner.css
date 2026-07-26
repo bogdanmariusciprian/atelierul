@@ -812,11 +812,14 @@
   .pl-rail {
     /* Marginea din stânga trebuie să fie EXACT capul zilei plus golul,
        altfel orele se decalează față de banda pe care o numerotează. */
-    height: 1rem !important; margin: 0 0 0.1rem calc(2.5rem + 0.3rem);
+    height: 0.72rem !important; margin: 0 0 0.02rem calc(2.5rem + 0.3rem);
   }
+  /* Cifrele orelor: mult mai mici și coborâte până aproape de gridlines, ca
+     să se citească drept etichete ale liniilor, nu ca un rând de sine
+     stătător plutind deasupra grilei. */
   .pl-hour {
-    right: auto; bottom: 0; transform: translateX(-50%);
-    font-size: 0.62rem; font-weight: 700;
+    right: auto; bottom: -2px; transform: translateX(-50%);
+    font-size: 0.46rem; font-weight: 700; letter-spacing: -0.02em;
   }
 
   /* Ziua: capul la stânga, banda în dreapta lui. */
@@ -827,15 +830,24 @@
        întinde toată ziua la ~90px. Fără linia asta, șapte zile nu mai încap pe
        ecran, oricât de subțiri ar fi benzile. */
     height: auto; min-height: 0;
-    flex: none; width: 2.5rem; padding: 0.1rem 0.15rem;
+    flex: none; width: 2.5rem; padding: 0.2rem 0.12rem;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; border-radius: 8px; gap: 0;
   }
   /* Marius citește bine textul mic și preferă densitatea: fiecare zecime de
-     rem economisită aici se duce în lățimea orarului. */
-  .pl-colhead__d { font-size: 0.62rem; line-height: 1.05; }
-  .pl-colhead__n { font-size: 0.5rem; line-height: 1.1; }
-  .pl-colhead__today, .pl-colhead__vac { font-size: 0.46rem; padding: 0 0.25rem; }
+     rem economisită aici se duce în lățimea orarului.
+     „Duminică" e cel mai lung nume și dă măsura: la 0.62rem depășea cei 2.5rem
+     ai capului și se lipea de margini. */
+  .pl-colhead__d { font-size: 0.52rem; line-height: 1.15; letter-spacing: -0.01em; }
+  .pl-colhead__n { font-size: 0.44rem; line-height: 1.2; }
+  .pl-colhead__vac { font-size: 0.42rem; padding: 0 0.25rem; }
+  /* Insigna AZI: textul stătea sus în ovalul alb pentru că moștenea o
+     interlinie de rând obișnuit. Centrare pe ambele axe, explicit. */
+  .pl-colhead__today {
+    font-size: 0.42rem; line-height: 1; letter-spacing: 0.02em;
+    padding: 0.12rem 0.32rem; margin-top: 0.1rem;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
 
   .pl-lane {
     /* `flex: none`, NU `flex: 1`. Lățimea benzii vine din JS și reprezintă
