@@ -106,41 +106,24 @@ const axGap = () => (VERT ? 3 : 0);
  *  Sub NUME_MIN_PX textul devine ilizibil chiar și pentru un ochi obișnuit cu
  *  densitate mare, așa că acolo ne oprim și lăsăm tăierea să-și facă treaba. */
 const NUME_MAX_PX = 9.5;      // ≈ 0.58rem, corpul „normal" de aici
-const NUME_MIN_PX = 5.5;
-const BLOC_H_PX = 42;         // banda de 3rem minus insetul de 3px sus și jos
-const SIMBOL_H_PX = 13;       // discul, când e afișat
+const NUME_MIN_PX = 4;        // Marius citește foarte mic și preferă întregul
 const MARGINI_PX = 5;         // paddingul orizontal al blocului
 
-/** Blocul e destul de lat cât să merite și discul-simbol?
- *  Sub prag renunțăm la el și dăm numelui tot blocul — culoarea identifică
- *  deja elevul, discul e a doua marcă, iar dintre două informații redundante
- *  o păstrăm pe cea care se citește. */
-const incapeSimbolul = (rows) => rows * rowPx() >= 62;
-
-/** Corpul de literă la care numele încape ÎNTREG în bloc.
+/** Corpul de literă la care numele încape ÎNTREG, pe UN SINGUR RÂND.
  *
- *  Simbolul stă acum DEASUPRA numelui, nu lângă el (ideea lui Marius), ceea ce
- *  schimbă socoteala în bine: numele primește toată lățimea blocului și poate
- *  curge pe mai multe rânduri. Un bloc de o oră are 26px lățime — pe un rând
- *  n-ar încăpea nimic, pe trei devine folosibil.
+ *  Ruperea pe mai multe rânduri părea o idee bună — „Cristina Cimpoesu" pe
+ *  trei rânduri încape la corp mai mare — dar arată ca un cuvânt spart:
+ *  „Cristina / Cimpoes / u". Marius preferă litera mică și numele întreg, pe
+ *  o linie, și vede bine. Deci singura limită care contează e LĂȚIMEA.
  *
- *  Două limite se bat între ele și o luăm pe cea mai strânsă: LĂȚIMEA (câte
- *  caractere intră pe un rând, înmulțit cu numărul de rânduri) și ÎNĂLȚIMEA
- *  (câte rânduri încap în bloc după ce scădem discul). 0.52 e lățimea medie a
- *  unui caracter raportată la corp; `-webkit-line-clamp` rămâne plasa de
- *  siguranță pentru numele neobișnuit de late. */
+ *  Simbolul stă deasupra, nu lângă nume, așa că nu mai fură din ea.
+ *  0.52 e lățimea medie a unui caracter raportată la corpul literei. */
 function autoNume(text, rows) {
   if (VERT) return "";
-  const cuSimbol = incapeSimbolul(rows);
   const latime = Math.max(8, rows * rowPx() - axGap() - MARGINI_PX);
-  const inaltime = BLOC_H_PX - (cuSimbol ? SIMBOL_H_PX : 0);
-  const randuri = cuSimbol ? 2 : 3;
-
   const n = Math.max(1, String(text || "").length);
-  const dinLatime = (latime * randuri) / (n * 0.52);
-  const dinInaltime = inaltime / (randuri * 1.12);   // 1.12 = interlinie
-  const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, dinLatime, dinInaltime));
-  return ` style="font-size:${px.toFixed(1)}px;--pl-nume-randuri:${randuri}"`;
+  const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, latime / (n * 0.52)));
+  return ` style="font-size:${px.toFixed(1)}px"`;
 }
 /** Cât de departe pe axa timpului a ajuns degetul, față de marginea benzii. */
 const axFrom = (rect, clientX, clientY) => (VERT ? clientY - rect.top : clientX - rect.left);
@@ -665,7 +648,7 @@ function gridHtml() {
              <button type="button" class="pl-mini" data-act="rename-ok" data-id="${esc(s.id)}">✓</button>
              <button type="button" class="pl-mini" data-act="rename-no">×</button>
            </span>`
-        : `${s.kind === "lesson" && (s.externalId ? s.extEmoji : pupilEmoji(s.userId)) && (VERT || incapeSimbolul(rows)) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(s.externalId ? s.extEmoji : pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm"${autoNume(slotName(s), rows)}>${esc(slotName(s))}</b>
+        : `${s.kind === "lesson" && (s.externalId ? s.extEmoji : pupilEmoji(s.userId)) ? `<i class="pl-cb__sym" aria-hidden="true">${esc(s.externalId ? s.extEmoji : pupilEmoji(s.userId))}</i>` : ""}<b class="pl-cb__nm"${autoNume(slotName(s), rows)}>${esc(slotName(s))}</b>
            <span class="pl-cb__time">${hhmm(s.start)}–${hhmm(s.end)}</span>
            ${alive && isAdmin() ? `<button type="button" class="pl-block__rec${s.recurrenceId ? " on" : ""}" data-act="rec-toggle" data-id="${esc(s.id)}"
                title="${s.recurrenceId

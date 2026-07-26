@@ -896,16 +896,16 @@
     justify-content: center; gap: 0; padding: 1px 2px; row-gap: 0;
   }
   .pl-cb__sym {
-    width: 0.8rem; height: 0.8rem; font-size: 0.5rem;
+    width: 0.72rem; height: 0.72rem; font-size: 0.45rem;
     box-shadow: inset 0 0 2px 1px rgb(0 0 0 / 0.55); flex: none;
+    margin-bottom: 1px;
   }
   .pl-cb__nm {
-    /* Corpul vine din JS (autoNume); aici doar îi dăm voie să se rupă pe
-       rânduri și îi punem plasa de siguranță la numărul de rânduri calculat. */
+    /* Corpul vine din JS (autoNume), calculat cât să încapă numele ÎNTREG pe
+       un rând. Ruperea pe mai multe rânduri arăta ca un cuvânt spart. */
     min-width: 0; width: 100%; padding: 0; text-align: center;
-    white-space: normal; word-break: break-word; line-height: 1.12;
-    display: -webkit-box; -webkit-box-orient: vertical;
-    -webkit-line-clamp: var(--pl-nume-randuri, 2); overflow: hidden;
+    white-space: nowrap; line-height: 1.1;
+    overflow: hidden; text-overflow: ellipsis;
   }
   /* Ora dispare de pe bloc. Nu e o pierdere: pe axa culcată POZIȚIA blocului
      pe riglă chiar este ora, iar eticheta o repeta consumând exact lățimea de
