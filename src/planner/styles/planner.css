@@ -888,14 +888,18 @@
     padding: 0 0.3rem; row-gap: 0;
   }
   .pl-cb__sym {
-    width: 1.45rem; height: 1.45rem; font-size: 0.8rem;
-    box-shadow: inset 0 0 3px 2px rgb(0 0 0 / 0.6); flex: none;
+    width: 1.15rem; height: 1.15rem; font-size: 0.68rem;
+    box-shadow: inset 0 0 2px 1.5px rgb(0 0 0 / 0.55); flex: none;
   }
-  .pl-cb__nm { font-size: 0.72rem; min-width: 0; }
-  .pl-cb__time {
-    position: static; margin-left: auto; padding-left: 0.2rem;
-    font-size: 0.6rem; text-align: right; flex: none;
+  .pl-cb__nm {
+    font-size: 0.72rem; min-width: 0; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  /* Ora dispare de pe bloc. Nu e o pierdere: pe axa culcată POZIȚIA blocului
+     pe riglă chiar este ora, iar eticheta o repeta consumând exact lățimea de
+     care are nevoie numele. La un bloc de două ore (~68px) discul plus ora nu
+     lăsau loc nici pentru o literă din nume. */
+  .pl-cb__time { display: none; }
   .pl-cb__rec { position: static; order: -1; flex: none; }
 
   /* Confirmarea de anulare se așeza pe coloană și ieșea din bandă („Anulezi /
@@ -910,6 +914,10 @@
   /* Tooltipul din data-name trăiește pe hover — pe atingere nu apare niciodată,
      dar stă în layout cu white-space: nowrap și poate lăți rândul degeaba. */
   .pl-dot::before, .pl-block--cell::before { display: none; }
+
+  /* Pastila de anunț e `position: sticky; bottom: .5rem` — pe telefon plutea
+     singură în mijlocul spațiului gol de sub orar. O lipim de fluxul paginii. */
+  .pl-live { position: static; margin: 0.4rem 0 0; }
 }
 
 /* ---- TELEFON: sertarul de unelte ----
