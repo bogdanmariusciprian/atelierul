@@ -562,7 +562,7 @@ function gridHtml() {
   // Hour labels sit centred IN their row, like a school timetable, not on the
   // boundary lines. Rows past the base ten render dimmed.
   const rail = Array.from({ length: HOURS }, (_, h) =>
-    `<span class="pl-hour${h >= 10 ? " is-dim" : ""}" style="${axPos((h + 0.5) * SLOTS_PER_H * rowPx())}">${DAY_START_H + h}</span>`
+    `<span class="pl-hour${h >= 10 ? " is-dim" : ""}" style="${axPos((VERT ? h + 0.5 : h) * SLOTS_PER_H * rowPx())}">${DAY_START_H + h}</span>`
   ).join("");
 
   const cols = DAYS.map((label, i) => {

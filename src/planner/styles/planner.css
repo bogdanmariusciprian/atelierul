@@ -936,14 +936,27 @@
     transition: height 0.18s ease;
     display: flex; flex-direction: column;
   }
+  /* Mânerul trebuie să se citească drept CONTROL, nu decor: o dunguliță
+     anonimă lângă butonul de chat trece complet neobservată. Etichetă, deci. */
   .pl-drawer__h {
-    flex: none; border: 0; background: transparent; cursor: pointer;
-    padding: 0.55rem 0; touch-action: none;
+    flex: none; border: 0; cursor: pointer; touch-action: none;
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0.8rem;
+    background: transparent; font: inherit;
+    font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--color-text-muted);
   }
   .pl-drawer__h::before {
-    content: ""; display: block; width: 2.4rem; height: 4px; margin: 0 auto;
+    content: ""; flex: none; width: 2.2rem; height: 4px;
     border-radius: 999px; background: var(--color-border);
   }
+  .pl-drawer[data-snap="0"] .pl-drawer__h::after { content: "▲"; font-size: 0.6rem; }
+  .pl-drawer:not([data-snap="0"]) .pl-drawer__h::after { content: "▼"; font-size: 0.6rem; }
+
+  /* Butonul de mesagerie și scutul de admin plutesc în colțul din dreapta-jos,
+     peste sertar. Nu-i urcăm deasupra lor (ar acoperi chatul) — le lăsăm o
+     curte liberă, ca uneltele să nu ajungă niciodată sub ele. */
+  .pl-drawer__in { padding-right: 7.5rem; }
   .pl-drawer__in {
     flex: 1; min-height: 0; overflow-y: auto;
     padding: 0 0.7rem 0.7rem;
