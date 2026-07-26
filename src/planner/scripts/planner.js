@@ -986,6 +986,9 @@ function sheetHtml() {
  *  mereu ascuns. Treapta 0 lasă la vedere doar paleta de buline — atât cât să
  *  pui o oră nouă fără să deschizi nimic. Grila primește exact atâta spațiu
  *  cât rămâne, ca sertarul să n-o acopere niciodată. */
+// ATENTIE: aceleasi trei valori sunt scrise si in planner.css, ca sertarul sa
+// aiba inaltime din prima clipa, nu abia dupa ce ruleaza fitDrawer(). Daca le
+// schimbi aici, schimba-le si acolo.
 const DRAWER_SNAP = [78, 208, 344];
 function fitDrawer() {
   const d = S.root.querySelector(".pl-drawer");

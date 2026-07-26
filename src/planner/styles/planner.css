@@ -796,6 +796,8 @@
    ========================================================= */
 @media (max-width: 700px) {
   .pl-grid { flex-direction: column; gap: 0.3rem; overflow-x: visible; }
+  /* Nimic din orar nu are voie să lățească pagina. */
+  .pl-wrap { overflow-x: clip; }
 
   /* Zilele NU stau direct în .pl-grid, ci într-un .pl-cols intermediar —
      o grilă de 7 coloane cu min-width: 46rem. Fără linia asta, întorsul lui
@@ -967,7 +969,8 @@
      imposibil de ratat. */
   .pl-dot.is-armed {
     outline: 3px solid var(--color-text); outline-offset: 3px;
-    transform: scale(1.14);
+    /* Fără scale(): mărirea împinge bulina peste marginea paletei și naște
+       bare de derulare. Inelul și haloul spun destul. */
     box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-primary) 25%, transparent);
   }
   /* Cand ai un cerc in mana, celelalte se dau la o parte din atentie. */
@@ -994,6 +997,14 @@
    vezi comentariul din base.css. Dacă cineva pune la loc `both` pe animația
    paginii, sertarul aterizează sub fold și pare că nu se deschide. */
 @media (max-width: 700px) {
+  /* Înălțimea stă AICI, nu doar în stilul inline pus de fitDrawer(). Altfel,
+     între momentul în care se scrie HTML-ul și momentul în care rulează
+     fitDrawer, sertarul e cât conținutul lui — foarte înalt — împinge pagina
+     și scoate o bară de derulare care apoi dispare. La fiecare randare, deci
+     și la fiecare atingere pe un bloc. */
+  .pl-drawer { height: 78px; }
+  .pl-drawer[data-snap="1"] { height: 208px; }
+  .pl-drawer[data-snap="2"] { height: 344px; }
   .pl-drawer {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     background: var(--color-bg);
