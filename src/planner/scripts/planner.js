@@ -83,6 +83,13 @@ const axPos = (px) => (VERT ? `top:${px}px` : `left:${px}px`);
 const axSize = (px) => (VERT ? `height:${px}px` : `width:${px}px`);
 /** Deplasarea fantomei trase, pe aceeași axă. */
 const axShift = (px) => (VERT ? `translateY(${px}px)` : `translateX(${px}px)`);
+/** Golul dintre două blocuri lipite.
+ *
+ *  Pe verticală sunt 3px care despart vizual două ore consecutive. Pe axa
+ *  culcată aceiași 3px scurtează blocul, iar marginea lui din dreapta cade
+ *  înaintea liniei orei: începutul pică exact, sfârșitul nu. Aici lungimea
+ *  trebuie să fie exactă, iar separarea o fac conturul și colțurile rotunde. */
+const axGap = () => (VERT ? 3 : 0);
 /** Cât de departe pe axa timpului a ajuns degetul, față de marginea benzii. */
 const axFrom = (rect, clientX, clientY) => (VERT ? clientY - rect.top : clientX - rect.left);
 /** Degetul e în interiorul acestei zile? Ziua stă pe axa PERPENDICULARĂ
@@ -623,7 +630,7 @@ function gridHtml() {
       // fed by data-name. Screen readers get the same words via aria-label.
       const tip = `${slotName(s)} · ${DAYS[i]} ${hhmm(s.start)}–${hhmm(s.end)}`;
       return `<div class="pl-block pl-block--cell${s.mine ? " is-mine" : ""}${alive ? " can-edit" : ""}${over ? " is-past" : ""}${s.kind === "personal" ? " is-personal" : ""}${confirming || asking ? " is-confirm" : ""}${renaming ? " is-renaming" : ""}"
-        style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx())}; ${axSize(rows * rowPx() - 3)}"
+        style="--c:${esc(slotColor(s))}; ${axPos(row * rowPx())}; ${axSize(rows * rowPx() - axGap())}"
         data-id="${esc(s.id)}" data-day="${i}" data-uid="${esc(s.externalId || s.userId)}" data-name="${esc(tip)}"
         aria-label="${esc(tip)}" ${alive && !confirming && !renaming && !asking ? 'data-act="grab"' : ""}>
         ${body}
@@ -886,7 +893,7 @@ function updateGhost() {
   if (!g) return;
   const { dayIdx, startMs, minutes, bad, badWhy, resize } = S.drag;
   g.style.transform = axShift(msToRow(startMs) * rowPx());
-  g.style[VERT ? "height" : "width"] = `${(minutes / SNAP_MIN) * rowPx() - 3}px`;
+  g.style[VERT ? "height" : "width"] = `${(minutes / SNAP_MIN) * rowPx() - axGap()}px`;
   g.classList.toggle("is-bad", !!bad);
   const rsz = resize || S.drag.resizeTop;
   const who = S.drag.id && !rsz ? "" : rsz ? durLabel(minutes) : sourceLabel();
@@ -1233,7 +1240,7 @@ function availResizeDrag(x, y) {
   const mm = (v) => `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`;
   g.classList.add("is-paint");
   g.style.transform = axShift(rowA * rowPx());
-  g.style[VERT ? "height" : "width"] = `${(rowB - rowA) * rowPx() - 3}px`;
+  g.style[VERT ? "height" : "width"] = `${(rowB - rowA) * rowPx() - axGap()}px`;
   g.innerHTML = `<b>${esc(DAYS[d.dayIdx])}${d.onDate ? ", doar ziua asta" : ", săptămânal"}</b><span>${mm(d.startMin)}–${mm(d.endMin)}</span>`;
 }
 
@@ -1253,7 +1260,7 @@ function paintDrag(x, y) {
   const g = d.ghost;
   g.classList.add("is-paint");
   g.style.transform = axShift(d.rowA * rowPx());
-  g.style[VERT ? "height" : "width"] = `${(d.rowB - d.rowA) * rowPx() - 3}px`;
+  g.style[VERT ? "height" : "width"] = `${(d.rowB - d.rowA) * rowPx() - axGap()}px`;
   const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   if (d.paintP) {
     // Sketching MY time: clashes must show while the pointer is still down —

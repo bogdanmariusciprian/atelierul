@@ -854,8 +854,11 @@
   .pl-now  { left: auto; right: auto; top: 0; bottom: 0; width: 2px; height: auto; }
   .pl-avail { left: auto; right: auto; top: 0; bottom: 0;
               border-left: 0; border-top: 3px solid color-mix(in srgb, #22c55e 55%, transparent); }
+  /* Fără gol pe lungime (vezi axGap în planner.js), două blocuri consecutive
+     s-ar atinge. Le desparte conturul, nu spațiul — și lungimea rămâne exactă. */
   .pl-block, .pl-ghost {
     left: auto; right: auto; top: 3px; bottom: 3px;
+    box-shadow: inset -1px 0 0 var(--color-bg);
     border-left: 0; border-top: 3px solid var(--c);
     padding: 0.15rem 0.3rem; border-radius: 8px;
     display: flex; align-items: center; overflow: hidden;
