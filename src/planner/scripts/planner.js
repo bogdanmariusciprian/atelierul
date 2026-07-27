@@ -384,6 +384,11 @@ const inHours = (startMs, minutes) => {
 const inPast = (startMs) => !isAdmin() && startMs < Date.now() - 5 * 60000;
 
 const swapFresh = (s) => s.swappedAt && (Date.now() - s.swappedAt < SWAP_FRESH_MS);
+/** Cât mai e de așteptat, scris în minute. Se deduce din `SWAP_FRESH_MS`, ca
+ *  textul să nu rămână în urmă dacă răgazul se schimbă vreodată. */
+const SWAP_FRESH_MIN = Math.round(SWAP_FRESH_MS / 60000);
+const SWAP_DONE_TITLU = `Oră tocmai schimbată — schimbul s-a încheiat, nu se mai fac oferte.`
+  + ` Revino în ${SWAP_FRESH_MIN} minute ca să inițiezi un nou schimb de zi sau de oră.`;
 const weekOf = (ms) => { const d = new Date(ms); d.setHours(0,0,0,0); const wd=(d.getDay()+6)%7; d.setDate(d.getDate()-wd); return d.getTime(); };
 const weekWord = (ms) => weekOf(ms) === weekOf(Date.now()) ? "săpt. asta" : "săpt. viitoare";
 const slotWhen = (start, end) => `${DAYS[(new Date(start).getDay()+6)%7]} ${hhmm(start)}–${hhmm(end)}, ${weekWord(start)}`;
@@ -970,7 +975,7 @@ function gridHtml() {
  *  the „offer one of my blocks" chooser. The teacher sees „?" passively. */
 function blockSwapHtml(s) {
   if (s.kind !== "lesson") return "";
-  if (swapFresh(s)) return `<i class="pl-swap pl-swap--done" title="Oră tocmai schimbată — schimbul s-a încheiat, nu se mai fac oferte">!</i>`;
+  if (swapFresh(s)) return `<i class="pl-swap pl-swap--done" title="${esc(SWAP_DONE_TITLU)}">!</i>`;
   if (isAdmin()) return s.swapWanted ? `<i class="pl-swap pl-swap--q is-static" title="Elevul vrea să schimbe ora">?</i>` : "";
   if (s.end < Date.now()) return "";
   if (s.mine) {
@@ -1223,7 +1228,13 @@ function sheetHtml() {
     // bloc, pentru cine îl nimerește; aici capătă un rând cu nume.
     const oferte = S.swapOffers.filter((o) => o.wantSlot === s.id).length;
     const amOferit = S.outgoingSwaps.some((o) => o.offerSlot === s.id);
-    const rSchimb = !(s.mine && viitor && !isAdmin()) ? "" : s.swapWanted
+    const rSchimb = !(s.mine && viitor && !isAdmin()) ? "" : swapFresh(s)
+      // Blocul arată un „!" neclickabil cât timp schimbul e proaspăt, deci
+      // butonul „?" lipsește — de acolo veneau cele 5 minute de răgaz. Foaia
+      // însă oferea rândul obișnuit, deci de aici se putea porni un schimb nou
+      // pe loc: două locuri care spuneau lucruri diferite despre aceeași oră.
+      ? `<span class="pl-sheet__say">⇄ ${esc(SWAP_DONE_TITLU)}</span>`
+      : s.swapWanted
       ? `<button type="button" class="pl-sheet__b" data-act="swap-open-mine" data-id="${esc(s.id)}">⇄ ${
           oferte ? `Vezi ofertele (${oferte})` : "Oferită la schimb — vezi sau oprește"}</button>`
       : amOferit
