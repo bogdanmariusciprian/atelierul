@@ -26,6 +26,29 @@
 .fo-s { color: var(--fo-s); }
 .fo-c { color: var(--fo-c); }
 
+/* ---- PROZA: aliniere pe ambele margini + alineat ----
+   Se aplică paragrafelor de text curgător, nu oricărui <p>. Un <p> care ține o
+   legendă de trei cuvinte sau șirul de sunete „c e a p ă" nu e proză: alineatul
+   l-ar împinge strâmb, iar justificarea n-ar avea ce alinia. De-aia excepțiile
+   de mai jos își cer înapoi alinierea lor.
+
+   `hyphens: auto` merge împreună cu `lang="ro"` de pe <html>: fără despărțire
+   în silabe, justificarea deschide râuri albe între cuvinte pe rândurile
+   scurte. */
+.lesson--fo p,
+.lesson--fo .fo-note {
+  text-align: justify;
+  text-indent: 1.5em;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+/* Ce nu e proză: cartonașele, legendele, rândurile de sub formule. */
+.lesson--fo .fo-sl-big,
+.lesson--fo .fo-sl-cap { text-align: center; text-indent: 0; }
+.lesson--fo .fo-g-def,
+.lesson--fo .fo-tout,
+.lesson--fo .fo-probe-out { text-align: left; text-indent: 0; }
+
 /* ---- chipurile de sub titlu: legenda, dinainte de a fi nevoie de ea ---- */
 .fo-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.9rem 0 0.2rem; }
 .fo-chip {
