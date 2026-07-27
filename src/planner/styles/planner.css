@@ -936,7 +936,12 @@
     left: auto; right: auto; top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px);
     border: 0; box-shadow: none;
     padding: 0.15rem 0.3rem; border-radius: var(--pl-r);
-    display: flex; align-items: center; overflow: hidden;
+    display: flex; align-items: center;
+    /* FĂRĂ `overflow: hidden` AICI. Desktopul are dinadins `overflow: visible`
+       pe `.pl-block--cell` (vezi mai sus), ca butonul de schimb să poată ieși
+       din bloc când se umflă în animație. Regula asta, venind mai târziu, o
+       anula — și „!"-ul verde apărea retezat exact de marginea blocului.
+       Numele nu are nevoie de ea: `.pl-cb__nm` își taie singur, cu ellipsis. */
   }
   .pl-ghost { border: 2px dashed var(--color-primary); }
 
