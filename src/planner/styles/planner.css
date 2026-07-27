@@ -1241,6 +1241,27 @@
   .pl-sheet__w {
     font-size: 0.66rem; color: var(--color-text-muted); margin-bottom: 0.15rem;
   }
+  /* FILELE FERESTRELOR SUPRAPUSE. Portocalia stă în verde, deci atingerea
+     nimerește mereu pe cea de deasupra. În loc să ceară țintire, foaia le arată
+     pe amândouă și schimbi din filă. Semnul (🔁 / 📌) plus intervalul spun care
+     e care fără să fie nevoie de nume. */
+  .pl-sheet__tabs { display: flex; gap: 4px; margin-bottom: 2px; }
+  .pl-sheet__tab {
+    flex: 1; padding: 5px 4px; font: inherit; font-size: 0.62rem; font-weight: 700;
+    cursor: pointer; color: var(--color-text-muted);
+    border: 1px solid var(--color-border); border-radius: var(--pl-r);
+    background: var(--color-bg);
+  }
+  .pl-sheet__tab.on {
+    color: var(--color-text);
+    border-color: color-mix(in srgb, #16a34a 55%, transparent);
+    background: color-mix(in srgb, #16a34a 10%, transparent);
+  }
+  .pl-sheet__tab.on.is-once {
+    border-color: color-mix(in srgb, #d97706 60%, transparent);
+    background: color-mix(in srgb, #d97706 12%, transparent);
+  }
+
   .pl-sheet__b {
     width: 100%; padding: 0.38rem 0.6rem; border-radius: 8px;
     border: 1.5px solid var(--color-border); background: var(--color-bg);

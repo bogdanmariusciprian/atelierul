@@ -326,6 +326,8 @@ const S = {
   vacOpen: false,      // admin: vacation form unfolded
   drawerSnap: 0,       // telefon: 0 = doar paleta, 1 = uneltele, 2 = tot
   sheetAvail: null,    // telefon: fereastra (verde/portocalie) cu foaia deschisa
+  sheetAvailSet: [],   // toate ferestrele care se suprapun acolo → taburile foii
+  gestTerminat: 0,     // cand s-a incheiat ultimul gest cu tragere: clicul de dupa nu mai e o atingere simpla
   sheetFor: null,      // telefon: blocul pentru care e deschisa foaia de actiuni
   sheetAt: 0,          // cand s-a deschis foaia: fereastra de garda contra clicului de la ridicarea degetului
   armed: null,         // telefon: ce ai luat in mana -- {kind:'dot'} sau {kind:'block',id,minutes}
@@ -414,6 +416,25 @@ const minOf = (ms) => { const d = new Date(ms); return d.getHours() * 60 + d.get
  *  una de-o-zi trebuie căutată după dată. `-1` dacă data ei nu e din săptămâna
  *  de pe ecran — se poate întâmpla dacă cineva schimbă săptămâna cu foaia
  *  deschisă, și atunci nu avem în ce zi s-o transformăm. */
+/** Deschide foaia unei ferestre, ȘTIIND CĂ POATE FI CEA GREȘITĂ.
+ *
+ *  Portocalia stă în verde și e desenată peste ea, deci atingerea nimerește
+ *  mereu pe cea de deasupra — chiar dacă voiai fereastra de dedesubt. În loc
+ *  s-o punem pe Marius să țintească printre ele, strângem tot ce se suprapune
+ *  acolo și le dăm ca file. Ce-a nimerit degetul e doar fila deschisă. */
+function deschideFoaiaFerestrei(id) {
+  const w = S.avail.find((x) => x.id === id);
+  if (!w) return;
+  const zi = ziuaFerestrei(w);
+  const vecine = zi < 0 ? [w]
+    : winsFor(zi).filter((o) => o.startMin < w.endMin && o.endMin > w.startMin);
+  S.armed = null; S.sheetFor = null;
+  S.sheetAvail = id;
+  S.sheetAvailSet = vecine.map((o) => o.id);
+  S.sheetAt = Date.now();
+  render();
+}
+
 function ziuaFerestrei(w) {
   if (!w.onDate) return w.weekday;
   for (let i = 0; i < 7; i++) if (isoDay(i) === w.onDate) return i;
@@ -1106,8 +1127,15 @@ function sheetHtml() {
     if (!w) return "";
     const zi = ziuaFerestrei(w);
     const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    const vecine = (S.sheetAvailSet.length ? S.sheetAvailSet : [w.id])
+      .map((x) => S.avail.find((o) => o.id === x)).filter(Boolean);
+    const file = vecine.length < 2 ? "" : `<div class="pl-sheet__tabs" role="tablist">${vecine.map((o) => `
+      <button type="button" role="tab" aria-selected="${o.id === w.id}"
+              class="pl-sheet__tab${o.id === w.id ? " on" : ""}${o.onDate ? " is-once" : ""}"
+              data-act="avail-tab" data-id="${esc(o.id)}">${o.onDate ? "📌" : "🔁"} ${mm(o.startMin)}–${mm(o.endMin)}</button>`).join("")}</div>`;
     return `<div class="pl-sheet" role="dialog" aria-modal="true" data-act="sheet-close">
       <div class="pl-sheet__card" data-act="sheet-stop">
+        ${file}
         <b class="pl-sheet__t">${w.onDate ? "Fereastră doar în ziua asta" : "Fereastră săptămânală"}</b>
         <span class="pl-sheet__w">${esc(DAYS[zi < 0 ? (w.weekday || 0) : zi])} ${mm(w.startMin)}–${mm(w.endMin)}</span>
         <button type="button" class="pl-sheet__b" data-act="avail-flip" data-id="${esc(w.id)}">${w.onDate
@@ -1862,6 +1890,11 @@ async function onUp(e) {
   const live = S.root.querySelector('[data-role="live"]');
   if (live) live.hidden = true;
   if (!d) return;
+  // Gestul ăsta a avut o tragere în el (chiar și una pe loc, ca așezarea unei
+  // ore cu bulina în mână). Browserul trimite după el un `click` obișnuit, iar
+  // dacă degetul s-a ridicat peste o fereastră, acel clic ar deschide foaia ei
+  // imediat după ce tocmai ai pus o oră. Îl însemnăm ca gest consumat.
+  S.gestTerminat = Date.now();
 
   // O ANULARE NU E O RIDICARE DE DEGET.
   //
@@ -2064,6 +2097,18 @@ async function onClick(e) {
   // foaia nu asculta atingeri.
   if (S.sheetAt && Date.now() - S.sheetAt < 420 && e.target.closest(".pl-sheet")) return;
 
+  // ATINGERE SIMPLĂ PE FEREASTRĂ = MENIUL EI.
+  //
+  // Cu creionul stins banda e inertă — nimic nu se desenează, nimic nu se ia în
+  // mână — deci atingerea e liberă și e gestul cel mai firesc. Cu creionul
+  // pornit rămâne cum era: acolo atingerea desenează, și n-are rost s-o
+  // încărcăm cu două înțelesuri.
+  if (!VERT && !S.paint && isAdmin() && Date.now() - S.gestTerminat > 350
+      && !e.target.closest("[data-act]")) {
+    const f = e.target.closest(".pl-avail");
+    if (f && f.dataset.availId) { deschideFoaiaFerestrei(f.dataset.availId); return; }
+  }
+
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act;
@@ -2087,7 +2132,7 @@ async function onClick(e) {
   if (act === "sheet-stop") return;                       // clic in card: nu inchide
   if (act === "sheet-close") {                            // clic pe fundal: inchide
     S.confirmId = null; S.moveAsk = null; S.renameId = null;
-    S.sheetFor = null; S.sheetAvail = null;
+    S.sheetFor = null; S.sheetAvail = null; S.sheetAvailSet = [];
     render(); return;
   }
   if (act === "sheet-move") {
@@ -2138,11 +2183,12 @@ async function onClick(e) {
     if (S.paintWhat === "personal") S.paintOnceP = once; else S.paintOnce = once;
     render(); return;
   }
+  if (act === "avail-tab") { S.sheetAvail = b.dataset.id; render(); return; }
   if (act === "avail-del") {
     const r = await deleteAvailabilityWindow(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();
-    S.sheetAvail = null;
+    S.sheetAvail = null; S.sheetAvailSet = [];
     showToast("Fereastră închisă.");
     render(); return;
   }
@@ -2166,7 +2212,7 @@ async function onClick(e) {
     const d = await deleteAvailabilityWindow(w.id);
     if (!d.ok) showToast(d.message);
     S.avail = await fetchAvailability();
-    S.sheetAvail = null;
+    S.sheetAvail = null; S.sheetAvailSet = [];
     showToast(w.onDate ? "Se repetă în fiecare săptămână." : "Rămâne doar în ziua asta.",
       { kind: "success" });
     render(); return;
@@ -2507,7 +2553,10 @@ function installLongPress(mount) {
     // si clic-dreapta ramane singurul drum, ca pana acum.
     if (VERT) return;
     if (e.button !== 0) return;
-    const tgt = e.target.closest(".pl-block--cell, .pl-avail, .pl-dot");
+    // Ferestrele NU mai sunt aici: se deschid la o atingere simpla, cand
+    // creionul e stins. Apasarea lunga a ramas doar pentru blocuri si buline,
+    // unde atingerea simpla e deja luata de „ia in mana".
+    const tgt = e.target.closest(".pl-block--cell, .pl-dot");
     if (!tgt) return;
     sx = e.clientX; sy = e.clientY; src = e.target;
     t = setTimeout(() => {
@@ -2528,15 +2577,7 @@ function installLongPress(mount) {
       // lunga -- acelasi loc unde sta si meniul blocurilor.
       const bloc = tinta && tinta.closest(".pl-block--cell");
       if (bloc && !VERT && bloc.dataset.id) {
-        S.armed = null; S.sheetAvail = null; S.sheetFor = bloc.dataset.id; S.sheetAt = Date.now();
-        render(); src = null; return;
-      }
-      // Fereastra: aceeasi foaie ca la blocuri. Portocalia e desenata peste
-      // verde si retrasa in ea, deci `closest` alege singur pe care ai apasat —
-      // nu e nevoie sa ne uitam la ce e ales in creion.
-      const fer = tinta && tinta.closest(".pl-avail");
-      if (fer && !VERT && isAdmin() && fer.dataset.availId) {
-        S.armed = null; S.sheetFor = null; S.sheetAvail = fer.dataset.availId; S.sheetAt = Date.now();
+        S.armed = null; S.sheetAvail = null; S.sheetAvailSet = []; S.sheetFor = bloc.dataset.id; S.sheetAt = Date.now();
         render(); src = null; return;
       }
       const dot = tinta && tinta.closest(".pl-dot");
@@ -2562,6 +2603,11 @@ function installLongPress(mount) {
 function onCtxMenu(e) {
   if (!isLoggedIn()) return;
 
+  // Pe telefon meniul browserului nu se cuvine peste orar: apărea peste foaia
+  // proaspăt deschisă și acoperea tocmai butoanele pe care le voiai. Îl oprim
+  // din start, indiferent pe ce s-a apăsat — inclusiv pe foaie sau pe sertar.
+  if (!VERT) e.preventDefault();
+
   // DOUA CAI CARE SE BAT. Pe Android apasarea lunga declanseaza SINGURA
   // evenimentul nativ `contextmenu`, la ~500ms — dupa temporizatorul nostru de
   // 400ms. Deci foaia se deschidea corect, iar imediat dupa ea venea meniul mic
@@ -2573,7 +2619,7 @@ function onCtxMenu(e) {
     if (b && b.dataset.id) {
       e.preventDefault();
       if (S.sheetFor !== b.dataset.id) {
-        S.armed = null; S.sheetAvail = null; S.sheetFor = b.dataset.id; S.sheetAt = Date.now();
+        S.armed = null; S.sheetAvail = null; S.sheetAvailSet = []; S.sheetFor = b.dataset.id; S.sheetAt = Date.now();
         render();
       }
       return;
@@ -2588,18 +2634,10 @@ function onCtxMenu(e) {
       render();
       return;
     }
-    // Fereastra lipsea de aici, deși comentariul de sus promite că „orice cale
-    // ar veni prima, ajunge în același loc". Venind pe calea nativă, cădea în
-    // meniul mic de dedesubt.
-    const f = isAdmin() ? e.target.closest(".pl-avail") : null;
-    if (f && f.dataset.availId) {
-      e.preventDefault();
-      if (S.sheetAvail !== f.dataset.availId) {
-        S.armed = null; S.sheetFor = null; S.sheetAvail = f.dataset.availId; S.sheetAt = Date.now();
-        render();
-      }
-      return;
-    }
+    // Ferestrele se deschid la atingere simplă, deci aici nu mai e nimic de
+    // făcut pentru ele. Ieșim oricum: pe telefon nu coborâm niciodată în meniul
+    // mic de dedesubt — tot ce se poate face are deja un drum.
+    return;
   }
 
   const blk = e.target.closest(".pl-block--cell");
