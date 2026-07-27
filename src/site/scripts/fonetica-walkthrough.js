@@ -115,13 +115,20 @@ const G = 2600;        // gravitație
 const AER = 0.55;      // frecarea cu aerul, pe secundă
 const SALT = 0.45;     // cât din viteză se întoarce la ciocnirea cu fundul
 const FRECARE = 0.72;  // cât se pierde pe orizontală la fiecare ciocnire
-const PRAG_SCUTURAT = 900;  // px/s: sub atât, mișcarea nu e scuturat, e mutare
 const ODIHNA = 40;     // px/s: sub atât, bucata se consideră așezată
 const ZBOR = 520;      // ms cât durează saltul final în căsuță
 
-/** Câte bucăți sare o scuturare. Nu toate deodată: o scuturare puternică
- *  scoate mai multe, una moale doar una-două, exact ca la o cutie adevărată. */
-const cateCad = (viteza) => Math.max(1, Math.min(5, Math.round(viteza / 1400)));
+/* ---- CE ÎNSEAMNĂ „SCUTURAT" ----
+   Nu orice mișcare iute. O tragere dreaptă, oricât de rapidă, nu scutură
+   nimic dintr-o cutie adevărată — ai mutat-o, atât. Scuturatul e dus-întors:
+   se cere o SCHIMBARE DE SENS, la viteză destul de mare.
+
+   Fără condiția asta, `pointermove` se declanșează de vreo sută de ori pe
+   secundă, iar o singură mișcare golea tot proverbul înainte să apuci să
+   vezi ce cade. */
+const PRAG_VITEZA = 1100;   // px/s, la momentul întoarcerii
+const RAGAZ = 190;          // ms între două scuturări socotite
+const PER_SCUTURARE = 1;    // câte bucăți sar la o întoarcere
 
 function initProverbe(root) {
   const gazda = root.querySelector('[data-role="fo-prov"]');
@@ -254,7 +261,8 @@ function initProverbe(root) {
   let prins = null;
   cutie.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
-    prins = { x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, dy: 0 };
+    prins = { x: e.clientX, y: e.clientY, t: performance.now(),
+              dx: 0, dy: 0, sx: 0, sy: 0, ultima: 0 };
     cutie.setPointerCapture(e.pointerId);
     cutie.classList.add("is-prins");
   });
@@ -270,15 +278,28 @@ function initProverbe(root) {
     prins.dy = (prins.dy + (e.clientY - prins.y)) * 0.55;
     cutie.style.transform = `translate(${prins.dx.toFixed(1)}px, ${prins.dy.toFixed(1)}px)`;
 
+    // Întoarcere = semnul vitezei s-a schimbat pe una dintre axe. Comparăm cu
+    // semnul de la mișcarea dinainte, nu cu poziția de plecare: contează unde
+    // se frânge mișcarea, nu cât de departe a ajuns.
+    const semn = (n) => (n > 0 ? 1 : n < 0 ? -1 : 0);
+    const sx = semn(vx), sy = semn(vy);
+    const intoarcere = (sx && prins.sx && sx !== prins.sx)
+                    || (sy && prins.sy && sy !== prins.sy);
     const viteza = Math.hypot(vx, vy);
-    if (viteza > PRAG_SCUTURAT) {
+
+    if (intoarcere && viteza > PRAG_VITEZA && acum - prins.ultima > RAGAZ) {
+      prins.ultima = acum;
       const libere = [...text.querySelectorAll(".fo-buc")];
-      for (let i = 0; i < cateCad(viteza) && libere.length; i++) {
+      for (let i = 0; i < PER_SCUTURARE && libere.length; i++) {
         const el = libere.splice(Math.floor(Math.random() * libere.length), 1)[0];
         desprinde(el, vx, vy);
       }
+      cutie.classList.add("is-lovit");
+      setTimeout(() => cutie.classList.remove("is-lovit"), 160);
       if (!text.querySelector(".fo-buc")) actualizeaza();
     }
+    if (sx) prins.sx = sx;
+    if (sy) prins.sy = sy;
     prins.x = e.clientX; prins.y = e.clientY; prins.t = acum;
   });
   const lasa = () => {

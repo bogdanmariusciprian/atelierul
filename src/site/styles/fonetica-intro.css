@@ -210,6 +210,10 @@
   transition: transform 0.25s cubic-bezier(.2,1.4,.4,1), opacity 0.2s ease;
 }
 .fo-cutie.is-prins { cursor: grabbing; transition: none; }
+/* O clipire la fiecare scuturare socotită. Fără ea, când nu cade nimic (n-ai
+   întors destul de tare) pare că unealta e stricată; așa se vede că gestul a
+   fost înregistrat, doar că prea moale. */
+.fo-cutie.is-lovit { border-color: var(--fo-v); background: color-mix(in srgb, var(--fo-v) 14%, transparent); }
 .fo-cutie.is-gol { opacity: 0.6; cursor: default; }
 /* Fundul cutiei, desenat: bucățile se opresc pe el, deci trebuie să se vadă
    că e o podea, nu doar o margine. */
