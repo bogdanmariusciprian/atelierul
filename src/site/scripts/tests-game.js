@@ -166,9 +166,10 @@ export async function initTestGame(mountEl, exam) {
   G.items = items;
   G.byId = new Map(items.map((i) => [i.id, i]));
   G.years = [...new Set(items.map((i) => i.year).filter((y) => y != null))].sort((a, b) => Number(b) - Number(a));
-  // Sessions come from the data itself (like years), so new ones show up on
-  // their own as soon as the teacher publishes items for them.
-  G.sessions = [...new Set(items.map((i) => i.session).filter(Boolean))].sort();
+  // Cele trei categorii, în ordinea calendarului, dar numai cele care chiar au
+  // itemi — un buton care nu duce nicăieri e o promisiune goală.
+  const gasite = new Set(items.map((i) => sesiuneCanonica(i.session)));
+  G.sessions = SESIUNI.filter((s) => gasite.has(s));
   G.typeCounts = {};
   items.forEach((i) => (i.types || []).forEach((t) => { G.typeCounts[t] = (G.typeCounts[t] || 0) + 1; }));
   G.availTypes = TEST_ITEM_TYPES.map((t) => t.code).filter((c) => G.typeCounts[c] > 0);
@@ -239,6 +240,37 @@ const looseKey = (s) => String(s || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .replace(/[^a-z0-9]+/g, " ").trim();
 
+// ---------- cele trei sesiuni ----------
+//
+// În bancă, sesiunea e text liber, scris la fiecare item în parte, iar
+// butoanele de filtrare se năşteau din ce se găsea acolo. Importurile s-au
+// făcut în momente diferite, așa că aceeași realitate a ajuns scrisă în patru
+// feluri: „Examen iulie", „Iulie - G1" (2026), „Examen" fără lună (2003–2009)
+// și „Examen septembrie". Elevul vedea patru butoane și putea nimeri combinații
+// an+sesiune care nu există, fără niciun semn că filtrul e vinovat.
+//
+// Jocul are de acum TREI categorii, atât. Gruparea se face la afișare, nu în
+// date: ce scrie la item rămâne neatins, fiindcă „G1" s-ar putea să însemne
+// ceva (grila 1 dintr-un examen cu mai multe variante) și n-avem dreptul să
+// ștergem o informație doar ca să ne iasă butoanele.
+const SESIUNI = ["Examen iulie", "Examen septembrie", "Simulare"];
+
+/** Sub care dintre cele trei intră eticheta scrisă la item.
+ *
+ *  Recunoașterea merge pe rădăcina cuvântului, nu pe potrivire exactă, ca să
+ *  prindă și „Iul", și „sept.", și „Iulie - G1".
+ *
+ *  Ce nu se recunoaște ajunge la „Examen iulie", pentru că admiterea la Drept
+ *  se ține în iulie — un item scris ciudat e mai bine să apară în sesiunea
+ *  principală decât să dispară dintre butoane și să rămână vizibil doar sub
+ *  „Toate". */
+function sesiuneCanonica(brut) {
+  const k = looseKey(brut);
+  if (/simulare/.test(k)) return SESIUNI[2];
+  if (/sept/.test(k)) return SESIUNI[1];
+  return SESIUNI[0];
+}
+
 // The badge on a downloadable paper links here with ?an=&ses=. Those names come
 // from FILE names, while the bank's sessions come from the teacher's import —
 // they rarely match to the letter. So: exact first, then either one containing
@@ -254,25 +286,19 @@ function applyPaperPreset() {
     if (hit != null) { G.sel.years = new Set([String(hit)]); G.all.years = false; }
   }
   if (ses) {
-    const want = looseKey(ses);
-    const hit = want && (
-      G.sessions.find((s) => looseKey(s) === want)
-      || G.sessions.find((s) => looseKey(s) && (want.startsWith(looseKey(s)) || looseKey(s).startsWith(want)))
-      // Last resort, on the first word only: „Iul" still finds „Iulie".
-      // Three characters minimum, so „G1" can't drag in something unrelated.
-      || G.sessions.find((s) => {
-        const a = looseKey(s).split(" ")[0], b = want.split(" ")[0];
-        return a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a));
-      })
-    );
-    if (hit) { G.sel.sessions = new Set([hit]); G.all.sessions = false; }
+    // Numele din fișier trece prin aceeași pâlnie ca eticheta itemului, deci
+    // „Iulie", „iul", „Iulie - G1" nimeresc toate „Examen iulie". Potrivirea
+    // aproximativă de dinainte — exact, apoi prefix, apoi primul cuvânt — n-are
+    // ce mai căuta: nu mai sunt decât trei ținte, toate cunoscute.
+    const hit = sesiuneCanonica(ses);
+    if (G.sessions.includes(hit)) { G.sel.sessions = new Set([hit]); G.all.sessions = false; }
   }
 }
 
 // ---------- filtering / ordering ----------
 function matchYearSession(it) {
   if (!G.all.years && !G.sel.years.has(String(it.year))) return false;
-  if (!G.all.sessions && !G.sel.sessions.has(it.session || "")) return false;
+  if (!G.all.sessions && !G.sel.sessions.has(sesiuneCanonica(it.session))) return false;
   return true;
 }
 // Under „all types" untagged items still play (nothing is excluded); a proper
@@ -331,7 +357,10 @@ function resumeSession(id) {
   const c = s.config || {};
   G.all = { years: c.allYears !== false, sessions: c.allSessions !== false, types: c.allTypes !== false };
   G.sel.years = new Set(c.years || []);
-  G.sel.sessions = new Set(c.sessions || []);
+  // Sesiunile salvate ÎNAINTE de gruparea în trei păstrează etichetele vechi
+  // („Iulie - G1"), care acum n-ar mai nimeri niciun buton — elevul și-ar
+  // relua jocul și n-ar mai avea niciun item. Trec și ele prin aceeași pâlnie.
+  G.sel.sessions = new Set((c.sessions || []).map(sesiuneCanonica));
   G.sel.types = new Set(c.types || []);
   G.sel.order = c.order || "random";
   G.sel.mode = c.mode || "invatare";
