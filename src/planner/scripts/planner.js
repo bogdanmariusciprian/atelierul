@@ -325,6 +325,7 @@ const S = {
   visH: 10,            // visible hour-rows: 8..17 by default, grows dimmed below
   vacOpen: false,      // admin: vacation form unfolded
   drawerSnap: 0,       // telefon: 0 = doar paleta, 1 = uneltele, 2 = tot
+  sheetAvail: null,    // telefon: fereastra (verde/portocalie) cu foaia deschisa
   sheetFor: null,      // telefon: blocul pentru care e deschisa foaia de actiuni
   sheetAt: 0,          // cand s-a deschis foaia: fereastra de garda contra clicului de la ridicarea degetului
   armed: null,         // telefon: ce ai luat in mana -- {kind:'dot'} sau {kind:'block',id,minutes}
@@ -408,6 +409,16 @@ const winsFor = (dayIdx) =>
 // guard would judge 09:00, for a window the teacher drew at 10:00.
 const minToMs = (dayIdx, min) => { const d = dayAt(dayIdx); d.setMinutes(min); return d.getTime(); };
 const minOf = (ms) => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
+
+/** În ce zi a săptămânii AFIȘATE cade fereastra: una săptămânală știe singură,
+ *  una de-o-zi trebuie căutată după dată. `-1` dacă data ei nu e din săptămâna
+ *  de pe ecran — se poate întâmpla dacă cineva schimbă săptămâna cu foaia
+ *  deschisă, și atunci nu avem în ce zi s-o transformăm. */
+function ziuaFerestrei(w) {
+  if (!w.onDate) return w.weekday;
+  for (let i = 0; i < 7; i++) if (isoDay(i) === w.onDate) return i;
+  return -1;
+}
 
 /** Inside ONE window — same rule as the server guard, mirrored so the pupil
  *  never sees an option the database would refuse. */
@@ -887,7 +898,7 @@ function gridHtml() {
               S.paint && S.paintWhat === "avail" && !!w.onDate === S.paintOnce ? `
               <span class="pl-avail__h pl-avail__h--top" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="top" title="Trage ca să muți începutul"></span>
               <span class="pl-avail__h pl-avail__h--bot" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="bot" title="Trage ca să muți sfârșitul"></span>
-              <button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
+              ${VERT ? `<button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}` : ""}
           </span>`;
         }).join("")}
         ${isToday ? nowLineHtml() : ""}
@@ -1084,6 +1095,29 @@ function render() {
  *  neatinsa; doar locul se schimba. */
 function sheetHtml() {
   if (VERT) return "";
+
+  // FEREASTRA, LA APĂSARE LUNGĂ. „×"-ul din colț era un pătrat de 1.2rem lipit
+  // de marginea unei ferestre uneori late de 20px, peste care mai treceau și
+  // blocurile elevilor: se nimerea greu și se apăsa din greșeală. Aici are loc
+  // să se numească, și încape lângă el și schimbarea de ritm — care altfel
+  // cerea ștergere plus redesenare.
+  if (S.sheetAvail) {
+    const w = S.avail.find((x) => x.id === S.sheetAvail);
+    if (!w) return "";
+    const zi = ziuaFerestrei(w);
+    const mm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    return `<div class="pl-sheet" role="dialog" aria-modal="true" data-act="sheet-close">
+      <div class="pl-sheet__card" data-act="sheet-stop">
+        <b class="pl-sheet__t">${w.onDate ? "Fereastră doar în ziua asta" : "Fereastră săptămânală"}</b>
+        <span class="pl-sheet__w">${esc(DAYS[zi < 0 ? (w.weekday || 0) : zi])} ${mm(w.startMin)}–${mm(w.endMin)}</span>
+        <button type="button" class="pl-sheet__b" data-act="avail-flip" data-id="${esc(w.id)}">${w.onDate
+          ? "🔁 Fă-o în fiecare săptămână"
+          : "📌 Doar în ziua asta"}</button>
+        <button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="avail-del" data-id="${esc(w.id)}">🗑 Șterge fereastra</button>
+        <button type="button" class="pl-sheet__b" data-act="sheet-close">Închide</button>
+      </div>
+    </div>`;
+  }
 
   // TOATE actiunile blocului, intr-un singur loc. Meniul mic de clic-dreapta
   // incapea doar cu „Sterge"; restul (recurenta, durata, redenumirea) traiau
@@ -2039,7 +2073,8 @@ async function onClick(e) {
   }
   if (act === "sheet-stop") return;                       // clic in card: nu inchide
   if (act === "sheet-close") {                            // clic pe fundal: inchide
-    S.confirmId = null; S.moveAsk = null; S.renameId = null; S.sheetFor = null;
+    S.confirmId = null; S.moveAsk = null; S.renameId = null;
+    S.sheetFor = null; S.sheetAvail = null;
     render(); return;
   }
   if (act === "sheet-move") {
@@ -2094,7 +2129,33 @@ async function onClick(e) {
     const r = await deleteAvailabilityWindow(b.dataset.id);
     if (!r.ok) { showToast(r.message); return; }
     S.avail = await fetchAvailability();
+    S.sheetAvail = null;
     showToast("Fereastră închisă.");
+    render(); return;
+  }
+  // SCHIMBAREA DE RITM = aceeași fereastră, alt fel de a se repeta.
+  //
+  // Nu există „update onDate": tabelul le ține ca rânduri de feluri diferite,
+  // iar RPC-ul de salvare absoarbe vecinii de același fel. Deci o facem în doi
+  // pași — și O SCRIEM ÎNTÂI pe cea nouă. Dacă am șterge-o pe cea veche prima
+  // și scrierea ar eșua, fereastra ar dispărea cu totul; așa, cel mai rău caz
+  // e o clipă cu amândouă, vizibilă și reparabilă.
+  if (act === "avail-flip") {
+    const w = S.avail.find((x) => x.id === b.dataset.id);
+    if (!w) return;
+    const zi = ziuaFerestrei(w);
+    if (zi < 0) { showToast("Fereastra nu e din săptămâna afișată."); return; }
+    const r = await saveAvailabilityWindow({
+      weekday: zi, startMin: w.startMin, endMin: w.endMin,
+      onDate: w.onDate ? null : isoDay(zi),
+    });
+    if (!r.ok) { showToast(r.message); return; }
+    const d = await deleteAvailabilityWindow(w.id);
+    if (!d.ok) showToast(d.message);
+    S.avail = await fetchAvailability();
+    S.sheetAvail = null;
+    showToast(w.onDate ? "Se repetă în fiecare săptămână." : "Rămâne doar în ziua asta.",
+      { kind: "success" });
     render(); return;
   }
 
@@ -2446,7 +2507,15 @@ function installLongPress(mount) {
       // lunga -- acelasi loc unde sta si meniul blocurilor.
       const bloc = src.closest && src.closest(".pl-block--cell");
       if (bloc && !VERT && bloc.dataset.id) {
-        S.armed = null; S.sheetFor = bloc.dataset.id; S.sheetAt = Date.now();
+        S.armed = null; S.sheetAvail = null; S.sheetFor = bloc.dataset.id; S.sheetAt = Date.now();
+        render(); src = null; return;
+      }
+      // Fereastra: aceeasi foaie ca la blocuri. Portocalia e desenata peste
+      // verde si retrasa in ea, deci `closest` alege singur pe care ai apasat —
+      // nu e nevoie sa ne uitam la ce e ales in creion.
+      const fer = src.closest && src.closest(".pl-avail");
+      if (fer && !VERT && isAdmin() && fer.dataset.availId) {
+        S.armed = null; S.sheetFor = null; S.sheetAvail = fer.dataset.availId; S.sheetAt = Date.now();
         render(); src = null; return;
       }
       const dot = src.closest && src.closest(".pl-dot");
@@ -2483,7 +2552,7 @@ function onCtxMenu(e) {
     if (b && b.dataset.id) {
       e.preventDefault();
       if (S.sheetFor !== b.dataset.id) {
-        S.armed = null; S.sheetFor = b.dataset.id; S.sheetAt = Date.now();
+        S.armed = null; S.sheetAvail = null; S.sheetFor = b.dataset.id; S.sheetAt = Date.now();
         render();
       }
       return;
