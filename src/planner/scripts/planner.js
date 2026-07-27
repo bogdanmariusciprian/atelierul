@@ -37,7 +37,6 @@ import {
 } from "../../shared/scripts/planner-repo.js";
 import { CURRENT_USER, isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
 import { showToast } from "../../shared/scripts/toast.js";
-import { store } from "../../shared/scripts/store.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -95,60 +94,11 @@ const RAIL_NARROW_PX = 46;           // capul zilei (2.5rem) + goluri, scăzute 
 // o singură decizie citită la fiecare randare, nu o a doua randare paralelă
 // care s-ar desincroniza de prima la prima corectură.
 let VERT = true;
-/** Cheia sub care ține minte alegerea. Valori: "lat", "vert" sau lipsă. */
-const AXA_KEY = "atelier_planner_axa";
-
-/** Ce așezare are orarul: în picioare (zile pe coloane, ora în jos — ca pe
- *  laptop) sau culcată (zile pe rânduri, ora la dreapta — pentru telefon).
- *
- *  Lățimea nu mai poate hotărî singură. Telefonul ÎNTORS are ~890px, adică mai
- *  mult decât pragul, deci ar primi așezarea de laptop înghesuită în 390px
- *  înălțime — exact ce nu vrei. Iar în picioare, uneori vrei tocmai așezarea
- *  aia, cu derulare laterală, fiindcă arată toată săptămâna deodată.
- *
- *  Deci lățimea e doar propunerea de pornire; ultimul cuvânt e al lui Marius,
- *  și se ține minte. Clasa de pe `<html>` e ce citește CSS-ul. */
 function readAxis() {
-  const ales = store.get(AXA_KEY);
-  const ingust = !!(window.matchMedia && window.matchMedia("(max-width: 700px)").matches);
-  VERT = ales === "vert" ? true : ales === "lat" ? false : !ingust;
-  document.documentElement.classList.toggle("pl-lat", !VERT);
+  VERT = !(window.matchMedia && window.matchMedia("(max-width: 700px)").matches);
   return VERT;
 }
 
-/** Butonul de întors ecranul apare doar pe ecrane de mărime de telefon — pe un
- *  laptop n-ar avea ce alege. Pragul e larg (1024) fiindcă telefonul întors
- *  trece binișor de 700, iar Marius încearcă și într-o fereastră Chrome îngustă,
- *  unde `pointer: coarse` nu se raportează. */
-const potIntoarce = () => window.innerWidth <= 1024;
-
-/** Butonul stă lipit sub bara de navigare, care e `position: fixed` și își
- *  schimbă înălțimea (pe telefon se strânge). Deci n-o scriem de mână, o
- *  măsurăm și o publicăm ca variabilă — la fel ca înălțimea sertarului. */
-function asazaSubNav() {
-  const h = document.querySelector(".site-header__inner") || document.querySelector(".site-header");
-  const jos = h ? Math.round(h.getBoundingClientRect().bottom) : 52;
-  document.documentElement.style.setProperty("--pl-navjos", `${Math.max(8, jos + 6)}px`);
-}
-
-/** Discret: un cerc mic, palid, care se aprinde la atingere. Nu e o unealtă de
- *  fiecare zi, e un comutator de așezare — n-are ce căuta în ochi. */
-function axaBtnHtml() {
-  if (!potIntoarce()) return "";
-  return `<button type="button" class="pl-axa" data-act="axa" title="${esc(VERT
-    ? "Întoarce orarul pentru telefon: zilele pe rânduri, ora curgând la dreapta."
-    : "Întoarce orarul ca pe laptop: zilele pe coloane, ora curgând în jos.")}"
-    aria-label="Întoarce așezarea orarului">⟳</button>`;
-}
-
-function intoarceAxa() {
-  store.set(AXA_KEY, VERT ? "lat" : "vert");
-  readAxis();
-  S.armed = null; S.sheetFor = null; S.sheetAvail = null; S.sheetAvailSet = [];
-  render();
-  showToast(VERT ? "Zilele pe coloane, ca pe laptop." : "Zilele pe rânduri, pentru telefon.",
-    { kind: "success" });
-}
 /** Jumătatea de oră, în pixeli.
  *
  *  Pe desktop e o constantă: lățimea e generoasă, înălțimea curge. Pe telefon
@@ -1103,10 +1053,10 @@ function render() {
     // coboară împreună într-un sertar cu trei trepte. Nu randăm nimic de două
     // ori — doar reasamblăm aceleași bucăți.
     S.root.innerHTML = VERT
-      ? `${axaBtnHtml()}${pal}${headerHtml()}${body}${below}
+      ? `${pal}${headerHtml()}${body}${below}
          ${swapModalsHtml()}
          <div class="pl-live" data-role="live" hidden></div>`
-      : `${axaBtnHtml()}${headerHtml()}${body}
+      : `${headerHtml()}${body}
          ${!S.loading ? `<div class="pl-drawer" data-snap="${S.drawerSnap}">
            <button type="button" class="pl-drawer__h" data-act="drawer"
                    aria-label="Deschide uneltele"><span>🖌 unelte</span></button>
@@ -1115,7 +1065,6 @@ function render() {
          ${sheetHtml()}
          ${swapModalsHtml()}
          <div class="pl-live" data-role="live" hidden></div>`;
-    asazaSubNav();
     if (!VERT) { fitDrawer(); incapNumele(); }
     masoara();
     return;
@@ -1290,7 +1239,7 @@ function masoara() {
   // așezarea de laptop încape sau nu în landscape. Samsung are în setări
   // „Screen zoom", care schimbă chiar viewportul CSS, deci singurul răspuns
   // bun e cel citit de pe aparat.
-  const lat = document.documentElement.classList.contains("pl-lat");
+  const lat = !VERT;
   linii.push(
     `ECRAN  ${window.innerWidth}×${window.innerHeight} css` +
     `  ·  dpr ${window.devicePixelRatio}` +
@@ -2237,7 +2186,6 @@ async function onClick(e) {
     S.week = d; render(); refresh(); return;
   }
   if (act === "today") { S.week = weekStart(); render(); refresh(); return; }
-  if (act === "axa") { intoarceAxa(); return; }
   if (act === "dur") { S.minutes = +b.dataset.m; render(); return; }
   if (act === "drawer") {
     // Tragerea a hotarat deja treapta; clickul care vine dupa ridicarea
