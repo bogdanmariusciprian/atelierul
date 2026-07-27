@@ -53,111 +53,249 @@ function initClasificare(root) {
 }
 
 /* =========================================================
-   PROPOZIȚIA CU TOATE SUNETELE
+   PROVERBELE CARE SE SCUTURĂ DE SUNETE
 
-   „Zâmbind fericit, hoțul jucăuș cheamă cinci vulpi ghidușe, iar seara ziua
-   se stinge peste ogoare."
+   Patru proverbe adevărate, câte unul pe temă: școală, educație, prieteni,
+   onestitate. Le prinzi cu degetul și le zgâlțâi; sunetele se desprind, cad cu
+   gravitație, se lovesc de fundul cutiei și își caută căsuța din clasificare.
 
-   Are, măcar o dată, fiecare dintre cele 34 de sunete ale limbii române:
-   7 vocale, 4 semivocale, i-ul șoptit, 18 consoane și cele 4 fără literă
-   proprie. E cusută anume, nu găsită.
+   DIN AL DOILEA PROVERB ÎNCOLO CAD DOAR SUNETELE NOI. Curba e chiar lecția:
+   primul umple 14 căsuțe, al doilea 10, al treilea numai 2, al patrulea 5.
+   Elevul simte cum se golește fântâna și începe să se întrebe ce mai lipsește.
 
-   Mai jos, fiecare literă care ține PRIMA apariție a unui sunet e însemnată cu
-   codul lui. O singură apariție per sunet: dacă ar zbura toate, ar pleca vreo
-   nouăzeci de bucăți deodată și n-ai mai vedea nimic. Așa, propoziția se
-   scutură exact de câte un exemplar din fiecare, iar clasificarea se umple.
+   Trei sunete nu cad din niciunul: g, h și g'. Nu e o scăpare, e adevărul
+   despre proverbe — sunt vechi și scurte, iar în ele nu încape toată limba.
+   Ultima secțiune le lasă pe seama elevului, cu exemple.
 
-   Segment: [litere] sau [litere, cod-sunet]. Codurile se potrivesc cu
-   `data-s` din clasificare; „_" la coadă înseamnă semivocală, „is" e i-ul
-   șoptit, „c2…" sunt consoanele fără literă proprie. */
-const PROPOZITIE = [
-  [["Z", "z"], ["â", "î"], ["m", "m"], ["b", "b"], ["i", "i"], ["n", "n"], ["d", "d"]],
-  [["f", "f"], ["e", "e"], ["r", "r"], ["i"], ["c", "c2č"], ["i"], ["t", "t"], [","]],
-  [["h", "h"], ["o", "o"], ["ț", "ț"], ["u", "u"], ["l", "l"]],
-  [["j", "j"], ["u"], ["c", "k"], ["ă", "ă"], ["u", "u_"], ["ș", "ș"]],
-  [["ch", "c2k"], ["e", "e_"], ["a", "a"], ["m"], ["ă"]],
-  [["cinci"]],
-  [["v", "v"], ["u"], ["l"], ["p", "p"], ["i", "is"]],
-  [["gh", "c2g"], ["idușe"], [","]],
-  [["i", "i_"], ["ar"]],
-  [["s", "s"], ["eara"]],
-  [["ziua"]],
-  [["se"]],
-  [["stin"], ["ge", "c2ǧ"]],
-  [["peste"]],
-  [["o"], ["g", "g"], ["oa", "o_"], ["re."]],
+   Segmentarea: fiecare literă (sau grup de litere) cu sunetul pe care-l ține.
+   Codurile se potrivesc cu `data-s` din clasificare. `null` = literă care nu
+   aduce niciun sunet nou de sine stătător (rămâne în proverb, nu cade). */
+const PROVERBE = [
+  { tema: "școală", text: [
+    [["C","c2č"],["i","i"],["n","n"],["e","e"]],
+    [["ș","ș"],["t","t"],["ie",null]],
+    [["c","k"],["a","a"],["r","r"],["te",null]],
+    [["are",null]],
+    [["p","p"],["at",null],["r",null],["u","u"]],
+    [["o","o"],["ch","c2k"],["i","is"],[".",null]],
+  ]},
+  { tema: "educație", text: [
+    [["Cine",null]],
+    [["s","s"],["e",null]],
+    [["sc",null],["oa","o_"],["l","l"],["ă","ă"]],
+    [["d","d"],["e",null]],
+    [["dimin",null],["ea","e_"],["ț","ț"],["ă",null]],
+    [["departe",null]],
+    [["a",null],["j","j"],["un",null],["ge","c2ǧ"],[".",null]],
+  ]},
+  { tema: "prieteni", text: [
+    [["Pr",null],["i",null],["etenul",null]],
+    [["la",null]],
+    [["ne",null],["v","v"],["o",null],["i","i_"],["e",null]],
+    [["se",null]],
+    [["cun",null],["oa",null],["ște",null],[".",null]],
+  ]},
+  { tema: "onestitate", text: [
+    [["Cine",null]],
+    [["f","f"],["ur",null],["ă",null]],
+    [["a",null],["z","z"],["i",null]],
+    [["un",null]],
+    [["o",null],["u","u_"],[",",null]],
+    [["m","m"],["â","î"],["i","i_"],["ne",null]],
+    [["fură",null]],
+    [["un",null]],
+    [["b","b"],["ou",null],[".",null]],
+  ]},
 ];
 
-/** Cât zboară o literă și cât se așteaptă între plecări. Plecările decalate
- *  sunt esențiale: pornite deodată, treizeci și patru de litere fac o pată. */
-const ZBOR_MS = 620;
-const PAS_MS = 45;
+/* ---- fizica ----
+   Toate în pixeli pe secundă, ca numerele să însemne ceva citite cu ochiul
+   liber: 2600 px/s² e cam o cădere de un ecran în jumătate de secundă. */
+const G = 2600;        // gravitație
+const AER = 0.55;      // frecarea cu aerul, pe secundă
+const SALT = 0.45;     // cât din viteză se întoarce la ciocnirea cu fundul
+const FRECARE = 0.72;  // cât se pierde pe orizontală la fiecare ciocnire
+const PRAG_SCUTURAT = 900;  // px/s: sub atât, mișcarea nu e scuturat, e mutare
+const ODIHNA = 40;     // px/s: sub atât, bucata se consideră așezată
+const ZBOR = 520;      // ms cât durează saltul final în căsuță
 
-/** Propoziția care se scutură de sunete.
- *
- *  La atingere, fiecare literă însemnată își lasă o copie care zboară la
- *  căsuța ei din clasificare. Copia se mișcă între două poziții MĂSURATE pe
- *  ecran (nu calculate), deci nimeriște oriunde ar cădea rândurile: pe telefon,
- *  pe laptop, după derulare, oricum. */
-function initPropozitie(root) {
-  const gazda = root.querySelector('[data-role="fo-pang"]');
-  const text = root.querySelector('[data-role="fo-pang-text"]');
-  const iesire = root.querySelector('[data-role="fo-pang-out"]');
-  if (!gazda || !text) return;
+/** Câte bucăți sare o scuturare. Nu toate deodată: o scuturare puternică
+ *  scoate mai multe, una moale doar una-două, exact ca la o cutie adevărată. */
+const cateCad = (viteza) => Math.max(1, Math.min(5, Math.round(viteza / 1400)));
 
-  // Scriem propoziția din date, ca segmentarea să trăiască într-un singur loc.
-  text.innerHTML = PROPOZITIE.map((cuvant) => cuvant.map(([lit, cod]) =>
-    cod ? `<span class="fo-lit" data-s="${cod}">${lit}</span>` : `<span>${lit}</span>`
-  ).join("")).join(" ");
+function initProverbe(root) {
+  const gazda = root.querySelector('[data-role="fo-prov"]');
+  if (!gazda) return;
+  const cutie = gazda.querySelector('[data-role="fo-cutie"]');
+  const text  = gazda.querySelector('[data-role="fo-prov-text"]');
+  const tema  = gazda.querySelector('[data-role="fo-prov-tema"]');
+  const stare = gazda.querySelector('[data-role="fo-prov-stare"]');
+  const urm   = gazda.querySelector('[data-role="fo-prov-next"]');
+  if (!cutie || !text) return;
 
-  let pornit = false;
-  gazda.addEventListener("click", () => {
-    if (pornit) return;
-    pornit = true;
-    gazda.classList.add("is-shaken");
+  const tinte = new Map();
+  for (const t of root.querySelectorAll(".fo-snd[data-s]")) tinte.set(t.dataset.s, t);
+  const stranse = new Set();          // ce sunete au ajuns deja în clasificare
+  let idx = 0;                        // al câtelea proverb
+  let bucati = [];                    // particulele în zbor
+  let raf = null;
 
-    const litere = [...text.querySelectorAll(".fo-lit")];
-    // O singură citire a poziţiilor, înainte de orice scriere: altfel fiecare
-    // copie adăugată ar muta-o pe următoarea şi zborurile ar porni strâmb.
-    const plecari = litere.map((el) => ({ el, r: el.getBoundingClientRect() }));
-    const tinte = new Map();
-    for (const t of root.querySelectorAll(".fo-snd[data-s]")) {
-      tinte.set(t.dataset.s, { el: t, r: t.getBoundingClientRect() });
+  /* ---- desenarea proverbului curent ---- */
+  function arata() {
+    const p = PROVERBE[idx];
+    if (tema) tema.textContent = p.tema;
+    text.innerHTML = p.text.map((cuv) => cuv.map(([lit, cod]) =>
+      cod && !stranse.has(cod)
+        ? `<span class="fo-buc" data-s="${cod}">${lit}</span>`
+        : `<span>${lit}</span>`
+    ).join("")).join(" ");
+    cutie.classList.remove("is-gol");
+    actualizeaza();
+  }
+
+  function actualizeaza() {
+    const ramase = text.querySelectorAll(".fo-buc").length;
+    if (stare) {
+      stare.textContent = ramase
+        ? `${ramase} ${ramase === 1 ? "sunet nou" : "sunete noi"} de scuturat`
+        : "Proverbul ăsta n-a mai rămas cu nimic nou.";
     }
+    const gata = ramase === 0;
+    cutie.classList.toggle("is-gol", gata);
+    if (urm) {
+      urm.hidden = !gata;
+      urm.textContent = idx < PROVERBE.length - 1
+        ? "Următorul proverb →" : "Vezi ce n-a căzut ↓";
+      urm.disabled = false;
+    }
+  }
 
-    plecari.forEach(({ el, r }, i) => {
-      const tinta = tinte.get(el.dataset.s);
-      if (!tinta) return;
-      const copie = document.createElement("span");
-      copie.className = "fo-fly";
-      copie.textContent = el.textContent;
-      copie.style.left = `${r.left}px`;
-      copie.style.top = `${r.top}px`;
-      document.body.appendChild(copie);
-
-      const dx = tinta.r.left + tinta.r.width / 2 - (r.left + r.width / 2);
-      const dy = tinta.r.top + tinta.r.height / 2 - (r.top + r.height / 2);
-
-      setTimeout(() => {
-        el.classList.add("is-gone");
-        copie.style.transform = `translate(${dx}px, ${dy}px) scale(0.85)`;
-        copie.style.opacity = "0.15";
-      }, i * PAS_MS + 20);
-
-      setTimeout(() => {
-        copie.remove();
-        tinta.el.classList.add("is-hit");
-      }, i * PAS_MS + ZBOR_MS);
+  /* ---- desprinderea: bucata devine particulă ---- */
+  function desprinde(el, vx, vy) {
+    const r = el.getBoundingClientRect();
+    const nod = document.createElement("span");
+    nod.className = "fo-buc-fly";
+    nod.textContent = el.textContent;
+    nod.style.transform = `translate(${r.left}px, ${r.top}px)`;
+    document.body.appendChild(nod);
+    bucati.push({
+      nod, cod: el.dataset.s,
+      x: r.left, y: r.top, w: r.width, h: r.height,
+      // Viteza mâinii, împrăștiată puțin: două bucăți plecate din același
+      // gest n-au voie să zboare identic, altfel se vede că-s desenate.
+      vx: vx * 0.55 + (Math.random() - 0.5) * 260,
+      vy: vy * 0.55 - Math.random() * 220,
+      rot: (Math.random() - 0.5) * 400,
+      unghi: 0, asezat: 0, pleaca: 0,
     });
+    el.replaceWith(document.createTextNode(el.textContent));
+    porneste();
+  }
 
-    if (iesire) {
-      setTimeout(() => {
-        iesire.textContent =
-          "Fiecare sunet și-a găsit locul. Propoziția a rămas fără ele, "
-          + "fiindcă literele erau doar hainele pe care le poartă sunetele.";
-      }, plecari.length * PAS_MS + ZBOR_MS);
+  /* ---- bucla de simulare ---- */
+  let tPrec = 0;
+  function pas(t) {
+    const dt = Math.min(0.032, tPrec ? (t - tPrec) / 1000 : 0.016);
+    tPrec = t;
+    const rc = cutie.getBoundingClientRect();
+    const fund = rc.bottom - 6;
+
+    for (const b of bucati) {
+      if (b.pleaca) continue;
+      b.vy += G * dt;
+      b.vx -= b.vx * AER * dt;
+      b.vy -= b.vy * AER * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.unghi += b.rot * dt;
+
+      // Pereții cutiei și fundul ei. Fundul e recitit la fiecare cadru: pagina
+      // se poate derula în timpul căderii, iar cutia se mută odată cu ea.
+      if (b.x < rc.left + 4)            { b.x = rc.left + 4;  b.vx = -b.vx * SALT; }
+      if (b.x + b.w > rc.right - 4)     { b.x = rc.right - 4 - b.w; b.vx = -b.vx * SALT; }
+      if (b.y + b.h > fund) {
+        b.y = fund - b.h;
+        b.vy = -b.vy * SALT;
+        b.vx *= FRECARE;
+        b.rot *= FRECARE;
+        if (Math.abs(b.vy) < ODIHNA) { b.vy = 0; b.asezat += dt; }
+      }
+      // După o clipă de stat pe fund, bucata pleacă spre căsuța ei.
+      if (b.asezat > 0.35) trimite(b);
+      b.nod.style.transform =
+        `translate(${b.x}px, ${b.y}px) rotate(${b.unghi.toFixed(1)}deg)`;
     }
+    bucati = bucati.filter((b) => b.nod.isConnected);
+    if (bucati.length) raf = requestAnimationFrame(pas);
+    else { raf = null; tPrec = 0; }
+  }
+  function porneste() { if (!raf) { tPrec = 0; raf = requestAnimationFrame(pas); } }
+
+  /* ---- saltul final în căsuță ---- */
+  function trimite(b) {
+    b.pleaca = 1;
+    const t = tinte.get(b.cod);
+    if (!t) { b.nod.remove(); return; }
+    const rt = t.getBoundingClientRect();
+    b.nod.style.transition = `transform ${ZBOR}ms cubic-bezier(.3,.9,.3,1), opacity ${ZBOR}ms ease`;
+    requestAnimationFrame(() => {
+      b.nod.style.transform = `translate(${rt.left}px, ${rt.top}px) scale(.8)`;
+      b.nod.style.opacity = "0";
+    });
+    setTimeout(() => {
+      b.nod.remove();
+      stranse.add(b.cod);
+      t.classList.add("is-hit", "is-prins");
+      actualizeaza();
+    }, ZBOR);
+  }
+
+  /* ---- prinderea și zgâlțâitul ---- */
+  let prins = null;
+  cutie.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    prins = { x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, dy: 0 };
+    cutie.setPointerCapture(e.pointerId);
+    cutie.classList.add("is-prins");
   });
+  cutie.addEventListener("pointermove", (e) => {
+    if (!prins) return;
+    const acum = performance.now();
+    const dt = Math.max(8, acum - prins.t) / 1000;
+    const vx = (e.clientX - prins.x) / dt;
+    const vy = (e.clientY - prins.y) / dt;
+    // Cutia urmează degetul, dar cu resort: se întoarce singură, ca un obiect
+    // ținut de o coardă. Fără asta, „scuturatul" ar fi doar o mutare.
+    prins.dx = (prins.dx + (e.clientX - prins.x)) * 0.55;
+    prins.dy = (prins.dy + (e.clientY - prins.y)) * 0.55;
+    cutie.style.transform = `translate(${prins.dx.toFixed(1)}px, ${prins.dy.toFixed(1)}px)`;
+
+    const viteza = Math.hypot(vx, vy);
+    if (viteza > PRAG_SCUTURAT) {
+      const libere = [...text.querySelectorAll(".fo-buc")];
+      for (let i = 0; i < cateCad(viteza) && libere.length; i++) {
+        const el = libere.splice(Math.floor(Math.random() * libere.length), 1)[0];
+        desprinde(el, vx, vy);
+      }
+      if (!text.querySelector(".fo-buc")) actualizeaza();
+    }
+    prins.x = e.clientX; prins.y = e.clientY; prins.t = acum;
+  });
+  const lasa = () => {
+    if (!prins) return;
+    prins = null;
+    cutie.classList.remove("is-prins");
+    cutie.style.transform = "";
+  };
+  cutie.addEventListener("pointerup", lasa);
+  cutie.addEventListener("pointercancel", lasa);
+
+  if (urm) urm.addEventListener("click", () => {
+    if (idx < PROVERBE.length - 1) { idx += 1; arata(); }
+    else gazda.querySelector('[data-role="fo-ramase"]')?.scrollIntoView({ block: "center" });
+  });
+
+  arata();
 }
 
 /** Capcana 1: cuvântul scris, lângă cuvântul auzit. */
@@ -235,7 +373,7 @@ function initPrelungire(root) {
 
 export function initFoneticaIntro(root = document) {
   initClasificare(root);
-  initPropozitie(root);
+  initProverbe(root);
   initPronume(root);
   initPrelungire(root);
 }

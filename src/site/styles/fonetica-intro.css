@@ -47,9 +47,8 @@
 .lesson--fo .fo-tout,
 .lesson--fo .fo-probe-out,
 .lesson--fo .fo-ex,
-.lesson--fo .fo-pang-lab,
-.lesson--fo .fo-pang-out { text-align: left; text-indent: 0; }
-.lesson--fo .fo-pang-text { text-align: justify; text-indent: 0; }
+.lesson--fo .fo-pang-lab { text-align: left; text-indent: 0; }
+.lesson--fo .fo-prov-text { text-align: left; text-indent: 0; }
 
 /* ---- chipurile de sub titlu: legenda, dinainte de a fi nevoie de ea ---- */
 .fo-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.9rem 0 0.2rem; }
@@ -195,45 +194,86 @@
   border-left: 3px solid var(--color-border); padding-left: 0.7rem;
 }
 
-/* ---- PROPOZIȚIA CARE SE SCUTURĂ DE SUNETE ---- */
-.fo-pang { margin: 0.9rem 0 1.1rem; }
-.fo-pang-lab { font-size: 0.9rem; color: var(--color-text-muted); margin: 0 0 0.5rem; }
-.fo-pang-btn {
-  display: block; width: 100%; text-align: left; cursor: pointer;
-  padding: 0.9rem 1.1rem; font: inherit;
-  border: 2px dashed color-mix(in srgb, var(--fo-v) 45%, transparent);
-  border-radius: 12px; background: var(--fo-v-bg); color: var(--color-text);
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.fo-pang-btn:hover { border-color: var(--fo-v); }
-.fo-pang-btn.is-shaken { cursor: default; border-style: solid; opacity: 0.75; }
-.fo-pang-text { font-size: 1.06rem; line-height: 1.9; }
+/* ---- PROVERBELE CARE SE SCUTURĂ ---- */
+.fo-prov { margin: 0.9rem 0 1.1rem; }
 
-/* Litera care ține prima apariție a unui sunet: subliniată discret, ca să se
-   vadă că e „de luat", dar nu atât cât să spargă citirea propoziției. */
-.fo-lit {
-  border-bottom: 2px solid color-mix(in srgb, var(--fo-v) 40%, transparent);
-  transition: opacity 0.25s ease, color 0.25s ease;
+/* Cutia e obiectul pe care-l apuci. `touch-action: none` e obligatoriu: fără
+   el, degetul derulează pagina în loc să zgâlțâie cutia, iar pe telefon
+   întreaga idee cade. */
+.fo-cutie {
+  position: relative; overflow: hidden;
+  padding: 1.1rem 1.1rem 2.2rem; cursor: grab;
+  border: 2px solid color-mix(in srgb, var(--fo-v) 45%, transparent);
+  border-radius: 14px; background: var(--fo-v-bg);
+  touch-action: none; -webkit-user-select: none; user-select: none;
+  /* Resortul cu care se întoarce după ce dai drumul. */
+  transition: transform 0.25s cubic-bezier(.2,1.4,.4,1), opacity 0.2s ease;
 }
-.fo-lit.is-gone { opacity: 0.18; border-bottom-color: transparent; }
+.fo-cutie.is-prins { cursor: grabbing; transition: none; }
+.fo-cutie.is-gol { opacity: 0.6; cursor: default; }
+/* Fundul cutiei, desenat: bucățile se opresc pe el, deci trebuie să se vadă
+   că e o podea, nu doar o margine. */
+.fo-cutie::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  background: color-mix(in srgb, var(--fo-v) 30%, transparent);
+}
+.fo-tema {
+  display: inline-block; margin-bottom: 0.45rem;
+  padding: 0.15rem 0.6rem; border-radius: 999px;
+  background: var(--fo-v); color: #fff;
+  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.fo-prov-text {
+  margin: 0; font-size: 1.15rem; line-height: 2; font-weight: 700;
+}
+/* Bucata care mai poate cădea: subliniată discret, ca să se vadă câte au mai
+   rămas fără să se numere. */
+.fo-buc {
+  border-bottom: 2px solid color-mix(in srgb, var(--fo-v) 45%, transparent);
+}
 
-/* Copia care zboară. Stă pe <body>, `position: fixed`, fiindcă pleacă dintr-un
-   loc și ajunge în altul, iar între ele poate trece peste orice. */
-.fo-fly {
-  position: fixed; z-index: 60; pointer-events: none;
-  font-weight: 800; font-size: 1.06rem; color: var(--fo-v);
-  transition: transform 0.6s cubic-bezier(0.34, 0.8, 0.3, 1), opacity 0.6s ease;
+.fo-prov-bara {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  margin-top: 0.6rem;
 }
-/* Căsuța care tocmai a primit un sunet clipește o dată. */
+.fo-prov-stare { font-size: 0.86rem; color: var(--color-text-muted); }
+.fo-prov-next {
+  margin-left: auto; padding: 0.35rem 0.9rem; cursor: pointer;
+  font: inherit; font-size: 0.85rem; font-weight: 700;
+  border: 1.5px solid var(--fo-v); border-radius: 999px;
+  background: var(--fo-v); color: #fff;
+}
+
+/* Bucata în cădere. Stă pe <body>, `position: fixed`, fiindcă traversează tot
+   ce e între cutie și clasificare. `will-change` o ține pe stratul ei, altfel
+   treizeci de bucăți care se mișcă odată fac pagina să sacadeze. */
+.fo-buc-fly {
+  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none;
+  font-weight: 800; font-size: 1.15rem; color: var(--fo-v);
+  will-change: transform;
+}
+/* Căsuța care tocmai a primit un sunet. */
 @keyframes fo-hit {
   0% { transform: scale(1); }
   40% { transform: scale(1.35); }
   100% { transform: scale(1); }
 }
 .fo-snd.is-hit { animation: fo-hit 0.45s ease; }
+.fo-snd.is-prins {
+  border-color: var(--fo-acc); background: var(--fo-acc); color: #fff;
+}
+
+/* Cele trei rămase: nu o eroare, o observație. De-aia arată ca o notă, nu ca
+   un avertisment. */
+.fo-ramase {
+  margin-top: 1rem; padding: 0.85rem 1rem;
+  border-left: 4px solid var(--fo-c); border-radius: 0;
+  background: var(--fo-c-bg); line-height: 1.7; font-size: 0.94rem;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .fo-fly { transition: opacity 0.3s ease; }
+  .fo-cutie { transition: none; }
   .fo-snd.is-hit { animation: none; }
 }
 
