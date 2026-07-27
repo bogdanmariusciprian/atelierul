@@ -1285,6 +1285,26 @@ function masoara() {
   const r = (el) => el.getBoundingClientRect();
   const f = (n) => n.toFixed(3);
 
+  // CÂT E ECRANUL, DE FAPT. Prin cod circulau două numere diferite pentru
+  // același telefon (360 și 412), niciunul verificat — și de ele atârnă dacă
+  // așezarea de laptop încape sau nu în landscape. Samsung are în setări
+  // „Screen zoom", care schimbă chiar viewportul CSS, deci singurul răspuns
+  // bun e cel citit de pe aparat.
+  const lat = document.documentElement.classList.contains("pl-lat");
+  linii.push(
+    `ECRAN  ${window.innerWidth}×${window.innerHeight} css` +
+    `  ·  dpr ${window.devicePixelRatio}` +
+    `  ·  fizic ${Math.round(window.innerWidth * window.devicePixelRatio)}×` +
+    `${Math.round(window.innerHeight * window.devicePixelRatio)}`,
+    `ORAR   ${lat ? "culcat (zile pe rânduri)" : "în picioare (zile pe coloane)"}` +
+    `  ·  o jumătate de oră = ${rowPx()}px  ·  ${S.visH} ore vizibile`,
+    `CERE   ${(rowPx() * S.visH * SLOTS_PER_H + RAIL_NARROW_PX)}px lățime` +
+    ` pentru orele afișate` +
+    (lat ? `  ·  7 benzi = ${S.root.querySelector(".pl-lane")
+      ? Math.round(7 * S.root.querySelector(".pl-lane").getBoundingClientRect().height + 24) : "?"}px înălțime` : ""),
+    "",
+  );
+
   for (const lane of S.root.querySelectorAll(".pl-lane")) {
     const zi = lane.dataset.day;
     const bloc = lane.querySelector(".pl-block--cell");
