@@ -231,11 +231,9 @@
 .fo-prov-text {
   margin: 0; font-size: 1.15rem; line-height: 2; font-weight: 700;
 }
-/* Bucata care mai poate cădea: subliniată discret, ca să se vadă câte au mai
-   rămas fără să se numere. */
-.fo-buc {
-  border-bottom: 2px solid color-mix(in srgb, var(--fo-v) 45%, transparent);
-}
+/* Bucata care mai poate cădea nu se însemnează cu nimic: proverbul trebuie să
+   arate ca un proverb, nu ca un text adnotat. Câte au mai rămas scrie oricum
+   sub cutie, iar surpriza „care o pica acum" e jumătate din joc. */
 
 .fo-prov-bara {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
