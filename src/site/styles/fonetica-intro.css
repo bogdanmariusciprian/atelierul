@@ -1,12 +1,12 @@
 /* =========================================================
-   Introducere în fonetică — stilul lecției.
+   Introducere în fonetică – stilul lecției.
 
    O singură idee de culoare, ținută peste tot: fiecare fel de sunet are
    culoarea lui, iar culoarea aia nu se folosește pentru nimic altceva.
 
-     vocală     roșu     — culoarea domeniului, e sunetul-vârf
-     semivocală chihlimbar — se sprijină pe vocală, deci stă „sub" ea
-     consoană   ardezie  — neutră, nu poate sta singură
+     vocală     roșu     – culoarea domeniului, e sunetul-vârf
+     semivocală chihlimbar – se sprijină pe vocală, deci stă „sub" ea
+     consoană   ardezie  – neutră, nu poate sta singură
 
    Elevul vede formula „S + V" în trei locuri diferite (chipurile de sus,
    clasificarea, grupurile vocalice) și în toate trei „S" e chihlimbar. Așa
@@ -148,7 +148,7 @@
   background: var(--color-surface); color: var(--color-text);
   font-style: normal; font-weight: 700; font-size: 0.88rem;
 }
-/* Îngroșatele din fișă — cele care cer atenție. Roșul din fișă devine aici
+/* Îngroșatele din fișă – cele care cer atenție. Roșul din fișă devine aici
    „umplut cu culoarea felului", ca semnul să spună și CE fel de sunet e. */
 .fo-snd.is-only {
   border-color: currentColor; background: currentColor; color: #fff;

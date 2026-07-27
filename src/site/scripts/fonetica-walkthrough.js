@@ -1,22 +1,22 @@
 // =========================================================
-// Introducere în fonetică — partea vie a lecției.
+// Introducere în fonetică – partea vie a lecției.
 //
 // Trei bucăți, toate pornind de la aceeași idee: fonetica nu se învață
 // privind cuvântul, ci rostindu-l. Ecranul nu poate rosti în locul elevului,
 // dar poate să-i CEARĂ s-o facă și să-i arate ce ar fi trebuit să audă.
 //
-//   1. Clasificarea — trei rânduri care se deschid, unul pe rând.
-//   2. Capcana pronumelor — atingi cuvântul, vezi ce se aude cu adevărat.
-//   3. Proba prelungirii — tragi de sunet și afli dacă el chiar există.
+//   1. Clasificarea – trei rânduri care se deschid, unul pe rând.
+//   2. Capcana pronumelor – atingi cuvântul, vezi ce se aude cu adevărat.
+//   3. Proba prelungirii – tragi de sunet și afli dacă el chiar există.
 //
 // Nimic aici nu are nevoie de sunet înregistrat: proba prelungirii se face cu
 // gura elevului, iar scrisul de pe ecran o oglindește. De-aia „ceapă" se
-// întinde în „čaaaapă", nu în „čeeeeeapă" — vede negru pe alb că vocala pe
+// întinde în „čaaaapă", nu în „čeeeeeapă" – vede negru pe alb că vocala pe
 // care o prelungește nu e cea din scriere.
 // =========================================================
 
 /** Trei rânduri, o singură deschidere: două panouri deschise în același timp
- *  ar cere compararea, iar aici ordinea contează — vocală, apoi semivocală,
+ *  ar cere compararea, iar aici ordinea contează – vocală, apoi semivocală,
  *  apoi consoană, fiecare sprijinindu-se pe cea dinainte. */
 function initClasificare(root) {
   const gazda = root.querySelector('[data-role="fo-class"]');
@@ -77,7 +77,7 @@ const LUNGIME = 6;
 
 /** Capcana 2: proba prelungirii.
  *
- *  Cuvântul ales se scrie cu vocala prelungită — dar cu vocala CARE SE AUDE,
+ *  Cuvântul ales se scrie cu vocala prelungită – dar cu vocala CARE SE AUDE,
  *  nu cu cea din scriere. La „ceapă" iese „čaaaapă": elevul vede că, oricât ar
  *  trage, nu poate prelungi un „e" pe care nu-l rostește. Asta e toată proba. */
 function initPrelungire(root) {
@@ -120,7 +120,7 @@ function initPrelungire(root) {
   zona.querySelectorAll(".fo-tcard").forEach((btn) => btn.addEventListener("click", () => arata(btn)));
   buton.addEventListener("click", trage);
 
-  // Pornim de la „ceapă", cazul din fișă — și cel mai contraintuitiv.
+  // Pornim de la „ceapă", cazul din fișă – și cel mai contraintuitiv.
   const primul = zona.querySelector('.fo-tcard[data-word="ceapă"]') || zona.querySelector(".fo-tcard");
   if (primul) arata(primul);
 }
