@@ -670,7 +670,10 @@ function initNavUser(slot, basePath) {
 
   const build = () => {
     if (!isLoggedIn()) {
-      slot.innerHTML = `<a class="btn btn--primary nav-cta" href="/comunitate/login/">Intră în cont</a>`;
+      // „în cont" se ascunde pe telefon (vezi layout.css): vizitatorul e singurul
+      // cu șase legături ÎN PLUS față de buton, iar măsurat pe cel mai încărcat
+      // caz nu încăpea tot. „Intră" spune același lucru, cu jumătate din lățime.
+      slot.innerHTML = `<a class="btn btn--primary nav-cta" href="/comunitate/login/">Intră<span class="nav-cta__rest"> în cont</span></a>`;
       return;
     }
     // MEMBERS live on the XP bar row (name + avatar there, one row with the
