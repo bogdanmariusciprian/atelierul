@@ -52,6 +52,114 @@ function initClasificare(root) {
   });
 }
 
+/* =========================================================
+   PROPOZIȚIA CU TOATE SUNETELE
+
+   „Zâmbind fericit, hoțul jucăuș cheamă cinci vulpi ghidușe, iar seara ziua
+   se stinge peste ogoare."
+
+   Are, măcar o dată, fiecare dintre cele 34 de sunete ale limbii române:
+   7 vocale, 4 semivocale, i-ul șoptit, 18 consoane și cele 4 fără literă
+   proprie. E cusută anume, nu găsită.
+
+   Mai jos, fiecare literă care ține PRIMA apariție a unui sunet e însemnată cu
+   codul lui. O singură apariție per sunet: dacă ar zbura toate, ar pleca vreo
+   nouăzeci de bucăți deodată și n-ai mai vedea nimic. Așa, propoziția se
+   scutură exact de câte un exemplar din fiecare, iar clasificarea se umple.
+
+   Segment: [litere] sau [litere, cod-sunet]. Codurile se potrivesc cu
+   `data-s` din clasificare; „_" la coadă înseamnă semivocală, „is" e i-ul
+   șoptit, „c2…" sunt consoanele fără literă proprie. */
+const PROPOZITIE = [
+  [["Z", "z"], ["â", "î"], ["m", "m"], ["b", "b"], ["i", "i"], ["n", "n"], ["d", "d"]],
+  [["f", "f"], ["e", "e"], ["r", "r"], ["i"], ["c", "c2č"], ["i"], ["t", "t"], [","]],
+  [["h", "h"], ["o", "o"], ["ț", "ț"], ["u", "u"], ["l", "l"]],
+  [["j", "j"], ["u"], ["c", "k"], ["ă", "ă"], ["u", "u_"], ["ș", "ș"]],
+  [["ch", "c2k"], ["e", "e_"], ["a", "a"], ["m"], ["ă"]],
+  [["cinci"]],
+  [["v", "v"], ["u"], ["l"], ["p", "p"], ["i", "is"]],
+  [["gh", "c2g"], ["idușe"], [","]],
+  [["i", "i_"], ["ar"]],
+  [["s", "s"], ["eara"]],
+  [["ziua"]],
+  [["se"]],
+  [["stin"], ["ge", "c2ǧ"]],
+  [["peste"]],
+  [["o"], ["g", "g"], ["oa", "o_"], ["re."]],
+];
+
+/** Cât zboară o literă și cât se așteaptă între plecări. Plecările decalate
+ *  sunt esențiale: pornite deodată, treizeci și patru de litere fac o pată. */
+const ZBOR_MS = 620;
+const PAS_MS = 45;
+
+/** Propoziția care se scutură de sunete.
+ *
+ *  La atingere, fiecare literă însemnată își lasă o copie care zboară la
+ *  căsuța ei din clasificare. Copia se mișcă între două poziții MĂSURATE pe
+ *  ecran (nu calculate), deci nimeriște oriunde ar cădea rândurile: pe telefon,
+ *  pe laptop, după derulare, oricum. */
+function initPropozitie(root) {
+  const gazda = root.querySelector('[data-role="fo-pang"]');
+  const text = root.querySelector('[data-role="fo-pang-text"]');
+  const iesire = root.querySelector('[data-role="fo-pang-out"]');
+  if (!gazda || !text) return;
+
+  // Scriem propoziția din date, ca segmentarea să trăiască într-un singur loc.
+  text.innerHTML = PROPOZITIE.map((cuvant) => cuvant.map(([lit, cod]) =>
+    cod ? `<span class="fo-lit" data-s="${cod}">${lit}</span>` : `<span>${lit}</span>`
+  ).join("")).join(" ");
+
+  let pornit = false;
+  gazda.addEventListener("click", () => {
+    if (pornit) return;
+    pornit = true;
+    gazda.classList.add("is-shaken");
+
+    const litere = [...text.querySelectorAll(".fo-lit")];
+    // O singură citire a poziţiilor, înainte de orice scriere: altfel fiecare
+    // copie adăugată ar muta-o pe următoarea şi zborurile ar porni strâmb.
+    const plecari = litere.map((el) => ({ el, r: el.getBoundingClientRect() }));
+    const tinte = new Map();
+    for (const t of root.querySelectorAll(".fo-snd[data-s]")) {
+      tinte.set(t.dataset.s, { el: t, r: t.getBoundingClientRect() });
+    }
+
+    plecari.forEach(({ el, r }, i) => {
+      const tinta = tinte.get(el.dataset.s);
+      if (!tinta) return;
+      const copie = document.createElement("span");
+      copie.className = "fo-fly";
+      copie.textContent = el.textContent;
+      copie.style.left = `${r.left}px`;
+      copie.style.top = `${r.top}px`;
+      document.body.appendChild(copie);
+
+      const dx = tinta.r.left + tinta.r.width / 2 - (r.left + r.width / 2);
+      const dy = tinta.r.top + tinta.r.height / 2 - (r.top + r.height / 2);
+
+      setTimeout(() => {
+        el.classList.add("is-gone");
+        copie.style.transform = `translate(${dx}px, ${dy}px) scale(0.85)`;
+        copie.style.opacity = "0.15";
+      }, i * PAS_MS + 20);
+
+      setTimeout(() => {
+        copie.remove();
+        tinta.el.classList.add("is-hit");
+      }, i * PAS_MS + ZBOR_MS);
+    });
+
+    if (iesire) {
+      setTimeout(() => {
+        iesire.textContent =
+          "Fiecare sunet și-a găsit locul. Propoziția a rămas fără ele, "
+          + "fiindcă literele erau doar hainele pe care le poartă sunetele.";
+      }, plecari.length * PAS_MS + ZBOR_MS);
+    }
+  });
+}
+
 /** Capcana 1: cuvântul scris, lângă cuvântul auzit. */
 function initPronume(root) {
   const zona = root.querySelector('[data-role="fo-trap-1"]');
@@ -127,6 +235,7 @@ function initPrelungire(root) {
 
 export function initFoneticaIntro(root = document) {
   initClasificare(root);
+  initPropozitie(root);
   initPronume(root);
   initPrelungire(root);
 }

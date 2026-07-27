@@ -39,33 +39,23 @@
 
         <p class="fo-def">
           Fonetica este știința care studiază
-          <span class="fo-k">sunetele articulate</span>.
+          <span class="fo-k" tabindex="0" role="button"
+                aria-label="Ce înseamnă sunete articulate"
+                data-tip="Articulate = emise de aparatul fonator. Un strănut e un sunet, dar nu e articulat. Un fluierat e un sunet, dar nu e articulat. Fonetica se uită numai la sunetele pe care le emitem ca să vorbim.">sunetele articulate</span>.
         </p>
 
         <div class="fo-note">
-          <b>„Articulat" înseamnă rostit de aparatul vorbirii.</b> Un strănut e
-          un sunet, dar nu e articulat. Un fluierat e un sunet, dar nu e
-          articulat. Fonetica se uită numai la sunetele pe care le facem ca să
-          vorbim.
+          <b>Sunetele se scriu între paranteze pătrate.</b> Ca să nu fim nevoiți
+          să învățăm un alfabet nou, ne folosim de forma literelor pe care le
+          știm deja. Dar ce stă între paranteze nu mai e literă, e <b>sunet</b>.
+          Când vezi <span class="fo-t">[a]</span>, nu spui „am scris a", spui
+          <b>„am rostit a"</b>.
         </div>
 
-        <div class="fo-sl">
-          <div class="fo-sl-card">
-            <span class="fo-sl-lab">Ce vezi</span>
-            <p class="fo-sl-big">c e a p ă</p>
-            <p class="fo-sl-cap">5 litere, adică scrierea</p>
-          </div>
-          <div class="fo-sl-join">dar ce auzi e</div>
-          <div class="fo-sl-card">
-            <span class="fo-sl-lab">Ce auzi</span>
-            <p class="fo-sl-big">[ č a a p ă ]</p>
-            <p class="fo-sl-cap">4 sunete, adică fonetica</p>
-          </div>
-        </div>
-        <p class="fo-after">
-          Litera și sunetul sunt lucruri diferite. Uneori două litere fac un
-          singur sunet, alteori o literă nu face niciunul. De aici încolo
-          numărăm <b>sunete</b>.
+        <p class="fo-ex">
+          <span class="fo-ex-w">ceapă</span>
+          <span class="fo-ex-ar" aria-hidden="true">se rostește</span>
+          <span class="fo-t fo-t--big">[ č a p ă ]</span>
         </p>
       </section>
 
@@ -78,19 +68,30 @@
           Atinge un rând ca să vezi ce înseamnă.
         </p>
 
+        <div class="fo-pang">
+          <p class="fo-pang-lab">
+            Propoziția de mai jos are <b>toate cele 34 de sunete</b> ale limbii
+            române, fiecare măcar o dată. Atinge-o.
+          </p>
+          <button type="button" class="fo-pang-btn" data-role="fo-pang">
+            <span class="fo-pang-text" data-role="fo-pang-text"></span>
+          </button>
+          <p class="fo-pang-out" data-role="fo-pang-out" aria-live="polite"></p>
+        </div>
+
         <div class="fo-class" data-role="fo-class">
           <!-- a) VOCALE -->
           <div class="fo-row fo-row--v" data-fo-open="v">
             <span class="fo-litera">a)</span>
             <b class="fo-rowname">vocale</b>
             <span class="fo-set">
-              <i class="fo-snd is-only" data-tip="mereu vocală">a</i>
-              <i class="fo-snd">e</i>
-              <i class="fo-snd">i</i>
-              <i class="fo-snd">o</i>
-              <i class="fo-snd">u</i>
-              <i class="fo-snd is-only" data-tip="mereu vocală">ă</i>
-              <i class="fo-snd is-only" data-tip="mereu vocală">î</i>
+              <i class="fo-snd is-only" data-s="a" data-tip="mereu vocală">a</i>
+              <i class="fo-snd" data-s="e">e</i>
+              <i class="fo-snd" data-s="i">i</i>
+              <i class="fo-snd" data-s="o">o</i>
+              <i class="fo-snd" data-s="u">u</i>
+              <i class="fo-snd is-only" data-s="ă" data-tip="mereu vocală">ă</i>
+              <i class="fo-snd is-only" data-s="î" data-tip="mereu vocală">î</i>
             </span>
             <span class="fo-count">7</span>
           </div>
@@ -116,11 +117,11 @@
             <span class="fo-litera">b)</span>
             <b class="fo-rowname">semivocale</b>
             <span class="fo-set">
-              <i class="fo-snd">e</i>
-              <i class="fo-snd">i</i>
-              <i class="fo-snd">o</i>
-              <i class="fo-snd">u</i>
-              <i class="fo-snd is-sup" data-tip="i final, șoptit">i</i>
+              <i class="fo-snd" data-s="e_">e</i>
+              <i class="fo-snd" data-s="i_">i</i>
+              <i class="fo-snd" data-s="o_">o</i>
+              <i class="fo-snd" data-s="u_">u</i>
+              <i class="fo-snd is-sup" data-s="is" data-tip="i final, șoptit">i</i>
             </span>
             <span class="fo-count">4 + 1</span>
           </div>
@@ -146,12 +147,12 @@
             <span class="fo-litera">c)</span>
             <b class="fo-rowname">consoane</b>
             <span class="fo-set">
-              <i class="fo-snd">b</i><i class="fo-snd">k</i><i class="fo-snd">d</i><i class="fo-snd">f</i><i class="fo-snd">g</i><i class="fo-snd">h</i><i class="fo-snd">j</i><i class="fo-snd">l</i><i class="fo-snd">m</i><i class="fo-snd">n</i><i class="fo-snd">p</i><i class="fo-snd">r</i><i class="fo-snd">s</i><i class="fo-snd">ș</i><i class="fo-snd">t</i><i class="fo-snd">ț</i><i class="fo-snd">v</i><i class="fo-snd">z</i>
+              <i class="fo-snd" data-s="b">b</i><i class="fo-snd" data-s="k">k</i><i class="fo-snd" data-s="d">d</i><i class="fo-snd" data-s="f">f</i><i class="fo-snd" data-s="g">g</i><i class="fo-snd" data-s="h">h</i><i class="fo-snd" data-s="j">j</i><i class="fo-snd" data-s="l">l</i><i class="fo-snd" data-s="m">m</i><i class="fo-snd" data-s="n">n</i><i class="fo-snd" data-s="p">p</i><i class="fo-snd" data-s="r">r</i><i class="fo-snd" data-s="s">s</i><i class="fo-snd" data-s="ș">ș</i><i class="fo-snd" data-s="t">t</i><i class="fo-snd" data-s="ț">ț</i><i class="fo-snd" data-s="v">v</i><i class="fo-snd" data-s="z">z</i>
               <span class="fo-plus">+</span>
-              <i class="fo-snd is-only" data-tip="se scrie ce, ci">č</i>
-              <i class="fo-snd is-only" data-tip="se scrie ge, gi">ǧ</i>
-              <i class="fo-snd is-only" data-tip="se scrie che, chi">k'</i>
-              <i class="fo-snd is-only" data-tip="se scrie ghe, ghi">g'</i>
+              <i class="fo-snd is-only" data-s="c2č" data-tip="se scrie ce, ci">č</i>
+              <i class="fo-snd is-only" data-s="c2ǧ" data-tip="se scrie ge, gi">ǧ</i>
+              <i class="fo-snd is-only" data-s="c2k" data-tip="se scrie che, chi">k'</i>
+              <i class="fo-snd is-only" data-s="c2g" data-tip="se scrie ghe, ghi">g'</i>
             </span>
             <span class="fo-count">18 + 4</span>
           </div>
@@ -221,7 +222,7 @@
             <p class="fo-g-def">două vocale alăturate, dar în <b>silabe diferite</b></p>
             <div class="fo-g-rows">
               <div class="fo-g-row">
-                <span class="fo-formula"><b class="fo-v">V</b> <span class="fo-break">–</span> <b class="fo-v">V</b></span>
+                <span class="fo-formula"><b class="fo-v">V</b> <span class="fo-break">—</span> <b class="fo-v">V</b></span>
                 <span class="fo-g-ex">poet → po-<u>e</u>t</span>
               </div>
             </div>
