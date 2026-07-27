@@ -11,12 +11,11 @@
   padding-block: var(--space-lg);
 }
 
-/* Breadcrumb + title block */
-.lesson__breadcrumb {
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-sm);
-}
+/* `.lesson__breadcrumb` a fost ștearsă: fiecare lecție își scria de mână
+   firimiturile, deși `renderPageBreadcrumbs` le construiește oricum din
+   catalog. Ieșeau două rânduri de navigare unul sub altul, iar cel scris de
+   mână se oprea înainte de lecție. Acum e una singură, generată — și nu mai e
+   nimic de scris de mână la lecția următoare. */
 
 .lesson__tag {
   display: inline-block;

@@ -425,7 +425,7 @@ function renderPageBreadcrumbs(basePath) {
       <a href="${basePath || "./"}">Acasă</a>
       <span aria-hidden="true">›</span>
       <a href="${basePath}lectii/">Lecții</a>
-      ${domain ? `<span aria-hidden="true">›</span><span class="page-crumbs__domain">${domain.label}</span>` : ""}
+      ${domain ? `<span aria-hidden="true">›</span><a class="page-crumbs__domain" href="${basePath}lectii/#${domain.slug}">${domain.label}</a>` : ""}
       <span aria-hidden="true">›</span>
       <b class="page-crumbs__here">${lesson.title}</b>
     </div>`;
