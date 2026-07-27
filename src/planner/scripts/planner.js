@@ -179,6 +179,12 @@ function pregatesteMasura() {
   const el = S.root && S.root.querySelector(".pl-cb__nm");
   const cs = getComputedStyle(el || document.body);
   _masura.font = `${el ? cs.fontWeight : 700} ${NUME_REF_PX}px ${cs.fontFamily}`;
+  // Un `font` pe care canvasul nu-l poate parsa e IGNORAT in tacere, iar
+  // contextul ramane la ce avea inainte — implicit „10px sans-serif". Atunci
+  // masuram totul la jumatate de corp, iesea un font de doua ori mai mare
+  // decat trebuia si numele se taia. Daca marimea nu s-a prins, ne intoarcem
+  // la ceva sigur: familia poate fi aproximativa, marimea nu are voie.
+  if (!_masura.font.includes(`${NUME_REF_PX}px`)) _masura.font = `${NUME_REF_PX}px sans-serif`;
 }
 function latimeText(text) {
   if (!_masura) pregatesteMasura();
@@ -197,6 +203,37 @@ function autoNume(text, rows) {
   const px = Math.max(NUME_MIN_PX, Math.min(NUME_MAX_PX, (latime * NUME_REF_PX) / laRef));
   return ` style="font-size:${px.toFixed(1)}px"`;
 }
+/** ADEVĂRUL DESPRE LĂȚIME ÎL SPUNE TEXTUL DESENAT, NU FORMULA.
+ *
+ *  `autoNume` e o ghicitoare bună și ieftină, dar rămâne o ghicitoare: nu știe
+ *  de paddingul real, de fontul care s-a încărcat între timp, de emoji-uri
+ *  care se măsoară altfel. Când greșește, numele se taie — și tocmai numele
+ *  întreg e ce vrea Marius.
+ *
+ *  Aici întrebăm elementul cât de lat E cu adevărat. `scrollWidth` dă lățimea
+ *  textului chiar și când e tăiat de `overflow: hidden`, deci raportul dintre
+ *  cât încape și cât ocupă e exact. Lățimea textului fiind proporțională cu
+ *  corpul literei, o singură înmulțire nimerește din prima — fără bucle de
+ *  încercări, fiecare cu recalcularea ei de layout.
+ *
+ *  O citire pentru toate, apoi o scriere pentru toate: dacă le-am amesteca,
+ *  fiecare scriere ar invalida citirea următoare și browserul ar reface
+ *  layoutul de zeci de ori pe randare. */
+function incapNumele() {
+  if (VERT || !S.root) return;
+  const nume = [...S.root.querySelectorAll(".pl-cb__nm")];
+  const deStrans = [];
+  for (const el of nume) {
+    const incape = el.clientWidth, ocupa = el.scrollWidth;
+    if (ocupa > incape && incape > 0) {
+      const acum = parseFloat(getComputedStyle(el).fontSize) || NUME_MAX_PX;
+      // -0.25 ca marjă: rotunjirile de subpixel pot lăsa ultima literă atinsă.
+      deStrans.push([el, Math.max(NUME_MIN_PX, acum * (incape / ocupa) - 0.25)]);
+    }
+  }
+  for (const [el, px] of deStrans) el.style.fontSize = `${px.toFixed(1)}px`;
+}
+
 /** Cât de departe pe axa timpului a ajuns degetul, față de marginea benzii. */
 const axFrom = (rect, clientX, clientY) => (VERT ? clientY - rect.top : clientX - rect.left);
 /** Degetul e în interiorul acestei zile? Ziua stă pe axa PERPENDICULARĂ
@@ -995,7 +1032,7 @@ function render() {
          ${sheetHtml()}
          ${swapModalsHtml()}
          <div class="pl-live" data-role="live" hidden></div>`;
-    if (!VERT) fitDrawer();
+    if (!VERT) { fitDrawer(); incapNumele(); }
     masoara();
     return;
   }
