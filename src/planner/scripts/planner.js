@@ -835,7 +835,19 @@ function gridHtml() {
           return `<span class="pl-avail${w.onDate ? " is-once" : ""} is-adanc-${_verde ? 1 : 0}" data-avail-id="${esc(w.id)}" style="${axPos(((w.startMin - DAY_START_H * 60) / SNAP_MIN) * rowPx() + axInset(_inL))}; ${axSize(((w.endMin - w.startMin) / SNAP_MIN) * rowPx() - axInset(_inL) - axInset(_inR))}"
               title="Fereastră deschisă elevilor, ${esc(DAYS[i])} ${mm(w.startMin)}–${mm(w.endMin)}, ${w.onDate ? "doar în această zi" : "în fiecare săptămână"}">
             <i class="pl-avail__tag">${w.onDate ? `doar ${d.getDate()} ${esc(MONTHS[d.getMonth()].slice(0, 3))}` : "deschis"} ${mm(w.startMin)}–${mm(w.endMin)}</i>
-            ${S.paint && S.paintWhat === "avail" ? `
+            ${
+              // MANERELE APAR DOAR PE FELUL DE FEREASTRA PE CARE-L DESENEZI.
+              //
+              // Verzile si portocaliile se suprapun aproape mereu — portocalia
+              // sta chiar in verde. Marginile lor cad la un pixel una de alta,
+              // iar pe un ecran de telefon degetul nu poate alege intre ele:
+              // vrei sa muti capatul portocaliei si muti verdea de dedesubt.
+              //
+              // Asa ca butonul de ritm din creion nu spune doar ce DESENEZI, ci
+              // si ce se lasa APUCAT: „in fiecare saptamana" scoate manerele
+              // verzilor, „doar ziua aleasa" pe ale portocaliilor. Restul stau
+              // deoparte si nu pot fi atinse din gresala.
+              S.paint && S.paintWhat === "avail" && !!w.onDate === S.paintOnce ? `
               <span class="pl-avail__h pl-avail__h--top" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="top" title="Trage ca să muți începutul"></span>
               <span class="pl-avail__h pl-avail__h--bot" data-act="avail-rsz" data-id="${esc(w.id)}" data-edge="bot" title="Trage ca să muți sfârșitul"></span>
               <button type="button" class="pl-avail__x" data-act="avail-del" data-id="${esc(w.id)}" aria-label="Șterge fereastra">×</button>` : ""}
@@ -1162,7 +1174,12 @@ function masoara() {
 // ATENTIE: aceleasi trei valori sunt scrise si in planner.css, ca sertarul sa
 // aiba inaltime din prima clipa, nu abia dupa ce ruleaza fitDrawer(). Daca le
 // schimbi aici, schimba-le si acolo.
-const DRAWER_SNAP = [78, 208, 344];
+// Treptele sertarului. Coborate de la 344 dupa ce uneltele s-au strans in
+// grila cu doua coloane: continutul nu mai ajunge acolo si ultima treapta
+// ramanea cu o palma de gol sub ea. TREBUIE sa ramana identice cu
+// inaltimile din planner.css — CSS-ul le are ca sa nu clipeasca o bara de
+// derulare intre `innerHTML` si `fitDrawer()`.
+const DRAWER_SNAP = [78, 208, 316];
 function fitDrawer() {
   const d = S.root.querySelector(".pl-drawer");
   if (!d) return;

@@ -815,10 +815,8 @@
      Erau patru valori alese pe rand — banda 8, verde 6, portocaliu 5, bloc 6 —
      si se vedea: un bloc avea alt colt decat fereastra din care facea parte.
      Acum toate pleaca din `--pl-r`. Schimbi o cifra, se schimba tot orarul. */
-  .pl-grid {
-    --pl-r: 4px;
-    flex-direction: column; gap: 4px; overflow-x: visible;
-  }
+  :root { --pl-r: 4px; }
+  .pl-grid { flex-direction: column; gap: 4px; overflow-x: visible; }
   /* Nimic din orar nu are voie să lățească pagina. */
   .pl-wrap { overflow-x: clip; }
 
@@ -948,6 +946,26 @@
      prisos: durata se schimbă din pastilele foii de acțiuni, mult mai ușor de
      nimerit decât 12 pixeli. */
   .pl-block__rsz, .pl-block__rsz--top { display: none !important; }
+  /* ...cu o singura exceptie: cand creionul e pe „activitate personala",
+     blocurile tale isi scot manerele, ca sa le poti intinde de margini. Restul
+     raman fara, deci nu ai cum sa apuci din gresala ora unui elev. Aceeasi
+     forma ca la ferestre: o fasie pe latura, nu un grip in mijloc (semana cu o
+     bara de derulare si deruta). */
+  .is-paint-personal .pl-block--cell.is-personal .pl-block__rsz,
+  .is-paint-personal .pl-block--cell.is-personal .pl-block__rsz--top {
+    display: block !important;
+    left: auto; right: 0; top: 0; bottom: 0; width: 12px; height: auto;
+    cursor: ew-resize;
+  }
+  .is-paint-personal .pl-block--cell.is-personal .pl-block__rsz--top {
+    left: 0; right: auto;
+  }
+  .is-paint-personal .pl-block--cell.is-personal .pl-block__rsz::after {
+    left: 50%; top: 50%; bottom: auto;
+    width: 3px; height: 60%; opacity: 0.9;
+    background: color-mix(in srgb, #fff 75%, transparent);
+    transform: translate(-50%, -50%);
+  }
 
   /* Ferestrele verzi ÎȘI PĂSTREAZĂ mânerele: în modul creion le tragi de
      margini ca să ajustezi intervalul deschis, și n-au alt drum. */
@@ -1092,7 +1110,7 @@
      și la fiecare atingere pe un bloc. */
   .pl-drawer { height: 78px; }
   .pl-drawer[data-snap="1"] { height: 208px; }
-  .pl-drawer[data-snap="2"] { height: 344px; }
+  .pl-drawer[data-snap="2"] { height: 316px; }
   .pl-drawer {
     position: fixed; left: 0; right: 0; bottom: 3px; z-index: 40;
     background: var(--color-bg);
@@ -1132,15 +1150,58 @@
   .pl-drawer[data-snap="0"] .pl-drawer__in { overflow: hidden; }
   .pl-drawer[data-snap="0"] .pl-below { opacity: 0; }
 
-  /* Uneltele se strâng: pe lat aveau loc să respire, aici nu. */
+  /* ---- UNELTELE, AȘEZATE ÎN TABEL ----
+     Pe lat, capsula creionului e un șir: buton, etichetă, comutator, etichetă,
+     comutator. Strânsă pe telefon, `flex-wrap` rupea șirul unde apuca, iar
+     eticheta unui comutator ajungea la coada rândului dinainte — se citea
+     „creion DESENEZI", apoi comutatorul, apoi „RITM" atârnat în gol. Plus o
+     rază de 999px pe un bloc de trei rânduri, care făcea din capsulă un ou.
+
+     Aici e o grilă de două coloane: eticheta mică la stânga, comutatorul ei
+     alături, pe lățime întreagă. Fiecare rând spune un lucru și se citește
+     de la stânga la dreapta, o dată. */
+  .pl-drawer .pl-pen {
+    display: grid; grid-template-columns: auto 1fr;
+    align-items: center; gap: 4px 6px;
+    padding: 5px 6px; border-radius: var(--pl-r); width: 100%;
+  }
+  .pl-drawer .pl-pen > .pl-paint,
+  .pl-drawer .pl-pen > .pl-ptitle { grid-column: 1 / -1; }
+  .pl-drawer .pl-pen__lab { font-size: 0.5rem; letter-spacing: 0.04em; }
+  .pl-drawer .pl-seg {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-radius: var(--pl-r); border-width: 1px;
+  }
+  .pl-drawer .pl-seg__b {
+    padding: 5px 3px; font-size: 0.62rem; line-height: 1.15;
+    white-space: normal; text-align: center;
+  }
+  .pl-drawer .pl-paint, .pl-drawer .pl-ptitle {
+    padding: 4px 8px; font-size: 0.68rem; border-radius: var(--pl-r);
+    min-width: 0; width: 100%; text-align: center;
+  }
+
+  /* Legenda: perechi semn+text puse în două coloane. Ca text curgător lăsa
+     rânduri ciunte și un „elev fără oră săptămâna asta" singur pe ultimul. */
   .pl-drawer .pl-legend { display: none; }
   .pl-drawer[data-snap="2"] .pl-legend {
-    display: flex; flex-wrap: wrap; gap: 0.15rem 0.4rem; font-size: 0.56rem;
+    display: grid; grid-template-columns: auto 1fr auto 1fr;
+    align-items: center; gap: 2px 5px;
+    margin: 5px 0 0; font-size: 0.5rem; line-height: 1.2;
   }
+  .pl-drawer .pl-legend__k, .pl-drawer .pl-legend__dot { margin-left: 0; }
   .pl-drawer .pl-hint { display: none; }
-  .pl-drawer[data-snap="2"] .pl-hint { display: block; font-size: 0.68rem; }
-  .pl-drawer .pl-tools { margin: 0.35rem 0; }
-  .pl-drawer .pl-pen { flex-wrap: wrap; gap: 0.3rem; }
+  .pl-drawer[data-snap="2"] .pl-hint { display: block; font-size: 0.62rem; margin: 4px 0 0; }
+
+  /* Durata: eticheta plus trei pastile egale, nu un rând care se rupe. */
+  .pl-drawer .pl-tools { margin: 5px 0 0; }
+  .pl-drawer .pl-tools:not(.pl-tools--pen) {
+    display: grid; grid-template-columns: auto repeat(3, 1fr); gap: 4px;
+  }
+  .pl-drawer .pl-dur {
+    padding: 5px 4px; font-size: 0.66rem; border-radius: var(--pl-r); border-width: 1px;
+  }
+  .pl-drawer .pl-dur__lab { font-size: 0.6rem; margin: 0; align-self: center; }
 
   /* Paleta are pe desktop `margin-top: 2.6rem`, curtea rezervată tooltipurilor
      care răsar deasupra bulinelor. În sertarul de 78px al treptei 0, marginea
