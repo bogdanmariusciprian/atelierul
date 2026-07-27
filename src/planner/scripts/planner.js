@@ -1850,7 +1850,7 @@ const onMove = (e) => {
   e.preventDefault();
 };
 
-async function onUp() {
+async function onUp(e) {
   window.removeEventListener("pointermove", onMove);
   const d = S.drag;
   S.drag = null;
@@ -1862,6 +1862,19 @@ async function onUp() {
   const live = S.root.querySelector('[data-role="live"]');
   if (live) live.hidden = true;
   if (!d) return;
+
+  // O ANULARE NU E O RIDICARE DE DEGET.
+  //
+  // `onUp` era pus pe amândouă, ca să curețe la fel — dar mai jos urmează
+  // așezarea propriu-zisă. Deci `pointercancel`-ul trimis de apăsarea lungă
+  // tocmai ca să OPREASCĂ desenatul îl executa: apăsai lung pe o fereastră cu
+  // creionul pornit și, în loc de meniu, îți desena una nouă.
+  //
+  // Curățenia de mai sus rămâne (fantoma, clasele, anunțul pentru cititoarele
+  // de ecran); ce nu mai rămâne e urmarea. La fel de bine și când anularea vine
+  // de la sistem — dacă gestul a fost luat din mâna paginii, n-avem de unde ști
+  // unde voia degetul să ajungă.
+  if (e && e.type === "pointercancel") return;
 
   // ===== TELEFON: atinge ca sa iei, atinge ca sa pui =====
   // Tragerea continua ramane, dar cu degetul e nesigura: pornesti de pe un
@@ -2499,13 +2512,21 @@ function installLongPress(mount) {
     sx = e.clientX; sy = e.clientY; src = e.target;
     t = setTimeout(() => {
       t = null;
+      // ȚINTA SE REȚINE ÎNAINTE DE DISPATCH. `stop()` șterge `src`, iar
+      // `pointercancel`-ul de mai jos — trimis chiar de noi, ca să oprim
+      // desenatul — îl declanșează. Fără linia asta, tot ce urmează cădea pe
+      // `null.closest(...)` și calea apăsării lungi murea în tăcere: blocurile
+      // păreau că merg doar fiindcă le prindea `contextmenu`-ul nativ al
+      // Androidului, iar ferestrele, care n-aveau acolo ramură, ajungeau la
+      // meniul mic de dinainte.
+      const tinta = src;
       // Tragerea pornită între timp trebuie oprită curat, altfel apăsarea ar
       // lăsa în urmă o fantomă și, la ridicare, ar așeza un bloc nedorit.
       mount.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
       // Pe telefon clicul pe bulina o ia in mana, deci editorul ei (nume,
       // culoare, simbol, durata) si-ar pierde gestul. Il mutam pe apasarea
       // lunga -- acelasi loc unde sta si meniul blocurilor.
-      const bloc = src.closest && src.closest(".pl-block--cell");
+      const bloc = tinta && tinta.closest(".pl-block--cell");
       if (bloc && !VERT && bloc.dataset.id) {
         S.armed = null; S.sheetAvail = null; S.sheetFor = bloc.dataset.id; S.sheetAt = Date.now();
         render(); src = null; return;
@@ -2513,19 +2534,19 @@ function installLongPress(mount) {
       // Fereastra: aceeasi foaie ca la blocuri. Portocalia e desenata peste
       // verde si retrasa in ea, deci `closest` alege singur pe care ai apasat —
       // nu e nevoie sa ne uitam la ce e ales in creion.
-      const fer = src.closest && src.closest(".pl-avail");
+      const fer = tinta && tinta.closest(".pl-avail");
       if (fer && !VERT && isAdmin() && fer.dataset.availId) {
         S.armed = null; S.sheetFor = null; S.sheetAvail = fer.dataset.availId; S.sheetAt = Date.now();
         render(); src = null; return;
       }
-      const dot = src.closest && src.closest(".pl-dot");
+      const dot = tinta && tinta.closest(".pl-dot");
       if (dot && !VERT) {
         S.armed = null;
         if (dot.dataset.ext) { S.editExternal = dot.dataset.ext; S.editPupil = null; }
         else if (dot.dataset.uid) { S.editPupil = dot.dataset.uid; S.editExternal = null; }
         render(); src = null; return;
       }
-      onCtxMenu({ target: src, clientX: sx, clientY: sy, preventDefault() {} });
+      if (tinta) onCtxMenu({ target: tinta, clientX: sx, clientY: sy, preventDefault() {} });
       src = null;
     }, LONGPRESS_MS);
   }, true);
@@ -2565,6 +2586,18 @@ function onCtxMenu(e) {
       else if (d.dataset.uid) { S.editPupil = d.dataset.uid; S.editExternal = null; }
       S.sheetAt = Date.now();
       render();
+      return;
+    }
+    // Fereastra lipsea de aici, deși comentariul de sus promite că „orice cale
+    // ar veni prima, ajunge în același loc". Venind pe calea nativă, cădea în
+    // meniul mic de dedesubt.
+    const f = isAdmin() ? e.target.closest(".pl-avail") : null;
+    if (f && f.dataset.availId) {
+      e.preventDefault();
+      if (S.sheetAvail !== f.dataset.availId) {
+        S.armed = null; S.sheetFor = null; S.sheetAvail = f.dataset.availId; S.sheetAt = Date.now();
+        render();
+      }
       return;
     }
   }
