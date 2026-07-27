@@ -74,6 +74,19 @@ textarea,
   user-select: text;
   -webkit-user-select: text;
 }
+/* ...cu o excepție: un widget pe care îl APUCI cu degetul (se trage, se
+   zgâlțâie, se rotește) nu trebuie să lase textul să se selecteze. Selecția
+   fură gestul: începi să tragi și, în loc să miști obiectul, înnegrești
+   cuvintele.
+
+   Aceeași specificitate ca lista albă de mai sus (0,3,1), dar scrisă DUPĂ ea,
+   deci câștigă egalitatea. Fără potrivirea asta n-ar avea efect: `user-select`
+   pus pe părinte se moștenește, iar lista albă îl suprascrie pe copil. */
+.lesson-section:not(.comments) .no-select :is(p, li, td, blockquote) {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Sub-elements of selectable text (bold, links in a paragraph…) follow it.
    A test item's question is rich text (sanitizeRich), so its inline markup
    must stay selectable together with the question. */
