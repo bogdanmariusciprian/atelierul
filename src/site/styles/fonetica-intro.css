@@ -163,17 +163,29 @@
 }
 .fo-plus { font-weight: 800; opacity: 0.5; padding: 0 0.15rem; }
 
-/* Sunetul, ca piesă: pătrat, monospațiat, ca să se numere ușor din priviri. */
+/* Sunetul, ca piesă: pătrat, monospațiat, ca să se numere ușor din priviri.
+   PORNEȘTE GOL. Litera e scrisă acolo de la început, dar nevăzută
+   (`color: transparent`), nu ștearsă — așa căsuța are din capul locului
+   lățimea potrivită, iar când sunetul sosește nu tresare nimic în rând.
+   Conturul întrerupt spune „aici lipsește ceva", ca un loc rezervat. */
 .fo-snd {
   display: grid; place-items: center; min-width: 1.55rem; height: 1.55rem;
   padding: 0 0.3rem; border-radius: 7px;
-  border: 1.5px solid color-mix(in srgb, var(--fo-acc, var(--color-border)) 30%, transparent);
-  background: var(--color-surface); color: var(--color-text);
+  border: 1.5px dashed color-mix(in srgb, var(--fo-acc, var(--color-border)) 35%, transparent);
+  background: transparent; color: transparent;
   font-style: normal; font-weight: 700; font-size: 0.88rem;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+/* Sosit: conturul se închide, litera se arată. */
+.fo-snd.is-prins {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--fo-acc, var(--color-border)) 45%, transparent);
+  background: var(--color-surface); color: var(--color-text);
 }
 /* Îngroșatele din fișă – cele care cer atenție. Roșul din fișă devine aici
-   „umplut cu culoarea felului", ca semnul să spună și CE fel de sunet e. */
-.fo-snd.is-only {
+   „umplut cu culoarea felului", ca semnul să spună și CE fel de sunet e.
+   Umplerea vine tot la sosire: o căsuță goală nu are ce colora. */
+.fo-snd.is-only.is-prins {
   border-color: var(--fo-acc); background: var(--fo-acc); color: #fff;
 }
 .fo-snd.is-sup { font-size: 0.68rem; align-items: start; padding-top: 0.15rem; }
@@ -262,9 +274,6 @@
   100% { transform: scale(1); }
 }
 .fo-snd.is-hit { animation: fo-hit 0.45s ease; }
-.fo-snd.is-prins {
-  border-color: var(--fo-acc); background: var(--fo-acc); color: #fff;
-}
 
 /* Cele trei rămase: nu o eroare, o observație. De-aia arată ca o notă, nu ca
    un avertisment. */
