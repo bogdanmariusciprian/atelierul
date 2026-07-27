@@ -2695,6 +2695,11 @@ function installLongPress(mount) {
     // Ferestrele NU mai sunt aici: se deschid la o atingere simpla, cand
     // creionul e stins. Apasarea lunga a ramas doar pentru blocuri si buline,
     // unde atingerea simpla e deja luata de „ia in mana".
+    //
+    // Butoanele de schimb sunt scoase: stau PE bloc, iar degetul zaboveste
+    // firesc pe ele. Fara linia asta, o apasare de o secunda pe „?" deschidea
+    // foaia blocului taman peste butonul pe care voiai sa-l apesi.
+    if (e.target.closest(".pl-swap")) return;
     const tgt = e.target.closest(".pl-block--cell, .pl-dot");
     if (!tgt) return;
     sx = e.clientX; sy = e.clientY; src = e.target;

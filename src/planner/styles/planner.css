@@ -1018,6 +1018,50 @@
      ieșea la o simplă apăsare, exact unde Marius voia să ia blocul în mână.
      Pe telefon dispare cu totul: anularea stă în meniul de apăsare lungă. */
   .pl-block__x { display: none !important; }
+
+  /* ---- SCHIMBUL „?/!", PE TELEFON ----
+     Tot ce s-a gândit pentru ecranul lat rămâne — cercul care se fâțâie, „Pac!"-ul
+     verde, numărul de oferte, „!"-ul din interior. Se schimbă doar mărimile, și
+     ancora după care se scalează.
+
+     DAR mai întâi o scăpare: „?"-ul de cerere are `opacity: 0` și se aprindea din
+     `.pl-block:hover`. Pe atingere nu există hover, deci pe telefon nu apărea
+     NICIODATĂ — funcția exista, dar nu se putea ajunge la ea. Aici stă aprins,
+     doar mai palid: e o invitație, nu un buton principal. */
+  .pl-swap {
+    top: 2px; left: 2px;
+    width: 0.85rem; height: 0.85rem;
+    font-size: 0.56rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  }
+  .pl-swap--q.off { opacity: 0.7; }
+  .pl-block--cell:hover .pl-swap--q.off { opacity: 0.95; }
+
+  .pl-swap--offer, .pl-swap--sent, .pl-swap--done {
+    width: 1.05rem; height: 1.05rem; font-size: 0.72rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  }
+
+  /* CERCUL MARE SE SCALEAZĂ DUPĂ ÎNĂLȚIME, NU DUPĂ LĂȚIME.
+     Pe desktop e `width: 68%`, fiindcă acolo blocul e îngust și înalt. Culcat,
+     raportul se întoarce: banda are ~44px înălțime, iar o oră ține 44px lățime
+     — dar două ore țin 88px. Scalat pe lățime, cercul unui bloc de două ore ar
+     ieși cu totul din bandă. Înălțimea e singura măsură care nu depinde de cât
+     durează ora. */
+  .pl-swap--q.on {
+    width: auto; height: 72%; aspect-ratio: 1;
+    font-size: 1.05rem;
+    box-shadow: 0 3px 9px rgba(0, 0, 0, 0.35);
+  }
+  .pl-swap--q.on.has-offer::after {
+    bottom: 1px; width: 0.6rem; height: 0.6rem;
+    font: 800 0.42rem/0.6rem system-ui, sans-serif;
+  }
+  .pl-swap__n {
+    top: -3px; right: -3px;
+    min-width: 0.68rem; height: 0.68rem;
+    font-size: 0.44rem; line-height: 0.68rem;
+  }
   /* Comutatorul 🔁 nu mai există pe telefon: era un buton de 1.15rem peste
      numele elevului, care se aprindea din hoverul emulat și pe care oricum nu
      puteai să-l nimerești. Comutarea trăiește în foaia de acțiuni, scrisă în
