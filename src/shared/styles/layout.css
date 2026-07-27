@@ -948,7 +948,10 @@ body.is-logged .nav-guest-only { display: none; }
   .site-header__inner {
     gap: clamp(0.25rem, 1.4vw, 0.6rem);
     padding-left: clamp(0.35rem, 1.6vw, 0.6rem);
-    padding-right: clamp(0.35rem, 1.6vw, 0.6rem);
+    /* Mai mult în dreapta decât în stânga, intenționat: acolo se termină
+       grupul de butoane, iar ultimul e un cerc — o muchie rotundă lipită de
+       marginea ecranului arată tăiată chiar când nu e. */
+    padding-right: clamp(0.55rem, 2.4vw, 1rem);
     /* Și pe verticală: antetul mânca o bandă cât un sfert de ecran ca să țină
        un rând de text de 11px. */
     padding-block: calc(clamp(0.25rem, 1.2vw, 0.5rem) - var(--p, 0) * 3px);
@@ -967,7 +970,11 @@ body.is-logged .nav-guest-only { display: none; }
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     max-width: 100%;
-    padding: 0.2rem 0;
+    /* Marginea din dreapta NU e decor. `overflow-x` face din nav o cutie care
+       taie, iar „M"-ul meditațiilor își desenează conturul 2px ÎN AFARA lui
+       (::before, forma de amibă). Fără spațiul ăsta, conturul — și o fâșie din
+       cerc — cad exact pe muchia cutiei și butonul pare retezat. */
+    padding: 0.2rem 0.3rem 0.2rem 0.1rem;
   }
   .main-nav::-webkit-scrollbar { display: none; }
   /* Fontul site-ului are x-height mare: la aceiași pixeli citește mult mai
