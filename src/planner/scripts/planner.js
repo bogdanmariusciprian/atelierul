@@ -1278,10 +1278,36 @@ function masoara() {
 // ramanea cu o palma de gol sub ea. TREBUIE sa ramana identice cu
 // inaltimile din planner.css — CSS-ul le are ca sa nu clipeasca o bara de
 // derulare intre `innerHTML` si `fitDrawer()`.
-const DRAWER_SNAP = [78, 208, 316];
+// Treapta 0 nu mai e un număr ales din ochi: se MĂSOARĂ, cât să încapă mânerul
+// și paleta întreagă, nimic mai mult. Cu 78px paleta rămânea tăiată pe la
+// jumătate, iar orice schimbare la mărimea bulinelor ar fi cerut reglat din nou
+// aici. `let` fiindcă prima randare o corectează.
+let DRAWER_SNAP = [148, 208, 316];
+/** Treapta închisă = mânerul plus paleta, măsurate.
+ *
+ *  `offsetTop` se socotește față de sertar (e `position: fixed`, deci el e
+ *  părintele de referință), așa că include deja mânerul și spațiile de
+ *  deasupra. Adăugăm doar marginea de jos a cutiei, ca bulinele să nu stea
+ *  lipite de muchie.
+ *
+ *  Măsurăm chiar dacă sertarul e strâns: `overflow: hidden` taie ce se vede,
+ *  nu micșorează copiii. */
+function masoaraTreapta0(d) {
+  const pal = d.querySelector(".pl-palette");
+  const cutie = d.querySelector(".pl-drawer__in");
+  if (!pal || !cutie || !pal.offsetHeight) return null;
+  const jos = parseFloat(getComputedStyle(cutie).paddingBottom) || 0;
+  return Math.round(pal.offsetTop + pal.offsetHeight + jos);
+}
+
 function fitDrawer() {
   const d = S.root.querySelector(".pl-drawer");
   if (!d) return;
+  const masurat = masoaraTreapta0(d);
+  if (masurat && masurat !== DRAWER_SNAP[0]) {
+    DRAWER_SNAP[0] = masurat;
+    document.documentElement.style.setProperty("--pl-snap0", `${masurat}px`);
+  }
   const h = DRAWER_SNAP[S.drawerSnap] || DRAWER_SNAP[0];
   d.style.height = `${h}px`;
   const b = S.root.querySelector(".pl-body");

@@ -1108,7 +1108,7 @@
      fitDrawer, sertarul e cât conținutul lui — foarte înalt — împinge pagina
      și scoate o bară de derulare care apoi dispare. La fiecare randare, deci
      și la fiecare atingere pe un bloc. */
-  .pl-drawer { height: 78px; }
+  .pl-drawer { height: var(--pl-snap0, 148px); }
   .pl-drawer[data-snap="1"] { height: 208px; }
   .pl-drawer[data-snap="2"] { height: 316px; }
   .pl-drawer {
