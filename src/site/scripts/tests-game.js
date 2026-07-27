@@ -428,6 +428,14 @@ function typeList() {
   const counts = typeCountsNow();
   const max = Math.max(1, ...G.typeOrder.map((c) => counts[c] || 0));
   const locked = G.sel.order !== "mine"; // dragging only means something under „Ordinea mea"
+  // NUMĂRUL SPUNE „ORDINE", CASETA SPUNE „ALEGE".
+  //
+  // Pătratul din fața fiecărui rând arată locul categoriei în ordinea de joc —
+  // dar sub „Pe tipuri" ordinea aia nu se folosește (itemii se grupează
+  // alfabetic), deci acolo numărul era un semn fără acoperire. Îl schimbăm cu o
+  // casetă: același loc, alt înțeles, și se vede dintr-o privire că poți juca
+  // doar câteva categorii, nu tot.
+  const bifabil = G.sel.order === "types";
   const qty = (n) => `
     <span class="tgame-tl__qty">
       <b>${n} ${n === 1 ? "item" : "itemi"}</b>
@@ -438,7 +446,11 @@ function typeList() {
     const on = !G.all.types && G.sel.types.has(code);
     return `<li class="tgame-tl__row${on ? " on" : ""}${n ? "" : " is-none"}" data-tcode="${esc(code)}">
         <span class="tgame-tl__grip"${locked ? "" : ` title="Trage ca să reordonezi"`} aria-hidden="true">⠿</span>
-        <span class="tgame-tl__ord" title="Locul ${i + 1} în ordinea de joc">${i + 1}</span>
+        ${bifabil
+          ? `<button type="button" class="tgame-tl__box${on ? " on" : ""}" data-type="${esc(code)}"
+                  role="checkbox" aria-checked="${on}"
+                  aria-label="${esc(TYPE_LABEL[code] || code)}${on ? " — inclusă" : " — exclusă"}"></button>`
+          : `<span class="tgame-tl__ord" title="Locul ${i + 1} în ordinea de joc">${i + 1}</span>`}
         <button type="button" class="tgame-tl__btn" data-type="${esc(code)}">${esc(TYPE_LABEL[code] || code)}</button>
         ${qty(n)}
       </li>`;
@@ -451,7 +463,9 @@ function typeList() {
        <span class="tgame-tl__qty"><b>niciun item</b></span>
      </li>`).join("");
   return `
-    ${locked ? `<p class="tgame-tl__hint">Alege <b>„Ordinea mea"</b> la Ordine ca să poți rearanja categoriile.</p>` : ""}
+    ${bifabil
+      ? `<p class="tgame-tl__hint tgame-tl__hint--pick">Bifează categoriile pe care vrei să le joci. Nebifat = nu intră în joc.</p>`
+      : locked ? `<p class="tgame-tl__hint">Alege <b>„Ordinea mea"</b> la Ordine ca să poți rearanja categoriile.</p>` : ""}
     <ul class="tgame-tl${locked ? " is-locked" : ""}" id="tgame-tl">${rows}${missing}</ul>`;
 }
 
@@ -1477,7 +1491,22 @@ function onClick(e) {
   const type = e.target.closest("[data-type]");
   if (type) { pickGroup("types", type.dataset.type); return renderConfig(); }
   const order = e.target.closest("[data-order]");
-  if (order) { G.sel.order = order.dataset.order; return renderConfig(); }
+  if (order) {
+    const nou = order.dataset.order;
+    // La INTRARE în „Pe tipuri" casetele pornesc goale, dinadins: un rând de
+    // bife deja puse s-ar citi ca o stare de fapt, nu ca o invitație. Așa,
+    // butonul de start arată „0 itemi" și e limpede că urmează să alegi.
+    if (nou === "types" && G.sel.order !== "types") {
+      G.all.types = false; G.sel.types = new Set();
+    // La IEȘIRE fără nicio bifă punem totul la loc pe „toate". Selecția goală
+    // avea sens doar ca invitație; dusă în altă ordine, ar lăsa jocul fără
+    // itemi și fără nimic pe ecran care să spună de ce.
+    } else if (nou !== "types" && G.sel.order === "types" && !G.sel.types.size) {
+      G.all.types = true;
+    }
+    G.sel.order = nou;
+    return renderConfig();
+  }
   const mode = e.target.closest("[data-mode]");
   if (mode) { G.sel.mode = mode.dataset.mode; return renderConfig(); }
   const limit = e.target.closest("[data-limit]");
