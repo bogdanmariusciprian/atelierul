@@ -794,7 +794,44 @@
    Regula de aur a acestui bloc: nu atinge nimic din geometria pe care o
    calculează JS-ul. CSS-ul se ocupă doar de axa perpendiculară.
    ========================================================= */
-@media (max-width: 700px) {
+/* Comutatorul de așezare — sub bara de navigare, în dreapta.
+   Trăiește ÎN AFARA blocului culcat, fiindcă trebuie să existe în amândouă
+   așezările: altfel, odată întors ecranul, n-ai avea cum să te întorci.
+   `--pl-navjos` vine măsurată din JS, bara de sus fiind fixă și de înălțime
+   variabilă (pe telefon se strânge). */
+.pl-axa {
+  position: fixed; z-index: 45;
+  top: var(--pl-navjos, 58px); right: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  font: inherit; font-size: 0.9rem; line-height: 1; cursor: pointer;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border); border-radius: 50%;
+  background: color-mix(in srgb, var(--color-bg) 85%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  opacity: 0.55; transition: opacity 0.15s ease, transform 0.25s ease;
+  user-select: none; -webkit-user-select: none;
+}
+.pl-axa:hover, .pl-axa:focus-visible { opacity: 1; }
+.pl-axa:active { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .pl-axa { transition: opacity 0.15s ease; }
+  .pl-axa:active { transform: none; }
+}
+
+/* ==========================================================================
+   AȘEZAREA CULCATĂ (zilele pe rânduri, ora curgând la dreapta)
+   ==========================================================================
+   Regulile astea stăteau în `@media (max-width: 700px)`, adică lățimea ecranului
+   hotăra singură. Nu mai merge: telefonul întors are ~890px lățime, deci ar cădea
+   pe așezarea de laptop strivită în 390px înălțime, iar Marius vrea să aleagă el.
+
+   Deci condiția nu mai e lățimea, ci o clasă pusă din JS (`readAxis`), care
+   ține cont și de lățime ȘI de alegerea salvată. CSS-ul de aici n-a trebuit
+   rescris: cuibărirea nativă face ca tot ce e înăuntru să fie citit ca
+   descendent al lui `html.pl-lat`. Un singur rând schimbat, aceleași reguli.
+   ========================================================================== */
+html.pl-lat {
   /* ---- TOT CE TINE DE GRILA STA PE PIXELI INTREGI ----
      Capul zilei are 40px, dar golul dintre el si banda era `0.3rem` = 4.8px,
      iar bordura benzii 1.5px. Banda incepea deci la 46.3px, si toate
@@ -815,7 +852,7 @@
      Erau patru valori alese pe rand — banda 8, verde 6, portocaliu 5, bloc 6 —
      si se vedea: un bloc avea alt colt decat fereastra din care facea parte.
      Acum toate pleaca din `--pl-r`. Schimbi o cifra, se schimba tot orarul. */
-  :root { --pl-r: 4px; }
+  & { --pl-r: 4px; }   /* `:root` cuibărit ar căuta un descendent; `&` e chiar el */
   .pl-grid { flex-direction: column; gap: 4px; overflow-x: visible; }
   /* Nimic din orar nu are voie să lățească pagina. */
   .pl-wrap { overflow-x: clip; }
@@ -1102,7 +1139,7 @@
    `position: fixed` e sigur aici DOAR pentru că <main> nu mai are transform —
    vezi comentariul din base.css. Dacă cineva pune la loc `both` pe animația
    paginii, sertarul aterizează sub fold și pare că nu se deschide. */
-@media (max-width: 700px) {
+html.pl-lat {
   /* Înălțimea stă AICI, nu doar în stilul inline pus de fitDrawer(). Altfel,
      între momentul în care se scrie HTML-ul și momentul în care rulează
      fitDrawer, sertarul e cât conținutul lui — foarte înalt — împinge pagina
@@ -1235,7 +1272,7 @@
    Anularea, „o dată / permanent" și redenumirea stăteau în bloc. Într-o bandă
    de 26px nu încap, iar ce încăpea acoperea tocmai ora despre care întrebau.
    Aici au loc să scrie întreg, iar blocul rămâne vizibil deasupra, marcat. */
-@media (max-width: 700px) {
+html.pl-lat {
   .pl-sheet {
     position: fixed; inset: 0; z-index: 60;
     display: flex; align-items: flex-end;
