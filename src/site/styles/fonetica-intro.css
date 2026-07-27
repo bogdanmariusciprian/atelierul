@@ -165,7 +165,7 @@
 
 /* Sunetul, ca piesă: pătrat, monospațiat, ca să se numere ușor din priviri.
    PORNEȘTE GOL. Litera e scrisă acolo de la început, dar nevăzută
-   (`color: transparent`), nu ștearsă — așa căsuța are din capul locului
+   (`color: transparent`), nu ștearsă: așa căsuța are din capul locului
    lățimea potrivită, iar când sunetul sosește nu tresare nimic în rând.
    Conturul întrerupt spune „aici lipsește ceva", ca un loc rezervat. */
 .fo-snd {
@@ -246,6 +246,15 @@
 /* Bucata care mai poate cădea nu se însemnează cu nimic: proverbul trebuie să
    arate ca un proverb, nu ca un text adnotat. Câte au mai rămas scrie oricum
    sub cutie, iar surpriza „care o pica acum" e jumătate din joc. */
+
+/* Golul lăsat în urmă de sunetul care a căzut. Linia de dedesubt spune „aici
+   lipsea ceva", ca într-un exercițiu cu spații de completat. Un gol mai lung
+   înseamnă mai multe litere pentru un singur sunet („ch" din ochi, „ge" din
+   ajunge), ceea ce e chiar lucrul pe care vrem să-l vadă. */
+.fo-gol {
+  color: transparent;
+  border-bottom: 2px solid color-mix(in srgb, var(--fo-v) 45%, transparent);
+}
 
 .fo-prov-bara {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;

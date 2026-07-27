@@ -64,7 +64,7 @@ function initClasificare(root) {
    Elevul simte cum se golește fântâna și începe să se întrebe ce mai lipsește.
 
    Trei sunete nu cad din niciunul: g, h și g'. Nu e o scăpare, e adevărul
-   despre proverbe — sunt vechi și scurte, iar în ele nu încape toată limba.
+   despre proverbe: sunt vechi și scurte, iar în ele nu încape toată limba.
    Ultima secțiune le lasă pe seama elevului, cu exemple.
 
    Segmentarea: fiecare literă (sau grup de litere) cu sunetul pe care-l ține.
@@ -120,7 +120,7 @@ const ZBOR = 520;      // ms cât durează saltul final în căsuță
 
 /* ---- CE ÎNSEAMNĂ „SCUTURAT" ----
    Nu orice mișcare iute. O tragere dreaptă, oricât de rapidă, nu scutură
-   nimic dintr-o cutie adevărată — ai mutat-o, atât. Scuturatul e dus-întors:
+   nimic dintr-o cutie adevărată, ai mutat-o, atât. Scuturatul e dus-întors:
    se cere o SCHIMBARE DE SENS, la viteză destul de mare.
 
    Fără condiția asta, `pointermove` se declanșează de vreo sută de ori pe
@@ -195,7 +195,13 @@ function initProverbe(root) {
       rot: (Math.random() - 0.5) * 400,
       unghi: 0, asezat: 0, pleaca: 0,
     });
-    el.replaceWith(document.createTextNode(el.textContent));
+    // Litera nu se șterge, se STINGE: rămâne scrisă, dar nevăzută. Golul
+    // păstrează astfel exact lățimea ei, iar cuvântul din jur nu se strânge la
+    // loc. Dacă am șterge-o, tot proverbul s-ar rearanja la fiecare cădere și
+    // ochiul n-ar mai găsi unde era sunetul. Scoatem și `data-s`, ca bucata să
+    // nu mai fie socotită printre cele care mai pot cădea.
+    el.className = "fo-gol";
+    el.removeAttribute("data-s");
     porneste();
   }
 
