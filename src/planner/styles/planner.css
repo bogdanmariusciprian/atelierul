@@ -1229,6 +1229,32 @@
     margin: 0; padding: 0.35rem 0.45rem; border-width: 1.5px; border-radius: 10px;
   }
   .pl-drawer .pl-dot { width: 2.1rem; height: 2.1rem; font-size: 0.9rem; }
+
+  /* ---- TAVA ELEVULUI ----
+     Adminul are o paletă de buline; elevul are un singur lucru de luat în mână,
+     deci un chip cu nume, nu un cerc colorat care ar trebui ghicit. Sub el,
+     socoteala („1 din 2") și o propoziție care spune ce urmează — pe telefon
+     nu există hover, deci ce nu scrie nu se află. */
+  .pl-palette--elev { flex-wrap: nowrap; gap: 6px; align-items: center; }
+  .pl-pick {
+    flex: none; display: flex; flex-direction: column; align-items: flex-start;
+    gap: 1px; padding: 5px 10px; cursor: pointer; font: inherit; text-align: left;
+    border: 1.5px solid var(--color-primary); border-radius: var(--pl-r);
+    background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg));
+    color: var(--color-text);
+    -webkit-user-select: none; user-select: none; touch-action: none;
+  }
+  .pl-pick b { font-size: 0.72rem; font-weight: 800; line-height: 1.15; }
+  .pl-pick i { font-style: normal; font-size: 0.54rem; color: var(--color-text-muted); }
+  /* Aprins = ora e în mână. Se vede de la distanță, fiindcă de aici încolo
+     orice atingere pe orar ÎNSEAMNĂ ceva, iar asta trebuie știut dinainte. */
+  .pl-pick.is-armed {
+    background: var(--color-primary); color: #fff;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+  .pl-pick.is-armed i { color: color-mix(in srgb, #fff 78%, transparent); }
+  .pl-pick.is-full:not(.is-armed) { opacity: 0.55; }
+  .pl-pick__say { font-size: 0.56rem; line-height: 1.2; color: var(--color-text-muted); }
 }
 
 /* ---- TELEFON: foaia cu întrebări, urcată de jos ----

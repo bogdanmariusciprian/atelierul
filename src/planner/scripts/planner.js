@@ -673,6 +673,36 @@ function externalEditorHtml() {
     </div>`;
 }
 
+/** TAVA ELEVULUI — un singur lucru de luat în mână.
+ *
+ *  Adminul are câte o bulină de fiecare elev; elevul are doar ora lui, deci
+ *  tava se strânge la un chip. Poartă exact același `data-act="pick"` ca
+ *  bulinele și, fiindcă n-are `data-uid`, sursa rămâne fără utilizator — iar
+ *  așezarea o pune pe seama celui logat, ca la tragerea de pe laptop. Nimic
+ *  nou în mecanica de dedesubt; doar altă mână care ține creionul.
+ *
+ *  Arată și socoteala („1 din 2"), fiindcă e singura limită care-l privește și
+ *  merită să fie sub ochi înainte să atingă, nu după ce e refuzat. */
+function trayHtml() {
+  const puse = S.slots.filter((x) => x.mine && x.kind === "lesson").length;
+  const plin = puse >= S.myMax;
+  const aprins = !!(S.armed && S.armed.kind === "dot");
+  return `<div class="pl-palette pl-palette--elev">
+      <button type="button" class="pl-pick${aprins ? " is-armed" : ""}${plin ? " is-full" : ""}"
+              data-act="pick" data-kind="lesson"
+              title="${plin
+                ? `Ai deja ${S.myMax} ${S.myMax === 1 ? "oră" : "ore"} săptămâna asta.`
+                : "Ia ora în mână, apoi atinge un interval deschis."}">
+        <b>${aprins ? "✋ ora e în mână" : "➕ ora mea"}</b>
+        <i>${puse} din ${S.myMax}</i>
+      </button>
+      <span class="pl-pick__say">${aprins
+        ? "Atinge un interval deschis."
+        : plin ? "Ai pus tot ce ai voie săptămâna asta."
+               : "Apasă, apoi atinge un interval deschis."}</span>
+    </div>`;
+}
+
 /** The chip editor: nickname, colour, default duration — the teacher's own
  *  labels for HIS planner. Nothing here touches the pupil's real profile. */
 function pupilEditorHtml() {
@@ -1086,10 +1116,14 @@ function render() {
     <button type="button" class="pl-dur${S.minutes === m ? " on" : ""}" data-act="dur" data-m="${m}">
       ${esc(durLabel(m))}
     </button>`).join("");
-  S.root.innerHTML = `
-    ${headerHtml()}
-    ${body}
-    ${!S.loading ? `<div class="pl-below">
+  // Sfatul diferă pentru că diferă gesturile. Pe laptop tragi cu mausul și ai
+  // mânere pe bloc; pe telefon iei ora în mână dintr-un chip, iar mânerele n-au
+  // loc pe o bandă de câțiva zeci de pixeli — de-aia acolo trimitem la apăsarea
+  // lungă. Un text care descrie gesturi inexistente e mai rău decât niciunul.
+  const sfat = VERT
+    ? `Ai dreptul la ${S.myMax} ${S.myMax === 1 ? "oră" : "ore"} pe săptămână. Trage în zona deschisă ca să-ți pui ora — blocul tău îl muți, îl întinzi de mânerul de jos (1h · 1h30 · 2h) sau îl anulezi cu ×.`
+    : `Ai dreptul la ${S.myMax} ${S.myMax === 1 ? "oră" : "ore"} pe săptămână. Apasă „ora mea", apoi atinge un interval deschis. Ora pusă: o atingere o ia în mână ca s-o muți, o apăsare lungă deschide tot ce se poate face cu ea.`;
+  const below = !S.loading ? `<div class="pl-below">
       <div class="pl-tools"><span class="pl-dur__lab">Durata</span>${durs}</div>
       <p class="pl-legend">
         <i class="pl-legend__k pl-legend__k--avail"></i> deschis — aici îți tragi ora
@@ -1099,11 +1133,29 @@ function render() {
         <i class="pl-legend__k pl-legend__k--today"></i> azi
         <i class="pl-legend__k pl-legend__k--now"></i> acum
       </p>
-      <p class="pl-hint">Ai dreptul la ${S.myMax} ${S.myMax === 1 ? "oră" : "ore"} pe săptămână. Trage în zona deschisă ca să-ți pui ora — blocul tău îl muți, îl întinzi de mânerul de jos (1h · 1h30 · 2h) sau îl anulezi cu ×.${
+      <p class="pl-hint">${sfat}${
         mineCount ? ` Ai ${mineCount} ${mineCount === 1 ? "oră" : "ore"} săptămâna asta.` : ""}</p>
-    </div>` : ""}
-    ${swapModalsHtml()}
-    <div class="pl-live" data-role="live" hidden></div>`;
+    </div>` : "";
+
+  // ACELAȘI SERTAR CA LA ADMIN, cu mai puțin în el. Elevul are de făcut un
+  // singur lucru, dar n-are rost să-i inventăm alt mecanism pentru asta:
+  // aceleași trepte, aceeași bară de tras, aceeași măsurare a treptei închise.
+  // Ce se schimbă e doar conținutul — o tavă cu un chip în loc de paletă.
+  S.root.innerHTML = VERT
+    ? `${headerHtml()}${body}${below}
+       ${swapModalsHtml()}
+       <div class="pl-live" data-role="live" hidden></div>`
+    : `${headerHtml()}${body}
+       ${!S.loading ? `<div class="pl-drawer" data-snap="${S.drawerSnap}">
+         <button type="button" class="pl-drawer__h" data-act="drawer"
+                 aria-label="Deschide uneltele"><span>🗓 ora mea</span></button>
+         <div class="pl-drawer__in">${trayHtml()}${below}</div>
+       </div>` : ""}
+       ${sheetHtml()}
+       ${swapModalsHtml()}
+       <div class="pl-live" data-role="live" hidden></div>`;
+  if (!VERT) { fitDrawer(); incapNumele(); }
+  masoara();
 }
 
 /** FOAIA DE JOS — intrebarile care nu incap in bloc.
@@ -1156,21 +1208,40 @@ function sheetHtml() {
     const s = S.slots.find((x) => x.id === S.sheetFor);
     if (!s) return "";
     const viitor = s.end >= Date.now();
+    // FOAIA NU MAI PRESUPUNE CĂ BLOCUL E AL TĂU. Se deschide din apăsare lungă
+    // pe ORICE bloc, iar elevul vede pe orar și orele altora. Fără garda asta i
+    // s-ar fi oferit „Mută" și „Anulează ora" pe ceva ce n-are dreptul să
+    // atingă — refuzul ar fi venit abia de la server, după apăsare.
+    const potEu = !!s.canEdit;
     const durata = Math.round((s.end - s.start) / 60000);
     const durs = DURATIONS.map((m) => `<button type="button"
         class="pl-sheet__dur${m === durata ? " on" : ""}" data-act="sheet-dur"
         data-id="${esc(s.id)}" data-m="${m}">${durLabel(m)}</button>`).join("");
+    // SCHIMBUL, ȘI ÎN FOAIE. Trăia doar ca un cerc „?" în colțul blocului —
+    // vizibil pe laptop, dar pe telefon blocul are câțiva zeci de pixeli și
+    // cercul ajunge cât o gămălie, peste care mai stă și numele. Rămâne și pe
+    // bloc, pentru cine îl nimerește; aici capătă un rând cu nume.
+    const oferte = S.swapOffers.filter((o) => o.wantSlot === s.id).length;
+    const amOferit = S.outgoingSwaps.some((o) => o.offerSlot === s.id);
+    const rSchimb = !(s.mine && viitor && !isAdmin()) ? "" : s.swapWanted
+      ? `<button type="button" class="pl-sheet__b" data-act="swap-open-mine" data-id="${esc(s.id)}">⇄ ${
+          oferte ? `Vezi ofertele (${oferte})` : "Oferită la schimb — vezi sau oprește"}</button>`
+      : amOferit
+        ? `<button type="button" class="pl-sheet__b" data-act="swap-withdraw-blk" data-id="${esc(s.id)}">↩ Retrage oferta de schimb</button>`
+        : `<button type="button" class="pl-sheet__b" data-act="swap-want-on" data-id="${esc(s.id)}">⇄ Nu pot în ziua asta — schimb ora</button>`;
     return `<div class="pl-sheet" role="dialog" aria-modal="true" data-act="sheet-close">
       <div class="pl-sheet__card" data-act="sheet-stop">
         <b class="pl-sheet__t">${esc(slotName(s))}</b>
         <span class="pl-sheet__w">${esc(DAYS[dayIndexOf(s.start)])} ${hhmm(s.start)}–${hhmm(s.end)}${
           s.recurrenceId ? " · se repetă săptămânal" : ""}</span>
-        ${viitor ? `<button type="button" class="pl-sheet__b" data-act="sheet-move" data-id="${esc(s.id)}">✥ Mută — apoi atinge unde</button>` : ""}
+        ${viitor && potEu ? `<button type="button" class="pl-sheet__b" data-act="sheet-move" data-id="${esc(s.id)}">✥ Mută — apoi atinge unde</button>` : ""}
+        ${rSchimb}
         ${viitor && isAdmin() ? `<button type="button" class="pl-sheet__b" data-act="rec-toggle" data-id="${esc(s.id)}">${
           s.recurrenceId ? "🔁 Oprește repetarea de aici" : "🔁 Repetă săptămânal"}</button>` : ""}
-        ${viitor && s.kind === "personal" ? `<button type="button" class="pl-sheet__b" data-act="sheet-rename" data-id="${esc(s.id)}">✎ Redenumește</button>` : ""}
-        ${viitor ? `<div class="pl-sheet__durs"><span class="pl-sheet__lab">Durata</span>${durs}</div>` : ""}
-        <button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="sheet-cancel" data-id="${esc(s.id)}">🗑 Anulează ora</button>
+        ${viitor && potEu && s.kind === "personal" ? `<button type="button" class="pl-sheet__b" data-act="sheet-rename" data-id="${esc(s.id)}">✎ Redenumește</button>` : ""}
+        ${viitor && potEu ? `<div class="pl-sheet__durs"><span class="pl-sheet__lab">Durata</span>${durs}</div>` : ""}
+        ${potEu && (viitor || isAdmin())
+          ? `<button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="sheet-cancel" data-id="${esc(s.id)}">🗑 Anulează ora</button>` : ""}
         ${s.recurrenceId && isAdmin() ? `<button type="button" class="pl-sheet__b pl-sheet__b--no" data-act="sheet-cancel-series" data-id="${esc(s.id)}">🗑 Anulează toată seria viitoare</button>` : ""}
         <button type="button" class="pl-sheet__b" data-act="sheet-close">Închide</button>
       </div>
@@ -1989,7 +2060,11 @@ async function onUp(e) {
       // față uneltele — și atunci aceeași atingere deschide reglajele ei.
       // Treapta sertarului spune deci în ce regim ești, fără vreun buton în
       // plus care s-o spună.
-      if (S.drawerSnap === DRAWER_SNAP.length - 1) {
+      // ...dar numai la admin. Elevul n-are ce regla — chipul lui e o singură
+      // oră, fără nume, culoare sau cotă de ales. Fără garda asta, atingerea pe
+      // chip cu sertarul deschis complet chema un editor care n-avea pe cine
+      // deschide și pica în gol: nici nu lua ora în mână, nici nu arăta ceva.
+      if (isAdmin() && S.drawerSnap === DRAWER_SNAP.length - 1) {
         S.armed = null; deschideEditorulBulinei(); render();
         // Editorul se deschide SUB paletă, adică deja sub marginea sertarului.
         // Fără asta se deschide pe bune, dar nevăzut, și pare că n-a mers.
