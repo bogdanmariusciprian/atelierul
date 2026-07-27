@@ -62,6 +62,17 @@ export const LESSONS = [
   { domain: "vocabular", title: "Arhaisme, regionalisme și neologisme" },
 
   // ---------- Fonetică ----------
+  // Introducerea stă PRIMA: e temelia pe care se sprijină restul domeniului.
+  // Ea împarte sunetele în vocale, semivocale și consoane; fără împărțirea
+  // asta, „diftong" și „hiat" din lecția următoare n-au din ce fi făcute.
+  {
+    domain: "fonetica",
+    slug: "fonetica-introducere",
+    title: "Introducere în fonetică: sunetele articulate",
+    href: "lectii/fonetica/introducere/",
+    summary: "Ce studiază fonetica și cum se împart sunetele: vocale, semivocale, consoane.",
+    ready: true,
+  },
   {
     domain: "fonetica",
     slug: "fonetica-grupuri-vocalice",
@@ -71,7 +82,6 @@ export const LESSONS = [
     ready: true,
   },
   { domain: "fonetica", title: "Sunetul și litera. Alfabetul limbii române" },
-  { domain: "fonetica", title: "Vocale, consoane și semivocale" },
   { domain: "fonetica", title: "Silaba" },
   { domain: "fonetica", title: "Despărțirea cuvintelor în silabe" },
   { domain: "fonetica", title: "Accentul" },
