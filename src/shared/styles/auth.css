@@ -30,6 +30,17 @@
   width: 20px;
   height: 20px;
 }
+/* Pe telefon se scalează odată cu literele de lângă el: 38px fix arăta ca un
+   bulgăre lângă un text de 9px. Regula stă AICI, nu în layout.css, fiindcă
+   auth.css se importă după el și ar fi bătut orice suprascriere de acolo. */
+@media (max-width: 720px) {
+  .nav-logout {
+    width: clamp(1.3rem, 4.8vw, 1.55rem);
+    height: clamp(1.3rem, 4.8vw, 1.55rem);
+  }
+  .nav-logout svg { width: 58%; height: 58%; }
+}
+
 .nav-logout:hover {
   color: var(--color-danger);
   border-color: var(--color-danger);

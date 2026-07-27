@@ -955,8 +955,8 @@ body.is-logged .nav-guest-only { display: none; }
   }
   /* The logo starts small on phones — 150px would eat the whole row. */
   .site-header__logo {
-    height: calc(clamp(26px, 7vw, 34px) - var(--p, 0) * 5px);
-    width: calc(clamp(26px, 7vw, 34px) - var(--p, 0) * 5px);
+    height: calc(clamp(24px, 6.4vw, 31px) - var(--p, 0) * 5px);
+    width: calc(clamp(24px, 6.4vw, 31px) - var(--p, 0) * 5px);
   }
   .main-nav {
     gap: clamp(0.2rem, 1.5vw, 0.75rem);
@@ -970,7 +970,12 @@ body.is-logged .nav-guest-only { display: none; }
     padding: 0.2rem 0;
   }
   .main-nav::-webkit-scrollbar { display: none; }
-  .main-nav a { white-space: nowrap; font-size: clamp(0.54rem, 2.1vw, 0.72rem); }
+  /* Fontul site-ului are x-height mare: la aceiași pixeli citește mult mai
+     „gros" decât fontul de rezervă care apare o clipă la încărcare. De-aia
+     valoarea de aici e mai mică decât ar sugera aritmetica. */
+  .main-nav a { white-space: nowrap; font-size: clamp(0.52rem, 1.9vw, 0.66rem); }
+  /* Pastila de pagină-activă strângea încă vreo 20px per capăt. */
+  .main-nav a[aria-current="page"] { padding: 0.15rem 0.4rem; }
   /* Cercul „M" al meditațiilor: pe măsura literelor de lângă el. */
   /* CELE DOUĂ CERCURI ERAU CÂT TREI RÂNDURI DE TEXT. „M"-ul și ieșirea au
      mărimi fixe, scrise pentru ecranul lat, iar lângă litere de 11px arătau ca
@@ -978,9 +983,9 @@ body.is-logged .nav-guest-only { display: none; }
      Nu e o problemă de spațiu, ci de proporție: se strâng la mărimea literelor
      de lângă ele. */
   .main-nav a.nav-meditatii {
-    width: clamp(1.2rem, 4.4vw, 1.5rem);
-    height: clamp(1.2rem, 4.4vw, 1.5rem);
-    font-size: clamp(0.56rem, 2.1vw, 0.74rem);
+    width: clamp(1.15rem, 4vw, 1.38rem);
+    height: clamp(1.15rem, 4vw, 1.38rem);
+    font-size: clamp(0.54rem, 1.9vw, 0.68rem);
   }
   .main-nav a.nav-meditatii::before { inset: -2px; }
   .theme-btn { font-size: clamp(0.8rem, 3vw, 1.05rem); padding: 0.2rem 0.3rem; }
@@ -989,12 +994,11 @@ body.is-logged .nav-guest-only { display: none; }
   .nav-user-slot { gap: clamp(0.2rem, 1.2vw, 0.5rem); }
   .nav-cta { font-size: clamp(0.58rem, 2.4vw, 0.85rem); padding: 0.3rem clamp(0.35rem, 1.6vw, 0.9rem); }
   .nav-cta__rest { display: none; }
-  .nav-logout {
-    width: clamp(1.4rem, 5.2vw, 1.7rem);
-    height: clamp(1.4rem, 5.2vw, 1.7rem);
-    padding: 0;
-  }
-  .nav-logout svg { width: 58%; height: 58%; }
+  /* Butonul de ieșire NU se micșorează de aici: mărimea lui (38px fix) stă în
+     auth.css, care se importă DUPĂ layout.css. Aceeași specificitate, dar mai
+     târziu în cascadă — deci auth.css câștiga, iar cercul rămânea mare oricât
+     scriam aici. Se vedea: la încărcare, cât timp auth.css n-a ajuns încă,
+     apărea o clipă corect, apoi sărea înapoi. Regula e mutată acolo. */
   /* ADMIN: „🎓 Profesor / cadru didactic" ocupă cât trei legături de nav și,
      pe telefon, nu spune nimic ce nu se vede din avatar — ești logat cu contul
      tău, nu-i o descoperire. Rămân avatarul și bulina de notificări, care sunt
@@ -1002,8 +1006,8 @@ body.is-logged .nav-guest-only { display: none; }
   .nav-user { padding: 0.15rem; gap: 0; }
   .nav-user__id { display: none; }
   .nav-user__av {
-    width: clamp(1.35rem, 5.2vw, 1.55rem);
-    height: clamp(1.35rem, 5.2vw, 1.55rem);
+    width: clamp(1.3rem, 4.8vw, 1.45rem);
+    height: clamp(1.3rem, 4.8vw, 1.45rem);
   }
 
   /* Breadcrumbs: one swipeable line instead of wrapping over the title. */
