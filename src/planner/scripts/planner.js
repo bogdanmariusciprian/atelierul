@@ -1904,6 +1904,18 @@ const onMove = (e) => {
   e.preventDefault();
 };
 
+/** Reglajele bulinei: nume, culoare, simbol, durata implicită. A doua atingere
+ *  pe aceeași bulină le închide — deci butonul e și comutator. */
+function deschideEditorulBulinei() {
+  if (S.source?.externalId) {
+    S.editExternal = S.editExternal === S.source.externalId ? null : S.source.externalId;
+    S.editPupil = null; S.extDelAsk = false;
+  } else if (S.source?.userId) {
+    S.editPupil = S.editPupil === S.source.userId ? null : S.source.userId;
+    S.editExternal = null;
+  }
+}
+
 async function onUp(e) {
   window.removeEventListener("pointermove", onMove);
   const d = S.drag;
@@ -1948,6 +1960,21 @@ async function onUp(e) {
   if (!VERT && !d.pointerMoved && gestSimplu) {
     const a = S.armed;
     if (d.fromTray) {
+      // SERTARUL DESCHIS COMPLET = REGIM DE REGLAJ.
+      //
+      // Bulina are două înțelesuri și trebuie un criteriu limpede între ele.
+      // Cât sertarul e strâns, ești în orar și atingerea ia bulina în mână, ca
+      // s-o pui pe o zi. Deschis la maximum, nu mai lucrezi pe orar — ai în
+      // față uneltele — și atunci aceeași atingere deschide reglajele ei.
+      // Treapta sertarului spune deci în ce regim ești, fără vreun buton în
+      // plus care s-o spună.
+      if (S.drawerSnap === DRAWER_SNAP.length - 1) {
+        S.armed = null; deschideEditorulBulinei(); render();
+        // Editorul se deschide SUB paletă, adică deja sub marginea sertarului.
+        // Fără asta se deschide pe bune, dar nevăzut, și pare că n-a mers.
+        S.root.querySelector(".pl-cfg")?.scrollIntoView({ block: "nearest" });
+        return;
+      }
       S.armed = a && a.kind === "dot" ? null : { kind: "dot" };
       render(); return;
     }
@@ -1969,17 +1996,7 @@ async function onUp(e) {
   // A press on a dot that never moved is a CLICK — and a click opens the dot's
   // settings. One object, two gestures, told apart by the flag the drag
   // machinery already keeps for free.
-  if (d.fromTray && !d.moved) {
-    if (S.source?.externalId) {
-      S.editExternal = S.editExternal === S.source.externalId ? null : S.source.externalId;
-      S.editPupil = null; S.extDelAsk = false;
-    } else if (S.source?.userId) {
-      S.editPupil = S.editPupil === S.source.userId ? null : S.source.userId;
-      S.editExternal = null;
-    }
-    render();
-    return;
-  }
+  if (d.fromTray && !d.moved) { deschideEditorulBulinei(); render(); return; }
   if (!d.moved) {
     // Third use of the same click-vs-drag flag: in the pencil's personal
     // regime, a motionless press on a grey block opens its inline rename.

@@ -1203,6 +1203,25 @@
   }
   .pl-drawer .pl-dur__lab { font-size: 0.6rem; margin: 0; align-self: center; }
 
+  /* REGLAJELE BULINEI, ÎN SERTAR. Se deschid sub paletă, deci trebuie să
+     respire pe 316px, nu pe lățimea unui laptop de unde vin corpurile lor.
+     `max-width: 21rem` pe rândul de simboluri era gândit ca să nu se întindă
+     pe un ecran lat; aici doar îl împiedica să umple lățimea pe care o are. */
+  .pl-drawer .pl-cfg {
+    margin-top: 5px; padding: 6px 7px;
+    border-width: 1px; border-radius: var(--pl-r);
+  }
+  .pl-drawer .pl-cfg__f { font-size: 0.62rem; gap: 4px; margin: 0 0 4px; }
+  .pl-drawer .pl-cfg__name, .pl-drawer .pl-cfg__emoji {
+    font-size: 0.66rem; padding: 4px 6px;
+    border-width: 1px; border-radius: var(--pl-r);
+  }
+  .pl-drawer .pl-cfg__emoji { width: 3.4rem; }
+  .pl-drawer .pl-cfg__sym { max-width: none; gap: 3px; }
+  .pl-drawer .pl-cfg__hint { font-size: 0.56rem; }
+  .pl-drawer .pl-cfg .pl-sym { font-size: 0.9rem; }
+  .pl-drawer .pl-cfg__acts { gap: 5px; }
+
   /* Paleta are pe desktop `margin-top: 2.6rem`, curtea rezervată tooltipurilor
      care răsar deasupra bulinelor. În sertarul de 78px al treptei 0, marginea
      aia împinge paleta afară din vedere — sertarul pare gol. */
