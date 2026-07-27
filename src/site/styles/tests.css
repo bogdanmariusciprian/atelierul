@@ -995,7 +995,7 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 /* no items under the CURRENT year/session choice — still listed, just quiet */
 .tgame-tl__row.is-none { opacity: 0.55; }
 
-/* Handles only exist under „Ordinea mea". Hiding them outright (instead of
+/* Handles only exist under „Pe categorii". Hiding them outright (instead of
    dimming) is the honest signal: no handle, nothing to grab. The rows stay
    fully clickable — it's the REORDERING that's off, not the selection. */
 .tgame-tl.is-locked .tgame-tl__grip { display: none; }
@@ -1053,6 +1053,9 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   font-size: 0.74rem; font-weight: 800; font-variant-numeric: tabular-nums;
 }
 .tgame-tl__row.on .tgame-tl__ord { background: var(--color-primary); color: #fff; }
+/* Nebifată: fără număr adevărat, doar o linioară. O categorie scoasă din joc
+   n-are al câtelea să fie, iar o cifră pe ea ar promite altceva. */
+.tgame-tl__ord.is-out { background: none; color: var(--color-text-muted); font-weight: 600; }
 .tgame-tl__row.is-empty .tgame-tl__ord { background: none; }
 
 /* CASETA DE BIFAT — stă exact în locul numărului de ordine, ca schimbul de
@@ -1076,6 +1079,7 @@ body.tgame-dragging { cursor: grabbing; user-select: none; }
   border: solid #fff; border-width: 0 2.5px 2.5px 0;
   transform: translateY(-1px) rotate(45deg);
 }
+.tgame-tl__box.is-off { cursor: default; opacity: 0.5; }
 .tgame-tl__hint--pick { font-weight: 700; }
 /* QUANTITY — a different language entirely: unit spelled out + a strength bar. */
 .tgame-tl__qty { text-align: right; min-width: 4.6rem; }
@@ -1555,6 +1559,9 @@ body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__box.on {
 }
 body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__box.on::after {
   border-color: var(--tc-ink);
+}
+body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__ord.is-out {
+  background: none; color: color-mix(in srgb, var(--cat-color) 60%, transparent);
 }
 body.tcat-page.tgame-active:not(.tg-mode) .tgame-tl__bar { background: var(--tc-deep); }
 

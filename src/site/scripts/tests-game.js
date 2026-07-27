@@ -10,7 +10,7 @@
 //         Ticking every option by hand makes the shortcut redundant, so it
 //         goes disabled; untick one and it comes back.
 //       - Topic types are a DRAG-TO-REORDER list; the order becomes the
-//         playing order („Ordinea mea").
+//         playing order („Pe categorii").
 //   • GAME: progress bar + live corect / greșit / puncte, a discreet elapsed
 //     timer, type labels. Correct → confetti + points fly in. Wrong → the page
 //     quakes, the card flashes red and a copy flies into the „greșite" counter,
@@ -63,7 +63,7 @@ const G = {
   all: { years: true, sessions: true, types: true },
   fx: { sound: true, vibrate: true },
   lives: 0, boosters: {}, cut: [], // cut = letters a booster hid on this item
-  typeOrder: [], // the pupil's drag order → playing order under „Ordinea mea"
+  typeOrder: [], // ordinea trasă de elev → succesiunea grupelor sub „Pe categorii"
   emoji: EMOJIS[0], label: "",
   saved: [], savedId: null,
   sessionId: null, queue: [],
@@ -317,14 +317,15 @@ function buildQueue(items) {
   const arr = [...items];
   const byNo = (a, b) => (Number(b.year) - Number(a.year)) || (Number(a.itemNo) - Number(b.itemNo));
   if (G.sel.order === "years") arr.sort(byNo);
-  else if (G.sel.order === "mine") {
-    // Rank by the pupil's drag order; untagged items go last.
+  else if (G.sel.order === "cats") {
+    // O SINGURĂ ORDONARE PE CATEGORII. Erau două butoane — „Pe tipuri" (grupare
+    // alfabetică) și „Ordinea mea" (grupare după cum tragi rândurile) — care
+    // făceau același lucru și se deosebeau doar prin cine hotărăște succesiunea
+    // grupelor. Acum e una singură: succesiunea vine din listă, iar lista
+    // pornește exact în ordinea de dinainte, deci nimeni nu pierde nimic.
     const rank = new Map(G.typeOrder.map((c, i) => [c, i]));
     const r = (it) => Math.min(...(it.types || []).map((t) => (rank.has(t) ? rank.get(t) : 99)).concat([99]));
     arr.sort((a, b) => r(a) - r(b) || byNo(a, b));
-  } else if (G.sel.order === "types") {
-    const ft = (it) => (it.types || [])[0] || "￿";
-    arr.sort((a, b) => ft(a).localeCompare(ft(b)) || byNo(a, b));
   } else shuffle(arr);
   return arr.map((i) => i.id);
 }
@@ -362,7 +363,9 @@ function resumeSession(id) {
   // relua jocul și n-ar mai avea niciun item. Trec și ele prin aceeași pâlnie.
   G.sel.sessions = new Set((c.sessions || []).map(sesiuneCanonica));
   G.sel.types = new Set(c.types || []);
-  G.sel.order = c.order || "random";
+  // Jocurile salvate ÎNAINTE de unire poartă numele vechi. Fără linia asta,
+  // elevul își relua sesiunea și primea o ordine aleatorie în loc de a lui.
+  G.sel.order = ({ types: "cats", mine: "cats" })[c.order] || c.order || "random";
   G.sel.mode = c.mode || "invatare";
   G.sel.limit = Number(c.limit) || 0;
   G.typeOrder = (c.typeOrder || []).filter((t) => G.availTypes.includes(t));
@@ -427,46 +430,55 @@ function typeCountsNow() {
 function typeList() {
   const counts = typeCountsNow();
   const max = Math.max(1, ...G.typeOrder.map((c) => counts[c] || 0));
-  const locked = G.sel.order !== "mine"; // dragging only means something under „Ordinea mea"
-  // NUMĂRUL SPUNE „ORDINE", CASETA SPUNE „ALEGE".
+  // O LISTĂ, O ÎNTREBARE: CE JOCI.
   //
-  // Pătratul din fața fiecărui rând arată locul categoriei în ordinea de joc —
-  // dar sub „Pe tipuri" ordinea aia nu se folosește (itemii se grupează
-  // alfabetic), deci acolo numărul era un semn fără acoperire. Îl schimbăm cu o
-  // casetă: același loc, alt înțeles, și se vede dintr-o privire că poți juca
-  // doar câteva categorii, nu tot.
-  const bifabil = G.sel.order === "types";
+  // Lista făcea două meserii deodată — ce intră în joc ȘI în ce ordine — iar
+  // semnele nu erau lipite de înțelesuri. Numărul de ordine se vedea în toate
+  // ordinile, deși conta doar sub una; selecția mergea peste tot, dar n-avea
+  // niciun semn care s-o arate, doar rândul aprins. De aici confuzia.
+  //
+  // Acum: CASETA e mereu acolo, fiindcă a alege categoriile e mereu posibil.
+  // NUMĂRUL și mânerul apar doar sub „Pe categorii", singurul loc unde
+  // succesiunea rândurilor chiar se folosește. Fiecare semn, un singur înțeles.
+  const peCategorii = G.sel.order === "cats";
   const qty = (n) => `
     <span class="tgame-tl__qty">
       <b>${n} ${n === 1 ? "item" : "itemi"}</b>
       <span class="tgame-tl__bar"><i style="width:${n ? Math.max(8, Math.round((n / max) * 100)) : 0}%"></i></span>
     </span>`;
-  const rows = G.typeOrder.map((code, i) => {
+  // Locul în ordinea de joc se numără doar printre cele BIFATE: o categorie
+  // scoasă din joc n-are al câtelea să fie, iar un număr pe ea ar promite
+  // altceva. De-aia numerotarea merge separat de indexul rândului.
+  let loc = 0;
+  const rows = G.typeOrder.map((code) => {
     const n = counts[code] || 0;
-    const on = !G.all.types && G.sel.types.has(code);
+    const on = G.all.types || G.sel.types.has(code);
+    if (on) loc += 1;
+    const nume = esc(TYPE_LABEL[code] || code);
     return `<li class="tgame-tl__row${on ? " on" : ""}${n ? "" : " is-none"}" data-tcode="${esc(code)}">
-        <span class="tgame-tl__grip"${locked ? "" : ` title="Trage ca să reordonezi"`} aria-hidden="true">⠿</span>
-        ${bifabil
-          ? `<button type="button" class="tgame-tl__box${on ? " on" : ""}" data-type="${esc(code)}"
-                  role="checkbox" aria-checked="${on}"
-                  aria-label="${esc(TYPE_LABEL[code] || code)}${on ? " — inclusă" : " — exclusă"}"></button>`
-          : `<span class="tgame-tl__ord" title="Locul ${i + 1} în ordinea de joc">${i + 1}</span>`}
-        <button type="button" class="tgame-tl__btn" data-type="${esc(code)}">${esc(TYPE_LABEL[code] || code)}</button>
+        ${peCategorii ? `<span class="tgame-tl__grip" title="Trage ca să schimbi succesiunea" aria-hidden="true">⠿</span>` : ""}
+        <button type="button" class="tgame-tl__box${on ? " on" : ""}" data-type="${esc(code)}"
+                role="checkbox" aria-checked="${on}"
+                aria-label="${nume}${on ? " — o joci" : " — n-o joci"}"></button>
+        ${peCategorii ? `<span class="tgame-tl__ord${on ? "" : " is-out"}"
+              title="${on ? `A ${loc}-a categorie jucată` : "Nebifată — nu intră în joc"}">${on ? loc : "—"}</span>` : ""}
+        <button type="button" class="tgame-tl__btn" data-type="${esc(code)}">${nume}</button>
         ${qty(n)}
       </li>`;
   }).join("");
   const missing = TEST_ITEM_TYPES.filter((t) => !(G.typeCounts[t.code] > 0)).map((t) =>
     `<li class="tgame-tl__row is-empty" title="Încă nu sunt itemi de acest tip">
-       <span class="tgame-tl__grip" aria-hidden="true">⠿</span>
-       <span class="tgame-tl__ord">·</span>
+       ${peCategorii ? `<span class="tgame-tl__grip" aria-hidden="true">⠿</span>` : ""}
+       <span class="tgame-tl__box is-off" aria-hidden="true"></span>
+       ${peCategorii ? `<span class="tgame-tl__ord is-out">—</span>` : ""}
        <span class="tgame-tl__btn">${esc(t.label)}</span>
        <span class="tgame-tl__qty"><b>niciun item</b></span>
      </li>`).join("");
   return `
-    ${bifabil
-      ? `<p class="tgame-tl__hint tgame-tl__hint--pick">Bifează categoriile pe care vrei să le joci. Nebifat = nu intră în joc.</p>`
-      : locked ? `<p class="tgame-tl__hint">Alege <b>„Ordinea mea"</b> la Ordine ca să poți rearanja categoriile.</p>` : ""}
-    <ul class="tgame-tl${locked ? " is-locked" : ""}" id="tgame-tl">${rows}${missing}</ul>`;
+    <p class="tgame-tl__hint tgame-tl__hint--pick">${peCategorii
+      ? `Bifează ce joci, trage rândurile ca să schimbi succesiunea.`
+      : `Bifează categoriile pe care vrei să le joci.`}</p>
+    <ul class="tgame-tl${peCategorii ? "" : " is-locked"}" id="tgame-tl">${rows}${missing}</ul>`;
 }
 
 function savedStrip() {
@@ -520,8 +532,9 @@ function renderConfig() {
   const n = matchingItems().length;
   const yearOpts = G.years.map((y) => ({ v: String(y), label: String(y) }));
   const sessOpts = G.sessions.map((s) => ({ v: s, label: s }));
-  const orderChips = [["random", "Aleatoriu"], ["years", "Pe ani"], ["types", "Pe tipuri"]]
-    .concat(G.typeOrder.length > 1 ? [["mine", "Ordinea mea"]] : [])
+  const orderChips = [["random", "Aleatoriu"], ["years", "Pe ani"]]
+    // „Pe categorii" are rost doar dacă sunt cel puțin două de aranjat.
+    .concat(G.typeOrder.length > 1 ? [["cats", "Pe categorii"]] : [])
     .map(([v, l]) => chip("order", v, l, G.sel.order === v)).join("");
   const modeChips = [
     ["invatare", "📖 Învățare"], ["examen", "📝 Examen"],
@@ -625,12 +638,12 @@ function renderConfig() {
 //   • the row LIFTS OUT of the list and floats over the page under the finger;
 //   • the remaining rows slide apart to open a gap (FLIP: measure, move, animate);
 //   • letting go anywhere outside the list cancels and the row flies home.
-// Only wired under „Ordinea mea" — reordering a list nothing sorts by would be
+// Only wired under „Pe categorii" — reordering a list nothing sorts by would be
 // a lie, so elsewhere the handles are simply inert.
 const DROP_PAD = 60; // how far outside the list still counts as „over" it
 function wireTypeDrag() {
   const list = root.querySelector("#tgame-tl");
-  if (!list || G.sel.order !== "mine") return;
+  if (!list || G.sel.order !== "cats") return;
 
   let st = null;
   const rows = () => [...list.querySelectorAll(".tgame-tl__row[data-tcode]")];
@@ -1491,22 +1504,7 @@ function onClick(e) {
   const type = e.target.closest("[data-type]");
   if (type) { pickGroup("types", type.dataset.type); return renderConfig(); }
   const order = e.target.closest("[data-order]");
-  if (order) {
-    const nou = order.dataset.order;
-    // La INTRARE în „Pe tipuri" casetele pornesc goale, dinadins: un rând de
-    // bife deja puse s-ar citi ca o stare de fapt, nu ca o invitație. Așa,
-    // butonul de start arată „0 itemi" și e limpede că urmează să alegi.
-    if (nou === "types" && G.sel.order !== "types") {
-      G.all.types = false; G.sel.types = new Set();
-    // La IEȘIRE fără nicio bifă punem totul la loc pe „toate". Selecția goală
-    // avea sens doar ca invitație; dusă în altă ordine, ar lăsa jocul fără
-    // itemi și fără nimic pe ecran care să spună de ce.
-    } else if (nou !== "types" && G.sel.order === "types" && !G.sel.types.size) {
-      G.all.types = true;
-    }
-    G.sel.order = nou;
-    return renderConfig();
-  }
+  if (order) { G.sel.order = order.dataset.order; return renderConfig(); }
   const mode = e.target.closest("[data-mode]");
   if (mode) { G.sel.mode = mode.dataset.mode; return renderConfig(); }
   const limit = e.target.closest("[data-limit]");
