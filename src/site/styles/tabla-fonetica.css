@@ -233,6 +233,22 @@
     margin-top: 2px;
   }
 
+  /* Sunetele speciale (tastele 1-4) stau fiecare într-o celulă de exact o
+     literă. Rândul c/v/s se aliniază numărând coloane, deci are nevoie ca
+     fiecare semn să ocupe o celulă și nici un fir de pixel în plus. Literele
+     obișnuite o fac de la sine, fiind monospațiate; „k̇" (literă plus semn
+     combinat) și „ĉ", „ĝ" (care pot lipsi din fontul monospațiat și atunci se
+     împrumută din altul) nu. Cutia le potrivește pe toate. */
+  .field .sym {
+    display: inline-block;
+    width: 1ch;
+    text-align: center;
+    font-variant-ligatures: none;
+  }
+  /* Golită de ștergere, cutia trebuie să dispară cu totul: altfel ar rămâne o
+     celulă goală care ar împinge mai departe tot ce urmează. */
+  .field .sym:empty { width: 0; }
+
   /* superscriptul fonetic (bold + subliniat) */
   .field sup { font-size: .72em; }
 

@@ -34,11 +34,38 @@ function loadSymbols() {
 function saveSymbols() { try { localStorage.setItem('fonetica_symbols', JSON.stringify(symbols)); } catch (e) {} }
 let symbols = loadSymbols();
 
-/* inserează simbolul asociat unei taste (1-4), bold sau normal, după setare */
+/* Inserează simbolul asociat unei taste (1-4), bold sau normal, după setare.
+   Simbolul intră într-o cutie de o celulă (span.sym, lat 1ch), nu ca text gol.
+
+   DE CE: rândul c/v/s de dedesubt se aliniază numărând coloane, adică se
+   bizuie pe faptul că fiecare semn ocupă exact o celulă de monospațiat. Asta e
+   adevărat pentru literele obișnuite, dar nu și pentru sunetele speciale:
+   „k̇" e literă plus semn combinat, două puncte de cod; „ĉ" și „ĝ" pot lipsi
+   din fontul monospațiat al calculatorului, iar atunci browserul le împrumută
+   din alt font, cu altă lățime. De-aici venea deplasarea mică de dedesubt.
+   Cutia de 1ch le ține pe toate într-o singură celulă, oricum ar fi desenate. */
 function insertSymbol(key) {
   const s = symbols[key];
   if (!s || !s.char) return;
-  if (s.bold) insertBold(s.char); else insertText(s.char);
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+
+  const cutie = document.createElement('span');
+  cutie.className = 'sym';
+  if (s.bold) {
+    const b = document.createElement('b');
+    b.textContent = s.char;
+    cutie.appendChild(b);
+  } else {
+    cutie.textContent = s.char;
+  }
+  range.insertNode(cutie);
+  range.setStartAfter(cutie);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 /* ================= Virgula automată din transcriere =================
