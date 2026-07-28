@@ -280,7 +280,8 @@
   //    la sfârșit strigăm; aplicația ascultă și își redesenează lista.
   // =========================================================
   import { enforceGate, revealGate } from "../../../../src/shared/scripts/site-gate.js";
-  import { listSheets, loadSheet, saveSheet, deleteSheet } from "../../../../src/shared/scripts/board-repo.js";
+  import { listSheets, loadSheet, saveSheet, deleteSheet,
+           loadNotes, saveNotes } from "../../../../src/shared/scripts/board-repo.js";
   import { supabase } from "../../../../src/shared/scripts/supabase-client.js";
 
   if (await enforceGate()) {
@@ -313,6 +314,10 @@
         }
         return { ok: false, motiv: "prea multe lucrări cu același nume" };
       },
+
+      /* Notițele: una singură pe lecție, deci doar citit și scris. */
+      notiteCiteste: () => loadNotes(LECTIE),
+      notiteScrie: (data) => saveNotes(LECTIE, data),
     };
 
     document.dispatchEvent(new Event("qwzky:boards-ready"));

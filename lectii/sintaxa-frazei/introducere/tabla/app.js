@@ -989,6 +989,29 @@
     };
   }
 
+  /* Aduce notița din cont și o pune pe ecran.
+     Dacă în cont nu e nimic, dar în browser da, o urcăm noi o dată: altfel
+     elevul care tocmai și-a făcut cont ar crede că și-a pierdut însemnările. */
+  async function aduNotiteleDinCont() {
+    const p = window.qwzkyBoards;
+    // Întrebăm dacă puntea ȘTIE de notițe, nu doar dacă există. O punte mai
+    // veche, rămasă dintr-o pagină nereîncărcată, ar fi oprit aplicația aici
+    // cu o eroare, în loc să meargă mai departe cu notițele din browser.
+    if (!p || typeof p.notiteCiteste !== 'function') return;
+    if (!(await p.esteLogat())) return;
+    const din_cont = await p.notiteCiteste();
+    if (din_cont && Array.isArray(din_cont.pages) && din_cont.pages.length) {
+      state.postits = din_cont;
+      if (typeof state.postits.w !== 'number') state.postits.w = 0;
+      if (typeof state.postits.h !== 'number') state.postits.h = 0;
+      aplicaMarimeaNotitei();
+      renderPostit();
+      return;
+    }
+    const areCeva = (state.postits.pages || []).some((x) => String(x || '').trim());
+    if (areCeva) p.notiteScrie(state.postits);
+  }
+
   /* Puntea spre cont, pusă de pagină. Lipsește doar dacă aplicația e deschisă
      de una singură, în afara sitului; atunci ne purtăm ca la un vizitator. */
   const punte = () => window.qwzkyBoards || null;
@@ -1484,8 +1507,26 @@
   }
   function persist() { clearTimeout(persistTimer); persistTimer = setTimeout(saveNow, 250); }
 
-  // Notițele se salvează separat și NU sunt șterse niciodată automat.
+  /* ---- Notițele ----
+     Elevul cu cont le are pe cont, deci le găsește de pe orice calculator.
+     Vizitatorul le păstrează în browserul lui: e un carnet de lucru, n-are
+     rost să i-l luăm doar fiindcă n-are cont.
+
+     Scriem în browser LA FIECARE tastă, ca plasă, dar pe server mult mai rar:
+     o notiță e text care curge, iar o cerere la fiecare literă ar fi și
+     risipă, și încetineală. */
+  var notiteTimer = null;
+  function trimiteNotiteleLaCont() {
+    const p = window.qwzkyBoards;
+    if (!p || typeof p.notiteScrie !== 'function') return;
+    clearTimeout(notiteTimer);
+    notiteTimer = setTimeout(async () => {
+      if (await p.esteLogat()) p.notiteScrie(state.postits);
+    }, 1200);
+  }
+
   function saveNotes() {
+    trimiteNotiteleLaCont();
     try {
       localStorage.setItem(NOTES_KEY, JSON.stringify(state.postits));
       return true;
@@ -1714,7 +1755,10 @@
 
     // Puntea se leagă după ce aplicația a pornit (modulele sunt amânate).
     // Când e gata, lista se poate desena cu adevărat.
-    document.addEventListener('qwzky:boards-ready', () => renderWorks());
+    document.addEventListener('qwzky:boards-ready', async () => {
+      renderWorks();
+      await aduNotiteleDinCont();
+    });
 
     // UI zoom
     $('uiZoomIn').addEventListener('click', () => { state.uiScale = clamp(state.uiScale + 0.05, 0.7, 1.3); applyUiScale(); persist(); });

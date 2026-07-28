@@ -148,3 +148,42 @@ export async function deleteSheet(id) {
   if (error) { console.warn("deleteSheet:", error.message); return false; }
   return true;
 }
+
+
+/* ================= NOTIȚELE (`learn_lessons_notes`) =================
+   Carnetul elevului de la o lecție: una singură, nu mai multe. De-aia n-are
+   listă și nici titlu, doar „citește-o" și „scrie-o".
+
+   Spre deosebire de table, notițele NU se dau profesorului: sunt însemnările
+   personale ale unui copil. Politica din 0076 le ține numai pentru el.
+   ==================================================================== */
+
+/** Notița mea de la o lecție, sau null dacă n-am scris încă nimic. */
+export async function loadNotes(lessonSlug) {
+  const u = await utilizator();
+  if (!u) return null;
+  const { data, error } = await supabase
+    .from("learn_lessons_notes")
+    .select("data, updated_at")
+    .eq("user_id", u.id)
+    .eq("lesson_slug", lessonSlug)
+    .maybeSingle();
+  if (error) { console.warn("loadNotes:", error.message); return null; }
+  return data ? data.data : null;
+}
+
+/**
+ * Scrie notița. `upsert` fiindcă rândul e unul singur pe elev și pe lecție:
+ * fie îl creează, fie îl rescrie, fără să ne intereseze care din două.
+ * `onConflict` numește cheia primară, ca baza să știe după ce recunoaște
+ * rândul deja existent.
+ */
+export async function saveNotes(lessonSlug, data) {
+  const u = await utilizator();
+  if (!u) return false;
+  const { error } = await supabase
+    .from("learn_lessons_notes")
+    .upsert({ user_id: u.id, lesson_slug: lessonSlug, data }, { onConflict: "user_id,lesson_slug" });
+  if (error) { console.warn("saveNotes:", error.message); return false; }
+  return true;
+}
