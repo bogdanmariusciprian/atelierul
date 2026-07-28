@@ -151,9 +151,17 @@
     transition: background .12s, opacity .12s;
   }
   .btn-save:hover { background: #3f5ee0; }
-  /* Salvat deja: butonul rămâne acolo, dar se retrage. Nu-l ascundem, ca
-     mâna să-l găsească în același loc data viitoare. */
-  .btn-save.e-curat { background: #b9c2d9; }
+
+  /* Salvat deja: butonul se retrage, dar NU se stinge.
+     Îl umplusem cu gri-albastru, ceea ce era o greșeală: un buton gri se
+     citește ca „nu merge", deși el merge foarte bine. Contur în culoarea
+     accentului, scris tot în ea: se vede că e viu, dar nu mai cere nimic. */
+  .btn-save.e-curat {
+    background: transparent;
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1.5px #ccd5fb;
+  }
+  .btn-save.e-curat:hover { background: var(--accent-soft); }
   .btn-save.e-ocupat { opacity: .6; pointer-events: none; }
   .btn-save__icon {
     width: 15px;
