@@ -23,10 +23,11 @@
       <span aria-hidden="true">←</span>
     </a>
 
-    <div class="brand">
-      <h1>Fonetică – analiza cuvintelor</h1>
-      <span>cuvânt → despărțire în silabe → transcriere fonetică</span>
-    </div>
+    <span class="tb-marca">
+      <span class="tb-marca__icon" aria-hidden="true"></span>
+      #LaTablă
+    </span>
+    <span class="tb-lectie">Noțiuni de fonetică</span>
 
     <div class="toolbar" id="toolbar">
       <div class="tgroup">
@@ -45,23 +46,37 @@
         <button class="btn mono" data-pair="()" title="Inserează (  )">(&nbsp;)</button>
         <button class="btn mono" data-pair="[]" title="Inserează [  ]">[&nbsp;]</button>
       </div>
-      <div class="tgroup">
-        <button class="btn" id="saveBtn" title="Salvează lucrul într-un fișier">💾</button>
-        <button class="btn" id="openBtn" title="Deschide un fișier salvat">📂</button>
-        <button class="btn" id="pdfBtn" title="Printează / salvează ca PDF">🖨</button>
+    </div>
+
+    <div class="tb-dreapta">
+      <button class="chip" id="scurtBtn" aria-expanded="false" title="Scurtăturile de tastatură">scurtături</button>
+      <button class="chip" id="notesBtn" title="Deschide notițele">notițe</button>
+      <button class="chip chip--stare" id="saveState" hidden>nesalvat</button>
+      <button class="btn-save" id="saveBtn" title="Salvează foaia în contul tău (Ctrl+S)">
+        <span class="btn-save__icon" aria-hidden="true"></span>
+        <span id="saveLabel">Salvează</span>
+      </button>
+      <button class="btn btn--ico" id="altBtn" title="Altele" aria-label="Altele" aria-expanded="false">⋯</button>
+
+      <div class="meniu" id="altMeniu" hidden>
+        <button class="meniu__it" id="sheetsBtn">Foile mele…</button>
+        <button class="meniu__it" id="saveAsBtn">Salvează ca foaie nouă…</button>
+        <button class="meniu__it" id="renameBtn">Redenumește foaia…</button>
+        <hr class="meniu__linie">
+        <button class="meniu__it" id="settingsBtn">Simboluri (tastele 1-4)…</button>
+        <button class="meniu__it" id="pdfBtn">Tipărește sau salvează PDF</button>
       </div>
-      <button class="btn" id="settingsBtn" title="Simboluri (tastele 1-4)">⚙</button>
-      <button class="btn btn-notes" id="notesBtn" title="Deschide notițele">📝 Notițe</button>
     </div>
   </div>
 
-  <div class="legend">
-    <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> → <span id="legendSyms"></span></span>
-    <span><kbd>Shift</kbd>+<kbd>A</kbd> ciclează ă → î → â</span>
-    <span><kbd>Shift</kbd>+<kbd>S</kbd> → ș · <kbd>Shift</kbd>+<kbd>T</kbd> → ț</span>
-    <span><kbd>,</kbd> → „, ” · <kbd>-</kbd> → „ - ”</span>
-    <span><kbd>Enter</kbd> rând nou · <kbd>Tab</kbd> etapa următoare</span>
-    <span id="saveStatus" class="save-status">salvare automată</span>
+  <div class="legend" id="legend" hidden>
+    <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> <span id="legendSyms"></span></span>
+    <span><kbd>Shift</kbd><kbd>A</kbd> ă → î → â</span>
+    <span><kbd>Shift</kbd><kbd>S</kbd> ș · <kbd>Shift</kbd><kbd>T</kbd> ț</span>
+    <span><kbd>-</kbd> desparte silabele</span>
+    <span><kbd>Tab</kbd> etapa următoare</span>
+    <span><kbd>Enter</kbd> rând nou</span>
+    <span><kbd>Ctrl</kbd><kbd>S</kbd> salvează</span>
   </div>
 </header>
 
@@ -103,8 +118,14 @@
   <div class="settings-hint">Tastele 1-4 și butoanele din bară inserează aceste simboluri. Bifează „bold" dacă vrei simbolul îngroșat. Setările se salvează pe acest calculator.</div>
 </aside>
 
-<!-- input ascuns pentru „Deschide fișier" -->
-<input type="file" id="openFile" accept=".json,application/json" hidden>
+<!-- Panoul „Foile mele": lista foilor salvate în cont pentru lecția asta. -->
+<aside class="notes foi" id="foiPanel" aria-hidden="true">
+  <div class="notes-head">
+    <strong>Foile mele</strong>
+    <button class="notes-close" id="foiClose" title="Închide">×</button>
+  </div>
+  <div class="foi-body" id="foiBody"></div>
+</aside>
 
 <!-- Șablon pentru un rând de lucru -->
 <template id="rowTemplate">

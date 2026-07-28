@@ -752,27 +752,65 @@ sheet.addEventListener('input', (e) => {
   }
 });
 
-/* ---------- Panourile Notițe / Simboluri (deschidere/închidere DOAR la click) ---------- */
+/* ---------- Panourile din dreapta (Notițe / Simboluri / Foile mele) ----------
+   Se deschid DOAR la click și numai unul odată: se așază toate în același colț,
+   iar două deschise s-ar acoperi unul pe altul. */
 const notesPanel    = document.getElementById('notesPanel');
 const settingsPanel = document.getElementById('settingsPanel');
+const panouri = [notesPanel, settingsPanel, document.getElementById('foiPanel')].filter(Boolean);
 
-/* deschide un panou și-l închide pe celălalt, ca să nu se suprapună în dreapta-sus */
+function inchidePanou(p) {
+  p.classList.remove('open');
+  p.setAttribute('aria-hidden', 'true');
+}
 function togglePanel(panel) {
-  const willOpen = !panel.classList.contains('open');
-  [notesPanel, settingsPanel].forEach(p => {
-    const on = (p === panel) && willOpen;
+  const seDeschide = !panel.classList.contains('open');
+  panouri.forEach((p) => {
+    const on = (p === panel) && seDeschide;
     p.classList.toggle('open', on);
     p.setAttribute('aria-hidden', on ? 'false' : 'true');
   });
 }
 document.getElementById('notesBtn').addEventListener('click', () => togglePanel(notesPanel));
-document.getElementById('notesClose').addEventListener('click', () => {
-  notesPanel.classList.remove('open'); notesPanel.setAttribute('aria-hidden', 'true');
+document.getElementById('notesClose').addEventListener('click', () => inchidePanou(notesPanel));
+document.getElementById('settingsBtn').addEventListener('click', () => { inchideMeniu(); togglePanel(settingsPanel); });
+document.getElementById('settingsClose').addEventListener('click', () => inchidePanou(settingsPanel));
+document.getElementById('foiClose').addEventListener('click', () => inchidePanou(document.getElementById('foiPanel')));
+document.getElementById('sheetsBtn').addEventListener('click', () => {
+  inchideMeniu();
+  togglePanel(document.getElementById('foiPanel'));
+  aratăFoile();
 });
-document.getElementById('settingsBtn').addEventListener('click', () => togglePanel(settingsPanel));
-document.getElementById('settingsClose').addEventListener('click', () => {
-  settingsPanel.classList.remove('open'); settingsPanel.setAttribute('aria-hidden', 'true');
+
+/* ---------- Scurtăturile: ascunse până le ceri ----------
+   Erau șase rânduri de text mărunt, citite o dată și apoi niciodată, dar care
+   luau înălțime din foaie la fiecare deschidere a paginii. */
+const elLegend = document.getElementById('legend');
+const elScurt  = document.getElementById('scurtBtn');
+elScurt.addEventListener('click', () => {
+  const seDeschide = elLegend.hidden;
+  elLegend.hidden = !seDeschide;
+  elScurt.setAttribute('aria-expanded', seDeschide ? 'true' : 'false');
+  elScurt.classList.toggle('e-apasat', seDeschide);
 });
+
+/* ---------- Meniul „⋯" ---------- */
+const elMeniu = document.getElementById('altMeniu');
+const elAlt   = document.getElementById('altBtn');
+function inchideMeniu() {
+  elMeniu.hidden = true;
+  elAlt.setAttribute('aria-expanded', 'false');
+}
+elAlt.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const seDeschide = elMeniu.hidden;
+  elMeniu.hidden = !seDeschide;
+  elAlt.setAttribute('aria-expanded', seDeschide ? 'true' : 'false');
+});
+document.addEventListener('click', (e) => {
+  if (!elMeniu.hidden && !e.target.closest('#altMeniu, #altBtn')) inchideMeniu();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') inchideMeniu(); });
 
 /* afișează butoanele de simboluri din bară + legenda, după setările curente */
 function renderSymbolButtons() {
@@ -897,60 +935,182 @@ function applyState(state) {
   renumber();
 }
 
-/* salvare automată în browser (localStorage), ca refresh-ul să nu piardă nimic */
+/* ================= SALVAREA =================
+   Două straturi, cu roluri diferite, ca să nu se încurce:
+
+   1. CONTUL, la cerere. Butonul „Salvează" scrie foaia în `learn_board_sheets`
+      (migrarea 0074). Se salvează doar când ceri tu, fiindcă o temă se predă,
+      nu se scurge. Poți ține mai multe foi la aceeași lecție.
+
+   2. BROWSERUL, tăcut. Tot ce scrii se pune și în localStorage, ca să nu
+      pierzi nimic dacă se închide fila din greșeală. Plasa asta nu se laudă
+      nicăieri și nu înseamnă „salvat": e doar ce aveai în mână.
+   ============================================ */
+import { listSheets, loadSheet, saveSheet, renameSheet, deleteSheet } from '../../shared/scripts/board-repo.js';
+
+const LECTIE = 'fonetica-introducere';
+
+/* Foaia deschisă acum: `id` null = n-a fost încă salvată în cont. */
+let foaia = { id: null, titlu: 'Foaie nouă', curat: true };
+
+const elSaveBtn   = document.getElementById('saveBtn');
+const elSaveLabel = document.getElementById('saveLabel');
+const elStare     = document.getElementById('saveState');
+
+/* Arată dacă mai e ceva nesalvat. Pastila apare DOAR când chiar e ceva de
+   salvat: un semn care stă mereu aprins nu mai spune nimic. */
+function aratăStarea() {
+  if (elStare) {
+    elStare.hidden = foaia.curat;
+    elStare.textContent = 'nesalvat';
+  }
+  if (elSaveLabel) elSaveLabel.textContent = foaia.id ? 'Salvează' : 'Salvează în cont';
+  if (elSaveBtn) elSaveBtn.classList.toggle('e-curat', foaia.curat);
+}
+
+function murdareste() {
+  if (!foaia.curat) return;
+  foaia.curat = false;
+  aratăStarea();
+}
+
+/* ---------- plasa din browser (tăcută) ---------- */
 var saveTimer = null;
-function scheduleSave() { try { clearTimeout(saveTimer); } catch (e) {} saveTimer = setTimeout(saveStateLocal, 400); }
+function scheduleSave() {
+  try { clearTimeout(saveTimer); } catch (e) {}
+  saveTimer = setTimeout(saveStateLocal, 400);
+}
 function saveStateLocal() {
-  try { localStorage.setItem('fonetica_state', JSON.stringify(collectState())); flashSaved(); } catch (e) {}
+  try { localStorage.setItem('fonetica_state', JSON.stringify(collectState())); } catch (e) {}
 }
 function loadStateLocal() {
   try { const raw = localStorage.getItem('fonetica_state'); if (raw) return JSON.parse(raw); } catch (e) {}
   return null;
 }
-function flashSaved() {
-  const el = document.getElementById('saveStatus');
-  if (!el) return;
-  el.textContent = '✓ salvat';
-  el.classList.add('show');
-  clearTimeout(flashSaved._t);
-  flashSaved._t = setTimeout(() => { el.classList.remove('show'); el.textContent = 'salvare automată'; }, 1100);
+
+/* orice tastare -> plasa din browser + semnul „nesalvat" */
+document.addEventListener('input', () => { scheduleSave(); murdareste(); });
+
+/* ---------- salvarea în cont ---------- */
+
+/* Un nume de pornire care spune ceva: data de azi. „Foaie nouă (3)" nu ajută
+   pe nimeni să-și găsească tema de acum două săptămâni. */
+function numeImplicit() {
+  const d = new Date();
+  const luni = ['ian','feb','mar','apr','mai','iun','iul','aug','sep','oct','noi','dec'];
+  return `${d.getDate()} ${luni[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-/* orice tastare -> salvare automată */
-document.addEventListener('input', scheduleSave);
+function spune(text, reușită = true) {
+  if (!elStare) return;
+  elStare.hidden = false;
+  elStare.textContent = text;
+  elStare.classList.toggle('e-bine', reușită);
+  clearTimeout(spune._t);
+  spune._t = setTimeout(() => { elStare.classList.remove('e-bine'); aratăStarea(); }, 1800);
+}
 
-/* salvare într-un fișier (îl poți redeschide oricând, pe orice calculator) */
-function downloadFile(name, content, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+async function salveaza(caFoaieNoua = false) {
+  const titlu = caFoaieNoua
+    ? (prompt('Numele foii noi:', numeImplicit()) || '').trim()
+    : (foaia.id ? foaia.titlu : (prompt('Numele foii:', numeImplicit()) || '').trim());
+  if (!titlu) return;                       // a apăsat „Renunță"
+
+  elSaveBtn && elSaveBtn.classList.add('e-ocupat');
+  const row = await saveSheet({
+    id: caFoaieNoua ? null : foaia.id,
+    lessonSlug: LECTIE,
+    title: titlu,
+    data: collectState(),
+  });
+  elSaveBtn && elSaveBtn.classList.remove('e-ocupat');
+
+  if (!row) { spune('nu s-a putut salva', false); return; }
+  foaia = { id: row.id, titlu: row.title, curat: true };
+  aratăStarea();
+  spune('salvat', true);
 }
-function timeStamp() {
-  const d = new Date(), p = n => String(n).padStart(2, '0');
-  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
-}
-document.getElementById('saveBtn').addEventListener('click', () => {
-  downloadFile('fonetica_' + timeStamp() + '.json', JSON.stringify(collectState(), null, 2), 'application/json');
+
+elSaveBtn && elSaveBtn.addEventListener('click', () => salveaza(false));
+document.getElementById('saveAsBtn').addEventListener('click', () => { inchideMeniu(); salveaza(true); });
+
+document.getElementById('renameBtn').addEventListener('click', async () => {
+  inchideMeniu();
+  if (!foaia.id) { alert('Salvează întâi foaia, apoi îi poți schimba numele.'); return; }
+  const nou = (prompt('Numele foii:', foaia.titlu) || '').trim();
+  if (!nou || nou === foaia.titlu) return;
+  if (await renameSheet(foaia.id, nou)) { foaia.titlu = nou; spune('redenumit', true); }
 });
-document.getElementById('openBtn').addEventListener('click', () => document.getElementById('openFile').click());
-document.getElementById('openFile').addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try { applyState(JSON.parse(reader.result)); scheduleSave(); }
-    catch (err) { alert('Fișierul nu poate fi citit (format nevalid).'); }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
+
+/* Ctrl+S: salvează în cont, nu deschide dialogul browserului. */
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    salveaza(false);
+  }
+});
+
+/* Dacă pleci cu foaia nesalvată, browserul întreabă. Nu putem scrie noi
+   mesajul (browserele îl aleg singure), dar întrebarea e ce contează. */
+window.addEventListener('beforeunload', (e) => {
+  if (foaia.curat) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+/* ---------- panoul „Foile mele" ---------- */
+const foiPanel = document.getElementById('foiPanel');
+const foiBody  = document.getElementById('foiBody');
+
+function candSalvat(iso) {
+  const d = new Date(iso), azi = new Date();
+  const ceas = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  if (d.toDateString() === azi.toDateString()) return 'azi, ' + ceas;
+  return d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) + ', ' + ceas;
+}
+
+async function aratăFoile() {
+  foiBody.innerHTML = '<p class="foi-gol">Se încarcă…</p>';
+  const foi = await listSheets(LECTIE);
+  if (!foi.length) {
+    foiBody.innerHTML = '<p class="foi-gol">N-ai încă nicio foaie salvată la lecția asta. Scrie ceva, apoi apasă „Salvează".</p>';
+    return;
+  }
+  foiBody.innerHTML = foi.map((f) => `
+    <div class="foaie${f.id === foaia.id ? ' e-deschisa' : ''}" data-id="${f.id}">
+      <button class="foaie__nume" data-act="deschide">${f.title}</button>
+      <span class="foaie__cand">${candSalvat(f.updated_at)}</span>
+      <button class="foaie__sterge" data-act="sterge" title="Șterge foaia" aria-label="Șterge foaia">×</button>
+    </div>`).join('');
+}
+
+foiBody.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const id = b.closest('.foaie').dataset.id;
+
+  if (b.dataset.act === 'sterge') {
+    if (!confirm('Ștergi foaia asta? Nu se mai poate aduce înapoi.')) return;
+    if (await deleteSheet(id)) {
+      if (foaia.id === id) foaia = { id: null, titlu: 'Foaie nouă', curat: foaia.curat };
+      aratăStarea();
+      aratăFoile();
+    }
+    return;
+  }
+
+  if (!foaia.curat && !confirm('Foaia de acum n-a fost salvată. O lași așa și o deschizi pe cealaltă?')) return;
+  const f = await loadSheet(id);
+  if (!f) { alert('Foaia nu s-a putut deschide.'); return; }
+  applyState(f.data);
+  foaia = { id: f.id, titlu: f.title, curat: true };
+  aratăStarea();
+  aratăFoile();
+  inchidePanou(foiPanel);
 });
 
 /* PDF: deschide dialogul de printare (de acolo alegi „Salvează ca PDF") */
-document.getElementById('pdfBtn').addEventListener('click', () => window.print());
+document.getElementById('pdfBtn').addEventListener('click', () => { inchideMeniu(); window.print(); });
 
 /* Șterge tot: cerința + toate rândurile (notițele și simbolurile rămân) */
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -960,6 +1120,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   addRowAfter(null);
   renumber();
   scheduleSave();
+  murdareste();
 });
 
 /* ---------- Pornire: restaurează lucrul salvat, sau un rând gol ---------- */
@@ -970,5 +1131,6 @@ if (savedState && savedState.rows && savedState.rows.length) {
   addRowAfter(null);
 }
 renumber();
+aratăStarea();
 const firstField = sheet.querySelector('.field');
 if (firstField) placeCaret(firstField, true);

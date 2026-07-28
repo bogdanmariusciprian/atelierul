@@ -47,31 +47,147 @@
   .header-inner {
     max-width: 1080px;
     margin: 0 auto;
-    padding: 14px 20px 12px;
+    padding: 9px 20px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
     flex-wrap: wrap;
   }
-  .brand { display: flex; flex-direction: column; margin-right: auto; }
-  .brand h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
-  .brand span { font-size: 12px; color: var(--muted); }
+
+  /* ---- marca: eticheta care spune unde ești ----
+     Titlul mare de dinainte lua un rând întreg ca să repete ceva ce elevul
+     tocmai a apăsat el însuși. O etichetă mică ajunge. */
+  .tb-marca {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    color: #3a4fc4;
+    font-weight: 600;
+    font-size: 13px;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .tb-marca__icon {
+    width: 15px;
+    height: 15px;
+    background: currentColor;
+    -webkit-mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
+    mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
+  }
+  .tb-lectie {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    user-select: none;
+  }
 
   .toolbar {
     display: flex;
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
+    margin-left: 6px;
   }
+  /* Uneltele se citesc ca trei mănunchiuri, nu ca zece obiecte risipite:
+     fiecare grup stă pe fundalul lui, iar butoanele dinăuntru n-au chenar. */
   .tgroup {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding-right: 8px;
-    margin-right: 2px;
-    border-right: 1px solid var(--line);
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: #f7f8fc;
   }
-  .tgroup:last-child { border-right: none; padding-right: 0; }
+
+  /* ---- partea dreaptă: starea foii ---- */
+  .tb-dreapta {
+    position: relative;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .chip {
+    font-family: var(--ui);
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .chip:hover { border-color: #cdd7ff; color: var(--ink); }
+  .chip.e-apasat { background: var(--accent-soft); border-color: #cdd7ff; color: #3a4fc4; }
+  /* Pastila de stare apare DOAR când chiar e ceva de salvat. Un semn care stă
+     mereu aprins nu mai spune nimic. */
+  .chip--stare { background: #fdf6e9; border-color: #f0c98a; color: #8a5a12; cursor: default; }
+  .chip--stare.e-bine { background: #e9f7ef; border-color: #a7dcbd; color: #1a7a45; }
+
+  .btn-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    padding: 0 15px;
+    border: none;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--ui);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: background .12s, opacity .12s;
+  }
+  .btn-save:hover { background: #3f5ee0; }
+  /* Salvat deja: butonul rămâne acolo, dar se retrage. Nu-l ascundem, ca
+     mâna să-l găsească în același loc data viitoare. */
+  .btn-save.e-curat { background: #b9c2d9; }
+  .btn-save.e-ocupat { opacity: .6; pointer-events: none; }
+  .btn-save__icon {
+    width: 15px;
+    height: 15px;
+    background: currentColor;
+    -webkit-mask: url("/assets/icons/file-download.svg") no-repeat center / contain;
+    mask: url("/assets/icons/file-download.svg") no-repeat center / contain;
+  }
+  .btn--ico { min-width: 34px; padding: 0; font-size: 17px; line-height: 1; }
+
+  /* ---- meniul „⋯" ---- */
+  .meniu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 30;
+    min-width: 224px;
+    padding: 5px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+  }
+  .meniu__it {
+    text-align: left;
+    font-family: var(--ui);
+    font-size: 13px;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+  .meniu__it:hover { background: var(--accent-soft); }
+  .meniu__linie { border: none; border-top: 1px solid var(--line); margin: 4px 6px; }
 
   .btn {
     font-family: var(--ui);
@@ -90,25 +206,19 @@
     justify-content: center;
   }
   .btn:hover { background: var(--accent-soft); border-color: #cdd7ff; }
+  /* În mănunchi butonul n-are chenar propriu: rama grupului îl ține deja. */
+  .tgroup .btn { border-color: transparent; background: transparent; }
+  .tgroup .btn:hover { background: #fff; box-shadow: 0 1px 3px rgba(31, 36, 48, .10); }
   .btn:active { transform: translateY(1px); }
   .btn.mono { font-family: var(--mono); font-size: 15px; }
   .btn b { font-weight: 800; }
 
-  .btn-notes {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-    font-weight: 600;
-    padding: 0 14px;
-    gap: 7px;
-  }
-  .btn-notes:hover { background: #3f5ee0; border-color: #3f5ee0; }
-
   /* ============ Legendă scurtături ============ */
+  .legend[hidden] { display: none; }
   .legend {
     max-width: 1080px;
     margin: 0 auto;
-    padding: 8px 20px 0;
+    padding: 2px 20px 10px;
     font-size: 12px;
     color: var(--muted);
     display: flex;
@@ -272,9 +382,6 @@
   .btn-danger { background: #fff2f2; border: 1px dashed #ffb0b0; color: #d13636; }
   .btn-danger:hover { background: #ffe4e4; border-color: #ff9b9b; }
 
-  .save-status { color: var(--muted); transition: color .2s; margin-left: auto; }
-  .save-status.show { color: #1a9d5a; font-weight: 600; }
-
   /* ============ Panoul de notițe ============ */
   .notes {
     position: fixed;
@@ -406,3 +513,46 @@
   transform: translateX(-2px);
 }
 
+
+/* ============ Panoul „Foile mele" ============
+   Aceeași casetă din dreapta ca notițele și simbolurile, deci elevul o
+   recunoaște fără s-o învețe. */
+.foi-body { padding: 10px 12px 14px; overflow-y: auto; }
+.foi-gol { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 4px 2px; }
+.foaie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 9px;
+}
+.foaie:hover { background: var(--accent-soft); }
+.foaie.e-deschisa { background: var(--accent-soft); }
+.foaie__nume {
+  flex: 1;
+  text-align: left;
+  font-family: var(--ui);
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.foaie.e-deschisa .foaie__nume { font-weight: 600; }
+.foaie__cand { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.foaie__sterge {
+  flex: none;
+  width: 22px; height: 22px;
+  border: none; border-radius: 6px;
+  background: transparent; color: var(--muted);
+  font-size: 16px; line-height: 1; cursor: pointer;
+}
+.foaie__sterge:hover { background: #ffe4e4; color: #d13636; }
+
+/* La tipărire rămâne doar foaia: capul de pagină și panourile n-au ce căuta
+   pe hârtie. */
+@media print {
+  header, .add-row, .notes, .tb-inapoi { display: none !important; }
+  body { height: auto; overflow: visible; }
+}
