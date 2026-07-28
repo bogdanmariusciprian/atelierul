@@ -541,30 +541,39 @@ html, body{ overscroll-behavior:none; touch-action:manipulation; }
 }
 
 /* ---- lista lucrărilor ----
-   Nume, nu poze. Numărul de ordine îl pune lista însăși (`<ol>`), deci nu se
-   poate desincroniza de rând. */
+   Nume, nu poze. Numărul de ordine îl pune lista însăși (`<ol>`).
+
+   ATENȚIE la rândul de listă: pusesem pe el `display:flex`, ca să așez numele
+   și „×"-ul unul lângă altul. Așa am pierdut numărul, fiindcă un element cu
+   `display:flex` nu mai e `list-item`, deci n-are marcator. Iar `flex:1` pe
+   nume îl întindea peste tot rândul și împingea „×"-ul tocmai în margine.
+   Rândul rămâne acum rând de listă, iar cele două stau inline, lipite. */
 .postit-works{padding:6px 8px 10px;overflow:auto;}
 .postit-works[hidden]{display:none;}
 .works-empty{margin:6px 4px;font-size:12.5px;line-height:1.55;color:#8a7c50;}
-.works-list{margin:0;padding:0 0 0 26px;list-style:decimal;}
-.works-list::marker{color:#8a7c50;}
+.works-list{margin:0;padding:0 0 0 30px;list-style:decimal;}
 .work{
-  display:flex;align-items:center;gap:4px;
-  padding:1px 0;color:#6b5f3c;font-size:12.5px;
+  display:list-item;
+  padding:1px 0;
+  color:#6b5f3c;font-size:12.5px;
 }
 .work::marker{color:#8a7c50;font-variant-numeric:tabular-nums;}
 .work-open{
-  flex:1;text-align:left;padding:4px 6px;border:none;border-radius:6px;
+  display:inline;padding:3px 6px;border:none;border-radius:6px;
   background:transparent;color:#3a3218;font:inherit;font-variant-numeric:tabular-nums;
   cursor:pointer;
 }
 .work-open:hover{background:#f2e6bd;}
+/* „×"-ul stă lipit de nume, nu în celălalt capăt al panoului: acolo ar fi la
+   fel de departe de lucrarea lui ca de vecina ei. Locul îi e păstrat mereu,
+   deci rândul nu tresare când se arată. */
 .work-del{
-  flex:none;width:20px;height:20px;border:none;border-radius:6px;
-  background:transparent;color:#a99a63;font-size:15px;line-height:1;cursor:pointer;
-  opacity:0;transition:opacity .12s;
+  display:inline-block;width:19px;height:19px;margin-left:2px;vertical-align:-4px;
+  border:none;border-radius:6px;
+  background:transparent;color:#a99a63;font-size:15px;line-height:19px;
+  text-align:center;cursor:pointer;opacity:0;transition:opacity .12s;
 }
-.work:hover .work-del{opacity:1;}
+.work:hover .work-del,.work-del:focus-visible{opacity:1;}
 .work-del:hover{background:#f6d6d3;color:#a3312a;}
 
 /* ---- mânerul de redimensionare ----
