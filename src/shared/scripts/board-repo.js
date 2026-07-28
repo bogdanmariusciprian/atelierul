@@ -63,26 +63,36 @@ export async function loadSheet(id) {
  */
 export async function saveSheet({ id, lessonSlug, title, data }) {
   const u = await utilizator();
-  if (!u) return null;
+  if (!u) return { row: null, motiv: "neconectat" };
 
-  if (id) {
-    const { data: row, error } = await supabase
-      .from("learn_lessons_boards")
-      .update({ title, data })
-      .eq("id", id)
-      .select("id, title, updated_at")
-      .maybeSingle();
-    if (error) { console.warn("saveSheet:", error.message); return null; }
-    return row;
+  const cerere = id
+    ? supabase.from("learn_lessons_boards").update({ title, data }).eq("id", id)
+    : supabase.from("learn_lessons_boards").insert({ user_id: u.id, lesson_slug: lessonSlug, title, data });
+
+  const { data: row, error } = await cerere.select("id, title, updated_at").maybeSingle();
+  if (error) {
+    console.warn("saveSheet:", error.code, error.message);
+    return { row: null, motiv: motivul(error) };
   }
+  return { row, motiv: null };
+}
 
-  const { data: row, error } = await supabase
-    .from("learn_lessons_boards")
-    .insert({ user_id: u.id, lesson_slug: lessonSlug, title, data })
-    .select("id, title, updated_at")
-    .maybeSingle();
-  if (error) { console.warn("saveSheet:", error.message); return null; }
-  return row;
+/** Traduce eroarea bazei într-un motiv scurt, de arătat pe ecran.
+ *  Fără asta, orice necaz arăta la fel: „nu s-a putut salva", iar cauza
+ *  adevărată (tabel lipsă, drepturi, rețea) rămânea ascunsă în consolă. */
+function motivul(error) {
+  const cod = error && error.code;
+  const txt = ((error && error.message) || "").toLowerCase();
+  if (cod === "42P01" || txt.includes("does not exist") || txt.includes("schema cache")) {
+    return "tabelul lipsește: aplică migrarea 0074";
+  }
+  if (cod === "42501" || txt.includes("row-level security") || txt.includes("policy")) {
+    return "n-ai drept de scriere pe foaia asta";
+  }
+  if (txt.includes("failed to fetch") || txt.includes("networkerror")) {
+    return "fără legătură la server";
+  }
+  return "nu s-a putut salva";
 }
 
 /** Schimbă numele unei foi, fără să atingă ce e scris pe ea. */

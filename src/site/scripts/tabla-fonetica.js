@@ -963,6 +963,7 @@ function aratăStarea() {
   if (elStare) {
     elStare.hidden = foaia.curat;
     elStare.textContent = 'nesalvat';
+    elStare.classList.remove('e-rau');
   }
   if (elSaveLabel) elSaveLabel.textContent = foaia.id ? 'Salvează' : 'Salvează în cont';
   if (elSaveBtn) elSaveBtn.classList.toggle('e-curat', foaia.curat);
@@ -1006,6 +1007,7 @@ function spune(text, reușită = true) {
   elStare.hidden = false;
   elStare.textContent = text;
   elStare.classList.toggle('e-bine', reușită);
+  elStare.classList.toggle('e-rau', !reușită);
   clearTimeout(spune._t);
   spune._t = setTimeout(() => { elStare.classList.remove('e-bine'); aratăStarea(); }, 1800);
 }
@@ -1017,7 +1019,7 @@ async function salveaza(caFoaieNoua = false) {
   if (!titlu) return;                       // a apăsat „Renunță"
 
   elSaveBtn && elSaveBtn.classList.add('e-ocupat');
-  const row = await saveSheet({
+  const { row, motiv } = await saveSheet({
     id: caFoaieNoua ? null : foaia.id,
     lessonSlug: LECTIE,
     title: titlu,
@@ -1025,22 +1027,31 @@ async function salveaza(caFoaieNoua = false) {
   });
   elSaveBtn && elSaveBtn.classList.remove('e-ocupat');
 
-  if (!row) { spune('nu s-a putut salva', false); return; }
+  if (!row) { spune(motiv || 'nu s-a putut salva', false); return; }
   foaia = { id: row.id, titlu: row.title, curat: true };
   aratăStarea();
   spune('salvat', true);
 }
 
 elSaveBtn && elSaveBtn.addEventListener('click', () => salveaza(false));
-document.getElementById('saveAsBtn').addEventListener('click', () => { inchideMeniu(); salveaza(true); });
-
-document.getElementById('renameBtn').addEventListener('click', async () => {
+/* `prompt` oprește pagina pe loc, înainte ca browserul să apuce să redeseneze,
+   deci meniul ar rămâne pe ecran sub fereastra de întrebare. Amânarea cu un
+   pas îi dă răgaz să se ascundă. */
+document.getElementById('saveAsBtn').addEventListener('click', () => {
   inchideMeniu();
+  setTimeout(() => salveaza(true), 0);
+});
+
+document.getElementById('renameBtn').addEventListener('click', () => {
+  inchideMeniu();
+  setTimeout(redenumeste, 0);
+});
+async function redenumeste() {
   if (!foaia.id) { alert('Salvează întâi foaia, apoi îi poți schimba numele.'); return; }
   const nou = (prompt('Numele foii:', foaia.titlu) || '').trim();
   if (!nou || nou === foaia.titlu) return;
   if (await renameSheet(foaia.id, nou)) { foaia.titlu = nou; spune('redenumit', true); }
-});
+}
 
 /* Ctrl+S: salvează în cont, nu deschide dialogul browserului. */
 document.addEventListener('keydown', (e) => {

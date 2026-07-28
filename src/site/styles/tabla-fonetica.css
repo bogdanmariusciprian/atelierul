@@ -128,6 +128,10 @@
      mereu aprins nu mai spune nimic. */
   .chip--stare { background: #fdf6e9; border-color: #f0c98a; color: #8a5a12; cursor: default; }
   .chip--stare.e-bine { background: #e9f7ef; border-color: #a7dcbd; color: #1a7a45; }
+  /* Motivul unei salvări ratate e o propoziție, nu un cuvânt: pastila trebuie
+     să-l poată ține întreg, altfel elevul vede „tabelul lipse…". */
+  .chip--stare.e-rau { background: #fdeceb; border-color: #f2b5b1; color: #a3312a; }
+  .chip--stare { max-width: 22rem; white-space: normal; line-height: 1.35; text-align: left; }
 
   .btn-save {
     display: inline-flex;
@@ -160,7 +164,13 @@
   }
   .btn--ico { min-width: 34px; padding: 0; font-size: 17px; line-height: 1; }
 
-  /* ---- meniul „⋯" ---- */
+  /* ---- meniul „⋯" ----
+     `[hidden]` trebuie scris aici, altfel meniul nu se închide niciodată:
+     regula `display: flex` de mai jos vine din foaia noastră de stil, iar ea
+     bate `[hidden] { display: none }`, care vine din foaia browserului.
+     Atributul rămâne pus, dar n-are nicio putere. Aceeași capcană ca la
+     mască: ce pare o pornire/oprire e de fapt o întrecere de reguli. */
+  .meniu[hidden] { display: none; }
   .meniu {
     position: absolute;
     top: calc(100% + 8px);
