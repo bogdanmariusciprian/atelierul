@@ -158,6 +158,61 @@ function taieVirgulaFinala(el) {
   }
 }
 
+/* ================= Îmbrăcarea simbolurilor deja scrise =================
+   Cutia de o celulă se pune la inserare, dar foile scrise ÎNAINTE de asta au
+   simbolurile ca text gol, deci s-ar purta mai departe după lățimea pe care
+   le-o dă fontul. Funcția de mai jos le îmbracă și pe ele, ca să nu fie
+   nevoie de rescris nimic.
+
+   Se cheamă la deschiderea unei foi și la ieșirea din câmp, deci vechiul se
+   îndreaptă de la sine, pe măsură ce lucrezi. */
+function imbracaSimboluri(el) {
+  if (!el) return;
+  const lista = Object.values(symbols).map(s => s && s.char).filter(Boolean);
+  if (!lista.length) return;
+
+  const cutieCu = (nod) => {
+    const c = document.createElement('span');
+    c.className = 'sym';
+    c.appendChild(nod);
+    return c;
+  };
+
+  // 1. simbolurile îngroșate: un <b> care ține exact un simbol.
+  //    Bold-ul pus de elev pe un cuvânt întreg NU se atinge: numai <b>-urile
+  //    care conțin fix un simbol din tabel intră în cutie.
+  el.querySelectorAll('b').forEach((b) => {
+    if (b.closest('.sym')) return;
+    if (!lista.includes(b.textContent)) return;
+    const gol = document.createElement('span');
+    b.replaceWith(gol);
+    gol.replaceWith(cutieCu(b));
+  });
+
+  // 2. simbolurile rămase ca text simplu
+  for (const nod of noduriText(el)) {
+    if (!nod.parentElement || nod.parentElement.closest('.sym')) continue;
+    const t = nod.textContent;
+    let i = 0, gasit = false;
+    const bucati = [];
+    while (i < t.length) {
+      const sim = lista.find((x) => t.startsWith(x, i));
+      if (sim) { bucati.push({ sim }); i += sim.length; gasit = true; continue; }
+      const ultim = bucati[bucati.length - 1];
+      if (ultim && ultim.text !== undefined) ultim.text += t[i];
+      else bucati.push({ text: t[i] });
+      i++;
+    }
+    if (!gasit) continue;
+    const frag = document.createDocumentFragment();
+    for (const b of bucati) {
+      if (b.sim) frag.appendChild(cutieCu(document.createTextNode(b.sim)));
+      else frag.appendChild(document.createTextNode(b.text));
+    }
+    nod.replaceWith(frag);
+  }
+}
+
 const A_VARIANTS = ['ă', 'î', 'â'];   // ciclul pentru Shift+A
 
 /* ---------- Utilitare pentru selecție / cursor ---------- */
@@ -787,7 +842,7 @@ sheet.addEventListener('blur', (e) => {
   if (field.classList.contains('trans') && /^\[\s*\]$/.test(bare.trim())) { field.innerHTML = ''; return; }
   // Virgula de la coadă și-a făcut treaba cât ai scris; acum ar rămâne
   // atârnată după ultimul sunet, așa că o strângem.
-  if (field.classList.contains('trans')) taieVirgulaFinala(field);
+  if (field.classList.contains('trans')) { taieVirgulaFinala(field); imbracaSimboluri(field); }
   if (field.classList.contains('types')) {                    // c/v/s -> curăț spațiile de la coadă
     const trimmed = bare.replace(/\s+$/, '');
     if (trimmed !== field.textContent) field.textContent = trimmed;
@@ -828,6 +883,7 @@ function applyState(state) {
       row.querySelector('.word').innerHTML   = r.word  || '';
       row.querySelector('.syll').innerHTML   = r.syll  || '';
       row.querySelector('.trans').innerHTML  = r.trans || '';
+      imbracaSimboluri(row.querySelector('.trans'));   // foile vechi: simbolurile intră în cutie
       row.querySelector('.types').textContent = r.types || '';
       (r.extra || []).forEach(html => {
         const arrow = document.createElement('span'); arrow.className = 'arrow'; arrow.textContent = '→';
