@@ -1045,7 +1045,7 @@
                    ' (' + doua(d.getHours()) + ':' + doua(d.getMinutes()) + ')';
       return '<li class="work" data-id="' + w.id + '">' +
              '<button class="work-open" data-open="' + w.id + '" title="Adu lucrarea înapoi pe pânză">' + cand + '</button>' +
-             '<button class="work-del" data-del="' + w.id + '" title="Șterge lucrarea" aria-label="Șterge lucrarea">×</button>' +
+             '<button class="work-del" data-del="' + w.id + '" title="Șterge lucrarea" aria-label="Șterge lucrarea"></button>' +
              '</li>';
     }).join('') + '</ol>';
   }

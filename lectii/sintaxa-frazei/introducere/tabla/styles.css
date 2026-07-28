@@ -567,17 +567,25 @@ html, body{ overscroll-behavior:none; touch-action:manipulation; }
 /* „×"-ul stă lipit de nume, nu în celălalt capăt al panoului: acolo ar fi la
    fel de departe de lucrarea lui ca de vecina ei. Locul îi e păstrat mereu,
    deci rândul nu tresare când se arată. */
+/* Semnul de ștergere e DESENAT, nu scris.
+   Litera „×" stă sus în caseta ei de font, iar centrarea casetei n-are cum s-o
+   coboare: oricât aș fi aliniat butonul, semnul rămânea deasupra rândului.
+   Două bare încrucișate, așezate din centrul butonului, cad exact la mijloc,
+   indiferent de font. */
 .work-del{
-  /* `inline-flex` ca să pot centra semnul înăuntru pe amândouă direcțiile;
-     `vertical-align:middle` ca butonul întreg să stea la mijlocul rândului.
-     Aveam o împingere fixă de 4px, care nimerea doar la mărimea de atunci:
-     schimbai mărimea scrisului din notiță și „×" urca sau cobora. */
-  display:inline-flex;align-items:center;justify-content:center;
-  width:19px;height:19px;margin-left:2px;vertical-align:middle;
-  border:none;border-radius:6px;
-  background:transparent;color:#a99a63;font-size:15px;line-height:1;
-  cursor:pointer;opacity:0;transition:opacity .12s;
+  position:relative;
+  display:inline-block;
+  width:18px;height:18px;margin-left:2px;vertical-align:middle;
+  border:none;border-radius:6px;padding:0;
+  background:transparent;color:#a99a63;
+  cursor:pointer;opacity:0;transition:opacity .12s,background .12s,color .12s;
 }
+.work-del::before,.work-del::after{
+  content:"";position:absolute;left:50%;top:50%;
+  width:10px;height:1.6px;border-radius:2px;background:currentColor;
+}
+.work-del::before{transform:translate(-50%,-50%) rotate(45deg);}
+.work-del::after{transform:translate(-50%,-50%) rotate(-45deg);}
 .work:hover .work-del,.work-del:focus-visible{opacity:1;}
 .work-del:hover{background:#f6d6d3;color:#a3312a;}
 
