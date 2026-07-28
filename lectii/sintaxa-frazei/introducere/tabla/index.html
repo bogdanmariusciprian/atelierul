@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+
+<!-- =========================================================
+     qwzkySyntax / „Sintaxa FRAZEI" – aplicație de sine stătătoare, adusă
+     întreagă din `Diverse/FrazaApp`. NU se modifică: `index.html`, `app.js` și
+     `styles.css` sunt exact fișierele lui Marius.
+
+     Singurele adăugiri sunt învelișul de mai jos: `noindex`, ascunderea până
+     se pronunță poarta de prelansare, și modulul care o cheamă. Niciun rând
+     din aplicație nu e atins.
+
+     Fișierele stau AICI, lângă pagina lor, nu în `src/`. Restul sitului e cod
+     pe care îl scriem noi și îl tot schimbăm; ăsta e un întreg terminat, adus
+     din afară. Pe deasupra, `styles.css` folosește nume obișnuite (`.toolbar`,
+     `.brand`, `.pill`): dacă ar sta în `src/site/styles/`, cineva l-ar putea
+     încărca într-o pagină obișnuită și i-ar strica așezarea.
+     ========================================================= -->
+<style>html:not(.gate-ready) body { visibility: hidden; }</style>
+  <title>Sintaxa FRAZEI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===== Bara de sus ===== -->
+    <header class="topbar">
+      <div class="brand"><span class="logo">q</span>Sintaxa FRAZEI</div>
+      <div class="top-actions">
+        <button id="btnClearAll" class="danger-pill" title="Curăță pânza și câmpul de text (notițele rămân)"></button>
+        <button id="btnSettings" class="icon-btn" title="Setări"></button>
+        <div id="bgDots" class="bg-dots" title="Fundalul pânzei"></div>
+      </div>
+    </header>
+
+    <!-- ===== Panel 1: input ===== -->
+    <section id="panel1" class="panel1">
+      <div class="panel1-head" id="panel1Head">
+        <span class="panel-title">Frază</span>
+        <div class="panel1-tools">
+          <button id="btnPaste" class="chip-btn" title="Lipește din clipboard"></button>
+          <button id="btnFontDec" class="chip-btn mono" title="Micșorează fontul">A−</button>
+          <button id="btnFontInc" class="chip-btn mono" title="Mărește fontul">A+</button>
+          <button id="btnClearText" class="chip-btn" title="Golește textul">Golește</button>
+          <button id="btnCollapse1" class="mini-collapse" title="Restrânge panoul">▾</button>
+        </div>
+      </div>
+      <textarea id="inputText" class="input-text" spellcheck="false"
+        placeholder="Scrie sau lipește fraza aici. Apare în timp real pe pânză, jos."></textarea>
+    </section>
+
+    <div id="vsplit" class="vsplit" title="Trage pentru a redimensiona"></div>
+
+    <!-- ===== Panel 2 ===== -->
+    <section class="panel2">
+
+      <!-- sub-panel 1: bara de instrumente -->
+      <div id="toolbar" class="bar toolbar">
+        <div class="bar-content">
+          <div class="group">
+            <button id="btnUndo" class="icon-btn" title="Anulează (Ctrl+Z)"></button>
+            <button id="btnRedo" class="icon-btn" title="Refă (Ctrl+Y)"></button>
+          </div>
+          <span class="divider"></span>
+          <div class="group" id="utilTools" title="Selecție / text / radieră"></div>
+          <span class="divider"></span>
+          <div class="group" id="shapeTools" title="Forme"></div>
+          <span class="divider"></span>
+          <div class="group color-group">
+            <label class="color-main" title="Culoarea conturului">
+              <span class="color-chip" id="colorChip"></span>
+              <input type="color" id="colorMain" />
+            </label>
+            <div class="favorites" id="favWrap"></div>
+          </div>
+          <span class="divider"></span>
+          <div class="group">
+            <button id="btnFocus" class="icon-btn" title="Ascunde meniurile (lasă pânza)"></button>
+            <button id="btnClearAnnot" class="icon-btn danger" title="Șterge toate marcajele"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- sub-panel 2: reglaje (toate sliderele) -->
+      <div id="slidersBar" class="bar sliders">
+        <div class="bar-content">
+          <div class="slider-cell">
+            <span class="lbl">Grosime</span>
+            <input type="range" id="strokeW" min="1" max="28" step="1" />
+            <span class="readout mono" id="strokeWVal">4</span>
+          </div>
+          <span class="divider"></span>
+          <div class="slider-cell">
+            <span class="lbl">Spațiu între cuvinte</span>
+            <input type="range" id="wordSp" min="0" max="120" step="1" />
+            <span class="readout mono" id="wordSpVal">12</span>
+          </div>
+          <span class="divider"></span>
+          <div class="slider-cell">
+            <span class="lbl">Spațiu între rânduri</span>
+            <input type="range" id="lineSp" min="0" max="160" step="1" />
+            <span class="readout mono" id="lineSpVal">22</span>
+          </div>
+          <span class="divider"></span>
+          <div class="slider-cell">
+            <span class="lbl">Opacitate marcaje</span>
+            <input type="range" id="opacity" min="0" max="100" step="1" />
+            <span class="readout mono" id="opacityVal">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- sub-panel 3: pânza -->
+      <div id="canvasWrap" class="canvas-wrap">
+        <canvas id="canvas"></canvas>
+
+        <div id="toolBadge" class="tool-badge"></div>
+        <div id="carousel" class="carousel"></div>
+        <textarea id="textInput" class="text-input" spellcheck="false" wrap="off" rows="1"></textarea>
+
+        <!-- zoom pânză (stânga jos a pânzei) -->
+        <div class="canvas-zoom">
+          <button id="czOut" class="cz-btn" title="Zoom −"></button>
+          <span id="czVal" class="cz-val mono">100%</span>
+          <button id="czIn" class="cz-btn" title="Zoom +"></button>
+          <button id="czReset" class="cz-btn" title="Resetează vederea"></button>
+        </div>
+
+        <!-- save / copy (dreapta jos) -->
+        <div class="float-actions">
+          <button id="btnSave" class="float-btn" title="Salvează ca JPEG"><span>JPEG</span></button>
+          <button id="btnCopy" class="float-btn" title="Copiază imaginea"><span>Copiază</span></button>
+        </div>
+
+        <!-- post-it (dreapta sus) -->
+        <div id="postitGroup" class="postit-group">
+          <button id="postitBtn" class="float-btn postit-btn" title="Notițe (hover)"></button>
+          <div id="postitPanel" class="postit-panel">
+            <div class="postit-toolbar">
+              <button id="ptBold" class="pt-b" title="Bold"><b>B</b></button>
+              <button id="ptItalic" class="pt-b" title="Italic"><i>I</i></button>
+              <label class="pt-color" title="Culoare text"><input type="color" id="ptColor" value="#1c1c1c" /></label>
+              <span class="pt-sep"></span>
+              <select id="ptRows" class="pt-sel" title="Rânduri"></select>
+              <span class="pt-x">×</span>
+              <select id="ptCols" class="pt-sel" title="Coloane"></select>
+              <button id="ptInsertTable" class="pt-b" title="Inserează tabel (max 6×6)"></button>
+              <span class="pt-sep"></span>
+              <button id="ptZoomOut" class="pt-b mono" title="Micșorează">A−</button>
+              <button id="ptZoomIn" class="pt-b mono" title="Mărește">A+</button>
+              <span class="pt-sep"></span>
+              <button id="ptPin" class="pt-b" title="Fixează deschis"></button>
+            </div>
+            <div id="postitBody" class="postit-body" contenteditable="true" spellcheck="false"></div>
+            <div class="postit-pager">
+              <button id="ptPrev" class="pt-b" title="Pagina anterioară">‹</button>
+              <span id="ptPageLabel" class="pt-page mono">1 / 1</span>
+              <button id="ptNext" class="pt-b" title="Pagina următoare">›</button>
+              <button id="ptAdd" class="pt-b" title="Pagină nouă">+</button>
+              <button id="ptDel" class="pt-b" title="Șterge pagina"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Bara de jos ===== -->
+    <footer class="footer">
+      <div class="ui-zoom">
+        <span class="lbl">Interfață</span>
+        <button id="uiZoomOut" class="mini-btn" title="Micșorează interfața">−</button>
+        <span id="uiZoomVal" class="readout mono">100%</span>
+        <button id="uiZoomIn" class="mini-btn" title="Mărește interfața">+</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ===== Setări ===== -->
+  <div id="settingsModal" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Setări</h2>
+        <button id="btnCloseSettings" class="icon-btn" title="Închide">✕</button>
+      </div>
+      <div class="modal-body">
+        <section class="set-sec">
+          <h3>Fundaluri pânză</h3>
+          <p class="hint">Cele cinci buline din dreapta sus.</p>
+          <div id="setBgWrap" class="swatch-row"></div>
+        </section>
+        <section class="set-sec">
+          <h3>Culori favorite</h3>
+          <p class="hint">Pentru selecție rapidă în bara de instrumente.</p>
+          <div id="setFavWrap" class="swatch-row"></div>
+        </section>
+        <section class="set-sec">
+          <h3>Rotița mouse-ului — schimbarea uneltei</h3>
+          <label class="field">
+            <span>Câți „pași” de rotiță schimbă unealta</span>
+            <input type="number" id="setWheelStep" min="1" max="12" step="1" />
+          </label>
+          <div class="field">
+            <span>Direcția de parcurgere</span>
+            <div id="setWheelDir"></div>
+          </div>
+          <p class="hint">Ce unelte apar la rotiță:</p>
+          <div id="setCarouselWrap" class="check-grid"></div>
+        </section>
+        <section class="set-sec">
+          <h3>Rotița mouse-ului — grosimea conturului (în timpul desenării)</h3>
+          <label class="field">
+            <span>Câți „pași” de rotiță schimbă grosimea</span>
+            <input type="number" id="setStrokeWheelStep" min="1" max="12" step="1" />
+          </label>
+          <label class="field">
+            <span>Cu cât se îngroașă la fiecare pas (viteză)</span>
+            <input type="number" id="setStrokeWheelAmount" min="1" max="6" step="1" />
+          </label>
+          <div class="field">
+            <span>Direcția (înainte = mărește)</span>
+            <div id="setStrokeWheelDir"></div>
+          </div>
+        </section>
+        <section class="set-sec">
+          <h3>Font text analizat</h3>
+          <div id="setFontFamily" class="seg"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- Confirmare proprie (fără dialog nativ) -->
+  <div id="confirmModal" class="modal">
+    <div class="modal-card confirm-card">
+      <div id="confirmMsg" class="confirm-msg"></div>
+      <div class="confirm-actions">
+        <button id="confirmNo" class="btn-soft">Nu</button>
+        <button id="confirmYes" class="btn-danger">Da</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+
+<script type="module">
+  // Poarta de prelansare. Aplicația nu cheamă bara sitului, deci n-ar fi fost
+  // chemată de la sine, iar pagina ar fi rămas deschisă oricui știe adresa.
+  import { enforceGate, revealGate } from "../../../../src/shared/scripts/site-gate.js";
+  if (await enforceGate()) revealGate();
+</script>
+</body>
+</html>
