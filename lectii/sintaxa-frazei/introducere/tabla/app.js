@@ -94,9 +94,10 @@
     carouselTools:['pencil','rect','circle','line','arrow','zigzag','wavy','curvedArrow','curvedArrowDown','text','eraser'],
     uiScale:1, zoom:1, panX:0, panY:0,
     shapes:[],
-    // `works` = lucrările salvate: fiecare cu chipul ei (o poză mică) și cu tot
-    // ce trebuie ca s-o poți relua. `w`/`h` = mărimea aleasă pentru panou.
-    postits:{ pages:[''], cur:0, zoom:1, works:[], w:0, h:0 },
+    // Lucrările NU mai stau aici: ele merg în contul elevului, prin punte.
+    // Aici rămân doar notițele, care sunt ale calculatorului ăstuia.
+    // `w`/`h` = mărimea aleasă pentru panou.
+    postits:{ pages:[''], cur:0, zoom:1, w:0, h:0 },
   };
 
   /* ---------- State ---------- */
@@ -973,8 +974,6 @@
      altfel, readusă peste alte reglaje, ar arăta altfel decât ai lăsat-o. */
   function lucrareaCurenta() {
     return {
-      id: Date.now(),
-      cand: new Date().toISOString(),
       text: state.text,
       // Lățimea la care erau rupte rândurile când s-a salvat. Fără ea, o
       // lucrare deschisă pe alt ecran s-ar re-aranja, iar marcajele ar cădea
@@ -990,19 +989,36 @@
     };
   }
 
-  function salveazaLucrarea() {
+  /* Puntea spre cont, pusă de pagină. Lipsește doar dacă aplicația e deschisă
+     de una singură, în afara sitului; atunci ne purtăm ca la un vizitator. */
+  const punte = () => window.qwzkyBoards || null;
+
+  /* Numele lucrării: data și ora salvării. Numărul de ordine îl pune lista. */
+  function numeleLucrarii() {
+    const d = new Date(), doua = (n) => String(n).padStart(2, '0');
+    return doua(d.getDate()) + '.' + doua(d.getMonth() + 1) + '.' + d.getFullYear() +
+           ' (' + doua(d.getHours()) + ':' + doua(d.getMinutes()) + ')';
+  }
+
+  async function salveazaLucrarea() {
     if (!state.text.trim() && !state.shapes.length) { toast('Nu e nimic de salvat'); return; }
-    state.postits.works = state.postits.works || [];
-    // Adăugate la coadă, ca numărul de ordine să fie chiar ordinea salvării:
-    // prima lucrare rămâne 1 oricâte ai mai salva după ea.
-    state.postits.works.push(lucrareaCurenta());
-    saveNotes();
-    renderWorks();
-    // Deschidem notița pe fila „Lucrări", ca elevul să vadă unde a ajuns.
+    const p = punte();
+    if (!p || !(await p.esteLogat())) {
+      // Vizitatorul nu pierde aplicația, doar lista. Îl ducem la fila
+      // „Lucrări", unde scrie de ce e goală și cum se umple.
+      $('postitGroup').classList.add('open');
+      const t = $('ptTabWorks');
+      if (t) t.click();
+      toast('Intră în cont ca să-ți poți salva lucrările');
+      return;
+    }
+    const r = await p.salveaza(numeleLucrarii(), lucrareaCurenta());
+    if (!r.ok) { toast(r.motiv || 'Lucrarea nu s-a putut salva'); return; }
     $('postitGroup').classList.add('open');
     const t = $('ptTabWorks');
     if (t) t.click();
-    toast('Lucrare salvată');
+    await renderWorks();
+    toast('Lucrare salvată în contul tău');
   }
 
   function restaureazaLucrarea(w) {
@@ -1025,29 +1041,38 @@
     toast('Lucrare readusă pe pânză');
   }
 
-  function renderWorks() {
+  /* Lista vine de pe server, deci desenarea ei așteaptă răspunsul.
+     Trei stări, nu una: fără cont, gol, plin. Fiecare spune limpede ce e. */
+  async function renderWorks() {
     const gazda = $('postitWorks');
     if (!gazda) return;
-    const lista = state.postits.works || [];
     const nr = $('ptWorksCount');
-    if (nr) nr.textContent = lista.length;
+    const p = punte();
+
+    if (!p || !(await p.esteLogat())) {
+      if (nr) nr.textContent = '';
+      gazda.innerHTML =
+        '<p class="works-empty">Lucrările se păstrează în contul tău, ca să le găsești de pe orice calculator.' +
+        '<br><a class="works-login" href="' + ((p && p.LOGIN) || '/comunitate/login/') + '">Intră în cont</a>' +
+        ' și butonul „Salvează" începe să le adune aici.</p>';
+      return;
+    }
+
+    gazda.innerHTML = '<p class="works-empty">Se încarcă…</p>';
+    const lista = await p.lista();
+    if (nr) nr.textContent = lista.length || '';
     if (!lista.length) {
       gazda.innerHTML = '<p class="works-empty">Nicio lucrare salvată încă. Apasă „Salvează" sub pânză, iar lucrarea vine aici; o aduci înapoi cu un click.</p>';
       return;
     }
-    // Numele e data și ora salvării, cu numărul de ordine în față. Fără poze:
-    // o listă de nume se citește dintr-o privire, iar chipurile mici oricum
-    // nu se deosebeau între ele când lucrările seamănă.
-    const doua = (n) => String(n).padStart(2, '0');
-    gazda.innerHTML = '<ol class="works-list">' + lista.map((w) => {
-      const d = new Date(w.cand);
-      const cand = doua(d.getDate()) + '.' + doua(d.getMonth() + 1) + '.' + d.getFullYear() +
-                   ' (' + doua(d.getHours()) + ':' + doua(d.getMinutes()) + ')';
-      return '<li class="work" data-id="' + w.id + '">' +
-             '<button class="work-open" data-open="' + w.id + '" title="Adu lucrarea înapoi pe pânză">' + cand + '</button>' +
-             '<button class="work-del" data-del="' + w.id + '" title="Șterge lucrarea" aria-label="Șterge lucrarea"></button>' +
-             '</li>';
-    }).join('') + '</ol>';
+    // Serverul le dă cu cea mai nouă în frunte; noi le numerotăm în ordinea
+    // salvării, deci le întoarcem: prima salvată rămâne 1 oricâte ar urma.
+    gazda.innerHTML = '<ol class="works-list">' + lista.slice().reverse().map((w) =>
+      '<li class="work" data-id="' + w.id + '">' +
+      '<button class="work-open" data-open="' + w.id + '" title="Adu lucrarea înapoi pe pânză">' +
+      String(w.title).replace(/</g, '&lt;') + '</button>' +
+      '<button class="work-del" data-del="' + w.id + '" title="Șterge lucrarea" aria-label="Șterge lucrarea"></button>' +
+      '</li>').join('') + '</ol>';
   }
 
   function downloadDataUrl(url, name) {
@@ -1476,9 +1501,10 @@
     let n = null;
     try { n = JSON.parse(localStorage.getItem(NOTES_KEY) || 'null'); } catch (e) {}
     if (n && Array.isArray(n.pages) && n.pages.length) state.postits = n;
-    // Notițele scrise înainte de lucrări n-au câmpurile noi. Le punem noi, ca
-    // restul codului să nu fie nevoit să întrebe de fiecare dată dacă există.
-    if (!Array.isArray(state.postits.works)) state.postits.works = [];
+    // Notițele vechi n-au câmpurile noi. Le punem noi, ca restul codului să nu
+    // fie nevoit să întrebe de fiecare dată dacă există. Ștergem și lucrările
+    // rămase din vremea când stăteau aici: acum locul lor e în cont.
+    delete state.postits.works;
     if (typeof state.postits.w !== 'number') state.postits.w = 0;
     if (typeof state.postits.h !== 'number') state.postits.h = 0;
     // curăță textele-substituent vechi salvate ca text real
@@ -1671,18 +1697,24 @@
 
     // Un singur ascultător pe listă: lucrările se schimbă mereu, iar unul pus
     // pe fiecare poză ar trebui refăcut la fiecare desenare.
-    $('postitWorks').addEventListener('click', (e) => {
+    $('postitWorks').addEventListener('click', async (e) => {
+      const p = punte();
+      if (!p) return;
       const del = e.target.closest('[data-del]');
       if (del) {
-        const id = Number(del.dataset.del);
-        state.postits.works = (state.postits.works || []).filter((w) => w.id !== id);
-        saveNotes(); renderWorks();
+        if (await p.sterge(del.dataset.del)) renderWorks();
         return;
       }
       const desc = e.target.closest('[data-open]');
       if (!desc) return;
-      restaureazaLucrarea((state.postits.works || []).find((w) => w.id === Number(desc.dataset.open)));
+      const w = await p.deschide(desc.dataset.open);
+      if (!w) { toast('Lucrarea nu s-a putut deschide'); return; }
+      restaureazaLucrarea(w.data);
     });
+
+    // Puntea se leagă după ce aplicația a pornit (modulele sunt amânate).
+    // Când e gata, lista se poate desena cu adevărat.
+    document.addEventListener('qwzky:boards-ready', () => renderWorks());
 
     // UI zoom
     $('uiZoomIn').addEventListener('click', () => { state.uiScale = clamp(state.uiScale + 0.05, 0.7, 1.3); applyUiScale(); persist(); });

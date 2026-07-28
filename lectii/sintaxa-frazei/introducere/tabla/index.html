@@ -265,10 +265,58 @@
   <script src="app.js"></script>
 
 <script type="module">
-  // Poarta de prelansare. Aplicația nu cheamă bara sitului, deci n-ar fi fost
-  // chemată de la sine, iar pagina ar fi rămas deschisă oricui știe adresa.
+  // =========================================================
+  // ÎNVELIȘUL SITULUI, în jurul aplicației.
+  //
+  // 1. Poarta de prelansare. Aplicația nu cheamă bara sitului, deci n-ar fi
+  //    fost chemată de la sine, iar pagina ar fi rămas deschisă oricui.
+  //
+  // 2. PUNTEA spre cont. `app.js` e un script obișnuit, nu un modul, deci nu
+  //    poate aduce singur Supabase. Îi punem la îndemână, pe `window`, exact
+  //    cele patru fapte de care are nevoie, și nimic mai mult: aplicația nu
+  //    știe ce e o bază de date, doar cere „lista mea" sau „ține asta".
+  //
+  //    Puntea se face DUPĂ ce app.js a pornit (modulele sunt amânate), de-aia
+  //    la sfârșit strigăm; aplicația ascultă și își redesenează lista.
+  // =========================================================
   import { enforceGate, revealGate } from "../../../../src/shared/scripts/site-gate.js";
-  if (await enforceGate()) revealGate();
+  import { listSheets, loadSheet, saveSheet, deleteSheet } from "../../../../src/shared/scripts/board-repo.js";
+  import { supabase } from "../../../../src/shared/scripts/supabase-client.js";
+
+  if (await enforceGate()) {
+    revealGate();
+
+    const LECTIE = "sintaxa-frazei-introducere";
+
+    async function esteLogat() {
+      try {
+        const { data } = await supabase.auth.getSession();
+        return !!(data && data.session);
+      } catch { return false; }
+    }
+
+    window.qwzkyBoards = {
+      LOGIN: "/comunitate/login/",
+      esteLogat,
+      lista: () => listSheets(LECTIE),
+      deschide: (id) => loadSheet(id),
+      sterge: (id) => deleteSheet(id),
+      /** Numele e data și ora, deci două salvări în același minut s-ar bate
+       *  cap în cap cu regula „un nume, o lucrare" (migrarea 0075). Când se
+       *  întâmplă, punem un număr în coadă în loc să aruncăm munca omului. */
+      async salveaza(nume, continut) {
+        for (let i = 1; i <= 20; i++) {
+          const titlu = i === 1 ? nume : `${nume} (${i})`;
+          const r = await saveSheet({ lessonSlug: LECTIE, title: titlu, data: continut });
+          if (r.row) return { ok: true, row: r.row };
+          if (r.motiv !== "mai ai o tablă cu numele ăsta") return { ok: false, motiv: r.motiv };
+        }
+        return { ok: false, motiv: "prea multe lucrări cu același nume" };
+      },
+    };
+
+    document.dispatchEvent(new Event("qwzky:boards-ready"));
+  }
 </script>
 </body>
 </html>
