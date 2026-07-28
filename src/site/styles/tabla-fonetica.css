@@ -1,9 +1,9 @@
 /* =========================================================
-   #LaTablă, fonetică: foaia de lucru.
+   #LaTablă, fonetică: tabla de lucru.
 
    Cuvânt -> despărțire în silabe -> transcriere -> tipul sunetelor.
    Unealta are tema ei, alta decât a sitului, fiindcă e un spațiu de lucru
-   pe tot ecranul: fundal deschis, foaie albă, fără nimic în jur. De-aia nu
+   pe tot ecranul: fundal deschis, tablă albă, fără nimic în jur. De-aia nu
    încarcă `main.css` și nu împrumută variabilele sitului.
    ========================================================= */
 
@@ -84,6 +84,45 @@
     user-select: none;
   }
 
+  /* ---- numele tablei deschise ----
+     Stă lângă lecție, unde te uiți oricum ca să știi unde ești. Arată ca un
+     text, nu ca un buton, până treci cu mausul peste el: numele e o
+     informație în primul rând, și abia apoi o unealtă. */
+  .tb-nume {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 15rem;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    font-family: var(--ui);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: background .12s, border-color .12s;
+  }
+  .tb-nume:hover { background: var(--accent-soft); border-color: #cdd7ff; }
+  .tb-nume > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+  /* Tabla nesalvată n-are încă nume adevărat: scrisul se subțiază, ca să se
+     vadă că e un loc gol, nu o denumire aleasă de cineva. */
+  .tb-nume.e-nesalvata { color: var(--muted); font-weight: 400; font-style: italic; }
+  .tb-nume__creion {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    background: currentColor;
+    opacity: 0;
+    -webkit-mask: url("/assets/icons/pencil.svg") no-repeat center / contain;
+    mask: url("/assets/icons/pencil.svg") no-repeat center / contain;
+    transition: opacity .12s;
+  }
+  .tb-nume:hover .tb-nume__creion { opacity: .75; }
+
   .toolbar {
     display: flex;
     align-items: center;
@@ -102,7 +141,7 @@
     background: #f7f8fc;
   }
 
-  /* ---- partea dreaptă: starea foii ---- */
+  /* ---- partea dreaptă: starea tablei ---- */
   .tb-dreapta {
     position: relative;
     margin-left: auto;
@@ -466,7 +505,7 @@
   .set-bold { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); cursor: pointer; margin-left: auto; }
   .settings-hint { padding: 12px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); line-height: 1.5; }
 
-  /* bara „Cerință" – panel orizontal FIX deasupra foii de lucru (nu scrollează) */
+  /* bara „Cerință" – panel orizontal FIX deasupra tablei de lucru (nu scrollează) */
   .prompt-wrap {
     flex: 0 0 auto;
     padding: 16px 20px 4px;
@@ -507,7 +546,7 @@
 
 /* ============ Întoarcerea la lecție ============
    Tabla e un spațiu de lucru, nu o pagină de citit: n-are bara sitului,
-   fiindcă meniul ar fura din înălțimea foii. Rămâne o singură ieșire,
+   fiindcă meniul ar fura din înălțimea tablei. Rămâne o singură ieșire,
    discretă, în capătul din stânga al capului de pagină. */
 .tb-inapoi {
   flex: 0 0 auto;

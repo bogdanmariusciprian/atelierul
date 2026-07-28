@@ -1,5 +1,5 @@
 // =========================================================
-// #LaTablă, fonetică: logica foii de lucru.
+// #LaTablă, fonetică: logica tablei de lucru.
 //
 // Se încarcă drept modul, DUPĂ ce poarta de prelansare a spus „poți intra".
 // Fiind modul, nu mai varsă nimic în fereastra globală: tot ce e mai jos
@@ -76,7 +76,7 @@ function insertSymbol(key) {
    deci virgulele îl ajută și pe el să pună literele sub sunetul potrivit.
 
    Virgula stă ÎN URMA cursorului, nu înaintea lui: după ce ai scris „k" pe
-   foaie apare „k, " și scrii mai departe. Așa următorul sunet are deja unde
+   tablă apare „k, " și scrii mai departe. Așa următorul sunet are deja unde
    să se așeze. Cea de la coadă se taie când pleci din câmp.
    =================================================================== */
 const VIRGULA = ', ';
@@ -164,7 +164,7 @@ function taieVirgulaFinala(el) {
    le-o dă fontul. Funcția de mai jos le îmbracă și pe ele, ca să nu fie
    nevoie de rescris nimic.
 
-   Se cheamă la deschiderea unei foi și la ieșirea din câmp, deci vechiul se
+   Se cheamă la deschiderea unei table și la ieșirea din câmp, deci vechiul se
    îndreaptă de la sine, pe măsură ce lucrezi. */
 function imbracaSimboluri(el) {
   if (!el) return;
@@ -784,7 +784,7 @@ document.getElementById('boardsBtn').addEventListener('click', () => {
 
 /* ---------- Scurtăturile: ascunse până le ceri ----------
    Erau șase rânduri de text mărunt, citite o dată și apoi niciodată, dar care
-   luau înălțime din foaie la fiecare deschidere a paginii. */
+   luau înălțime din tablă la fiecare deschidere a paginii. */
 const elLegend = document.getElementById('legend');
 const elScurt  = document.getElementById('scurtBtn');
 elScurt.addEventListener('click', () => {
@@ -905,7 +905,7 @@ function collectState() {
   };
 }
 
-/* reconstruiește foaia din starea salvată */
+/* reconstruiește tabla din starea salvată */
 function applyState(state) {
   if (!state) return;
   document.getElementById('promptArea').value = state.prompt || '';
@@ -938,9 +938,9 @@ function applyState(state) {
 /* ================= SALVAREA =================
    Două straturi, cu roluri diferite, ca să nu se încurce:
 
-   1. CONTUL, la cerere. Butonul „Salvează" scrie foaia în `learn_lessons_boards`
+   1. CONTUL, la cerere. Butonul „Salvează" scrie tabla în `learn_lessons_boards`
       (migrarea 0074). Se salvează doar când ceri tu, fiindcă o temă se predă,
-      nu se scurge. Poți ține mai multe foi la aceeași lecție.
+      nu se scurge. Poți ține mai multe table la aceeași lecție.
 
    2. BROWSERUL, tăcut. Tot ce scrii se pune și în localStorage, ca să nu
       pierzi nimic dacă se închide fila din greșeală. Plasa asta nu se laudă
@@ -950,30 +950,35 @@ import { listSheets, loadSheet, saveSheet, renameSheet, deleteSheet } from '../.
 
 const LECTIE = 'fonetica-introducere';
 
-/* Tabla deschisă acum: `id` null = n-a fost încă salvată în cont.
-   Variabila se cheamă `foaia` fiindcă în cod se citește limpede, dar pe ecran
-   scrie peste tot „tablă": elevul lucrează la tablă, nu pe o foaie. */
-let foaia = { id: null, titlu: 'Tablă nouă', curat: true };
+/* Tabla deschisă acum: `id` null = n-a fost încă salvată în cont. */
+let tabla = { id: null, titlu: 'Tablă nouă', curat: true };
 
 const elSaveBtn   = document.getElementById('saveBtn');
 const elSaveLabel = document.getElementById('saveLabel');
 const elStare     = document.getElementById('saveState');
+const elNume      = document.getElementById('boardName');
+const elNumeText  = document.getElementById('boardNameText');
 
 /* Arată dacă mai e ceva nesalvat. Pastila apare DOAR când chiar e ceva de
    salvat: un semn care stă mereu aprins nu mai spune nimic. */
 function aratăStarea() {
   if (elStare) {
-    elStare.hidden = foaia.curat;
+    elStare.hidden = tabla.curat;
     elStare.textContent = 'nesalvat';
     elStare.classList.remove('e-rau');
   }
-  if (elSaveLabel) elSaveLabel.textContent = foaia.id ? 'Salvează' : 'Salvează în cont';
-  if (elSaveBtn) elSaveBtn.classList.toggle('e-curat', foaia.curat);
+  if (elNumeText) elNumeText.textContent = tabla.id ? tabla.titlu : 'Tablă nouă';
+  if (elNume) {
+    elNume.classList.toggle('e-nesalvata', !tabla.id);
+    elNume.title = tabla.id ? 'Schimbă numele tablei' : 'Salvează tabla ca să-i dai un nume';
+  }
+  if (elSaveLabel) elSaveLabel.textContent = tabla.id ? 'Salvează' : 'Salvează în cont';
+  if (elSaveBtn) elSaveBtn.classList.toggle('e-curat', tabla.curat);
 }
 
 function murdareste() {
-  if (!foaia.curat) return;
-  foaia.curat = false;
+  if (!tabla.curat) return;
+  tabla.curat = false;
   aratăStarea();
 }
 
@@ -996,7 +1001,7 @@ document.addEventListener('input', () => { scheduleSave(); murdareste(); });
 
 /* ---------- salvarea în cont ---------- */
 
-/* Un nume de pornire care spune ceva: data de azi. „Foaie nouă (3)" nu ajută
+/* Un nume de pornire care spune ceva: data de azi. „Tablă nouă (3)" nu ajută
    pe nimeni să-și găsească tema de acum două săptămâni. */
 /* Dacă numele propus e deja luat, îi punem un număr. Altfel elevul ar primi
    din start un nume respins, ceea ce e o primire proastă. */
@@ -1026,12 +1031,12 @@ function spune(text, reușită = true) {
   spune._t = setTimeout(() => { elStare.classList.remove('e-bine'); aratăStarea(); }, 1800);
 }
 
-async function salveaza(caFoaieNoua = false) {
-  let titlu = foaia.id && !caFoaieNoua ? foaia.titlu : null;
+async function salveaza(caTablaNoua = false) {
+  let titlu = tabla.id && !caTablaNoua ? tabla.titlu : null;
   if (!titlu) {
     const luate = await listSheets(LECTIE);
     titlu = await intreaba({
-      titlu: caFoaieNoua ? 'Salvează ca tablă nouă' : 'Salvează tabla',
+      titlu: caTablaNoua ? 'Salvează ca tablă nouă' : 'Salvează tabla',
       camp: numeLiber(numeImplicit(), luate),
       verifica: verificatorulNumelui(luate),
     });
@@ -1040,7 +1045,7 @@ async function salveaza(caFoaieNoua = false) {
 
   elSaveBtn && elSaveBtn.classList.add('e-ocupat');
   const { row, motiv } = await saveSheet({
-    id: caFoaieNoua ? null : foaia.id,
+    id: caTablaNoua ? null : tabla.id,
     lessonSlug: LECTIE,
     title: titlu,
     data: collectState(),
@@ -1048,7 +1053,7 @@ async function salveaza(caFoaieNoua = false) {
   elSaveBtn && elSaveBtn.classList.remove('e-ocupat');
 
   if (!row) { spune(motiv || 'nu s-a putut salva', false); return; }
-  foaia = { id: row.id, titlu: row.title, curat: true };
+  tabla = { id: row.id, titlu: row.title, curat: true };
   aratăStarea();
   spune('salvat', true);
 }
@@ -1064,23 +1069,31 @@ document.getElementById('renameBtn').addEventListener('click', () => {
   redenumeste();
 });
 async function redenumeste() {
-  if (!foaia.id) { spune('salvează întâi tabla', false); return; }
+  if (!tabla.id) { spune('salvează întâi tabla', false); return; }
   const luate = await listSheets(LECTIE);
   const nou = await intreaba({
     titlu: 'Redenumește tabla',
-    camp: foaia.titlu,
+    camp: tabla.titlu,
     buton: 'Schimbă',
-    verifica: verificatorulNumelui(luate, foaia.id),
+    verifica: verificatorulNumelui(luate, tabla.id),
   });
-  if (!nou || nou === foaia.titlu) return;
-  if (await renameSheet(foaia.id, nou)) {
-    foaia.titlu = nou;
+  if (!nou || nou === tabla.titlu) return;
+  if (await renameSheet(tabla.id, nou)) {
+    tabla.titlu = nou;
     spune('redenumit', true);
     aratăTablele();
   } else {
     spune('mai ai o tablă cu numele ăsta', false);
   }
 }
+
+/* Numele din capul paginii: apăsat, deschide aceeași fereastră de redenumit
+   ca din meniu. Dacă tabla n-a fost încă salvată, n-are ce redenumi, așa că
+   apăsarea o salvează, iar numele îl dai atunci. Tot un drum, tot acolo. */
+elNume && elNume.addEventListener('click', () => {
+  if (tabla.id) redenumeste();
+  else salveaza(false);
+});
 
 /* Ctrl+S: salvează în cont, nu deschide dialogul browserului. */
 document.addEventListener('keydown', (e) => {
@@ -1090,10 +1103,10 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* Dacă pleci cu foaia nesalvată, browserul întreabă. Nu putem scrie noi
+/* Dacă pleci cu tabla nesalvată, browserul întreabă. Nu putem scrie noi
    mesajul (browserele îl aleg singure), dar întrebarea e ce contează. */
 window.addEventListener('beforeunload', (e) => {
-  if (foaia.curat) return;
+  if (tabla.curat) return;
   e.preventDefault();
   e.returnValue = '';
 });
@@ -1182,7 +1195,7 @@ function verificatorulNumelui(luate, afaraDe = null) {
 /* Clic pe fundal = renunțare, ca la orice fereastră modernă. */
 dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close('nu'); });
 
-/* ---------- panoul „Foile mele" ---------- */
+/* ---------- panoul „Tablele mele" ---------- */
 const boardsPanel = document.getElementById('boardsPanel');
 const boardsBody  = document.getElementById('boardsBody');
 
@@ -1195,13 +1208,13 @@ function candSalvat(iso) {
 
 async function aratăTablele() {
   boardsBody.innerHTML = '<p class="boards-empty">Se încarcă…</p>';
-  const foi = await listSheets(LECTIE);
-  if (!foi.length) {
+  const lista = await listSheets(LECTIE);
+  if (!lista.length) {
     boardsBody.innerHTML = '<p class="boards-empty">N-ai încă nicio tablă salvată la lecția asta. Scrie ceva, apoi apasă „Salvează".</p>';
     return;
   }
-  boardsBody.innerHTML = foi.map((f) => `
-    <div class="board${f.id === foaia.id ? ' e-deschisa' : ''}" data-id="${f.id}">
+  boardsBody.innerHTML = lista.map((f) => `
+    <div class="board${f.id === tabla.id ? ' e-deschisa' : ''}" data-id="${f.id}">
       <button class="board__name" data-act="deschide">${f.title}</button>
       <span class="board__when">${candSalvat(f.updated_at)}</span>
       <button class="board__del" data-act="sterge" title="Șterge tabla" aria-label="Șterge tabla">×</button>
@@ -1216,14 +1229,14 @@ boardsBody.addEventListener('click', async (e) => {
   if (b.dataset.act === 'sterge') {
     if (!await intreaba({ titlu: 'Ștergi tabla?', text: 'Nu se mai poate aduce înapoi.', buton: 'Șterge' })) return;
     if (await deleteSheet(id)) {
-      if (foaia.id === id) foaia = { id: null, titlu: 'Tablă nouă', curat: foaia.curat };
+      if (tabla.id === id) tabla = { id: null, titlu: 'Tablă nouă', curat: tabla.curat };
       aratăStarea();
       aratăTablele();
     }
     return;
   }
 
-  if (!foaia.curat && !await intreaba({
+  if (!tabla.curat && !await intreaba({
         titlu: 'Tabla de acum n-a fost salvată',
         text: 'O lași așa și o deschizi pe cealaltă?',
         buton: 'Deschide',
@@ -1231,7 +1244,7 @@ boardsBody.addEventListener('click', async (e) => {
   const f = await loadSheet(id);
   if (!f) { spune('tabla nu s-a putut deschide', false); return; }
   applyState(f.data);
-  foaia = { id: f.id, titlu: f.title, curat: true };
+  tabla = { id: f.id, titlu: f.title, curat: true };
   aratăStarea();
   aratăTablele();
   inchidePanou(boardsPanel);

@@ -9,10 +9,10 @@
 // fiecare tastă": asta ar transforma o temă într-un jurnal.
 //
 // Numele tabelului urmează regula din 0062, domeniul → entitatea →
-// calificativul: foaia atârnă de LECȚIE, deci stă în aceeași familie cu
+// calificativul: tabla atârnă de LECȚIE, deci stă în aceeași familie cu
 // `learn_lessons_progress` și `learn_lessons_favorites`.
 //
-// Migrarea 0074 ține politicile: elevul umblă doar la foile lui, profesorul le
+// Migrarea 0074 ține politicile: elevul umblă doar la tablele lui, profesorul le
 // citește pe toate ca să corecteze, dar nu le poate schimba. Numele unei
 // table e unic pe elev și pe lecție (migrarea 0075).
 // =========================================================
@@ -78,7 +78,7 @@ export async function saveSheet({ id, lessonSlug, title, data }) {
     return { row: null, motiv: motivul(error) };
   }
   // Fără eroare, dar nici rând: se întâmplă când UPDATE n-a găsit ce să
-  // schimbe (foaia a fost ștearsă între timp), sau când politica a lăsat
+  // schimbe (tabla a fost ștearsă între timp), sau când politica a lăsat
   // scrierea să treacă dar oprește citirea înapoi. Tăcerea asta ar fi cea mai
   // rea dintre toate, fiindcă arată a reușită.
   if (!row) {
@@ -119,7 +119,7 @@ function motivul(error) {
     return "tabelul lipsește: aplică migrarea 0074";
   }
   if (cod === "42501" || txt.includes("row-level security") || txt.includes("policy")) {
-    return "n-ai drept de scriere pe foaia asta";
+    return "n-ai drept de scriere pe tabla asta";
   }
   // 23505 = index unic încălcat. Verificăm și în browser înainte de salvare,
   // dar două ferestre deschise deodată pot păcăli verificarea aia; baza, nu.

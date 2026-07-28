@@ -29,6 +29,13 @@
     </span>
     <span class="tb-lectie">Noțiuni de fonetică</span>
 
+    <!-- Numele tablei deschise. E buton, nu etichetă: se apasă și se schimbă
+         chiar de aici, fără drumul prin meniul „⋯". -->
+    <button class="tb-nume" id="boardName" title="Schimbă numele tablei">
+      <span id="boardNameText">Tablă nouă</span>
+      <span class="tb-nume__creion" aria-hidden="true"></span>
+    </button>
+
     <div class="toolbar" id="toolbar">
       <div class="tgroup">
         <button class="btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
@@ -52,7 +59,7 @@
       <button class="chip" id="scurtBtn" aria-expanded="false" title="Scurtăturile de tastatură">scurtături</button>
       <button class="chip" id="notesBtn" title="Deschide notițele">notițe</button>
       <button class="chip chip--stare" id="saveState" hidden>nesalvat</button>
-      <button class="btn-save" id="saveBtn" title="Salvează foaia în contul tău (Ctrl+S)">
+      <button class="btn-save" id="saveBtn" title="Salvează tabla în contul tău (Ctrl+S)">
         <span class="btn-save__icon" aria-hidden="true"></span>
         <span id="saveLabel">Salvează</span>
       </button>
@@ -127,7 +134,7 @@
   <div class="boards-body" id="boardsBody"></div>
 </aside>
 
-<!-- Fereastra de întrebat (nume de foaie, confirmări).
+<!-- Fereastra de întrebat (nume de tablă, confirmări).
      Element <dialog> adevărat, nu `prompt` din browser: acela poate fi oprit
      de utilizator sau de browser („nu mai lăsa pagina să deschidă ferestre"),
      iar atunci se întoarce gol și pare că apeși degeaba. -->
