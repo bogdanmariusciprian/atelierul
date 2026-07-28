@@ -532,21 +532,26 @@
 }
 
 
-/* ============ Panoul „Foile mele" ============
+/* ============ Panoul „Tablele mele" ============
    Aceeași casetă din dreapta ca notițele și simbolurile, deci elevul o
-   recunoaște fără s-o învețe. */
-.foi-body { padding: 10px 12px 14px; overflow-y: auto; }
-.foi-gol { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 4px 2px; }
-.foaie {
+   recunoaște fără s-o învețe.
+
+   Clasele poartă numele englezesc „board", nu „tablă": pe ecran scrie
+   „tablă", dar în cod numele se potrivește cu tabelul din bază
+   (`learn_lessons_boards`), iar „table" ar fi însemnat două lucruri deodată,
+   tabla de scris și tabelul din bază. */
+.boards-body { padding: 10px 12px 14px; overflow-y: auto; }
+.boards-empty { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 4px 2px; }
+.board {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
   border-radius: 9px;
 }
-.foaie:hover { background: var(--accent-soft); }
-.foaie.e-deschisa { background: var(--accent-soft); }
-.foaie__nume {
+.board:hover { background: var(--accent-soft); }
+.board.e-deschisa { background: var(--accent-soft); }
+.board__name {
   flex: 1;
   text-align: left;
   font-family: var(--ui);
@@ -557,16 +562,16 @@
   padding: 0;
   cursor: pointer;
 }
-.foaie.e-deschisa .foaie__nume { font-weight: 600; }
-.foaie__cand { font-size: 11px; color: var(--muted); white-space: nowrap; }
-.foaie__sterge {
+.board.e-deschisa .board__name { font-weight: 600; }
+.board__when { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.board__del {
   flex: none;
   width: 22px; height: 22px;
   border: none; border-radius: 6px;
   background: transparent; color: var(--muted);
   font-size: 16px; line-height: 1; cursor: pointer;
 }
-.foaie__sterge:hover { background: #ffe4e4; color: #d13636; }
+.board__del:hover { background: #ffe4e4; color: #d13636; }
 
 /* La tipărire rămâne doar foaia: capul de pagină și panourile n-au ce căuta
    pe hârtie. */
@@ -608,3 +613,15 @@
    greutate: cel care duce lucrul mai departe stă în dreapta, unde îl caută
    mâna. */
 .dlg__butoane .btn { height: 34px; padding: 0 14px; }
+
+/* Mesajul din fereastră când numele nu e bun (gol sau deja luat). Stă lipit
+   sub câmp, nu într-o altă fereastră: greșeala se repară acolo unde s-a
+   făcut. */
+.dlg__eroare {
+  margin: -4px 0 0;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  color: #a3312a;
+  line-height: 1.5;
+}
+.dlg__eroare[hidden] { display: none; }

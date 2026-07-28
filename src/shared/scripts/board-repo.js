@@ -1,7 +1,7 @@
 // =========================================================
-// Foile de la tablă (#LaTablă): date REALE (Supabase `learn_lessons_boards`).
+// Tablele elevului (#LaTablă): date REALE (Supabase `learn_lessons_boards`).
 //
-// Tabla e un caiet legat de o lecție. Elevul are mai multe foi la aceeași
+// Tabla e un caiet legat de o lecție. Elevul are mai multe table la aceeași
 // lecție, ca să poată păstra tema de săptămâna trecută lângă cea de azi.
 //
 // Salvarea se face LA CERERE. Modulul ăsta nu salvează niciodată singur: cine
@@ -13,7 +13,8 @@
 // `learn_lessons_progress` și `learn_lessons_favorites`.
 //
 // Migrarea 0074 ține politicile: elevul umblă doar la foile lui, profesorul le
-// citește pe toate ca să corecteze, dar nu le poate schimba.
+// citește pe toate ca să corecteze, dar nu le poate schimba. Numele unei
+// table e unic pe elev și pe lecție (migrarea 0075).
 // =========================================================
 import { supabase } from "./supabase-client.js";
 
@@ -28,7 +29,7 @@ async function utilizator() {
   }
 }
 
-/** Foile mele de la o lecție, cea atinsă ultima dată în frunte.
+/** Tablele mele de la o lecție, cea atinsă ultima dată în frunte.
  *  Fără sesiune întoarce lista goală, nu o eroare: e o stare firească. */
 export async function listSheets(lessonSlug) {
   const u = await utilizator();
@@ -43,7 +44,7 @@ export async function listSheets(lessonSlug) {
   return data || [];
 }
 
-/** Conținutul unei foi. */
+/** Conținutul unei table. */
 export async function loadSheet(id) {
   const { data, error } = await supabase
     .from("learn_lessons_boards")
@@ -55,7 +56,7 @@ export async function loadSheet(id) {
 }
 
 /**
- * Salvează foaia. Fără `id` scrie una nouă, cu `id` o rescrie pe cea veche.
+ * Salvează tabla. Fără `id` scrie una nouă, cu `id` o rescrie pe cea veche.
  * Întoarce `{ id, title, updated_at }` sau null dacă n-a mers.
  *
  * `user_id` se trimite explicit la inserare fiindcă politica îl cere în
@@ -83,7 +84,7 @@ export async function saveSheet({ id, lessonSlug, title, data }) {
   if (!row) {
     console.error("saveSheet: cererea a mers, dar n-a venit niciun rând înapoi.");
     await diagnostic();
-    return { row: null, motiv: id ? "foaia nu mai există" : "scrierea n-a lăsat urmă" };
+    return { row: null, motiv: id ? "tabla nu mai există" : "scrierea n-a lăsat urmă" };
   }
   return { row, motiv: null };
 }
@@ -120,6 +121,9 @@ function motivul(error) {
   if (cod === "42501" || txt.includes("row-level security") || txt.includes("policy")) {
     return "n-ai drept de scriere pe foaia asta";
   }
+  // 23505 = index unic încălcat. Verificăm și în browser înainte de salvare,
+  // dar două ferestre deschise deodată pot păcăli verificarea aia; baza, nu.
+  if (cod === "23505") return "mai ai o tablă cu numele ăsta";
   if (txt.includes("failed to fetch") || txt.includes("networkerror")) {
     return "fără legătură la server";
   }
@@ -128,7 +132,7 @@ function motivul(error) {
   return `${cod || "eroare"}: ${(error && error.message) || "necunoscută"}`;
 }
 
-/** Schimbă numele unei foi, fără să atingă ce e scris pe ea. */
+/** Schimbă numele unei table, fără să atingă ce e scris pe ea. */
 export async function renameSheet(id, title) {
   const { error } = await supabase
     .from("learn_lessons_boards")
@@ -138,7 +142,7 @@ export async function renameSheet(id, title) {
   return true;
 }
 
-/** Șterge o foaie. Cine cheamă trebuie să întrebe întâi: aici nu se cere. */
+/** Șterge o tablă. Cine cheamă trebuie să întrebe întâi: aici nu se cere. */
 export async function deleteSheet(id) {
   const { error } = await supabase.from("learn_lessons_boards").delete().eq("id", id);
   if (error) { console.warn("deleteSheet:", error.message); return false; }

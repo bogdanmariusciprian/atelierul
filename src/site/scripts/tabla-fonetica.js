@@ -159,7 +159,7 @@ function taieVirgulaFinala(el) {
 }
 
 /* ================= Îmbrăcarea simbolurilor deja scrise =================
-   Cutia de o celulă se pune la inserare, dar foile scrise ÎNAINTE de asta au
+   Cutia de o celulă se pune la inserare, dar tablele scrise ÎNAINTE de asta au
    simbolurile ca text gol, deci s-ar purta mai departe după lățimea pe care
    le-o dă fontul. Funcția de mai jos le îmbracă și pe ele, ca să nu fie
    nevoie de rescris nimic.
@@ -752,12 +752,12 @@ sheet.addEventListener('input', (e) => {
   }
 });
 
-/* ---------- Panourile din dreapta (Notițe / Simboluri / Foile mele) ----------
+/* ---------- Panourile din dreapta (Notițe / Simboluri / Tablele mele) ----------
    Se deschid DOAR la click și numai unul odată: se așază toate în același colț,
    iar două deschise s-ar acoperi unul pe altul. */
 const notesPanel    = document.getElementById('notesPanel');
 const settingsPanel = document.getElementById('settingsPanel');
-const panouri = [notesPanel, settingsPanel, document.getElementById('foiPanel')].filter(Boolean);
+const panouri = [notesPanel, settingsPanel, document.getElementById('boardsPanel')].filter(Boolean);
 
 function inchidePanou(p) {
   p.classList.remove('open');
@@ -775,11 +775,11 @@ document.getElementById('notesBtn').addEventListener('click', () => togglePanel(
 document.getElementById('notesClose').addEventListener('click', () => inchidePanou(notesPanel));
 document.getElementById('settingsBtn').addEventListener('click', () => { inchideMeniu(); togglePanel(settingsPanel); });
 document.getElementById('settingsClose').addEventListener('click', () => inchidePanou(settingsPanel));
-document.getElementById('foiClose').addEventListener('click', () => inchidePanou(document.getElementById('foiPanel')));
-document.getElementById('sheetsBtn').addEventListener('click', () => {
+document.getElementById('boardsClose').addEventListener('click', () => inchidePanou(boardsPanel));
+document.getElementById('boardsBtn').addEventListener('click', () => {
   inchideMeniu();
-  togglePanel(document.getElementById('foiPanel'));
-  aratăFoile();
+  togglePanel(boardsPanel);
+  aratăTablele();
 });
 
 /* ---------- Scurtăturile: ascunse până le ceri ----------
@@ -921,7 +921,7 @@ function applyState(state) {
       row.querySelector('.word').innerHTML   = r.word  || '';
       row.querySelector('.syll').innerHTML   = r.syll  || '';
       row.querySelector('.trans').innerHTML  = r.trans || '';
-      imbracaSimboluri(row.querySelector('.trans'));   // foile vechi: simbolurile intră în cutie
+      imbracaSimboluri(row.querySelector('.trans'));   // tablele vechi: simbolurile intră în cutie
       row.querySelector('.types').textContent = r.types || '';
       (r.extra || []).forEach(html => {
         const arrow = document.createElement('span'); arrow.className = 'arrow'; arrow.textContent = '→';
@@ -950,8 +950,10 @@ import { listSheets, loadSheet, saveSheet, renameSheet, deleteSheet } from '../.
 
 const LECTIE = 'fonetica-introducere';
 
-/* Foaia deschisă acum: `id` null = n-a fost încă salvată în cont. */
-let foaia = { id: null, titlu: 'Foaie nouă', curat: true };
+/* Tabla deschisă acum: `id` null = n-a fost încă salvată în cont.
+   Variabila se cheamă `foaia` fiindcă în cod se citește limpede, dar pe ecran
+   scrie peste tot „tablă": elevul lucrează la tablă, nu pe o foaie. */
+let foaia = { id: null, titlu: 'Tablă nouă', curat: true };
 
 const elSaveBtn   = document.getElementById('saveBtn');
 const elSaveLabel = document.getElementById('saveLabel');
@@ -996,6 +998,18 @@ document.addEventListener('input', () => { scheduleSave(); murdareste(); });
 
 /* Un nume de pornire care spune ceva: data de azi. „Foaie nouă (3)" nu ajută
    pe nimeni să-și găsească tema de acum două săptămâni. */
+/* Dacă numele propus e deja luat, îi punem un număr. Altfel elevul ar primi
+   din start un nume respins, ceea ce e o primire proastă. */
+function numeLiber(baza, luate) {
+  const ocupate = new Set(luate.map((t) => t.title.trim().toLowerCase()));
+  if (!ocupate.has(baza.trim().toLowerCase())) return baza;
+  for (let i = 2; i < 99; i++) {
+    const incercare = `${baza} (${i})`;
+    if (!ocupate.has(incercare.toLowerCase())) return incercare;
+  }
+  return baza;
+}
+
 function numeImplicit() {
   const d = new Date();
   const luni = ['ian','feb','mar','apr','mai','iun','iul','aug','sep','oct','noi','dec'];
@@ -1015,9 +1029,11 @@ function spune(text, reușită = true) {
 async function salveaza(caFoaieNoua = false) {
   let titlu = foaia.id && !caFoaieNoua ? foaia.titlu : null;
   if (!titlu) {
+    const luate = await listSheets(LECTIE);
     titlu = await intreaba({
-      titlu: caFoaieNoua ? 'Salvează ca foaie nouă' : 'Salvează foaia',
-      camp: numeImplicit(),
+      titlu: caFoaieNoua ? 'Salvează ca tablă nouă' : 'Salvează tabla',
+      camp: numeLiber(numeImplicit(), luate),
+      verifica: verificatorulNumelui(luate),
     });
   }
   if (!titlu) return;                       // a apăsat „Renunță"
@@ -1048,10 +1064,22 @@ document.getElementById('renameBtn').addEventListener('click', () => {
   redenumeste();
 });
 async function redenumeste() {
-  if (!foaia.id) { spune('salvează întâi foaia', false); return; }
-  const nou = await intreaba({ titlu: 'Redenumește foaia', camp: foaia.titlu, buton: 'Schimbă' });
+  if (!foaia.id) { spune('salvează întâi tabla', false); return; }
+  const luate = await listSheets(LECTIE);
+  const nou = await intreaba({
+    titlu: 'Redenumește tabla',
+    camp: foaia.titlu,
+    buton: 'Schimbă',
+    verifica: verificatorulNumelui(luate, foaia.id),
+  });
   if (!nou || nou === foaia.titlu) return;
-  if (await renameSheet(foaia.id, nou)) { foaia.titlu = nou; spune('redenumit', true); }
+  if (await renameSheet(foaia.id, nou)) {
+    foaia.titlu = nou;
+    spune('redenumit', true);
+    aratăTablele();
+  } else {
+    spune('mai ai o tablă cu numele ăsta', false);
+  }
 }
 
 /* Ctrl+S: salvează în cont, nu deschide dialogul browserului. */
@@ -1085,24 +1113,51 @@ const dlgTitlu = document.getElementById('dlgTitlu');
 const dlgText  = document.getElementById('dlgText');
 const dlgCamp  = document.getElementById('dlgCamp');
 const dlgDa    = document.getElementById('dlgDa');
+const dlgEroare = document.getElementById('dlgEroare');
 
 /* Deschide fereastra și așteaptă răspunsul. Cu `camp: true` întoarce textul
    scris (sau null la renunțare); fără el, întoarce true/false. */
-function intreaba({ titlu, text = '', camp = null, buton = 'Salvează' }) {
+function intreaba({ titlu, text = '', camp = null, buton = 'Salvează', verifica = null }) {
   dlgTitlu.textContent = titlu;
   dlgText.textContent = text;
   dlgText.hidden = !text;
   dlgDa.textContent = buton;
   dlgCamp.hidden = camp === null;
   dlgCamp.value = camp || '';
+  dlgEroare.hidden = true;
+
+  const forma = dlg.querySelector('form');
 
   return new Promise((raspunde) => {
+    // Numele greșit nu închide fereastra. Dacă am închide-o și am arăta
+    // greșeala altundeva, elevul ar trebui s-o deschidă iar și să scrie tot de
+    // la capăt; așa repară pe loc, cu numele lui încă în câmp.
+    const laTrimitere = (e) => {
+      if (!verifica || dlg.returnValue !== 'da') return;
+      const greseala = verifica(dlgCamp.value.trim());
+      if (!greseala) return;
+      e.preventDefault();
+      dlgEroare.textContent = greseala;
+      dlgEroare.hidden = false;
+      dlgCamp.focus();
+      dlgCamp.select();
+    };
+    // `returnValue` se pune înainte de `submit`, la apăsarea butonului.
+    const laApasare = (e) => { dlg.returnValue = e.target.value || 'nu'; };
+
     const gata = () => {
       dlg.removeEventListener('close', gata);
+      forma.removeEventListener('submit', laTrimitere);
+      dlgDa.removeEventListener('click', laApasare);
+      document.getElementById('dlgNu').removeEventListener('click', laApasare);
       const da = dlg.returnValue === 'da';
       if (camp === null) { raspunde(da); return; }
       raspunde(da ? dlgCamp.value.trim() : null);
     };
+
+    dlgDa.addEventListener('click', laApasare);
+    document.getElementById('dlgNu').addEventListener('click', laApasare);
+    forma.addEventListener('submit', laTrimitere);
     dlg.addEventListener('close', gata);
     dlg.returnValue = 'nu';       // Esc și clicul în afară = renunțare
     dlg.showModal();
@@ -1110,12 +1165,26 @@ function intreaba({ titlu, text = '', camp = null, buton = 'Salvează' }) {
   });
 }
 
+/* Verifică numele unei table înainte de salvare: nu poate fi gol și nu poate
+   fi al alteia. Comparăm fără majuscule și fără spațiile de la capete, la fel
+   ca indexul unic din baza de date (migrarea 0075), ca răspunsul de pe ecran
+   să fie același cu cel al bazei. */
+function verificatorulNumelui(luate, afaraDe = null) {
+  const cheie = (t) => t.trim().toLowerCase();
+  const ocupate = new Set(luate.filter((t) => t.id !== afaraDe).map((t) => cheie(t.title)));
+  return (nume) => {
+    if (!nume) return 'Pune-i un nume.';
+    if (ocupate.has(cheie(nume))) return 'Mai ai o tablă cu numele ăsta. Alege altul.';
+    return null;
+  };
+}
+
 /* Clic pe fundal = renunțare, ca la orice fereastră modernă. */
 dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close('nu'); });
 
 /* ---------- panoul „Foile mele" ---------- */
-const foiPanel = document.getElementById('foiPanel');
-const foiBody  = document.getElementById('foiBody');
+const boardsPanel = document.getElementById('boardsPanel');
+const boardsBody  = document.getElementById('boardsBody');
 
 function candSalvat(iso) {
   const d = new Date(iso), azi = new Date();
@@ -1124,48 +1193,48 @@ function candSalvat(iso) {
   return d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) + ', ' + ceas;
 }
 
-async function aratăFoile() {
-  foiBody.innerHTML = '<p class="foi-gol">Se încarcă…</p>';
+async function aratăTablele() {
+  boardsBody.innerHTML = '<p class="boards-empty">Se încarcă…</p>';
   const foi = await listSheets(LECTIE);
   if (!foi.length) {
-    foiBody.innerHTML = '<p class="foi-gol">N-ai încă nicio foaie salvată la lecția asta. Scrie ceva, apoi apasă „Salvează".</p>';
+    boardsBody.innerHTML = '<p class="boards-empty">N-ai încă nicio tablă salvată la lecția asta. Scrie ceva, apoi apasă „Salvează".</p>';
     return;
   }
-  foiBody.innerHTML = foi.map((f) => `
-    <div class="foaie${f.id === foaia.id ? ' e-deschisa' : ''}" data-id="${f.id}">
-      <button class="foaie__nume" data-act="deschide">${f.title}</button>
-      <span class="foaie__cand">${candSalvat(f.updated_at)}</span>
-      <button class="foaie__sterge" data-act="sterge" title="Șterge foaia" aria-label="Șterge foaia">×</button>
+  boardsBody.innerHTML = foi.map((f) => `
+    <div class="board${f.id === foaia.id ? ' e-deschisa' : ''}" data-id="${f.id}">
+      <button class="board__name" data-act="deschide">${f.title}</button>
+      <span class="board__when">${candSalvat(f.updated_at)}</span>
+      <button class="board__del" data-act="sterge" title="Șterge tabla" aria-label="Șterge tabla">×</button>
     </div>`).join('');
 }
 
-foiBody.addEventListener('click', async (e) => {
+boardsBody.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
-  const id = b.closest('.foaie').dataset.id;
+  const id = b.closest('.board').dataset.id;
 
   if (b.dataset.act === 'sterge') {
-    if (!await intreaba({ titlu: 'Ștergi foaia?', text: 'Nu se mai poate aduce înapoi.', buton: 'Șterge' })) return;
+    if (!await intreaba({ titlu: 'Ștergi tabla?', text: 'Nu se mai poate aduce înapoi.', buton: 'Șterge' })) return;
     if (await deleteSheet(id)) {
-      if (foaia.id === id) foaia = { id: null, titlu: 'Foaie nouă', curat: foaia.curat };
+      if (foaia.id === id) foaia = { id: null, titlu: 'Tablă nouă', curat: foaia.curat };
       aratăStarea();
-      aratăFoile();
+      aratăTablele();
     }
     return;
   }
 
   if (!foaia.curat && !await intreaba({
-        titlu: 'Foaia de acum n-a fost salvată',
+        titlu: 'Tabla de acum n-a fost salvată',
         text: 'O lași așa și o deschizi pe cealaltă?',
         buton: 'Deschide',
       })) return;
   const f = await loadSheet(id);
-  if (!f) { spune('foaia nu s-a putut deschide', false); return; }
+  if (!f) { spune('tabla nu s-a putut deschide', false); return; }
   applyState(f.data);
   foaia = { id: f.id, titlu: f.title, curat: true };
   aratăStarea();
-  aratăFoile();
-  inchidePanou(foiPanel);
+  aratăTablele();
+  inchidePanou(boardsPanel);
 });
 
 /* PDF: deschide dialogul de printare (de acolo alegi „Salvează ca PDF") */

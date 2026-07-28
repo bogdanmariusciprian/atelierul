@@ -59,9 +59,9 @@
       <button class="btn btn--ico" id="altBtn" title="Altele" aria-label="Altele" aria-expanded="false">⋯</button>
 
       <div class="meniu" id="altMeniu" hidden>
-        <button class="meniu__it" id="sheetsBtn">Foile mele…</button>
-        <button class="meniu__it" id="saveAsBtn">Salvează ca foaie nouă…</button>
-        <button class="meniu__it" id="renameBtn">Redenumește foaia…</button>
+        <button class="meniu__it" id="boardsBtn">Tablele mele…</button>
+        <button class="meniu__it" id="saveAsBtn">Salvează ca tablă nouă…</button>
+        <button class="meniu__it" id="renameBtn">Redenumește tabla…</button>
         <hr class="meniu__linie">
         <button class="meniu__it" id="settingsBtn">Simboluri (tastele 1-4)…</button>
         <button class="meniu__it" id="pdfBtn">Tipărește sau salvează PDF</button>
@@ -118,13 +118,13 @@
   <div class="settings-hint">Tastele 1-4 și butoanele din bară inserează aceste simboluri. Bifează „bold" dacă vrei simbolul îngroșat. Setările se salvează pe acest calculator.</div>
 </aside>
 
-<!-- Panoul „Foile mele": lista foilor salvate în cont pentru lecția asta. -->
-<aside class="notes foi" id="foiPanel" aria-hidden="true">
+<!-- Panoul „Tablele mele": tablele salvate în cont pentru lecția asta. -->
+<aside class="notes boards" id="boardsPanel" aria-hidden="true">
   <div class="notes-head">
-    <strong>Foile mele</strong>
-    <button class="notes-close" id="foiClose" title="Închide">×</button>
+    <strong>Tablele mele</strong>
+    <button class="notes-close" id="boardsClose" title="Închide">×</button>
   </div>
-  <div class="foi-body" id="foiBody"></div>
+  <div class="boards-body" id="boardsBody"></div>
 </aside>
 
 <!-- Fereastra de întrebat (nume de foaie, confirmări).
@@ -136,6 +136,7 @@
     <h2 class="dlg__titlu" id="dlgTitlu"></h2>
     <p class="dlg__text" id="dlgText" hidden></p>
     <input class="dlg__camp" id="dlgCamp" hidden>
+    <p class="dlg__eroare" id="dlgEroare" hidden></p>
     <div class="dlg__butoane">
       <button class="btn" value="nu" id="dlgNu">Renunță</button>
       <button class="btn-save" value="da" id="dlgDa">Salvează</button>
