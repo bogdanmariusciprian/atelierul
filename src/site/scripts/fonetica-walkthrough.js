@@ -127,11 +127,11 @@ const ZBOR = 520;      // ms cât durează saltul final în căsuță
    secundă, iar o singură mișcare golea tot proverbul înainte să apuci să
    vezi ce cade. */
 const PRAG_VITEZA = 1100;   // px/s, la momentul întoarcerii
-const RAGAZ = 130;          // ms între două scuturări socotite
-// Răgazul a scăzut de la 190 odată cu slăbirea treptată: acum o scuturătură
-// face mai puțin (clatină, nu scoate), deci poate veni mai des fără să pară
-// că se golește proverbul singur. Altfel același gest ar dura de trei ori mai
-// mult decât înainte.
+const RAGAZ = 230;          // ms între două scuturări socotite
+// Răgazul e ținut mare dinadins. Cu 130 ms, cele trei scuturături ale unei
+// litere încăpeau în patru zecimi de secundă: pe hârtie erau trei pași, la
+// ochi era tot o desprindere instantanee. Aici nu numărul de pași contează,
+// ci timpul în care se văd.
 
 /* Nicio bucată nu sare din prima. La fiecare scuturătură, o singură literă se
    mai slăbește un pic: stă tot mai strâmb în cuvânt, ca un dinte care se
@@ -282,17 +282,23 @@ function initProverbe(root) {
      `composite: "add"` adună mișcarea PESTE înclinarea pe care bucata o are
      deja din `data-slab`, în loc s-o înlocuiască. Fără el, litera slăbită ar
      sări înapoi drept pe durata tresăririi. */
-  const nuMisca = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* Amplitudinea trebuie citită pe o cutie care ea însăși se plimbă după
+     deget. Un grad-doi de înclinare, cât aveam la început, se pierde complet
+     acolo: literele păreau nemișcate. De-aia cifrele sunt mari, nu delicate.
+
+     Nu punem pază de „reduced motion" aici: toată jucăria asta e mișcare,
+     bucățile chiar zboară prin pagină. A opri doar tremuratul ar însemna să
+     ascundem singurul semn care spune ce se întâmplă. */
   function tresar(el, tarie, intarziere = 0) {
-    if (nuMisca) return;
     el.animate(
       [
-        { transform: "translateY(0) rotate(0deg)" },
-        { transform: `translateY(${-1.2 * tarie}px) rotate(${3 * tarie}deg)` },
-        { transform: `translateY(${0.8 * tarie}px) rotate(${-2.2 * tarie}deg)` },
-        { transform: "translateY(0) rotate(0deg)" },
+        { transform: "translate(0,0) rotate(0deg)" },
+        { transform: `translate(${-2 * tarie}px, ${-3.5 * tarie}px) rotate(${9 * tarie}deg)` },
+        { transform: `translate(${2 * tarie}px, ${2 * tarie}px) rotate(${-7 * tarie}deg)` },
+        { transform: `translate(0, ${-1 * tarie}px) rotate(${3 * tarie}deg)` },
+        { transform: "translate(0,0) rotate(0deg)" },
       ],
-      { duration: 170 + tarie * 45, delay: intarziere, easing: "ease-in-out",
+      { duration: 260 + tarie * 70, delay: intarziere, easing: "ease-in-out",
         composite: "add" },
     );
   }
@@ -331,7 +337,7 @@ function initProverbe(root) {
     if (intoarcere && viteza > PRAG_VITEZA && acum - prins.ultima > RAGAZ) {
       prins.ultima = acum;
       const libere = [...text.querySelectorAll(".fo-buc")];
-      libere.forEach((el, i) => tresar(el, 1, i * 14));
+      libere.forEach((el, i) => tresar(el, 1, i * 22));
 
       // Bucata la care lucrăm rămâne aceeași până cade: se vede cum se
       // clatină tot mai tare, în loc să tresară de fiecare dată alta.

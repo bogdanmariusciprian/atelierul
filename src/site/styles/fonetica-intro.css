@@ -255,11 +255,24 @@
 .fo-cuv { white-space: nowrap; }
 
 /* Cât de strâmb stă litera care se clatină. Doi pași văzuți, al treilea o
-   scoate afară. Înclinarea rămâne între scuturături: e urma lucrului făcut,
-   iar elevul știe de la ce literă să continue. */
-.fo-buc[data-slab] { transition: transform 0.18s ease; }
-.fo-buc[data-slab="1"] { transform: rotate(-7deg) translateY(1px); }
-.fo-buc[data-slab="2"] { transform: rotate(11deg) translateY(2px); }
+   scoate afară. Înclinarea RĂMÂNE între scuturături: e urma lucrului făcut,
+   iar elevul știe la ce literă e.
+
+   Semnele sunt tari dinadins: litera se ridică din rând, se mărește și se
+   colorează. Mai devreme erau șapte grade de înclinare, care se pierdeau cu
+   totul pe o cutie ce se plimbă după deget; părea că nu se clatină nimic. */
+.fo-buc[data-slab] {
+  transition: transform 0.2s ease, color 0.2s ease;
+  transform-origin: 50% 90%;
+}
+.fo-buc[data-slab="1"] {
+  transform: rotate(-13deg) translateY(-2px) scale(1.08);
+  color: color-mix(in srgb, var(--fo-v) 55%, currentColor);
+}
+.fo-buc[data-slab="2"] {
+  transform: rotate(18deg) translateY(-4px) scale(1.18);
+  color: var(--fo-v);
+}
 
 /* Golul lăsat în urmă de sunetul care a căzut. Linia de dedesubt spune „aici
    lipsea ceva", ca într-un exercițiu cu spații de completat. Un gol mai lung
