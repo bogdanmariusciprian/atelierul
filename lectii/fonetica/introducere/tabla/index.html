@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>#LaTablă: analiza cuvintelor – Atelierul-LRO</title>
+<meta name="robots" content="noindex">
+
+<!-- Pagina stă ascunsă până când poarta de prelansare hotărăște. Regula e
+     scrisă aici, în pagină, nu într-un fișier adus din afară: dacă ar veni
+     dintr-un `<link>`, ar putea întârzia, iar conținutul ar clipi pentru
+     cineva care oricum urmează să fie trimis la /in-curand/. -->
+<style>html:not(.gate-ready) body { visibility: hidden; }</style>
+<link rel="stylesheet" href="../../../../src/site/styles/tabla-fonetica.css">
+</head>
+<body>
+
+
+<header>
+  <div class="header-inner">
+    <a class="tb-inapoi" href="../" title="Înapoi la lecție" aria-label="Înapoi la lecție">
+      <span aria-hidden="true">←</span>
+    </a>
+
+    <div class="brand">
+      <h1>Fonetică – analiza cuvintelor</h1>
+      <span>cuvânt → despărțire în silabe → transcriere fonetică</span>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <div class="tgroup">
+        <button class="btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button class="btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button class="btn" data-cmd="underline" title="Subliniat (Ctrl+U)"><u>U</u></button>
+        <button class="btn" data-cmd="superscript" title="Superscript (pe selecție: bold + subliniat + spațiu înainte)">x<sup>2</sup></button>
+      </div>
+      <div class="tgroup">
+        <button class="btn mono sym-btn" data-symkey="1"></button>
+        <button class="btn mono sym-btn" data-symkey="2"></button>
+        <button class="btn mono sym-btn" data-symkey="3"></button>
+        <button class="btn mono sym-btn" data-symkey="4"></button>
+      </div>
+      <div class="tgroup">
+        <button class="btn mono" data-pair="()" title="Inserează (  )">(&nbsp;)</button>
+        <button class="btn mono" data-pair="[]" title="Inserează [  ]">[&nbsp;]</button>
+      </div>
+      <div class="tgroup">
+        <button class="btn" id="saveBtn" title="Salvează lucrul într-un fișier">💾</button>
+        <button class="btn" id="openBtn" title="Deschide un fișier salvat">📂</button>
+        <button class="btn" id="pdfBtn" title="Printează / salvează ca PDF">🖨</button>
+      </div>
+      <button class="btn" id="settingsBtn" title="Simboluri (tastele 1-4)">⚙</button>
+      <button class="btn btn-notes" id="notesBtn" title="Deschide notițele">📝 Notițe</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> → <span id="legendSyms"></span></span>
+    <span><kbd>Shift</kbd>+<kbd>A</kbd> ciclează ă → î → â</span>
+    <span><kbd>Shift</kbd>+<kbd>S</kbd> → ș · <kbd>Shift</kbd>+<kbd>T</kbd> → ț</span>
+    <span><kbd>,</kbd> → „, ” · <kbd>-</kbd> → „ - ”</span>
+    <span><kbd>Enter</kbd> rând nou · <kbd>Tab</kbd> etapa următoare</span>
+    <span id="saveStatus" class="save-status">salvare automată</span>
+  </div>
+</header>
+
+<!-- Bara „Cerință" – fixă, în afara zonei scrollabile -->
+<div class="prompt-wrap">
+  <div class="prompt-bar">
+    <span class="p-label">Cerință</span>
+    <textarea id="promptArea" placeholder="Scrie aici cerința exercițiului… (ex: Despărțiți în silabe și transcrieți fonetic cuvintele de mai jos.)"></textarea>
+  </div>
+</div>
+
+<main>
+  <div class="main-inner">
+    <div class="sheet" id="sheet"></div>
+    <div class="add-row">
+      <button class="btn-add" id="addStageBtn" title="Adaugă o etapă (câmp) pe rândul curent">+ etapă</button>
+      <button class="btn-add" id="addRowBtn">+ rând nou</button>
+      <button class="btn-add btn-danger" id="clearBtn" title="Șterge cerința și toate rândurile">🗑 Șterge tot</button>
+    </div>
+  </div>
+</main>
+
+<!-- Panoul de notițe (se deschide/închide DOAR la click) -->
+<aside class="notes" id="notesPanel" aria-hidden="true">
+  <div class="notes-head">
+    <strong>Notițe</strong>
+    <button class="notes-close" id="notesClose" title="Închide">×</button>
+  </div>
+  <textarea id="notesArea" placeholder="Scrie-ți aici notițele (vocale, consoane, semivocale, reguli de despărțire în silabe...)"></textarea>
+</aside>
+
+<!-- Panoul de simboluri (tastele 1-4) – se deschide/închide la click -->
+<aside class="notes settings" id="settingsPanel" aria-hidden="true">
+  <div class="notes-head">
+    <strong>Simboluri – tastele 1-4</strong>
+    <button class="notes-close" id="settingsClose" title="Închide">×</button>
+  </div>
+  <div class="settings-body" id="settingsBody"></div>
+  <div class="settings-hint">Tastele 1-4 și butoanele din bară inserează aceste simboluri. Bifează „bold" dacă vrei simbolul îngroșat. Setările se salvează pe acest calculator.</div>
+</aside>
+
+<!-- input ascuns pentru „Deschide fișier" -->
+<input type="file" id="openFile" accept=".json,application/json" hidden>
+
+<!-- Șablon pentru un rând de lucru -->
+<template id="rowTemplate">
+  <div class="row">
+    <div class="rownum"></div>
+    <div class="field word"  contenteditable="true" data-ph="cuvânt"></div>
+    <span class="arrow">→</span>
+    <div class="field syll"  contenteditable="true" data-ph="si-la-be"></div>
+    <span class="arrow">→</span>
+    <div class="stage3">
+      <div class="field trans" contenteditable="true" data-ph="[ transcriere ]"></div>
+      <div class="field types" contenteditable="true" data-ph="c v s"></div>
+      <div class="types-label">tipul sunetelor: c = consoană · v = vocală · s = semivocală</div>
+    </div>
+  </div>
+</template>
+
+
+<script type="module">
+  // Tabla nu cheamă bara sitului, deci nici poarta n-ar fi fost chemată de la
+  // sine: o punem noi, altfel pagina ar fi rămas deschisă oricui știe adresa.
+  // Unealta se încarcă abia după ce poarta răspunde, deci un vizitator
+  // nechemat nici măcar n-o descarcă.
+  import { enforceGate, revealGate } from "../../../../src/shared/scripts/site-gate.js";
+  if (await enforceGate()) {
+    await import("../../../../src/site/scripts/tabla-fonetica.js");
+    revealGate();
+  }
+</script>
+</body>
+</html>
