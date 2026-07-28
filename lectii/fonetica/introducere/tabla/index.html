@@ -127,6 +127,22 @@
   <div class="foi-body" id="foiBody"></div>
 </aside>
 
+<!-- Fereastra de întrebat (nume de foaie, confirmări).
+     Element <dialog> adevărat, nu `prompt` din browser: acela poate fi oprit
+     de utilizator sau de browser („nu mai lăsa pagina să deschidă ferestre"),
+     iar atunci se întoarce gol și pare că apeși degeaba. -->
+<dialog class="dlg" id="dlg">
+  <form method="dialog" class="dlg__form">
+    <h2 class="dlg__titlu" id="dlgTitlu"></h2>
+    <p class="dlg__text" id="dlgText" hidden></p>
+    <input class="dlg__camp" id="dlgCamp" hidden>
+    <div class="dlg__butoane">
+      <button class="btn" value="nu" id="dlgNu">Renunță</button>
+      <button class="btn-save" value="da" id="dlgDa">Salvează</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Șablon pentru un rând de lucru -->
 <template id="rowTemplate">
   <div class="row">

@@ -1013,9 +1013,13 @@ function spune(text, reușită = true) {
 }
 
 async function salveaza(caFoaieNoua = false) {
-  const titlu = caFoaieNoua
-    ? (prompt('Numele foii noi:', numeImplicit()) || '').trim()
-    : (foaia.id ? foaia.titlu : (prompt('Numele foii:', numeImplicit()) || '').trim());
+  let titlu = foaia.id && !caFoaieNoua ? foaia.titlu : null;
+  if (!titlu) {
+    titlu = await intreaba({
+      titlu: caFoaieNoua ? 'Salvează ca foaie nouă' : 'Salvează foaia',
+      camp: numeImplicit(),
+    });
+  }
   if (!titlu) return;                       // a apăsat „Renunță"
 
   elSaveBtn && elSaveBtn.classList.add('e-ocupat');
@@ -1034,21 +1038,18 @@ async function salveaza(caFoaieNoua = false) {
 }
 
 elSaveBtn && elSaveBtn.addEventListener('click', () => salveaza(false));
-/* `prompt` oprește pagina pe loc, înainte ca browserul să apuce să redeseneze,
-   deci meniul ar rămâne pe ecran sub fereastra de întrebare. Amânarea cu un
-   pas îi dă răgaz să se ascundă. */
 document.getElementById('saveAsBtn').addEventListener('click', () => {
   inchideMeniu();
-  setTimeout(() => salveaza(true), 0);
+  salveaza(true);
 });
 
 document.getElementById('renameBtn').addEventListener('click', () => {
   inchideMeniu();
-  setTimeout(redenumeste, 0);
+  redenumeste();
 });
 async function redenumeste() {
-  if (!foaia.id) { alert('Salvează întâi foaia, apoi îi poți schimba numele.'); return; }
-  const nou = (prompt('Numele foii:', foaia.titlu) || '').trim();
+  if (!foaia.id) { spune('salvează întâi foaia', false); return; }
+  const nou = await intreaba({ titlu: 'Redenumește foaia', camp: foaia.titlu, buton: 'Schimbă' });
   if (!nou || nou === foaia.titlu) return;
   if (await renameSheet(foaia.id, nou)) { foaia.titlu = nou; spune('redenumit', true); }
 }
@@ -1068,6 +1069,49 @@ window.addEventListener('beforeunload', (e) => {
   e.preventDefault();
   e.returnValue = '';
 });
+
+/* ================= Fereastra de întrebat =================
+   Un <dialog> al nostru, nu `prompt`/`confirm` din browser.
+
+   DE CE: ferestrele browserului pot fi oprite, fie de utilizator (bifa „nu mai
+   lăsa pagina să deschidă ferestre", care rămâne pusă până la reîncărcare),
+   fie de browser în anumite situații. Când sunt oprite, `prompt` se întoarce
+   gol pe loc, fără niciun semn, iar codul crede că omul a apăsat „Renunță".
+   Rezultatul: apeși „Salvează", nu se întâmplă nimic și nici măcar nu afli de
+   ce. Fereastra noastră nu poate fi oprită de nimeni.
+   ========================================================= */
+const dlg      = document.getElementById('dlg');
+const dlgTitlu = document.getElementById('dlgTitlu');
+const dlgText  = document.getElementById('dlgText');
+const dlgCamp  = document.getElementById('dlgCamp');
+const dlgDa    = document.getElementById('dlgDa');
+
+/* Deschide fereastra și așteaptă răspunsul. Cu `camp: true` întoarce textul
+   scris (sau null la renunțare); fără el, întoarce true/false. */
+function intreaba({ titlu, text = '', camp = null, buton = 'Salvează' }) {
+  dlgTitlu.textContent = titlu;
+  dlgText.textContent = text;
+  dlgText.hidden = !text;
+  dlgDa.textContent = buton;
+  dlgCamp.hidden = camp === null;
+  dlgCamp.value = camp || '';
+
+  return new Promise((raspunde) => {
+    const gata = () => {
+      dlg.removeEventListener('close', gata);
+      const da = dlg.returnValue === 'da';
+      if (camp === null) { raspunde(da); return; }
+      raspunde(da ? dlgCamp.value.trim() : null);
+    };
+    dlg.addEventListener('close', gata);
+    dlg.returnValue = 'nu';       // Esc și clicul în afară = renunțare
+    dlg.showModal();
+    if (camp !== null) { dlgCamp.focus(); dlgCamp.select(); }
+  });
+}
+
+/* Clic pe fundal = renunțare, ca la orice fereastră modernă. */
+dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close('nu'); });
 
 /* ---------- panoul „Foile mele" ---------- */
 const foiPanel = document.getElementById('foiPanel');
@@ -1101,7 +1145,7 @@ foiBody.addEventListener('click', async (e) => {
   const id = b.closest('.foaie').dataset.id;
 
   if (b.dataset.act === 'sterge') {
-    if (!confirm('Ștergi foaia asta? Nu se mai poate aduce înapoi.')) return;
+    if (!await intreaba({ titlu: 'Ștergi foaia?', text: 'Nu se mai poate aduce înapoi.', buton: 'Șterge' })) return;
     if (await deleteSheet(id)) {
       if (foaia.id === id) foaia = { id: null, titlu: 'Foaie nouă', curat: foaia.curat };
       aratăStarea();
@@ -1110,9 +1154,13 @@ foiBody.addEventListener('click', async (e) => {
     return;
   }
 
-  if (!foaia.curat && !confirm('Foaia de acum n-a fost salvată. O lași așa și o deschizi pe cealaltă?')) return;
+  if (!foaia.curat && !await intreaba({
+        titlu: 'Foaia de acum n-a fost salvată',
+        text: 'O lași așa și o deschizi pe cealaltă?',
+        buton: 'Deschide',
+      })) return;
   const f = await loadSheet(id);
-  if (!f) { alert('Foaia nu s-a putut deschide.'); return; }
+  if (!f) { spune('foaia nu s-a putut deschide', false); return; }
   applyState(f.data);
   foaia = { id: f.id, titlu: f.title, curat: true };
   aratăStarea();
@@ -1124,8 +1172,12 @@ foiBody.addEventListener('click', async (e) => {
 document.getElementById('pdfBtn').addEventListener('click', () => { inchideMeniu(); window.print(); });
 
 /* Șterge tot: cerința + toate rândurile (notițele și simbolurile rămân) */
-document.getElementById('clearBtn').addEventListener('click', () => {
-  if (!confirm('Ștergi tot? Se golesc cerința și toate rândurile. (Notițele și simbolurile rămân.)')) return;
+document.getElementById('clearBtn').addEventListener('click', async () => {
+  if (!await intreaba({
+        titlu: 'Ștergi tot?',
+        text: 'Se golesc cerința și toate rândurile. Notițele și simbolurile rămân.',
+        buton: 'Șterge tot',
+      })) return;
   document.getElementById('promptArea').value = '';
   sheet.innerHTML = '';
   addRowAfter(null);

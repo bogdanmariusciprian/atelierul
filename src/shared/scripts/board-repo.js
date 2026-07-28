@@ -71,10 +71,41 @@ export async function saveSheet({ id, lessonSlug, title, data }) {
 
   const { data: row, error } = await cerere.select("id, title, updated_at").maybeSingle();
   if (error) {
-    console.warn("saveSheet:", error.code, error.message);
+    console.error("saveSheet a picat:", { code: error.code, message: error.message,
+                                          details: error.details, hint: error.hint });
+    await diagnostic();
     return { row: null, motiv: motivul(error) };
   }
+  // Fără eroare, dar nici rând: se întâmplă când UPDATE n-a găsit ce să
+  // schimbe (foaia a fost ștearsă între timp), sau când politica a lăsat
+  // scrierea să treacă dar oprește citirea înapoi. Tăcerea asta ar fi cea mai
+  // rea dintre toate, fiindcă arată a reușită.
+  if (!row) {
+    console.error("saveSheet: cererea a mers, dar n-a venit niciun rând înapoi.");
+    await diagnostic();
+    return { row: null, motiv: id ? "foaia nu mai există" : "scrierea n-a lăsat urmă" };
+  }
   return { row, motiv: null };
+}
+
+/** Când salvarea pică, scrie în consolă tot ce trebuie ca să știm de ce, fără
+ *  să mai fie nevoie de încă o tură de întrebări: cine e conectat, dacă
+ *  tabelul se poate citi și dacă politicile îl lasă. */
+async function diagnostic() {
+  const raport = {};
+  try {
+    const { data } = await supabase.auth.getSession();
+    raport.sesiune = data && data.session ? "da" : "NU";
+    raport.utilizator = data && data.session ? data.session.user.email : "-";
+    raport.expira = data && data.session ? new Date(data.session.expires_at * 1000).toLocaleString("ro-RO") : "-";
+  } catch (e) { raport.sesiune = "eroare: " + e.message; }
+
+  const { data: cit, error: eCit } = await supabase
+    .from("learn_lessons_boards").select("id").limit(1);
+  raport.citireTabel = eCit ? `${eCit.code}: ${eCit.message}` : `merge (${(cit || []).length} rânduri)`;
+
+  console.table(raport);
+  return raport;
 }
 
 /** Traduce eroarea bazei într-un motiv scurt, de arătat pe ecran.
@@ -92,7 +123,9 @@ function motivul(error) {
   if (txt.includes("failed to fetch") || txt.includes("networkerror")) {
     return "fără legătură la server";
   }
-  return "nu s-a putut salva";
+  // Necunoscut: arătăm mesajul brut. Un „nu s-a putut salva" fără cauză ne-a
+  // costat deja două runde de ghicit.
+  return `${cod || "eroare"}: ${(error && error.message) || "necunoscută"}`;
 }
 
 /** Schimbă numele unei foi, fără să atingă ce e scris pe ea. */

@@ -566,3 +566,37 @@
   header, .add-row, .notes, .tb-inapoi { display: none !important; }
   body { height: auto; overflow: visible; }
 }
+
+/* ============ Fereastra de întrebat ============
+   Element <dialog> adevărat: browserul îi dă singur fundalul, capcana de
+   tastatură (Tab nu iese din ea) și închiderea cu Esc. Nimic din toate astea
+   n-ar veni de la sine dintr-un div. */
+.dlg {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  width: min(400px, calc(100vw - 32px));
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 18px 48px rgba(31, 36, 48, .22);
+}
+.dlg::backdrop { background: rgba(31, 36, 48, .35); }
+.dlg__form { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.dlg__titlu { margin: 0; font-family: var(--ui); font-size: 16px; font-weight: 600; }
+.dlg__text { margin: 0; font-family: var(--ui); font-size: 13px; color: var(--muted); line-height: 1.55; }
+.dlg__camp {
+  font-family: var(--ui);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--field-bg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 11px;
+  outline: none;
+}
+.dlg__camp:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dlg__butoane { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+/* Butonul de renunțare e primul în cod (deci primul la Tab), dar al doilea ca
+   greutate: cel care duce lucrul mai departe stă în dreapta, unde îl caută
+   mâna. */
+.dlg__butoane .btn { height: 34px; padding: 0 14px; }
