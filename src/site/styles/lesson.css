@@ -863,7 +863,13 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
    vadă că e o însușire a lecției, nu un buton.
 
    Iconul e tăiat cu mască dintr-un SVG, ca semnele de domeniu, deci își ia
-   culoarea din `background` și se potrivește singur cu orice domeniu. */
+   culoarea din `background` și se potrivește singur cu orice domeniu.
+
+   ATENȚIE la împărțirea pe două elemente, nu e cochetărie: masca taie TOT ce
+   desenează elementul, inclusiv pseudo-elementele lui. Dacă masca ar sta pe
+   același element cu bula, bula ar fi și ea tăiată după silueta tablei, deci
+   n-ar mai apărea nimic la hover. De-aia masca stă pe `::before`, iar bula pe
+   `::after`, pe un părinte curat. */
 .track-node__board {
   position: relative;
   display: inline-block;
@@ -871,14 +877,24 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
   width: 0.95em;
   height: 0.95em;
   margin-left: 0.45em;
+}
+.track-node__board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: var(--card-color, var(--color-text-muted));
   -webkit-mask: url("/assets/icons/tabla-bifa.svg") no-repeat center / contain;
   mask: url("/assets/icons/tabla-bifa.svg") no-repeat center / contain;
   opacity: 0.5;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
-.track-node__label:hover .track-node__board { opacity: 1; }
-.track-node__board:hover { opacity: 1; transform: scale(1.14); }
+.track-node__label:hover .track-node__board::before { opacity: 1; }
+.track-node__board:hover::before { opacity: 1; transform: scale(1.14); }
+
+/* Fiecare rând din traseu are `z-index: 1`, deci își face teancul lui de
+   straturi. Fără regula asta, bula unui rând ar rămâne sub rândul următor,
+   care se desenează după el. Rândul atins urcă deasupra vecinilor. */
+.track-node:hover { z-index: 5; }
 
 /* Bula se deschide spre STÂNGA (`right: 0`), fiindcă semnul stă la capătul
    titlului: dacă ar crește spre dreapta, pe ecran îngust ar ieși din panou,
