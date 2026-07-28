@@ -1,0 +1,136 @@
+/* =========================================================
+   Textul argumentativ – fila „Aprofundare".
+
+   Fila e metoda de lucru a profesorului, transpusă. De-aia stilul de aici nu
+   inventează nimic: ține ierarhia a) b) c) d) limpede și face din cele șapte
+   categorii de argumente ceva care se citește dintr-o privire, nu un zid de
+   text cu subpuncte.
+   ========================================================= */
+
+/* ---- regula, cu litera ei ----
+   Litera stă într-un cerc, în afara textului. Așa se vede unde începe fiecare
+   regulă chiar și când derulezi repede, iar textul rămâne aliniat pe o
+   singură coloană, nu în trepte. */
+.ta-regula {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  margin-block: 1.3rem;
+}
+.ta-litera {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  margin-top: 0.1rem;
+  border-radius: 50%;
+  background: var(--lesson-color);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ta-corp { flex: 1; min-width: 0; }
+.ta-cap {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* ---- listele metodei ---- */
+.ta-lista {
+  margin: 0.3rem 0 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+  line-height: 1.75;
+}
+.ta-lista > li { margin-bottom: 0.35rem; }
+.ta-lista > li::marker { color: var(--lesson-color); }
+
+/* ---- cele șapte categorii de argumente ----
+   Cartonașe, nu subpuncte. Șapte categorii cu câte patru-cinci cuvinte
+   fiecare ar fi făcut un zid de text în care nu se mai vede unde se termină
+   una și începe alta. Așa se citesc ca familii, iar elevul le poate parcurge
+   cu ochiul când caută un unghi pentru argumentul lui.
+
+   `auto-fit` cu `minmax`: pe ecran lat intră trei pe rând, pe telefon una,
+   fără să scriem noi vreun număr de coloane. */
+.ta-categorii {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.6rem;
+}
+.ta-cat {
+  padding: 0.7rem 0.9rem;
+  border: 1.5px solid var(--color-border);
+  border-left: 4px solid var(--lesson-color);
+  border-radius: 0 10px 10px 0;
+  background: var(--color-bg);
+}
+.ta-cat b {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--lesson-color);
+  font-size: 0.98rem;
+}
+.ta-cat span {
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* ---- termenul cu lămurire (truism) ----
+   Bula apare și la atingere, nu doar la hover: pe telefon hover nu există,
+   iar lămurirea asta e chiar miezul sfatului. De-aia termenul e focusabil. */
+.ta-term {
+  position: relative;
+  border-bottom: 2px dotted var(--lesson-color);
+  font-weight: 600;
+  cursor: help;
+}
+.ta-term::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 5;
+  width: min(24rem, 78vw);
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--lesson-color);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 400;
+  line-height: 1.55;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+.ta-term:hover::after,
+.ta-term:focus::after,
+.ta-term:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* ---- eticheta #callToAction ----
+   Scrisă monospațiat fiindcă e o notație de lucru, nu un cuvânt din text:
+   așa ochiul n-o citește ca parte din propoziție. */
+.ta-eticheta {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--lesson-color) 12%, transparent);
+  color: var(--lesson-color);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.86rem;
+  font-weight: 700;
+}

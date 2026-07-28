@@ -1272,3 +1272,44 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
      iar degetul n-are de ce s-o caute. */
   .lesson-tabla { display: flex; width: 100%; justify-content: center; }
 }
+
+/* ============ File în lecție (Introducere / Aprofundare) ============
+   Stau AICI, în stilul comun, nu în cel al unei lecții anume: a doua lecție
+   cu file le folosește la fel, fără să-și copieze regulile.
+
+   Arată ca niște file de dosar, nu ca butoane: linia de dedesubt le leagă
+   între ele, iar fila deschisă o rupe. Așa se citește dintr-o privire că e
+   vorba de două fețe ale aceluiași lucru, nu de două acțiuni. */
+.lesson-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 1.4rem 0 0;
+  border-bottom: 2px solid var(--color-border);
+}
+.lesson-tab {
+  position: relative;
+  bottom: -2px;
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.lesson-tab:hover { color: var(--color-text); background: var(--color-surface); }
+.lesson-tab.is-on {
+  color: var(--lesson-color);
+  border-bottom-color: var(--lesson-color);
+}
+.lesson-tab:focus-visible { outline: 2px solid var(--lesson-color); outline-offset: 2px; }
+
+/* Fila ascunsă chiar dispare. `[hidden]` singur n-ar fi de ajuns dacă vreo
+   regulă i-ar da `display`, cum am pățit deja la meniul din tablă. */
+.lesson-tabpanel[hidden] { display: none; }

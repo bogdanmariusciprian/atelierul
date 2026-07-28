@@ -12,6 +12,7 @@
   <meta property="og:image" content="/assets/logo/logo.png" />
   <link rel="stylesheet" href="../../../src/shared/styles/main.css" />
   <link rel="stylesheet" href="../../../src/site/styles/lesson.css" />
+  <link rel="stylesheet" href="../../../src/site/styles/text-argumentativ.css" />
 </head>
 <body>
   <div id="header"></div>
@@ -25,6 +26,20 @@
         bun are o structură clară: îți spui părerea, o sprijini cu argumente și
         închei printr-o concluzie.
       </p>
+
+      <!-- FILELE: două drumuri spre aceeași lecție.
+           „Introducere" = ce era înainte, structura de bază.
+           „Aprofundare" = metoda de lucru, cu regulile și categoriile de
+           argumente. Exercițiile și recapitularea stau AFARĂ, comune: sunt
+           aceleași indiferent pe ce cale ai învățat. -->
+      <div class="lesson-tabs" role="tablist" aria-label="Cele două părți ale lecției">
+        <button class="lesson-tab is-on" role="tab" aria-selected="true"
+                aria-controls="fila-introducere" id="tab-introducere" data-tab="introducere">Introducere</button>
+        <button class="lesson-tab" role="tab" aria-selected="false"
+                aria-controls="fila-aprofundare" id="tab-aprofundare" data-tab="aprofundare">Aprofundare</button>
+      </div>
+
+      <div class="lesson-tabpanel" id="fila-introducere" role="tabpanel" aria-labelledby="tab-introducere">
 
       <!-- OBIECTIVE -->
       <section class="lesson-section">
@@ -86,6 +101,82 @@
           <p><strong>Concluzie:</strong> <em>Prin urmare, cititul rămâne o activitate de neînlocuit.</em></p>
         </div>
       </section>
+
+      </div><!-- /fila Introducere -->
+
+      <div class="lesson-tabpanel" id="fila-aprofundare" role="tabpanel"
+           aria-labelledby="tab-aprofundare" hidden>
+
+        <!-- 1. CONSIDERAȚII -->
+        <section class="lesson-section">
+          <h2 class="lesson-section__title">Considerații</h2>
+          <p>Patru lucruri de ținut minte înainte de a scrie un rând.</p>
+          <ul class="ta-lista">
+            <li>Textul argumentativ trebuie să fie <b>convingător</b>.</li>
+            <li>Trebuie să aibă o <b>structură clasică</b>: început, cuprins și încheiere.</li>
+            <li>Trebuie să ofere <b>exemple concrete, specifice, clare</b>, plus citate din text.</li>
+            <li>
+              Trebuie să evităm
+              <span class="ta-term" tabindex="0" role="button"
+                    data-tip="Propoziții cunoscute de toată lumea ca fiind adevărate, dar folosite ca și cum tocmai s-ar fi inventat apa caldă.">truismele</span>.
+            </li>
+          </ul>
+        </section>
+
+        <!-- 2. REGULI -->
+        <section class="lesson-section">
+          <h2 class="lesson-section__title">Reguli</h2>
+
+          <div class="ta-regula">
+            <span class="ta-litera">a</span>
+            <div class="ta-corp">
+              <h3 class="ta-cap">Introducere</h3>
+              <ul class="ta-lista">
+                <li>Răspunsul clar la cerință.</li>
+                <li>Definirea unor termeni din răspuns.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="ta-regula">
+            <span class="ta-litera">b</span>
+            <div class="ta-corp">
+              <h3 class="ta-cap">Argumentele se aleg din următoarele categorii</h3>
+              <div class="ta-categorii">
+                <div class="ta-cat"><b>Social</b><span>relații, joburi, meserii, familie, prieteni</span></div>
+                <div class="ta-cat"><b>Emoțional</b><span>stări, emoții, reacții, impulsuri</span></div>
+                <div class="ta-cat"><b>Cultural</b><span>cunoștințe, dezvoltarea culturii generale, satisfacerea curiozității, invenții</span></div>
+                <div class="ta-cat"><b>Psihologic</b><span>mentalitate, personalitate, memorie, imaginație, percepție, puncte de vedere diferite</span></div>
+                <div class="ta-cat"><b>Logistic</b><span>materiale, instrumente, organizare de evenimente, resurse umane și de timp, lucrul manual</span></div>
+                <div class="ta-cat"><b>Economic</b><span>îmbogățire și prosperitate, investiții, economisire</span></div>
+                <div class="ta-cat"><b>Moral</b><span>valori personale, calități și defecte, credințe, altruism sau egoism</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ta-regula">
+            <span class="ta-litera">c</span>
+            <div class="ta-corp">
+              <h3 class="ta-cap">Exemplele se dezvoltă de la general la particular</h3>
+            </div>
+          </div>
+
+          <div class="ta-regula">
+            <span class="ta-litera">d</span>
+            <div class="ta-corp">
+              <h3 class="ta-cap">Concluzia cuprinde două elemente</h3>
+              <ul class="ta-lista">
+                <li>Un enunț de tip rezumat, în care se enumeră cele două elemente.</li>
+                <li>
+                  <span class="ta-eticheta">#callToAction</span>
+                  sfat sau recomandare pentru creșterea argumentelor.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /fila Aprofundare -->
 
       <!-- EXERCIȚII -->
       <section class="lesson-section">
@@ -185,7 +276,9 @@
     import { initLessonComments } from "../../../src/site/scripts/comments.js";
     import { initProposeExercise } from "../../../src/site/scripts/propose-exercise.js";
     import { initLessonProgress } from "../../../src/site/scripts/lesson-progress.js";
+    import { initLessonTabs } from "../../../src/site/scripts/lesson-tabs.js";
     renderChrome("../../../");
+    initLessonTabs();
     initLessonExercises();
     initLessonProgress("../../../");
     initProposeExercise("../../../");
