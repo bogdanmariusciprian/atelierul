@@ -568,10 +568,15 @@ html, body{ overscroll-behavior:none; touch-action:manipulation; }
    fel de departe de lucrarea lui ca de vecina ei. Locul îi e păstrat mereu,
    deci rândul nu tresare când se arată. */
 .work-del{
-  display:inline-block;width:19px;height:19px;margin-left:2px;vertical-align:-4px;
+  /* `inline-flex` ca să pot centra semnul înăuntru pe amândouă direcțiile;
+     `vertical-align:middle` ca butonul întreg să stea la mijlocul rândului.
+     Aveam o împingere fixă de 4px, care nimerea doar la mărimea de atunci:
+     schimbai mărimea scrisului din notiță și „×" urca sau cobora. */
+  display:inline-flex;align-items:center;justify-content:center;
+  width:19px;height:19px;margin-left:2px;vertical-align:middle;
   border:none;border-radius:6px;
-  background:transparent;color:#a99a63;font-size:15px;line-height:19px;
-  text-align:center;cursor:pointer;opacity:0;transition:opacity .12s;
+  background:transparent;color:#a99a63;font-size:15px;line-height:1;
+  cursor:pointer;opacity:0;transition:opacity .12s;
 }
 .work:hover .work-del,.work-del:focus-visible{opacity:1;}
 .work-del:hover{background:#f6d6d3;color:#a3312a;}
