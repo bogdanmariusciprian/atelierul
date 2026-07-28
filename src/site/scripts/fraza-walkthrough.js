@@ -78,7 +78,7 @@ const STEPS = [
   { cls: "s-num", t: "Numărăm predicatele la bară",
     d: "Numerotăm barele – dar doar pe cele care au un predicat înaintea lor. Ies <b>7</b>. Deci <b>7 = 7 = 6</b>." },
   { cls: "s-type", t: "Precizăm felul propozițiilor",
-    d: "Lângă fiecare număr trecem, în paranteză, felul: prima e <b>(PP)</b>, restul <b>(PS)</b>. Regula: orice propoziție care are cerc este <b>PS</b>." },
+    d: "Lângă fiecare număr trecem, în paranteză, felul. Te uiți la cerc, nu la poziție: propoziția care <b>are cerc</b> e <b>(PS)</b>, cea fără cerc e <b>(PP)</b>. Aici PP se nimerește prima, dar nu e o regulă – o subordonată poate sta și în capul frazei." },
 ];
 
 function initWalkthrough() {
