@@ -127,8 +127,17 @@ const ZBOR = 520;      // ms cât durează saltul final în căsuță
    secundă, iar o singură mișcare golea tot proverbul înainte să apuci să
    vezi ce cade. */
 const PRAG_VITEZA = 1100;   // px/s, la momentul întoarcerii
-const RAGAZ = 190;          // ms între două scuturări socotite
-const PER_SCUTURARE = 1;    // câte bucăți sar la o întoarcere
+const RAGAZ = 130;          // ms între două scuturări socotite
+// Răgazul a scăzut de la 190 odată cu slăbirea treptată: acum o scuturătură
+// face mai puțin (clatină, nu scoate), deci poate veni mai des fără să pară
+// că se golește proverbul singur. Altfel același gest ar dura de trei ori mai
+// mult decât înainte.
+
+/* Nicio bucată nu sare din prima. La fiecare scuturătură, o singură literă se
+   mai slăbește un pic: stă tot mai strâmb în cuvânt, ca un dinte care se
+   clatină, și abia la a treia se desprinde. Restul proverbului tresare și el,
+   ca să se vadă că totul e gata să cadă, dar cade doar ce s-a slăbit destul. */
+const SLABIRE = 3;          // câte scuturături ține o bucată până se desprinde
 
 function initProverbe(root) {
   const gazda = root.querySelector('[data-role="fo-prov"]');
@@ -151,11 +160,16 @@ function initProverbe(root) {
   function arata() {
     const p = PROVERBE[idx];
     if (tema) tema.textContent = p.tema;
-    text.innerHTML = p.text.map((cuv) => cuv.map(([lit, cod]) =>
+    /* Fiecare cuvânt într-un înveliș care nu se rupe: bucățile sunt
+       `inline-block` (altfel nu s-ar putea înclina), iar între două
+       `inline-block` browserul are voie să treacă la rândul următor, adică ar
+       putea despica un cuvânt în două. */
+    text.innerHTML = p.text.map((cuv) => `<span class="fo-cuv">` + cuv.map(([lit, cod]) =>
       cod && !stranse.has(cod)
         ? `<span class="fo-buc" data-s="${cod}">${lit}</span>`
         : `<span>${lit}</span>`
-    ).join("")).join(" ");
+    ).join("") + `</span>`).join(" ");
+    slabit = null;
     cutie.classList.remove("is-gol");
     actualizeaza();
   }
@@ -202,6 +216,7 @@ function initProverbe(root) {
     // nu mai fie socotită printre cele care mai pot cădea.
     el.className = "fo-gol";
     el.removeAttribute("data-s");
+    el.removeAttribute("data-slab");
     porneste();
   }
 
@@ -263,8 +278,28 @@ function initProverbe(root) {
     }, ZBOR);
   }
 
+  /* ---- tresărirea în cuvânt ----
+     `composite: "add"` adună mișcarea PESTE înclinarea pe care bucata o are
+     deja din `data-slab`, în loc s-o înlocuiască. Fără el, litera slăbită ar
+     sări înapoi drept pe durata tresăririi. */
+  const nuMisca = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function tresar(el, tarie, intarziere = 0) {
+    if (nuMisca) return;
+    el.animate(
+      [
+        { transform: "translateY(0) rotate(0deg)" },
+        { transform: `translateY(${-1.2 * tarie}px) rotate(${3 * tarie}deg)` },
+        { transform: `translateY(${0.8 * tarie}px) rotate(${-2.2 * tarie}deg)` },
+        { transform: "translateY(0) rotate(0deg)" },
+      ],
+      { duration: 170 + tarie * 45, delay: intarziere, easing: "ease-in-out",
+        composite: "add" },
+    );
+  }
+
   /* ---- prinderea și zgâlțâitul ---- */
   let prins = null;
+  let slabit = null;   // bucata care se clatină acum
   cutie.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     prins = { x: e.clientX, y: e.clientY, t: performance.now(),
@@ -296,9 +331,17 @@ function initProverbe(root) {
     if (intoarcere && viteza > PRAG_VITEZA && acum - prins.ultima > RAGAZ) {
       prins.ultima = acum;
       const libere = [...text.querySelectorAll(".fo-buc")];
-      for (let i = 0; i < PER_SCUTURARE && libere.length; i++) {
-        const el = libere.splice(Math.floor(Math.random() * libere.length), 1)[0];
-        desprinde(el, vx, vy);
+      libere.forEach((el, i) => tresar(el, 1, i * 14));
+
+      // Bucata la care lucrăm rămâne aceeași până cade: se vede cum se
+      // clatină tot mai tare, în loc să tresară de fiecare dată alta.
+      if (!slabit || !slabit.isConnected || !slabit.classList.contains("fo-buc")) {
+        slabit = libere[Math.floor(Math.random() * libere.length)] || null;
+      }
+      if (slabit) {
+        const nivel = Number(slabit.dataset.slab || 0) + 1;
+        if (nivel >= SLABIRE) { desprinde(slabit, vx, vy); slabit = null; }
+        else { slabit.dataset.slab = nivel; tresar(slabit, nivel + 1); }
       }
       cutie.classList.add("is-lovit");
       setTimeout(() => cutie.classList.remove("is-lovit"), 160);

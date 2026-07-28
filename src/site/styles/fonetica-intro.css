@@ -247,6 +247,20 @@
    arate ca un proverb, nu ca un text adnotat. Câte au mai rămas scrie oricum
    sub cutie, iar surpriza „care o pica acum" e jumătate din joc. */
 
+/* Bucata care mai poate cădea trebuie să se poată înclina, iar `transform`
+   n-are niciun efect pe un element pur inline: de-aia `inline-block`.
+   Prețul: între două `inline-block` browserul are voie să treacă la rândul
+   următor, deci ar despica un cuvânt în două. Învelișul de cuvânt îl oprește. */
+.fo-buc, .fo-gol { display: inline-block; }
+.fo-cuv { white-space: nowrap; }
+
+/* Cât de strâmb stă litera care se clatină. Doi pași văzuți, al treilea o
+   scoate afară. Înclinarea rămâne între scuturături: e urma lucrului făcut,
+   iar elevul știe de la ce literă să continue. */
+.fo-buc[data-slab] { transition: transform 0.18s ease; }
+.fo-buc[data-slab="1"] { transform: rotate(-7deg) translateY(1px); }
+.fo-buc[data-slab="2"] { transform: rotate(11deg) translateY(2px); }
+
 /* Golul lăsat în urmă de sunetul care a căzut. Linia de dedesubt spune „aici
    lipsea ceva", ca într-un exercițiu cu spații de completat. Un gol mai lung
    înseamnă mai multe litere pentru un singur sunet („ch" din ochi, „ge" din
