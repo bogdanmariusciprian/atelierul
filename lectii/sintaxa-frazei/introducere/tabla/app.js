@@ -187,21 +187,11 @@
       }
       y += lineStep; // Enter / sfârșit de paragraf -> același pas de rând
     }
-    /* Fraza scurtă stă la mijlocul paginii, pe verticală.
-       Măsurăm întâi cât ocupă, apoi, DACĂ încape, coborâm tot blocul cu
-       jumătate din golul rămas. Când textul trece de înălțimea paginii,
-       îl lăsăm să pornească de sus, ca acum: altfel ar sări în sus la
-       fiecare rând nou și ai scrie pe un text care fuge.
-
-       Măsura o luăm din `pageRect` (fereastra), nu din pagina văzută la
-       mărirea curentă, ca fraza să nu se plimbe când dai zoom. */
-    const inaltimeText = words.length ? (y - lineStep) - (PAGE_PAD + topGap) + state.fontSize : 0;
-    const inaltimePagina = pageRect().h;
-    if (words.length && inaltimeText < inaltimePagina) {
-      const dy = Math.round((inaltimePagina - inaltimeText) / 2 - topGap);
-      if (dy > 0) { for (const w of words) w.y += dy; y += dy; }
-    }
-
+    /* Centrarea NU se mai face aici, mutând textul în adâncul paginii.
+       Se face din vedere: `centreazaLucrarea` așază pe ecran tot ce e desenat.
+       Așa lucrarea stă la mijloc și pe verticală, și pe orizontală, la orice
+       mărire, iar chenarul rămâne lipit de text. Mutat în așezare, textul ar
+       fi coborât în pagină, dar pe ecran ar fi rămas tot sus la zoom out. */
     layout.words = words;
     layout.lineStep = lineStep;
     layout.contentBottom = y + PAGE_PAD;
@@ -469,6 +459,7 @@
     canvas.height = Math.round(ch * dpr);
     state.pageWidth = cw;
     layoutText();
+    centreazaLucrarea();
     render();
   }
 
@@ -724,10 +715,28 @@
   /* ============================================================
      ROTIȚĂ: carusel unelte + Ctrl-zoom
      ============================================================ */
+  /* Așază lucrarea în mijlocul ecranului, pe amândouă direcțiile.
+     Se cheamă DOAR când tot ce e desenat încape pe ecran. Când nu încape, a
+     centra ar însemna să sari peste locul la care te uitai, deci lăsăm vederea
+     unde e și te muți tu cu mâna. */
+  function centreazaLucrarea() {
+    const b = computeExportBounds();
+    const lw = (b.x2 - b.x1) * state.zoom, lh = (b.y2 - b.y1) * state.zoom;
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    if (lw > cw || lh > ch) return false;
+    state.panX = Math.round((cw - lw) / 2 - b.x1 * state.zoom);
+    state.panY = Math.round((ch - lh) / 2 - b.y1 * state.zoom);
+    return true;
+  }
+
   function zoomAt(cx, cy, factor) {
     const wx = (cx - state.panX) / state.zoom, wy = (cy - state.panY) / state.zoom;
     const nz = clamp(state.zoom * factor, 0.2, 6);
     state.panX = cx - wx * nz; state.panY = cy - wy * nz; state.zoom = nz;
+    // Dacă după mărire lucrarea încape toată pe ecran, o punem la mijloc.
+    // Altfel ar rămâne agățată în colțul din stânga-sus, cu ecranul gol în jur,
+    // tocmai când dai zoom out ca s-o vezi întreagă.
+    centreazaLucrarea();
     $('czVal').textContent = Math.round(state.zoom * 100) + '%';
     render(); persist();
   }
@@ -863,17 +872,6 @@
     const w = canvas.clientWidth || 800, h = canvas.clientHeight || 600;
     return { x: PAGE_PAD, y: PAGE_PAD, w: Math.max(80, w - PAGE_PAD * 2), h: Math.max(80, h - PAGE_PAD * 2) };
   }
-  /* Pagina AȘA CUM SE VEDE ACUM. Are aceeași margine ca `pageRect`, dar
-     lățimea și înălțimea le ia din cât cuprinde ecranul la mărirea curentă:
-     dai zoom out, vezi mai mult, deci pagina crește. Colțul din stânga-sus
-     rămâne pe loc, ca mutarea pânzei să NU miște chenarul; altfel zona
-     exportată s-ar schimba de fiecare dată când tragi de pânză. */
-  function pageRectView() {
-    const z = state.zoom || 1;
-    const w = (canvas.clientWidth || 800) / z, h = (canvas.clientHeight || 600) / z;
-    return { x: PAGE_PAD, y: PAGE_PAD, w: Math.max(80, w - PAGE_PAD * 2), h: Math.max(80, h - PAGE_PAD * 2) };
-  }
-
   /* Cât loc ocupă tot ce e desenat: fraza plus marcajele. */
   function contentBounds() {
     let b = null;
@@ -890,21 +888,25 @@
     return b;
   }
 
-  /* Chenarul punctat = exact ce intră în captură. E reuniunea dintre pagina
-     văzută acum și tot ce s-a desenat, cu o margine de respiro. Așa:
-       • fraza lungă nu mai iese pe dedesubt,
-       • marcajele trase pe lângă text intră și ele în poză,
-       • la zoom out chenarul crește, deci ai loc de adnotat în jurul frazei. */
+  /* Chenarul punctat = exact ce intră în captură, și se ia DUPĂ CONȚINUT.
+     Strânge fraza și marcajele, cu o margine de respiro, la orice mărire.
+
+     Prima dată îl legasem și de cât cuprinde ecranul, ca să crească la zoom
+     out. A ieșit invers decât trebuia: la zoom out ecranul cuprinde mult, iar
+     chenarul devenea un dreptunghi mare care nu mai avea nicio treabă cu
+     textul. Acum urmărește doar ce e desenat, deci arată la fel la orice
+     mărire, iar la zoom out vezi întreaga lucrare în el.
+
+     Pânza goală primește o pagină de pornire cât fereastra, ca să nu rămână
+     un chenar de mărimea unui timbru. */
   function computeExportBounds() {
-    const p = pageRectView();
-    const b = { x1: p.x, y1: p.y, x2: p.x + p.w, y2: p.y + p.h };
     const c = contentBounds();
-    if (c) {
-      const m = PAGE_PAD / 2;
-      b.x1 = Math.min(b.x1, c.x1 - m); b.y1 = Math.min(b.y1, c.y1 - m);
-      b.x2 = Math.max(b.x2, c.x2 + m); b.y2 = Math.max(b.y2, c.y2 + m);
+    if (!c) {
+      const p = pageRect();
+      return { x1: p.x, y1: p.y, x2: p.x + p.w, y2: p.y + p.h };
     }
-    return b;
+    const m = PAGE_PAD;
+    return { x1: c.x1 - m, y1: c.y1 - m, x2: c.x2 + m, y2: c.y2 + m };
   }
 
   function exportCanvas() {
@@ -931,28 +933,12 @@
      mică, iar o captură la mărime naturală ar umple-o după câteva salvări.
      Ce se restaurează nu vine din poză, ci din starea salvată alături.
      ============================================================ */
-  const CHIP_W = 200;
-
-  /* Poza mică pentru listă: exportul obișnuit, micșorat la lățime fixă. */
-  function chipulLucrarii() {
-    const mare = exportCanvas();
-    const sc = Math.min(1, CHIP_W / mare.width);
-    const mic = document.createElement('canvas');
-    mic.width = Math.max(1, Math.round(mare.width * sc));
-    mic.height = Math.max(1, Math.round(mare.height * sc));
-    const c = mic.getContext('2d');
-    c.imageSmoothingQuality = 'high';
-    c.drawImage(mare, 0, 0, mic.width, mic.height);
-    return mic.toDataURL('image/jpeg', 0.72);
-  }
-
   /* Tot ce face o lucrare să fie ea însăși. Reglajele de desen intră și ele:
      altfel, readusă peste alte reglaje, ar arăta altfel decât ai lăsat-o. */
   function lucrareaCurenta() {
     return {
       id: Date.now(),
       cand: new Date().toISOString(),
-      chip: chipulLucrarii(),
       text: state.text,
       shapes: JSON.parse(JSON.stringify(state.shapes)),
       view: { zoom: state.zoom, panX: state.panX, panY: state.panY },
@@ -967,7 +953,9 @@
   function salveazaLucrarea() {
     if (!state.text.trim() && !state.shapes.length) { toast('Nu e nimic de salvat'); return; }
     state.postits.works = state.postits.works || [];
-    state.postits.works.unshift(lucrareaCurenta());   // cea nouă în frunte
+    // Adăugate la coadă, ca numărul de ordine să fie chiar ordinea salvării:
+    // prima lucrare rămâne 1 oricâte ai mai salva după ea.
+    state.postits.works.push(lucrareaCurenta());
     saveNotes();
     renderWorks();
     // Deschidem notița pe fila „Lucrări", ca elevul să vadă unde a ajuns.
@@ -1004,16 +992,19 @@
       gazda.innerHTML = '<p class="works-empty">Nicio lucrare salvată încă. Apasă „Salvează" sub pânză, iar lucrarea vine aici; o aduci înapoi cu un click.</p>';
       return;
     }
-    gazda.innerHTML = lista.map((w) => {
+    // Numele e data și ora salvării, cu numărul de ordine în față. Fără poze:
+    // o listă de nume se citește dintr-o privire, iar chipurile mici oricum
+    // nu se deosebeau între ele când lucrările seamănă.
+    const doua = (n) => String(n).padStart(2, '0');
+    gazda.innerHTML = '<ol class="works-list">' + lista.map((w) => {
       const d = new Date(w.cand);
-      const cand = d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) + ', ' +
-        String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-      const titlu = (w.text || '').trim().split(/\s+/).slice(0, 5).join(' ') || 'fără text';
-      return '<figure class="work" data-id="' + w.id + '" title="Adu lucrarea înapoi pe pânză">' +
-             '<img src="' + w.chip + '" alt="" />' +
-             '<figcaption><b>' + titlu.replace(/</g, '&lt;') + '</b><span>' + cand + '</span></figcaption>' +
-             '<button class="work-del" data-del="' + w.id + '" title="Șterge lucrarea" aria-label="Șterge lucrarea">×</button></figure>';
-    }).join('');
+      const cand = doua(d.getDate()) + '.' + doua(d.getMonth() + 1) + '.' + d.getFullYear() +
+                   ' (' + doua(d.getHours()) + ':' + doua(d.getMinutes()) + ')';
+      return '<li class="work" data-id="' + w.id + '">' +
+             '<button class="work-open" data-open="' + w.id + '" title="Adu lucrarea înapoi pe pânză">' + cand + '</button>' +
+             '<button class="work-del" data-del="' + w.id + '" title="Șterge lucrarea" aria-label="Șterge lucrarea">×</button>' +
+             '</li>';
+    }).join('') + '</ol>';
   }
 
   function downloadDataUrl(url, name) {
@@ -1522,7 +1513,14 @@
   /* ============================================================
      EVENIMENTE GENERALE
      ============================================================ */
-  function onTextChange() { state.text = $('inputText').value; layoutText(); render(); persist(); }
+  function onTextChange() {
+    state.text = $('inputText').value;
+    layoutText();
+    // Cât timp lucrarea încape pe ecran, o ținem la mijloc și în timp ce scrii:
+    // fraza crește în ambele părți deodată, în loc să fugă spre dreapta.
+    centreazaLucrarea();
+    render(); persist();
+  }
 
   const isTyping = () => {
     const a = document.activeElement;
@@ -1597,7 +1595,11 @@
     $('czReset').innerHTML = svgIcon('fit', 18);
     $('czIn').addEventListener('click', () => zoomCenter(1.2));
     $('czOut').addEventListener('click', () => zoomCenter(1/1.2));
-    $('czReset').addEventListener('click', () => { state.zoom = 1; state.panX = 0; state.panY = 0; $('czVal').textContent = '100%'; render(); persist(); });
+    $('czReset').addEventListener('click', () => {
+      state.zoom = 1; state.panX = 0; state.panY = 0;
+      centreazaLucrarea();
+      $('czVal').textContent = '100%'; render(); persist();
+    });
 
     // save / copy
     $('btnSave').innerHTML = svgIcon('download', 16) + '<span>JPEG</span>';
@@ -1634,9 +1636,9 @@
         saveNotes(); renderWorks();
         return;
       }
-      const fig = e.target.closest('.work');
-      if (!fig) return;
-      restaureazaLucrarea((state.postits.works || []).find((w) => w.id === Number(fig.dataset.id)));
+      const desc = e.target.closest('[data-open]');
+      if (!desc) return;
+      restaureazaLucrarea((state.postits.works || []).find((w) => w.id === Number(desc.dataset.open)));
     });
 
     // UI zoom

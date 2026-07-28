@@ -540,22 +540,29 @@ html, body{ overscroll-behavior:none; touch-action:manipulation; }
   background:#e2d195;color:#4a4020;font-size:11px;line-height:17px;
 }
 
-/* ---- lista lucrărilor ---- */
-.postit-works{padding:8px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;}
+/* ---- lista lucrărilor ----
+   Nume, nu poze. Numărul de ordine îl pune lista însăși (`<ol>`), deci nu se
+   poate desincroniza de rând. */
+.postit-works{padding:6px 8px 10px;overflow:auto;}
 .postit-works[hidden]{display:none;}
-.works-empty{grid-column:1/-1;margin:6px 4px;font-size:12.5px;line-height:1.55;color:#8a7c50;}
+.works-empty{margin:6px 4px;font-size:12.5px;line-height:1.55;color:#8a7c50;}
+.works-list{margin:0;padding:0 0 0 26px;list-style:decimal;}
+.works-list::marker{color:#8a7c50;}
 .work{
-  position:relative;margin:0;border:1px solid #e0d09a;border-radius:9px;
-  background:#fffdf5;overflow:hidden;cursor:pointer;transition:border-color .12s,transform .12s;
+  display:flex;align-items:center;gap:4px;
+  padding:1px 0;color:#6b5f3c;font-size:12.5px;
 }
-.work:hover{border-color:#c9ad55;transform:translateY(-1px);}
-.work img{display:block;width:100%;height:auto;background:#fff;}
-.work figcaption{display:block;padding:5px 7px;font-size:11px;line-height:1.35;color:#6b5f3c;}
-.work figcaption b{display:block;font-weight:600;color:#3a3218;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.work::marker{color:#8a7c50;font-variant-numeric:tabular-nums;}
+.work-open{
+  flex:1;text-align:left;padding:4px 6px;border:none;border-radius:6px;
+  background:transparent;color:#3a3218;font:inherit;font-variant-numeric:tabular-nums;
+  cursor:pointer;
+}
+.work-open:hover{background:#f2e6bd;}
 .work-del{
-  position:absolute;top:4px;right:4px;width:20px;height:20px;
-  border:none;border-radius:6px;background:rgba(255,253,245,.9);color:#8a7c50;
-  font-size:15px;line-height:1;cursor:pointer;opacity:0;transition:opacity .12s;
+  flex:none;width:20px;height:20px;border:none;border-radius:6px;
+  background:transparent;color:#a99a63;font-size:15px;line-height:1;cursor:pointer;
+  opacity:0;transition:opacity .12s;
 }
 .work:hover .work-del{opacity:1;}
 .work-del:hover{background:#f6d6d3;color:#a3312a;}
@@ -584,6 +591,5 @@ html, body{ overscroll-behavior:none; touch-action:manipulation; }
    ce lucrare e care. */
 @media (max-width: 620px){
   .postit-panel{width:min(92vw,330px);}
-  .postit-works{grid-template-columns:1fr;}
   .back-lesson span:last-child{display:none;}
 }
