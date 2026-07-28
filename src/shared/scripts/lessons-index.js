@@ -100,6 +100,7 @@ export const LESSONS = [
     href: "lectii/sintaxa-frazei/introducere/",
     summary: "Câte predicate, atâtea propoziții – descâlcim fraza pas cu pas, cu cercuri, pătrate și bare.",
     ready: true,
+    board: true,
   },
   { domain: "sintaxa-frazei", title: "Propoziția și fraza" },
   { domain: "sintaxa-frazei", title: "Propoziția principală și propoziția secundară" },

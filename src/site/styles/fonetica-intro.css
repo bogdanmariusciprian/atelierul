@@ -131,51 +131,6 @@
 .fo-ex s { color: var(--color-text-muted); text-decoration-thickness: 1.5px; }
 .fo-ex sup { font-size: 0.68em; }
 
-/* ---- ușa spre exersat ----
-   Singurul loc colorat tare din toată lecția. Fișa e albă și așezată; aici
-   se schimbă regimul, de la citit la făcut, iar butonul trebuie să spună
-   asta dintr-o privire, fără să scrie nimeni „acum urmează altceva".
-
-   E deocamdată `<button>`, nu `<a>`: încă nu duce nicăieri. Când legăm
-   pagina de exersat, devine `<a href="…">` cu exact același stil, fiindcă
-   regulile de mai jos nu se uită la ce fel de element e. */
-.fo-exerseaza {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: 0.4rem 0;
-  padding: 0.85rem 1.9rem;
-  border: none;
-  border-radius: 999px;
-  background: var(--fo-r);
-  color: #fff;
-  font: inherit;
-  font-size: 1.02rem;
-  font-weight: 700;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-}
-.fo-exerseaza:hover {
-  background: color-mix(in srgb, var(--fo-r) 88%, #000);
-  transform: translateY(-1px);
-}
-.fo-exerseaza:active { transform: translateY(0); }
-
-/* Iconul se taie cu mască, nu se pune ca imagine: așa își ia culoarea din
-   `background`, deci rămâne alb pe buton și s-ar face roșu dacă butonul ar
-   deveni vreodată cu contur. Un singur fișier, două înfățișări. */
-.fo-exerseaza__icon {
-  flex: none;
-  width: 1.15em;
-  height: 1.15em;
-  background: currentColor;
-  -webkit-mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
-  mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
-}
-
 /* ---- pe telefon ----
    Retragerile se strâng, altfel al treilea nivel ajunge lipit de marginea
    din dreapta și rândurile se rup după două cuvinte. */
@@ -185,7 +140,4 @@
   .fo-pct { padding-left: 1.1rem; }
   .fo-ex { margin-left: 0.7rem; font-size: 0.9rem; }
   .fo-sir { font-size: 0.92rem; }
-  /* Pe ecran îngust butonul ia toată lățimea: e ținta cea mai importantă din
-     pagină, iar degetul n-are de ce s-o caute. */
-  .fo-exerseaza { display: flex; width: 100%; justify-content: center; }
 }

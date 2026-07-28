@@ -1221,3 +1221,54 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
   .blank { min-width: 7rem; }
   .match__select { max-width: 100%; }
 }
+
+/* ============ Ușa spre tablă (#LaTablă) ============
+   Butonul care duce de la lecție la unealta de lucru. Stă AICI, în stilul
+   comun al lecțiilor, nu în cel al foneticii: orice lecție cu tablă îl
+   folosește la fel, fără să-și copieze regulile.
+
+   Culoarea vine din `--lesson-color`, pe care fiecare lecție și-o pune pe
+   `<article>`. Așa butonul e roșu la fonetică și albastru la sintaxă, fără
+   nicio regulă în plus: e singurul loc colorat tare din pagină, deci se vede
+   dintr-o privire că acolo se schimbă regimul, de la citit la făcut.
+
+   E deopotrivă `<a>` și `<button>`: regulile nu se uită la ce fel de element
+   e, ca să nu ne încurce dacă vreo lecție îl leagă altfel. */
+.lesson-tabla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0;
+  padding: 0.85rem 1.9rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--lesson-color, var(--color-primary));
+  color: #fff;
+  font: inherit;
+  font-size: 1.02rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  text-decoration: none;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.lesson-tabla:hover { filter: brightness(0.92); transform: translateY(-1px); }
+.lesson-tabla:active { transform: translateY(0); }
+
+/* Iconul se taie cu mască, nu se pune ca imagine: așa își ia culoarea din
+   `background`, deci rămâne alb pe buton oricare ar fi culoarea lecției. */
+.lesson-tabla__icon {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  background: currentColor;
+  -webkit-mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
+  mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
+}
+
+@media (max-width: 560px) {
+  /* Pe ecran îngust ia toată lățimea: e ținta cea mai importantă din pagină,
+     iar degetul n-are de ce s-o caute. */
+  .lesson-tabla { display: flex; width: 100%; justify-content: center; }
+}
