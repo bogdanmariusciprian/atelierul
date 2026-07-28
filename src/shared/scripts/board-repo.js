@@ -1,5 +1,5 @@
 // =========================================================
-// Foile de la tablă (#LaTablă): date REALE (Supabase `learn_board_sheets`).
+// Foile de la tablă (#LaTablă): date REALE (Supabase `learn_lessons_boards`).
 //
 // Tabla e un caiet legat de o lecție. Elevul are mai multe foi la aceeași
 // lecție, ca să poată păstra tema de săptămâna trecută lângă cea de azi.
@@ -7,6 +7,10 @@
 // Salvarea se face LA CERERE. Modulul ăsta nu salvează niciodată singur: cine
 // îl cheamă hotărăște când. De-aia n-are nici temporizator, nici „salvează la
 // fiecare tastă": asta ar transforma o temă într-un jurnal.
+//
+// Numele tabelului urmează regula din 0062, domeniul → entitatea →
+// calificativul: foaia atârnă de LECȚIE, deci stă în aceeași familie cu
+// `learn_lessons_progress` și `learn_lessons_favorites`.
 //
 // Migrarea 0074 ține politicile: elevul umblă doar la foile lui, profesorul le
 // citește pe toate ca să corecteze, dar nu le poate schimba.
@@ -30,7 +34,7 @@ export async function listSheets(lessonSlug) {
   const u = await utilizator();
   if (!u) return [];
   const { data, error } = await supabase
-    .from("learn_board_sheets")
+    .from("learn_lessons_boards")
     .select("id, title, updated_at")
     .eq("user_id", u.id)
     .eq("lesson_slug", lessonSlug)
@@ -42,7 +46,7 @@ export async function listSheets(lessonSlug) {
 /** Conținutul unei foi. */
 export async function loadSheet(id) {
   const { data, error } = await supabase
-    .from("learn_board_sheets")
+    .from("learn_lessons_boards")
     .select("id, title, data, updated_at")
     .eq("id", id)
     .maybeSingle();
@@ -63,7 +67,7 @@ export async function saveSheet({ id, lessonSlug, title, data }) {
 
   if (id) {
     const { data: row, error } = await supabase
-      .from("learn_board_sheets")
+      .from("learn_lessons_boards")
       .update({ title, data })
       .eq("id", id)
       .select("id, title, updated_at")
@@ -73,7 +77,7 @@ export async function saveSheet({ id, lessonSlug, title, data }) {
   }
 
   const { data: row, error } = await supabase
-    .from("learn_board_sheets")
+    .from("learn_lessons_boards")
     .insert({ user_id: u.id, lesson_slug: lessonSlug, title, data })
     .select("id, title, updated_at")
     .maybeSingle();
@@ -84,7 +88,7 @@ export async function saveSheet({ id, lessonSlug, title, data }) {
 /** Schimbă numele unei foi, fără să atingă ce e scris pe ea. */
 export async function renameSheet(id, title) {
   const { error } = await supabase
-    .from("learn_board_sheets")
+    .from("learn_lessons_boards")
     .update({ title })
     .eq("id", id);
   if (error) { console.warn("renameSheet:", error.message); return false; }
@@ -93,7 +97,7 @@ export async function renameSheet(id, title) {
 
 /** Șterge o foaie. Cine cheamă trebuie să întrebe întâi: aici nu se cere. */
 export async function deleteSheet(id) {
-  const { error } = await supabase.from("learn_board_sheets").delete().eq("id", id);
+  const { error } = await supabase.from("learn_lessons_boards").delete().eq("id", id);
   if (error) { console.warn("deleteSheet:", error.message); return false; }
   return true;
 }

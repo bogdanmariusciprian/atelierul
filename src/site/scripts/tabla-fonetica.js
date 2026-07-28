@@ -938,7 +938,7 @@ function applyState(state) {
 /* ================= SALVAREA =================
    Două straturi, cu roluri diferite, ca să nu se încurce:
 
-   1. CONTUL, la cerere. Butonul „Salvează" scrie foaia în `learn_board_sheets`
+   1. CONTUL, la cerere. Butonul „Salvează" scrie foaia în `learn_lessons_boards`
       (migrarea 0074). Se salvează doar când ceri tu, fiindcă o temă se predă,
       nu se scurge. Poți ține mai multe foi la aceeași lecție.
 
