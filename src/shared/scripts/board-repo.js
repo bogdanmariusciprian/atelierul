@@ -154,8 +154,9 @@ export async function deleteSheet(id) {
    Carnetul elevului de la o lecție: una singură, nu mai multe. De-aia n-are
    listă și nici titlu, doar „citește-o" și „scrie-o".
 
-   Spre deosebire de table, notițele NU se dau profesorului: sunt însemnările
-   personale ale unui copil. Politica din 0076 le ține numai pentru el.
+   Elevul le scrie și le schimbă; profesorul le poate CITI (0077), ca să vadă
+   ce are elevul pe ecran când zice că ceva nu merge. Scrisul rămâne numai al
+   elevului: nimeni nu-i umblă în carnet.
    ==================================================================== */
 
 /** Notița mea de la o lecție, sau null dacă n-am scris încă nimic. */
