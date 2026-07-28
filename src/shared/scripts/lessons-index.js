@@ -68,9 +68,9 @@ export const LESSONS = [
   {
     domain: "fonetica",
     slug: "fonetica-introducere",
-    title: "Introducere în fonetică: sunetele articulate",
+    title: "Noțiuni de fonetică",
     href: "lectii/fonetica/introducere/",
-    summary: "Ce studiază fonetica și cum se împart sunetele: vocale, semivocale, consoane.",
+    summary: "Definiția, clasificarea sunetelor articulate și grupurile de sunete vocalice.",
     ready: true,
   },
   {

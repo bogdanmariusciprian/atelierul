@@ -1,439 +1,143 @@
 /* =========================================================
-   Introducere în fonetică – stilul lecției.
+   Noțiuni de fonetică – stilul lecției.
 
-   O singură idee de culoare, ținută peste tot: fiecare fel de sunet are
-   culoarea lui, iar culoarea aia nu se folosește pentru nimic altceva.
+   Lecția e o fișă, nu un articol: numere, litere, sunete între paranteze,
+   formule încercuite. De-aia stilul de aici face doar două lucruri: ține
+   ierarhia 1 / a) / • limpede la orice lățime de ecran, și scoate în
+   evidență ce era scris cu roșu în fișă.
 
-     vocală     roșu     – culoarea domeniului, e sunetul-vârf
-     semivocală chihlimbar – se sprijină pe vocală, deci stă „sub" ea
-     consoană   ardezie  – neutră, nu poate sta singură
-
-   Elevul vede formula „S + V" în trei locuri diferite (chipurile de sus,
-   clasificarea, grupurile vocalice) și în toate trei „S" e chihlimbar. Așa
-   ajunge să citească formula fără s-o mai traducă.
+   Roșul are un singur înțeles, ținut peste tot: „ăsta nu se poartă ca
+   celelalte din rândul lui". A, Ă, Î sunt mereu vocale, nu devin niciodată
+   semivocale. č, ǧ, K', G' sunt consoane fără literă proprie. Dacă roșul ar
+   însemna și altceva pe undeva, n-ar mai însemna nimic.
    ========================================================= */
 
 .lesson--fo {
-  --fo-v: #dc2626;   /* vocală */
-  --fo-s: #d97706;   /* semivocală */
-  --fo-c: #475569;   /* consoană */
-  --fo-v-bg: #fef2f2;
-  --fo-s-bg: #fffbeb;
-  --fo-c-bg: #f1f5f9;
+  --fo-r: #dc2626;
+  --fo-lin: color-mix(in srgb, var(--color-border) 80%, transparent);
 }
 
-.fo-v { color: var(--fo-v); }
-.fo-s { color: var(--fo-s); }
-.fo-c { color: var(--fo-c); }
-
-/* ---- PROZA: aliniere pe ambele margini + alineat ----
-   Se aplică paragrafelor de text curgător, nu oricărui <p>. Un <p> care ține o
-   legendă de trei cuvinte sau șirul de sunete „c e a p ă" nu e proză: alineatul
-   l-ar împinge strâmb, iar justificarea n-ar avea ce alinia. De-aia excepțiile
-   de mai jos își cer înapoi alinierea lor.
-
-   `hyphens: auto` merge împreună cu `lang="ro"` de pe <html>: fără despărțire
-   în silabe, justificarea deschide râuri albe între cuvinte pe rândurile
-   scurte. */
-.lesson--fo p,
-.lesson--fo .fo-note {
-  text-align: justify;
-  text-indent: 1.5em;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+/* ---- lista mare: 1. 2. 3. ----
+   Numerele stau în afara textului, aliniate între ele, ca într-o fișă. Așa
+   rândul al doilea al unui punct se aliniază sub primul cuvânt, nu sub cifră. */
+.fo-lista {
+  margin: 1.6rem 0 0;
+  padding-left: 1.9rem;
+  list-style: decimal;
+  font-size: 1.06rem;
+  line-height: 1.85;
 }
-/* Ce nu e proză: cartonașele, legendele, rândurile de sub formule. */
-.lesson--fo .fo-g-def,
-.lesson--fo .fo-tout,
-.lesson--fo .fo-probe-out,
-.lesson--fo .fo-ex,
-.lesson--fo .fo-pang-lab { text-align: left; text-indent: 0; }
-.lesson--fo .fo-prov-text { text-align: left; text-indent: 0; }
+.fo-lista > li { margin-bottom: 1.15rem; }
+.fo-lista > li::marker { font-weight: 700; color: var(--color-text-muted); }
 
-/* ---- chipurile de sub titlu: legenda, dinainte de a fi nevoie de ea ---- */
-.fo-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.9rem 0 0.2rem; }
-/* Lecția pornea lipită de titlu. Prima secțiune are nevoie de o respirație
-   mai mare decât cea dintre secțiuni, ca titlul să rămână titlu. */
-.lesson--fo .lesson-section:first-of-type { margin-top: 2.4rem; }
-.fo-chip {
-  display: inline-flex; align-items: center; gap: 0.45rem;
-  padding: 0.3rem 0.8rem; border-radius: 999px;
-  border: 1.5px solid var(--color-border); background: var(--color-bg);
-  font-size: 0.82rem; color: var(--color-text-muted);
-  user-select: none; -webkit-user-select: none;
+/* ---- sublista: a) b) c) ---- */
+.fo-sub {
+  margin: 0.45rem 0 0;
+  padding-left: 1.7rem;
+  list-style: lower-alpha;
 }
-.fo-chip b { font-size: 0.95rem; font-weight: 800; }
+.fo-sub > li { margin-bottom: 0.5rem; }
+.fo-sub > li::marker { color: var(--color-text-muted); }
 
-/* ---- eticheta de secțiune ---- */
-.fo-seclabel {
-  display: inline-flex; align-items: center; gap: 0.55rem;
-  margin-bottom: 0.5rem; padding: 0.3rem 0.95rem 0.3rem 0.32rem;
-  border-radius: 999px; background: var(--fo-v-bg); color: var(--fo-v);
-  font-weight: 800; font-size: 0.82rem;
-  user-select: none; -webkit-user-select: none;
+/* ---- punctele: ascendent / descendent ---- */
+.fo-pct {
+  margin: 0.4rem 0 0;
+  padding-left: 1.5rem;
+  list-style: disc;
 }
-.fo-seclabel .kn {
-  display: grid; place-items: center; flex: none;
-  width: 1.6rem; height: 1.6rem; border-radius: 50%;
-  background: var(--fo-v); color: #fff; font-size: 0.84rem;
-}
+.fo-pct > li { margin-bottom: 0.4rem; }
 
-/* ---- definiția ---- */
-.fo-def { font-size: 1.12rem; line-height: 1.7; margin: 0.2rem 0 0.9rem; }
-.fo-k {
-  padding: 0.1rem 0.4rem; border-radius: 6px;
-  background: var(--fo-v-bg); color: var(--fo-v); font-weight: 800;
-}
-.fo-note {
-  padding: 0.8rem 1rem; margin: 0 0 1.1rem;
-  border-left: 4px solid var(--fo-v); border-radius: 0;
-  background: var(--fo-v-bg); font-size: 0.94rem; line-height: 1.65;
-}
+/* ---- felurile de scris ---- */
+.fo-cap { font-weight: 700; }
+.fo-fel { font-weight: 700; }
+.fo-kind { color: var(--color-text-muted); }
+.fo-tare { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
-/* ---- notația: ce stă între paranteze pătrate ---- */
-/* Simbolul e desenat altfel decât textul din jur, ca ochiul să nu-l citească
-   drept literă: monospațiat, pe fundal propriu. */
-.fo-t {
+/* Săgeata și bara oblică nu sunt cuvinte, sunt semne de legătură: mai
+   șterse decât textul, ca ochiul să sară peste ele. */
+.fo-sag, .fo-bara, .fo-linie { color: var(--color-text-muted); padding: 0 0.2rem; }
+
+/* Sunetul scris cu roșu: excepția din rândul lui. */
+.fo-r { color: var(--fo-r); font-weight: 700; }
+
+/* ---- șirul de sunete dintre paranteze ----
+   Monospațiat, ca sunetele să se numere ușor din priviri și ca parantezele
+   să stea drept. Curge după eticheta „vocale:" și trece singur pe rândul
+   următor când nu mai încape. */
+.fo-sir {
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-weight: 700; letter-spacing: 0.04em;
-  padding: 0.05rem 0.35rem; border-radius: 6px;
-  background: var(--color-surface); color: var(--fo-v);
+  font-size: 0.98rem;
+  letter-spacing: 0.02em;
+  word-spacing: 0.1em;
 }
-.fo-t--big { font-size: 1.15rem; padding: 0.2rem 0.6rem; }
-.fo-ex {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
-  margin: 0.2rem 0 0; padding: 0.7rem 0.9rem;
-  border-radius: 12px; border: 1.5px solid var(--color-border);
-  background: var(--color-bg);
-}
-.fo-ex-w { font-size: 1.15rem; font-weight: 800; }
-.fo-ex-ar { font-size: 0.78rem; color: var(--color-text-muted); }
-.fo-after { margin: 0.6rem 0 0; line-height: 1.7; }
+.fo-sir sup { font-size: 0.68em; }
 
-/* ---- termenul cu lămurire ---- */
-/* Bula apare și la atingere, nu doar la hover: pe telefon hover nu există, iar
-   lămurirea asta e prea importantă ca s-o pierdem acolo. De-aia termenul e
-   focusabil. */
-.fo-k { cursor: help; position: relative; }
-.fo-k::after {
-  content: attr(data-tip);
-  position: absolute; left: 0; top: calc(100% + 0.5rem); z-index: 5;
-  width: min(22rem, 78vw); padding: 0.6rem 0.8rem;
-  border-radius: 10px; border: 1.5px solid var(--fo-v);
-  background: var(--color-surface); color: var(--color-text);
-  font-size: 0.85rem; font-weight: 400; line-height: 1.55;
-  text-align: left; text-indent: 0; hyphens: none;
-  opacity: 0; visibility: hidden; transform: translateY(-4px);
-  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+/* ---- formulele încercuite: S + V ----
+   În fișă sunt trase cu pixul în jurul formulei. Aici e o pastilă cu contur
+   subțire, care face același lucru: spune că „S + V" se citește ca un tot,
+   nu ca trei semne alăturate. */
+.fo-oval {
+  display: inline-block;
+  padding: 0.12rem 0.8rem;
+  border: 1.5px solid var(--fo-lin);
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.fo-k:hover::after, .fo-k:focus::after, .fo-k:focus-visible::after {
-  opacity: 1; visibility: visible; transform: translateY(0);
-}
+.fo-oval--mic { padding: 0.12rem 0.55rem; }
 
-/* ---- clasificarea: trei rânduri care se deschid ---- */
-.fo-class { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.8rem 0 0; }
-
-.fo-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 0.55rem;
-  padding: 0.7rem 0.9rem; cursor: pointer;
-  border: 1.5px solid var(--color-border); border-radius: 12px;
-  background: var(--color-bg);
-  transition: border-color 0.15s ease, background 0.15s ease;
-  user-select: none; -webkit-user-select: none;
+/* ---- blocul ATENȚIE ----
+   Nu e o casetă de avertizare, e a doua jumătate a fișei. Dunga din stânga
+   o desparte de partea de sus fără s-o transforme în alarmă. */
+.fo-atentie {
+  margin: 0.4rem 0 0;
+  padding: 1rem 1.1rem;
+  border-left: 4px solid var(--fo-r);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--fo-r) 5%, transparent);
 }
-.fo-row:hover { border-color: currentColor; }
-/* Culoarea felului merge mai departe printr-o VARIABILĂ, nu prin `currentColor`.
-   Motivul e o capcană: `background: currentColor` se rezolvă la valoarea lui
-   `color` DE PE ACELAȘI ELEMENT, iar la sunetul marcat tot noi puneam
-   `color: #fff` în aceeași regulă. Ieșea alb pe alb, adică pătrate goale. */
-.fo-row--v { --fo-acc: var(--fo-v); color: var(--fo-v); }
-.fo-row--s { --fo-acc: var(--fo-s); color: var(--fo-s); }
-.fo-row--c { --fo-acc: var(--fo-c); color: var(--fo-c); }
-.fo-row.is-open { border-color: currentColor; }
-.fo-row--v.is-open { background: var(--fo-v-bg); }
-.fo-row--s.is-open { background: var(--fo-s-bg); }
-.fo-row--c.is-open { background: var(--fo-c-bg); }
-
-.fo-litera { font-weight: 800; opacity: 0.65; flex: none; }
-.fo-rowname { font-size: 1rem; flex: none; }
-.fo-set { display: flex; flex-wrap: wrap; gap: 0.28rem; align-items: center; flex: 1; }
-.fo-count {
-  flex: none; font-size: 0.76rem; font-weight: 800;
-  color: var(--color-text-muted); white-space: nowrap;
-}
-.fo-plus { font-weight: 800; opacity: 0.5; padding: 0 0.15rem; }
-
-/* Sunetul, ca piesă: pătrat, monospațiat, ca să se numere ușor din priviri.
-   PORNEȘTE GOL. Litera e scrisă acolo de la început, dar nevăzută
-   (`color: transparent`), nu ștearsă: așa căsuța are din capul locului
-   lățimea potrivită, iar când sunetul sosește nu tresare nimic în rând.
-   Conturul întrerupt spune „aici lipsește ceva", ca un loc rezervat. */
-.fo-snd {
-  display: grid; place-items: center; min-width: 1.55rem; height: 1.55rem;
-  padding: 0 0.3rem; border-radius: 7px;
-  border: 1.5px dashed color-mix(in srgb, var(--fo-acc, var(--color-border)) 35%, transparent);
-  background: transparent; color: transparent;
-  font-style: normal; font-weight: 700; font-size: 0.88rem;
-  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-}
-/* Sosit: conturul se închide, litera se arată. */
-.fo-snd.is-prins {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--fo-acc, var(--color-border)) 45%, transparent);
-  background: var(--color-surface); color: var(--color-text);
-}
-/* Îngroșatele din fișă – cele care cer atenție. Roșul din fișă devine aici
-   „umplut cu culoarea felului", ca semnul să spună și CE fel de sunet e.
-   Umplerea vine tot la sosire: o căsuță goală nu are ce colora. */
-.fo-snd.is-only.is-prins {
-  border-color: var(--fo-acc); background: var(--fo-acc); color: #fff;
-}
-.fo-snd.is-sup { font-size: 0.68rem; align-items: start; padding-top: 0.15rem; }
-
-.fo-drawer {
-  padding: 0.85rem 1rem; margin: -0.15rem 0 0;
-  border: 1.5px solid var(--color-border); border-top: 0; border-radius: 0 0 12px 12px;
-  background: var(--color-surface); line-height: 1.7;
-}
-.fo-drawer p { margin: 0 0 0.6rem; }
-.fo-drawer p:last-child { margin-bottom: 0; }
-.fo-hi {
-  padding: 0.55rem 0.75rem; border-radius: 8px;
-  background: var(--color-bg); font-size: 0.95rem;
-}
-.fo-why {
-  font-size: 0.9rem; color: var(--color-text-muted);
-  border-left: 3px solid var(--color-border); padding-left: 0.7rem;
-}
-
-/* ---- PROVERBELE CARE SE SCUTURĂ ---- */
-.fo-prov { margin: 0.9rem 0 1.1rem; }
-
-/* Cutia e obiectul pe care-l apuci. `touch-action: none` e obligatoriu: fără
-   el, degetul derulează pagina în loc să zgâlțâie cutia, iar pe telefon
-   întreaga idee cade. */
-.fo-cutie {
-  position: relative; overflow: hidden;
-  padding: 1.1rem 1.1rem 2.2rem; cursor: grab;
-  border: 2px solid color-mix(in srgb, var(--fo-v) 45%, transparent);
-  border-radius: 14px; background: var(--fo-v-bg);
-  touch-action: none; -webkit-user-select: none; user-select: none;
-  /* Resortul cu care se întoarce după ce dai drumul. */
-  transition: transform 0.25s cubic-bezier(.2,1.4,.4,1), opacity 0.2s ease;
-}
-.fo-cutie.is-prins { cursor: grabbing; transition: none; }
-/* O clipire la fiecare scuturare socotită. Fără ea, când nu cade nimic (n-ai
-   întors destul de tare) pare că unealta e stricată; așa se vede că gestul a
-   fost înregistrat, doar că prea moale. */
-.fo-cutie.is-lovit { border-color: var(--fo-v); background: color-mix(in srgb, var(--fo-v) 14%, transparent); }
-.fo-cutie.is-gol { opacity: 0.6; cursor: default; }
-/* Fundul cutiei, desenat: bucățile se opresc pe el, deci trebuie să se vadă
-   că e o podea, nu doar o margine. */
-.fo-cutie::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
-  background: color-mix(in srgb, var(--fo-v) 30%, transparent);
-}
-.fo-tema {
-  display: inline-block; margin-bottom: 0.45rem;
-  padding: 0.15rem 0.6rem; border-radius: 999px;
-  background: var(--fo-v); color: #fff;
-  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.fo-prov-text {
-  margin: 0; font-size: 1.15rem; line-height: 2; font-weight: 700;
-}
-/* Bucata care mai poate cădea nu se însemnează cu nimic: proverbul trebuie să
-   arate ca un proverb, nu ca un text adnotat. Câte au mai rămas scrie oricum
-   sub cutie, iar surpriza „care o pica acum" e jumătate din joc. */
-
-/* Bucata care mai poate cădea trebuie să se poată înclina, iar `transform`
-   n-are niciun efect pe un element pur inline: de-aia `inline-block`.
-   Prețul: între două `inline-block` browserul are voie să treacă la rândul
-   următor, deci ar despica un cuvânt în două. Învelișul de cuvânt îl oprește. */
-.fo-buc, .fo-gol { display: inline-block; }
-.fo-cuv { white-space: nowrap; }
-
-/* Cât de strâmb stă litera care se clatină. Doi pași văzuți, al treilea o
-   scoate afară. Înclinarea RĂMÂNE între scuturături: e urma lucrului făcut,
-   iar elevul știe la ce literă e.
-
-   Semnele sunt tari dinadins: litera se ridică din rând, se mărește și se
-   colorează. Mai devreme erau șapte grade de înclinare, care se pierdeau cu
-   totul pe o cutie ce se plimbă după deget; părea că nu se clatină nimic. */
-.fo-buc[data-slab] {
-  transition: transform 0.2s ease, color 0.2s ease;
-  transform-origin: 50% 90%;
-}
-.fo-buc[data-slab="1"] {
-  transform: rotate(-13deg) translateY(-2px) scale(1.08);
-  color: color-mix(in srgb, var(--fo-v) 55%, currentColor);
-}
-.fo-buc[data-slab="2"] {
-  transform: rotate(18deg) translateY(-4px) scale(1.18);
-  color: var(--fo-v);
-}
-
-/* Golul lăsat în urmă de sunetul care a căzut. Linia de dedesubt spune „aici
-   lipsea ceva", ca într-un exercițiu cu spații de completat. Un gol mai lung
-   înseamnă mai multe litere pentru un singur sunet („ch" din ochi, „ge" din
-   ajunge), ceea ce e chiar lucrul pe care vrem să-l vadă. */
-.fo-gol {
-  color: transparent;
-  border-bottom: 2px solid color-mix(in srgb, var(--fo-v) 45%, transparent);
-}
-
-.fo-prov-bara {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
-  margin-top: 0.6rem;
-}
-.fo-prov-stare { font-size: 0.86rem; color: var(--color-text-muted); }
-.fo-prov-next {
-  margin-left: auto; padding: 0.35rem 0.9rem; cursor: pointer;
-  font: inherit; font-size: 0.85rem; font-weight: 700;
-  border: 1.5px solid var(--fo-v); border-radius: 999px;
-  background: var(--fo-v); color: #fff;
-}
-
-/* Bucata în cădere. Stă pe <body>, `position: fixed`, fiindcă traversează tot
-   ce e între cutie și clasificare. `will-change` o ține pe stratul ei, altfel
-   treizeci de bucăți care se mișcă odată fac pagina să sacadeze. */
-.fo-buc-fly {
-  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none;
-  font-weight: 800; font-size: 1.15rem; color: var(--fo-v);
-  will-change: transform;
-}
-/* Căsuța care tocmai a primit un sunet. */
-@keyframes fo-hit {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.35); }
-  100% { transform: scale(1); }
-}
-.fo-snd.is-hit { animation: fo-hit 0.45s ease; }
-
-/* Cele trei rămase: nu o eroare, o observație. De-aia arată ca o notă, nu ca
-   un avertisment. */
-.fo-ramase {
-  margin-top: 1rem; padding: 0.85rem 1rem;
-  border-left: 4px solid var(--fo-c); border-radius: 0;
-  background: var(--fo-c-bg); line-height: 1.7; font-size: 0.94rem;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fo-cutie { transition: none; }
-  .fo-snd.is-hit { animation: none; }
-}
-
-/* ---- grupurile vocalice, pe scurt ---- */
-.fo-groups { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.8rem 0 0; }
-.fo-g {
-  padding: 0.8rem 1rem; border-radius: 12px;
-  border: 1.5px solid var(--color-border); background: var(--color-bg);
-}
-.fo-g-lab {
-  display: inline-block; font-weight: 800; font-size: 0.9rem;
-  color: var(--fo-v); margin-bottom: 0.15rem;
-}
-.fo-g-def { margin: 0 0 0.55rem; font-size: 0.92rem; color: var(--color-text-muted); }
-.fo-g-rows { display: flex; flex-direction: column; gap: 0.4rem; }
-.fo-g-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-.fo-g-kind {
-  flex: none; min-width: 6.2rem; font-size: 0.82rem; font-weight: 700;
-  color: var(--color-text-muted);
-}
-/* Formula e inima lecției: apare identic aici și în chipurile de sus. */
-.fo-formula {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  padding: 0.25rem 0.7rem; border-radius: 999px;
-  border: 1.5px solid var(--color-border); background: var(--color-surface);
-  font-weight: 800; font-size: 0.9rem; white-space: nowrap;
-}
-.fo-break { color: var(--color-text-muted); font-weight: 700; }
-.fo-g-sep { font-size: 0.8rem; color: var(--color-text-muted); }
-.fo-g-ex { font-size: 0.95rem; }
-.fo-g-ex u { text-decoration-color: var(--fo-s); text-underline-offset: 3px; text-decoration-thickness: 2px; }
-
-.fo-more {
-  display: inline-block; margin-top: 0.7rem; font-weight: 700;
-  color: var(--fo-v); text-decoration: none;
-}
-.fo-more:hover { text-decoration: underline; }
-
-/* ---- capcanele ---- */
-.fo-trap {
-  padding: 1rem 1.1rem; margin: 0.9rem 0 0; border-radius: 12px;
-  border: 1.5px solid color-mix(in srgb, var(--fo-v) 35%, transparent);
-  background: var(--fo-v-bg);
-}
-.fo-trap-head { display: flex; align-items: center; gap: 0.55rem; margin-bottom: 0.5rem; }
-.fo-trap-head b { font-size: 1.02rem; }
-.fo-tnum {
-  display: grid; place-items: center; flex: none;
-  width: 1.6rem; height: 1.6rem; border-radius: 50%;
-  background: var(--fo-v); color: #fff; font-weight: 800; font-size: 0.84rem;
-}
-.fo-trap > p { line-height: 1.7; }
-
-.fo-tcards { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.7rem 0; }
-/* Rândul de cuvinte al probei stă lipit de cutia de probă de deasupra: e
-   aceeași unealtă, nu o listă nouă. */
-.fo-tcards--probe { margin-top: 0.2rem; }
-.fo-tcard {
-  padding: 0.4rem 0.85rem; cursor: pointer; font: inherit; font-weight: 700;
-  border: 1.5px solid var(--color-border); border-radius: 999px;
-  background: var(--color-bg); color: var(--color-text);
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.fo-tcard:hover { border-color: var(--fo-v); }
-.fo-tcard.on { border-color: var(--fo-v); background: var(--fo-v); color: #fff; }
-
-.fo-tout {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-  padding: 0.7rem 0.9rem; margin: 0.3rem 0 0.6rem;
-  border-radius: 10px; background: var(--color-bg); min-height: 3rem;
-}
-.fo-scris { font-weight: 800; font-size: 1.05rem; }
-.fo-sageata { font-size: 0.76rem; color: var(--color-text-muted); }
-.fo-zis {
-  font-weight: 800; font-size: 1.05rem; color: var(--fo-v);
+.fo-atentie__cap {
+  display: block;
+  margin-bottom: 0.6rem;
+  color: var(--fo-r);
+  font-weight: 700;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.9rem;
 }
-.fo-nota {
-  flex-basis: 100%; font-size: 0.86rem; color: var(--color-text-muted); line-height: 1.5;
+.fo-atentie__lista {
+  margin: 0;
+  padding-left: 1.6rem;
+  list-style: decimal;
+  line-height: 1.8;
 }
+.fo-atentie__lista > li { margin-bottom: 0.85rem; }
+.fo-atentie__lista > li:last-child { margin-bottom: 0; }
 
-/* ---- proba prelungirii ---- */
-.fo-probe {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
-  padding: 0.9rem 1rem; margin: 0.7rem 0;
-  border-radius: 12px; border: 1.5px solid var(--color-border);
-  background: var(--color-bg);
+/* ---- rândul cu exemple ----
+   Retras spre dreapta, ca în fișă: exemplul atârnă de regulă, nu stă lângă
+   ea. Tăietura pe „[čeeeeeceapă]" e chiar gestul tău din fișă: forma
+   încercată și respinsă rămâne la vedere, ca elevul să vadă ce NU merge. */
+.fo-ex {
+  margin: 0.4rem 0 0 1.4rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.96rem;
+  text-align: left;
+  text-indent: 0;
 }
-.fo-probe-word {
-  font-size: 1.35rem; font-weight: 800; letter-spacing: 0.04em;
-  transition: letter-spacing 0.35s ease;
-}
-.fo-probe-word.is-pulled { letter-spacing: 0.16em; }
-.fo-probe-btn {
-  padding: 0.4rem 0.9rem; cursor: pointer; font: inherit; font-weight: 700;
-  border: 1.5px solid var(--fo-v); border-radius: 999px;
-  background: var(--color-surface); color: var(--fo-v);
-}
-.fo-probe-btn:hover { background: var(--fo-v); color: #fff; }
-.fo-probe-out { flex-basis: 100%; margin: 0.2rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.fo-verdict {
-  font-size: 1.1rem; letter-spacing: 0.05em;
-  padding: 0.2rem 0.6rem; border-radius: 8px;
-}
-.fo-probe-out.is-yes .fo-verdict { background: #dcfce7; color: #15803d; }
-.fo-probe-out.is-no  .fo-verdict { background: #fee2e2; color: #b91c1c; }
-.fo-verdict-lab { font-size: 0.9rem; }
+.fo-ex s { color: var(--color-text-muted); text-decoration-thickness: 1.5px; }
+.fo-ex sup { font-size: 0.68em; }
 
-@media (prefers-reduced-motion: reduce) {
-  .fo-probe-word { transition: none; }
-}
-
-@media (max-width: 720px) {
-  .fo-g-kind { min-width: 0; }
-  .fo-row { padding: 0.6rem 0.7rem; }
+/* ---- pe telefon ----
+   Retragerile se strâng, altfel al treilea nivel ajunge lipit de marginea
+   din dreapta și rândurile se rup după două cuvinte. */
+@media (max-width: 560px) {
+  .fo-lista { padding-left: 1.4rem; font-size: 1rem; }
+  .fo-sub { padding-left: 1.25rem; }
+  .fo-pct { padding-left: 1.1rem; }
+  .fo-ex { margin-left: 0.7rem; font-size: 0.9rem; }
+  .fo-sir { font-size: 0.92rem; }
 }
