@@ -72,6 +72,10 @@ export const LESSONS = [
     href: "lectii/fonetica/introducere/",
     summary: "Definiția, clasificarea sunetelor articulate și grupurile de sunete vocalice.",
     ready: true,
+    // `board` = lecția are tablă interactivă, adică butonul #LaTablă. Steagul
+    // stă AICI, lângă lecție, nu în hub: catalogul e singurul loc care știe
+    // ce cuprinde fiecare lecție, iar semnul din traseu se desenează din el.
+    board: true,
   },
   {
     domain: "fonetica",

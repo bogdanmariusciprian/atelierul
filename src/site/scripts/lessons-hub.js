@@ -38,13 +38,26 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
     ? `<span class="track-node__summary">${lesson.summary}</span>`
     : "";
 
+  // Semnul de tablă: doar iconul, fără cuvinte, ca traseul să rămână o listă
+  // de titluri. Ce înseamnă se află la hover și la focus.
+  //
+  // Stă ÎN titlu, nu lângă el, dinadins: e o însușire a lecției ăleia, nu un
+  // buton de sine stătător. De-aia n-are nici `tabindex` – un element pe care
+  // se poate ajunge cu tastatura n-are voie să stea într-un link. Cine merge
+  // cu tastatura ajunge pe legătura lecției, iar lămurirea se arată atunci.
+  const tabla = lesson.board
+    ? `<span class="track-node__board" role="img"
+             aria-label="Lecția asta are tablă interactivă"
+             data-tip="Lecția asta are tablă interactivă"></span>`
+    : "";
+
   // Planned title (no page yet): non-clickable, marked "în curând".
   if (!ready) {
     return `
       <li class="track-node track-node--soon">
         <span class="node">${ring}</span>
         <span class="track-node__label">
-          <span class="track-node__title">${lesson.title}
+          <span class="track-node__title">${lesson.title}${tabla}
             <span class="track-node__soon">în curând</span>
           </span>
           ${summary}
@@ -57,7 +70,7 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
     <li class="track-node">
       <a class="node" href="${href}" aria-label="${lesson.title}">${ring}</a>
       <a class="track-node__label" href="${href}">
-        <span class="track-node__title">${lesson.title}</span>
+        <span class="track-node__title">${lesson.title}${tabla}</span>
         ${summary}
       </a>
     </li>`;

@@ -856,6 +856,64 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
   -webkit-user-select: none;
 }
 
+/* ---- semnul „are tablă interactivă" ----
+   Doar iconul, în culoarea domeniului, fără niciun cuvânt lângă titlu:
+   traseul trebuie să rămână o listă de lecții, nu una de etichete. Stins
+   pe jumătate cât stai departe, aprins când treci peste rând, ca să se
+   vadă că e o însușire a lecției, nu un buton.
+
+   Iconul e tăiat cu mască dintr-un SVG, ca semnele de domeniu, deci își ia
+   culoarea din `background` și se potrivește singur cu orice domeniu. */
+.track-node__board {
+  position: relative;
+  display: inline-block;
+  vertical-align: -0.12em;
+  width: 0.95em;
+  height: 0.95em;
+  margin-left: 0.45em;
+  background: var(--card-color, var(--color-text-muted));
+  -webkit-mask: url("/assets/icons/tabla-bifa.svg") no-repeat center / contain;
+  mask: url("/assets/icons/tabla-bifa.svg") no-repeat center / contain;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.track-node__label:hover .track-node__board { opacity: 1; }
+.track-node__board:hover { opacity: 1; transform: scale(1.14); }
+
+/* Bula se deschide spre STÂNGA (`right: 0`), fiindcă semnul stă la capătul
+   titlului: dacă ar crește spre dreapta, pe ecran îngust ar ieși din panou,
+   iar panoul are `overflow-y: auto`, deci ar tăia-o. */
+.track-node__board::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: -0.4rem;
+  top: calc(100% + 0.45rem);
+  z-index: 6;
+  width: max-content;
+  max-width: 14rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 9px;
+  border: 1.5px solid var(--card-color, var(--color-border));
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+/* La hover pe semn, dar și când tastatura ajunge pe legătura lecției: altfel
+   lămurirea ar exista numai pentru cine are maus. */
+.track-node__board:hover::after,
+.track-node__label:focus-visible .track-node__board::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
 .track-node__label:hover .track-node__title {
   color: var(--card-color);
 }
