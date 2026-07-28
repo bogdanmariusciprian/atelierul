@@ -29,6 +29,9 @@
 
     <!-- ===== Bara de sus ===== -->
     <header class="topbar">
+      <a id="backLesson" class="back-lesson" href="../" title="Înapoi la lecție">
+        <span aria-hidden="true">←</span><span>Lecția</span>
+      </a>
       <div class="brand"><span class="logo">q</span>Sintaxa FRAZEI</div>
       <div class="top-actions">
         <button id="btnClearAll" class="danger-pill" title="Curăță pânza și câmpul de text (notițele rămân)"></button>
@@ -132,18 +135,25 @@
 
         <!-- save / copy (dreapta jos) -->
         <div class="float-actions">
-          <button id="btnSave" class="float-btn" title="Salvează ca JPEG"><span>JPEG</span></button>
+          <button id="btnKeep" class="float-btn float-btn--keep" title="Salvează lucrarea în notițe (o poți relua)"><span>Salvează</span></button>
+          <button id="btnSave" class="float-btn" title="Descarcă imaginea ca JPEG"><span>JPEG</span></button>
           <button id="btnCopy" class="float-btn" title="Copiază imaginea"><span>Copiază</span></button>
         </div>
 
         <!-- post-it (dreapta sus) -->
         <div id="postitGroup" class="postit-group">
-          <button id="postitBtn" class="float-btn postit-btn" title="Notițe (hover)"></button>
+          <button id="postitBtn" class="float-btn postit-btn" title="Notițe (deschide / închide)"></button>
           <div id="postitPanel" class="postit-panel">
             <div class="postit-toolbar">
-              <button id="ptBold" class="pt-b" title="Bold"><b>B</b></button>
-              <button id="ptItalic" class="pt-b" title="Italic"><i>I</i></button>
+              <button id="ptBold" class="pt-b" title="Îngroșat (Ctrl+B)"><b>B</b></button>
+              <button id="ptItalic" class="pt-b" title="Cursiv (Ctrl+I)"><i>I</i></button>
+              <button id="ptUnderline" class="pt-b" title="Subliniat (Ctrl+U)"><u>U</u></button>
               <label class="pt-color" title="Culoare text"><input type="color" id="ptColor" value="#1c1c1c" /></label>
+              <span class="pt-sep"></span>
+              <button id="ptAlignLeft" class="pt-b" title="Aliniat la stânga"></button>
+              <button id="ptAlignCenter" class="pt-b" title="Centrat"></button>
+              <button id="ptAlignRight" class="pt-b" title="Aliniat la dreapta"></button>
+              <button id="ptAlignJustify" class="pt-b" title="Aliniat pe ambele margini"></button>
               <span class="pt-sep"></span>
               <select id="ptRows" class="pt-sel" title="Rânduri"></select>
               <span class="pt-x">×</span>
@@ -155,7 +165,12 @@
               <span class="pt-sep"></span>
               <button id="ptPin" class="pt-b" title="Fixează deschis"></button>
             </div>
+            <div class="postit-tabs">
+              <button id="ptTabNotes" class="pt-tab active" data-tab="notes">Notițe</button>
+              <button id="ptTabWorks" class="pt-tab" data-tab="works">Lucrări <span id="ptWorksCount" class="pt-count">0</span></button>
+            </div>
             <div id="postitBody" class="postit-body" contenteditable="true" spellcheck="false"></div>
+            <div id="postitWorks" class="postit-works" hidden></div>
             <div class="postit-pager">
               <button id="ptPrev" class="pt-b" title="Pagina anterioară">‹</button>
               <span id="ptPageLabel" class="pt-page mono">1 / 1</span>
@@ -163,6 +178,7 @@
               <button id="ptAdd" class="pt-b" title="Pagină nouă">+</button>
               <button id="ptDel" class="pt-b" title="Șterge pagina"></button>
             </div>
+            <div id="ptResize" class="postit-resize" title="Trage ca să redimensionezi"></div>
           </div>
         </div>
       </div>

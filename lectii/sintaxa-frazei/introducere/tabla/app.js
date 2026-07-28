@@ -23,6 +23,8 @@
     line:'<line x1="5" y1="19" x2="19" y2="5"/>',
     arrow:'<line x1="4" y1="12" x2="19" y2="12"/><polyline points="13,6 20,12 13,18"/>',
     curvedArrow:'<path d="M4 16 A 8 8 0 0 1 20 16" fill="none"/><polyline points="16.5 14 20 17.5 23.5 14" fill="none"/>',
+    // Aceeași săgeată, oglindită: burta în jos, vârful tot în dreapta.
+    curvedArrowDown:'<path d="M4 8 A 8 8 0 0 0 20 8" fill="none"/><polyline points="16.5 10 20 6.5 23.5 10" fill="none"/>',
     zigzag:'<polyline points="3,15 7,9 11,15 15,9 19,15 21,11"/>',
     wavy:'<path d="M3 13 Q 6 7 9 13 T 15 13 T 21 13"/>',
     text:'<line x1="6" y1="6" x2="18" y2="6"/><line x1="12" y1="6" x2="12" y2="19"/>',
@@ -43,6 +45,10 @@
     zoomOut:'<circle cx="11" cy="11" r="6"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="15.5" y1="15.5" x2="20" y2="20"/>',
     fit:'<path d="M4 9 V4 h5 M20 9 V4 h-5 M4 15 v5 h5 M20 15 v5 h-5"/>',
     pin:'<path d="M9 4 h6 l-1 6 3 3 H7 l3 -3 Z"/><line x1="12" y1="13" x2="12" y2="20"/>',
+    alignLeft:'<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="14" y2="10"/><line x1="4" y1="14" x2="19" y2="14"/><line x1="4" y1="18" x2="12" y2="18"/>',
+    alignCenter:'<line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="10" x2="17" y2="10"/><line x1="5" y1="14" x2="19" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/>',
+    alignRight:'<line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="10" x2="20" y2="10"/><line x1="5" y1="14" x2="20" y2="14"/><line x1="12" y1="18" x2="20" y2="18"/>',
+    alignJustify:'<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="20" y2="18"/>',
     table:'<rect x="4" y="5" width="16" height="14" rx="1.5"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="12" y1="5" x2="12" y2="19"/>',
   };
   function svgIcon(name, size) {
@@ -63,13 +69,14 @@
     { id:'zigzag',      name:'Linie în zigzag',  icon:'zigzag',      cursor:'crosshair', shape:true  },
     { id:'wavy',        name:'Linie ondulată',   icon:'wavy',        cursor:'crosshair', shape:true  },
     { id:'arrow',       name:'Săgeată dreaptă',  icon:'arrow',       cursor:'crosshair', shape:true  },
-    { id:'curvedArrow', name:'Săgeată curbată',  icon:'curvedArrow', cursor:'crosshair', shape:true  },
+    { id:'curvedArrow', name:'Săgeată curbată (pe deasupra)', icon:'curvedArrow', cursor:'crosshair', shape:true  },
+    { id:'curvedArrowDown', name:'Săgeată curbată (pe dedesubt)', icon:'curvedArrowDown', cursor:'crosshair', shape:true  },
     { id:'text',        name:'Text',             icon:'text',        cursor:'text',      shape:true  },
     { id:'eraser',      name:'Radieră',          icon:'eraser',      cursor:'cell',      shape:false },
   ];
   const toolById = (id) => TOOLS.find((t) => t.id === id);
   const UTIL_TOOLS = ['select', 'pan', 'text', 'eraser'];
-  const SHAPE_TOOLS = ['pencil', 'rect', 'circle', 'line', 'zigzag', 'wavy', 'arrow', 'curvedArrow'];
+  const SHAPE_TOOLS = ['pencil', 'rect', 'circle', 'line', 'zigzag', 'wavy', 'arrow', 'curvedArrow', 'curvedArrowDown'];
 
   const FONTS = {
     serif:'Georgia,"Times New Roman","Iowan Old Style",serif',
@@ -84,10 +91,12 @@
     favorites:['#e5484d','#2f6fed','#2fa84f','#f08c00','#8e44ad'],
     bgColors:['#ffffff','#fbf3d6','#eaf2fb','#eef1f4','#202533'],
     bgIndex:0, wheelStep:3, wheelDir:1, strokeWheelStep:3, strokeWheelDir:1, strokeWheelAmount:1,
-    carouselTools:['pencil','rect','circle','line','arrow','zigzag','wavy','curvedArrow','text','eraser'],
+    carouselTools:['pencil','rect','circle','line','arrow','zigzag','wavy','curvedArrow','curvedArrowDown','text','eraser'],
     uiScale:1, zoom:1, panX:0, panY:0,
     shapes:[],
-    postits:{ pages:[''], cur:0, zoom:1 },
+    // `works` = lucrările salvate: fiecare cu chipul ei (o poză mică) și cu tot
+    // ce trebuie ca s-o poți relua. `w`/`h` = mărimea aleasă pentru panou.
+    postits:{ pages:[''], cur:0, zoom:1, works:[], w:0, h:0 },
   };
 
   /* ---------- State ---------- */
@@ -178,6 +187,21 @@
       }
       y += lineStep; // Enter / sfârșit de paragraf -> același pas de rând
     }
+    /* Fraza scurtă stă la mijlocul paginii, pe verticală.
+       Măsurăm întâi cât ocupă, apoi, DACĂ încape, coborâm tot blocul cu
+       jumătate din golul rămas. Când textul trece de înălțimea paginii,
+       îl lăsăm să pornească de sus, ca acum: altfel ar sări în sus la
+       fiecare rând nou și ai scrie pe un text care fuge.
+
+       Măsura o luăm din `pageRect` (fereastra), nu din pagina văzută la
+       mărirea curentă, ca fraza să nu se plimbe când dai zoom. */
+    const inaltimeText = words.length ? (y - lineStep) - (PAGE_PAD + topGap) + state.fontSize : 0;
+    const inaltimePagina = pageRect().h;
+    if (words.length && inaltimeText < inaltimePagina) {
+      const dy = Math.round((inaltimePagina - inaltimeText) / 2 - topGap);
+      if (dy > 0) { for (const w of words) w.y += dy; y += dy; }
+    }
+
     layout.words = words;
     layout.lineStep = lineStep;
     layout.contentBottom = y + PAGE_PAD;
@@ -240,10 +264,16 @@
       drawArrowHead(c, s.x2, s.y2, Math.atan2(s.y2 - s.y1, s.x2 - s.x1), s.width); return;
     }
 
-    if (s.type === 'curvedArrow') {
+    // Cele două săgeți curbate sunt una și aceeași, doar cu burta în părți
+    // opuse. De-aia geometria stă într-un singur loc, cu un semn care spune
+    // încotro se umflă: `-1` în sus (curcubeu), `+1` în jos (albie).
+    if (s.type === 'curvedArrow' || s.type === 'curvedArrowDown') {
+      const jos = s.type === 'curvedArrowDown';
       const dx = s.x2 - s.x1, dy = s.y2 - s.y1, len = Math.hypot(dx, dy) || 1;
       let nx = -dy/len, ny = dx/len;
-      if (ny > 0) { nx = -nx; ny = -ny; } // arcuiește în sus (curcubeu)
+      // Normala are două sensuri; îl alegem pe cel cerut, indiferent din ce
+      // parte a fost trasă săgeata.
+      if ((jos && ny < 0) || (!jos && ny > 0)) { nx = -nx; ny = -ny; }
       const bulge = Math.max(28, len * 0.4);
       const mx = (s.x1 + s.x2)/2, my = (s.y1 + s.y2)/2;
       const cx = mx + nx*bulge, cy = my + ny*bulge;
@@ -319,7 +349,21 @@
       return pad4(x1, y1, x2, y2, m);
     }
     const extra = shapeAmp(s) + 12 + s.width*1.8;
-    return pad4(s.x1, s.y1, s.x2, s.y2, m + extra);
+    const b = pad4(s.x1, s.y1, s.x2, s.y2, m + extra);
+    // Săgeata curbată iese din coarda dintre capete: vârful arcului stă la
+    // jumătate din umflătură, pe normală. Fără corectura asta, chenarul
+    // punctat ar tăia tocmai burta săgeții.
+    if (s.type === 'curvedArrow' || s.type === 'curvedArrowDown') {
+      const jos = s.type === 'curvedArrowDown';
+      const dx = s.x2 - s.x1, dy = s.y2 - s.y1, len = Math.hypot(dx, dy) || 1;
+      let nx = -dy/len, ny = dx/len;
+      if ((jos && ny < 0) || (!jos && ny > 0)) { nx = -nx; ny = -ny; }
+      const varf = Math.max(28, len * 0.4) / 2;
+      const vx = (s.x1 + s.x2)/2 + nx*varf, vy = (s.y1 + s.y2)/2 + ny*varf;
+      b.x1 = Math.min(b.x1, vx - m); b.y1 = Math.min(b.y1, vy - m);
+      b.x2 = Math.max(b.x2, vx + m); b.y2 = Math.max(b.y2, vy + m);
+    }
+    return b;
   }
   function bboxHas(b, p) { return p.x >= b.x1 && p.x <= b.x2 && p.y >= b.y1 && p.y <= b.y2; }
   function rectsIntersect(a, b) { return !(b.x1 > a.x2 || b.x2 < a.x1 || b.y1 > a.y2 || b.y2 < a.y1); }
@@ -440,6 +484,7 @@
       case 'line':        return Object.assign(base, { type:'line',    x1:a.x, y1:a.y, x2:b.x, y2:b.y });
       case 'arrow':       return Object.assign(base, { type:'arrow',   x1:a.x, y1:a.y, x2:b.x, y2:b.y });
       case 'curvedArrow': return Object.assign(base, { type:'curvedArrow', x1:a.x, y1:a.y, x2:b.x, y2:b.y });
+      case 'curvedArrowDown': return Object.assign(base, { type:'curvedArrowDown', x1:a.x, y1:a.y, x2:b.x, y2:b.y });
       case 'zigzag':      return Object.assign(base, { type:'zigzag',  x1:a.x, y1:a.y, x2:b.x, y2:b.y });
       case 'wavy':        return Object.assign(base, { type:'wavy',    x1:a.x, y1:a.y, x2:b.x, y2:b.y });
     }
@@ -818,9 +863,48 @@
     const w = canvas.clientWidth || 800, h = canvas.clientHeight || 600;
     return { x: PAGE_PAD, y: PAGE_PAD, w: Math.max(80, w - PAGE_PAD * 2), h: Math.max(80, h - PAGE_PAD * 2) };
   }
+  /* Pagina AȘA CUM SE VEDE ACUM. Are aceeași margine ca `pageRect`, dar
+     lățimea și înălțimea le ia din cât cuprinde ecranul la mărirea curentă:
+     dai zoom out, vezi mai mult, deci pagina crește. Colțul din stânga-sus
+     rămâne pe loc, ca mutarea pânzei să NU miște chenarul; altfel zona
+     exportată s-ar schimba de fiecare dată când tragi de pânză. */
+  function pageRectView() {
+    const z = state.zoom || 1;
+    const w = (canvas.clientWidth || 800) / z, h = (canvas.clientHeight || 600) / z;
+    return { x: PAGE_PAD, y: PAGE_PAD, w: Math.max(80, w - PAGE_PAD * 2), h: Math.max(80, h - PAGE_PAD * 2) };
+  }
+
+  /* Cât loc ocupă tot ce e desenat: fraza plus marcajele. */
+  function contentBounds() {
+    let b = null;
+    const cuprinde = (x1, y1, x2, y2) => {
+      if (!b) { b = { x1, y1, x2, y2 }; return; }
+      b.x1 = Math.min(b.x1, x1); b.y1 = Math.min(b.y1, y1);
+      b.x2 = Math.max(b.x2, x2); b.y2 = Math.max(b.y2, y2);
+    };
+    // Textul: `w.y` e linia de bază, deci sus urcăm cu mărimea literei, iar jos
+    // coborâm cu coada literelor de tip „p" sau „g".
+    const fs = state.fontSize;
+    for (const w of layout.words) cuprinde(w.x, w.y - fs, w.x + w.w, w.y + fs * 0.3);
+    for (const sh of state.shapes) { const sb = shapeBBox(sh); cuprinde(sb.x1, sb.y1, sb.x2, sb.y2); }
+    return b;
+  }
+
+  /* Chenarul punctat = exact ce intră în captură. E reuniunea dintre pagina
+     văzută acum și tot ce s-a desenat, cu o margine de respiro. Așa:
+       • fraza lungă nu mai iese pe dedesubt,
+       • marcajele trase pe lângă text intră și ele în poză,
+       • la zoom out chenarul crește, deci ai loc de adnotat în jurul frazei. */
   function computeExportBounds() {
-    const p = pageRect();
-    return { x1: p.x, y1: p.y, x2: p.x + p.w, y2: p.y + p.h };
+    const p = pageRectView();
+    const b = { x1: p.x, y1: p.y, x2: p.x + p.w, y2: p.y + p.h };
+    const c = contentBounds();
+    if (c) {
+      const m = PAGE_PAD / 2;
+      b.x1 = Math.min(b.x1, c.x1 - m); b.y1 = Math.min(b.y1, c.y1 - m);
+      b.x2 = Math.max(b.x2, c.x2 + m); b.y2 = Math.max(b.y2, c.y2 + m);
+    }
+    return b;
   }
 
   function exportCanvas() {
@@ -834,6 +918,102 @@
     c.translate(-b.x1, -b.y1);
     drawContent(c);
     return off;
+  }
+
+  /* ============================================================
+     LUCRĂRILE SALVATE (fila „Lucrări" din notițe)
+
+     Aplicația nu ține minte între sesiuni nici fraza, nici marcajele: așa a
+     fost gândită. De-aia o lucrare salvată își duce singură tot ce-i trebuie
+     ca să fie readusă întocmai.
+
+     Poza e doar CHIPUL din listă, micșorată dinadins: memoria browserului e
+     mică, iar o captură la mărime naturală ar umple-o după câteva salvări.
+     Ce se restaurează nu vine din poză, ci din starea salvată alături.
+     ============================================================ */
+  const CHIP_W = 200;
+
+  /* Poza mică pentru listă: exportul obișnuit, micșorat la lățime fixă. */
+  function chipulLucrarii() {
+    const mare = exportCanvas();
+    const sc = Math.min(1, CHIP_W / mare.width);
+    const mic = document.createElement('canvas');
+    mic.width = Math.max(1, Math.round(mare.width * sc));
+    mic.height = Math.max(1, Math.round(mare.height * sc));
+    const c = mic.getContext('2d');
+    c.imageSmoothingQuality = 'high';
+    c.drawImage(mare, 0, 0, mic.width, mic.height);
+    return mic.toDataURL('image/jpeg', 0.72);
+  }
+
+  /* Tot ce face o lucrare să fie ea însăși. Reglajele de desen intră și ele:
+     altfel, readusă peste alte reglaje, ar arăta altfel decât ai lăsat-o. */
+  function lucrareaCurenta() {
+    return {
+      id: Date.now(),
+      cand: new Date().toISOString(),
+      chip: chipulLucrarii(),
+      text: state.text,
+      shapes: JSON.parse(JSON.stringify(state.shapes)),
+      view: { zoom: state.zoom, panX: state.panX, panY: state.panY },
+      look: {
+        fontKey: state.fontKey, fontSize: state.fontSize,
+        wordSpacing: state.wordSpacing, lineSpacing: state.lineSpacing,
+        markingOpacity: state.markingOpacity, bgIndex: state.bgIndex,
+      },
+    };
+  }
+
+  function salveazaLucrarea() {
+    if (!state.text.trim() && !state.shapes.length) { toast('Nu e nimic de salvat'); return; }
+    state.postits.works = state.postits.works || [];
+    state.postits.works.unshift(lucrareaCurenta());   // cea nouă în frunte
+    saveNotes();
+    renderWorks();
+    // Deschidem notița pe fila „Lucrări", ca elevul să vadă unde a ajuns.
+    $('postitGroup').classList.add('open');
+    const t = $('ptTabWorks');
+    if (t) t.click();
+    toast('Lucrare salvată');
+  }
+
+  function restaureazaLucrarea(w) {
+    if (!w) return;
+    state.text = w.text || '';
+    $('inputText').value = state.text;
+    state.shapes = JSON.parse(JSON.stringify(w.shapes || []));
+    selection = [];
+    if (w.view) { state.zoom = w.view.zoom; state.panX = w.view.panX; state.panY = w.view.panY; }
+    if (w.look) Object.assign(state, w.look);
+    nextId = state.shapes.reduce((m, s) => Math.max(m, s.id || 0), 0) + 1;
+    applyStateToUI();
+    applyFont();
+    layoutText();
+    render();
+    pushHistory();     // lucrarea readusă e un pas nou, deci „undo" te întoarce
+    toast('Lucrare readusă pe pânză');
+  }
+
+  function renderWorks() {
+    const gazda = $('postitWorks');
+    if (!gazda) return;
+    const lista = state.postits.works || [];
+    const nr = $('ptWorksCount');
+    if (nr) nr.textContent = lista.length;
+    if (!lista.length) {
+      gazda.innerHTML = '<p class="works-empty">Nicio lucrare salvată încă. Apasă „Salvează" sub pânză, iar lucrarea vine aici; o aduci înapoi cu un click.</p>';
+      return;
+    }
+    gazda.innerHTML = lista.map((w) => {
+      const d = new Date(w.cand);
+      const cand = d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) + ', ' +
+        String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      const titlu = (w.text || '').trim().split(/\s+/).slice(0, 5).join(' ') || 'fără text';
+      return '<figure class="work" data-id="' + w.id + '" title="Adu lucrarea înapoi pe pânză">' +
+             '<img src="' + w.chip + '" alt="" />' +
+             '<figcaption><b>' + titlu.replace(/</g, '&lt;') + '</b><span>' + cand + '</span></figcaption>' +
+             '<button class="work-del" data-del="' + w.id + '" title="Șterge lucrarea" aria-label="Șterge lucrarea">×</button></figure>';
+    }).join('');
   }
 
   function downloadDataUrl(url, name) {
@@ -899,18 +1079,16 @@
     }
     $('ptRows').value = 2; $('ptCols').value = 2;
 
-    // Pe tabletă (fără hover): atingerea butonului deschide/închide notița.
-    // O atingere în afara ei o închide (dacă nu e fixată cu acul).
+    // COMUTATOR CURAT: butonul deschide, butonul închide, și atât.
+    //
+    // Înainte, panoul se închidea și la orice apăsare în afara lui, dacă nu era
+    // prins cu acul. De-acolo venea neprevăzutul: alegeai o culoare, atingeai
+    // pânza ca să desenezi, iar notița dispărea. Nici acul nu mai e nevoie
+    // pentru asta, dar rămâne, fiindcă are alt rost: ține panoul deschis.
     const panel = $('postitPanel');
     $('postitBtn').addEventListener('click', (e) => {
       e.stopPropagation();
       group.classList.toggle('open');
-    });
-    document.addEventListener('pointerdown', (e) => {
-      if (!group.classList.contains('open')) return;
-      if (postitPinned) return;
-      if (group.contains(e.target)) return;
-      group.classList.remove('open');
     });
 
     body.addEventListener('input', savePostit);
@@ -921,10 +1099,22 @@
       document.execCommand(cmd, false, val || null);
       body.focus(); savePostit();
     }
-    $('ptBold').addEventListener('mousedown', (e) => e.preventDefault());
-    $('ptBold').addEventListener('click', () => exec('bold'));
-    $('ptItalic').addEventListener('mousedown', (e) => e.preventDefault());
-    $('ptItalic').addEventListener('click', () => exec('italic'));
+    // `mousedown` oprit peste tot: fără el, apăsarea pe buton mută cursorul din
+    // text și selecția se pierde înainte să apuce comanda s-o folosească.
+    const comanda = (idBtn, cmd, icon) => {
+      const b = $(idBtn);
+      if (!b) return;
+      if (icon) b.innerHTML = svgIcon(icon, 15);
+      b.addEventListener('mousedown', (e) => e.preventDefault());
+      b.addEventListener('click', () => exec(cmd));
+    };
+    comanda('ptBold', 'bold');
+    comanda('ptItalic', 'italic');
+    comanda('ptUnderline', 'underline');
+    comanda('ptAlignLeft', 'justifyLeft', 'alignLeft');
+    comanda('ptAlignCenter', 'justifyCenter', 'alignCenter');
+    comanda('ptAlignRight', 'justifyRight', 'alignRight');
+    comanda('ptAlignJustify', 'justifyFull', 'alignJustify');
     $('ptColor').addEventListener('input', () => exec('foreColor', $('ptColor').value));
     $('ptColor').parentElement.addEventListener('mousedown', (e) => { if (e.target.tagName !== 'INPUT') e.preventDefault(); });
 
@@ -958,7 +1148,57 @@
       }
     });
 
+    /* ---- Panoul se trage de colț ----
+       Mânerul stă în colțul din stânga-jos, fiindcă panoul e agățat de
+       dreapta-sus: acolo sunt cele două laturi care chiar se pot mișca.
+       Mărimea se ține minte, ca notița să te aștepte cum ai lăsat-o. */
+    const maner = $('ptResize');
+    if (maner) {
+      let de = null;
+      maner.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        maner.setPointerCapture(e.pointerId);
+        de = { x: e.clientX, y: e.clientY, w: panel.offsetWidth, h: $('postitBody').offsetHeight };
+      });
+      maner.addEventListener('pointermove', (e) => {
+        if (!de) return;
+        // Spre stânga înseamnă mai lat, fiindcă panoul crește dinspre dreapta.
+        const w = clamp(de.w + (de.x - e.clientX), 260, 900);
+        const h = clamp(de.h + (e.clientY - de.y), 90, 900);
+        state.postits.w = Math.round(w);
+        state.postits.h = Math.round(h);
+        aplicaMarimeaNotitei();
+      });
+      const gata = () => { if (de) { de = null; persist(); } };
+      maner.addEventListener('pointerup', gata);
+      maner.addEventListener('pointercancel', gata);
+    }
+
+    /* ---- Filele: Notițe / Lucrări ---- */
+    const file = [$('ptTabNotes'), $('ptTabWorks')].filter(Boolean);
+    file.forEach((t) => t.addEventListener('click', () => {
+      const care = t.dataset.tab;
+      file.forEach((x) => x.classList.toggle('active', x === t));
+      $('postitBody').hidden = care !== 'notes';
+      $('postitWorks').hidden = care !== 'works';
+      if (care === 'works') renderWorks();
+    }));
+
+    aplicaMarimeaNotitei();
     renderPostit();
+    renderWorks();
+  }
+
+  /* Lățimea și înălțimea alese de utilizator, puse pe panou. */
+  function aplicaMarimeaNotitei() {
+    const panel = $('postitPanel');
+    if (!panel) return;
+    if (state.postits.w) panel.style.width = state.postits.w + 'px';
+    const h = state.postits.h;
+    if (h) {
+      $('postitBody').style.height = h + 'px';
+      $('postitWorks').style.height = h + 'px';
+    }
   }
 
   /* ============================================================
@@ -1187,12 +1427,26 @@
 
   // Notițele se salvează separat și NU sunt șterse niciodată automat.
   function saveNotes() {
-    try { localStorage.setItem(NOTES_KEY, JSON.stringify(state.postits)); } catch (e) {}
+    try {
+      localStorage.setItem(NOTES_KEY, JSON.stringify(state.postits));
+      return true;
+    } catch (e) {
+      // Memoria browserului e de vreo cinci megaocteți, iar fiecare lucrare
+      // duce cu ea un chip. Când se umple, o salvare picată în tăcere ar fi
+      // cel mai rău lucru: ai crede că lucrarea e la adăpost.
+      toast('Nu mai e loc în memoria browserului. Șterge câteva lucrări.');
+      return false;
+    }
   }
   function loadNotes() {
     let n = null;
     try { n = JSON.parse(localStorage.getItem(NOTES_KEY) || 'null'); } catch (e) {}
     if (n && Array.isArray(n.pages) && n.pages.length) state.postits = n;
+    // Notițele scrise înainte de lucrări n-au câmpurile noi. Le punem noi, ca
+    // restul codului să nu fie nevoit să întrebe de fiecare dată dacă există.
+    if (!Array.isArray(state.postits.works)) state.postits.works = [];
+    if (typeof state.postits.w !== 'number') state.postits.w = 0;
+    if (typeof state.postits.h !== 'number') state.postits.h = 0;
     // curăță textele-substituent vechi salvate ca text real
     const stale = ['notițe pentru lecție…', 'notițe pentru lecție...', 'scrie notițe…', 'scrie notițe...'];
     state.postits.pages = state.postits.pages.map((p) => {
@@ -1350,6 +1604,40 @@
     $('btnCopy').innerHTML = svgIcon('copy', 16) + '<span>Copiază</span>';
     $('btnSave').addEventListener('click', saveJpeg);
     $('btnCopy').addEventListener('click', copyImg);
+    /* ---- Întoarcerea la lecție ----
+       Aplicația nu ține minte fraza și marcajele între sesiuni, deci plecarea
+       de aici înseamnă pierderea lor. Înainte se pleca fără niciun cuvânt.
+       Acum întreabă, iar dacă vrei să păstrezi, ai butonul „Salvează".
+       Nu întreabă degeaba: pânza goală te lasă să pleci pe tăcute. */
+    const inapoi = $('backLesson');
+    if (inapoi) inapoi.addEventListener('click', (e) => {
+      const areLucru = state.text.trim() || state.shapes.length;
+      if (!areLucru) return;
+      e.preventDefault();
+      const ok = window.confirm(
+        'Pleci de la tablă?\n\nFraza și marcajele de pe pânză nu se păstrează. ' +
+        'Dacă vrei să le găsești data viitoare, apasă întâi „Salvează" (butonul galben de sub pânză).'
+      );
+      if (ok) location.href = inapoi.getAttribute('href');
+    });
+
+    $('btnKeep').innerHTML = svgIcon('note', 16) + '<span>Salvează</span>';
+    $('btnKeep').addEventListener('click', salveazaLucrarea);
+
+    // Un singur ascultător pe listă: lucrările se schimbă mereu, iar unul pus
+    // pe fiecare poză ar trebui refăcut la fiecare desenare.
+    $('postitWorks').addEventListener('click', (e) => {
+      const del = e.target.closest('[data-del]');
+      if (del) {
+        const id = Number(del.dataset.del);
+        state.postits.works = (state.postits.works || []).filter((w) => w.id !== id);
+        saveNotes(); renderWorks();
+        return;
+      }
+      const fig = e.target.closest('.work');
+      if (!fig) return;
+      restaureazaLucrarea((state.postits.works || []).find((w) => w.id === Number(fig.dataset.id)));
+    });
 
     // UI zoom
     $('uiZoomIn').addEventListener('click', () => { state.uiScale = clamp(state.uiScale + 0.05, 0.7, 1.3); applyUiScale(); persist(); });
@@ -1430,7 +1718,8 @@
       // Scurtăturile de o literă NU se declanșează decât dacă mouse-ul e pe pânză,
       // ca să nu interfereze niciodată cu scrisul în câmpul de text.
       if (!pointerOverCanvas) return;
-      const map = { v:'select', p:'pencil', r:'rect', o:'circle', l:'line', a:'arrow', c:'curvedArrow', z:'zigzag', w:'wavy', t:'text', e:'eraser' };
+      // „x" pentru săgeata de dedesubt: „c" era luat de sora ei de deasupra.
+      const map = { v:'select', p:'pencil', r:'rect', o:'circle', l:'line', a:'arrow', c:'curvedArrow', x:'curvedArrowDown', z:'zigzag', w:'wavy', t:'text', e:'eraser' };
       const k = e.key.toLowerCase();
       if (map[k]) setTool(map[k]);
     });
