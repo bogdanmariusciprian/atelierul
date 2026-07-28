@@ -1213,20 +1213,34 @@ async function aratăTablele() {
     boardsBody.innerHTML = '<p class="boards-empty">N-ai încă nicio tablă salvată la lecția asta. Scrie ceva, apoi apasă „Salvează".</p>';
     return;
   }
+  /* Rândul ÎNTREG e butonul de deschis, nu doar numele. Înainte, numele era
+     un buton cât textul lui, iar data de alături și marginile rândului nu
+     făceau nimic: apăsai puțin pe lângă și părea că unealta nu răspunde. */
   boardsBody.innerHTML = lista.map((f) => `
-    <div class="board${f.id === tabla.id ? ' e-deschisa' : ''}" data-id="${f.id}">
-      <button class="board__name" data-act="deschide">${f.title}</button>
+    <div class="board${f.id === tabla.id ? ' e-deschisa' : ''}" data-id="${f.id}"
+         role="button" tabindex="0" title="Deschide „${f.title}"">
+      <span class="board__name">${f.title}</span>
       <span class="board__when">${candSalvat(f.updated_at)}</span>
-      <button class="board__del" data-act="sterge" title="Șterge tabla" aria-label="Șterge tabla">×</button>
+      <button class="board__del" data-act="sterge" title="Șterge tabla" aria-label="Șterge „${f.title}"">×</button>
     </div>`).join('');
 }
 
-boardsBody.addEventListener('click', async (e) => {
-  const b = e.target.closest('[data-act]');
-  if (!b) return;
-  const id = b.closest('.board').dataset.id;
+/* Enter și Space pe rândul selectat cu tastatura fac cât un clic. */
+boardsBody.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const rand = e.target.closest('.board');
+  if (!rand) return;
+  e.preventDefault();
+  rand.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+});
 
-  if (b.dataset.act === 'sterge') {
+boardsBody.addEventListener('click', async (e) => {
+  const rand = e.target.closest('.board');
+  if (!rand) return;
+  const id = rand.dataset.id;
+  const b = e.target.closest('[data-act]');
+
+  if (b && b.dataset.act === 'sterge') {
     if (!await intreaba({ titlu: 'Ștergi tabla?', text: 'Nu se mai poate aduce înapoi.', buton: 'Șterge' })) return;
     if (await deleteSheet(id)) {
       if (tabla.id === id) tabla = { id: null, titlu: 'Tablă nouă', curat: tabla.curat };
@@ -1235,6 +1249,8 @@ boardsBody.addEventListener('click', async (e) => {
     }
     return;
   }
+
+  if (id === tabla.id) { inchidePanou(boardsPanel); return; }   // e deja deschisă
 
   if (!tabla.curat && !await intreaba({
         titlu: 'Tabla de acum n-a fost salvată',
