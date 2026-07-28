@@ -161,9 +161,39 @@
   /* ============================================================
      AȘEZAREA TEXTULUI (wrapping + spațiere uniformă)
      ============================================================ */
+  /* ============================================================
+     LĂȚIMEA DE RUPERE A RÂNDURILOR
+
+     Cât timp fraza e curată, rândurile se rup după fereastră: o lărgești, textul
+     se așază pe lățimea nouă. Firesc, fiindcă n-ai ce strica.
+
+     DAR din clipa în care ai pus primul marcaj, lucrurile se schimbă. Marcajele
+     stau la coordonate fixe, peste cuvinte. Dacă textul s-ar re-aranja sub ele,
+     sublinierile ar ajunge sub alte cuvinte, iar săgețile ar arăta spre nimic:
+     toată munca s-ar da peste cap dintr-o simplă redimensionare a ferestrei.
+
+     De-aia, la primul marcaj, îngheață lățimea de atunci și rândurile rămân
+     rupte exact așa. Fereastra poate fi apoi oricât de lată sau de îngustă.
+
+     Ștergi toate marcajele și gheața se topește: te-ai întors la fraza curată,
+     deci n-ai ce strica din nou.
+     ============================================================ */
+  let latimeInghetata = null;
+
+  /* Cheamă asta după ORICE schimbare a marcajelor. Stă în `pushHistory` și în
+     `restore`, prin care trec toate: adăugare, ștergere, undo, redo, curățare. */
+  function potrivesteInghetul() {
+    if (state.shapes.length) {
+      if (latimeInghetata == null) latimeInghetata = pageRect().w;
+    } else {
+      latimeInghetata = null;
+    }
+  }
+
   function layoutText() {
     if (!ctx) return;
-    const maxW = Math.max(60, pageRect().w - TEXT_PAD * 2);
+    const latime = latimeInghetata != null ? latimeInghetata : pageRect().w;
+    const maxW = Math.max(60, latime - TEXT_PAD * 2);
     ctx.font = state.fontSize + 'px ' + fontCss();
     const spaceW = ctx.measureText(' ').width;
     const gap = spaceW + state.wordSpacing;
@@ -841,6 +871,7 @@
      ============================================================ */
   function snapshot() { return JSON.stringify(state.shapes); }
   function pushHistory() {
+    potrivesteInghetul();
     history = history.slice(0, hindex + 1);
     history.push(snapshot());
     if (history.length > HCAP) history.shift();
@@ -852,6 +883,11 @@
     state.shapes = JSON.parse(history[i]);
     reId();
     selection = [];
+    // Un „undo" care scoate ultimul marcaj dezgheață lățimea, iar rândurile se
+    // rup din nou după fereastră. De-aia trebuie și o re-așezare a textului.
+    const inainte = latimeInghetata;
+    potrivesteInghetul();
+    if (inainte !== latimeInghetata) layoutText();
     render();
     updateUndoRedo();
     persist();
@@ -940,6 +976,10 @@
       id: Date.now(),
       cand: new Date().toISOString(),
       text: state.text,
+      // Lățimea la care erau rupte rândurile când s-a salvat. Fără ea, o
+      // lucrare deschisă pe alt ecran s-ar re-aranja, iar marcajele ar cădea
+      // lângă alte cuvinte decât cele pe care le-ai însemnat.
+      wrapW: latimeInghetata != null ? latimeInghetata : pageRect().w,
       shapes: JSON.parse(JSON.stringify(state.shapes)),
       view: { zoom: state.zoom, panX: state.panX, panY: state.panY },
       look: {
@@ -971,6 +1011,9 @@
     $('inputText').value = state.text;
     state.shapes = JSON.parse(JSON.stringify(w.shapes || []));
     selection = [];
+    // Lucrările vechi n-au lățimea salvată; atunci o luăm din fereastră, ca
+    // înainte, și cel puțin nu se strică nimic.
+    latimeInghetata = state.shapes.length ? (w.wrapW || pageRect().w) : null;
     if (w.view) { state.zoom = w.view.zoom; state.panX = w.view.panX; state.panY = w.view.panY; }
     if (w.look) Object.assign(state, w.look);
     nextId = state.shapes.reduce((m, s) => Math.max(m, s.id || 0), 0) + 1;
