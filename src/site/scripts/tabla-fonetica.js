@@ -41,6 +41,96 @@ function insertSymbol(key) {
   if (s.bold) insertBold(s.char); else insertText(s.char);
 }
 
+/* ================= Virgula automată din transcriere =================
+   În câmpul de transcriere, fiecare sunet vine cu virgula lui după el. Nu e
+   o înfrumusețare: virgula e ceea ce desparte sunetele unul de altul, iar
+   dacă o pune mașina, elevul nu mai are cum să uite vreuna și nu mai pierde
+   timp cu ea. Câmpul c/v/s de dedesubt se aliniază oricum după separatori,
+   deci virgulele îl ajută și pe el să pună literele sub sunetul potrivit.
+
+   Virgula stă ÎN URMA cursorului, nu înaintea lui: după ce ai scris „k" pe
+   foaie apare „k, " și scrii mai departe. Așa următorul sunet are deja unde
+   să se așeze. Cea de la coadă se taie când pleci din câmp.
+   =================================================================== */
+const VIRGULA = ', ';
+
+/* Doar transcrierea primește virgule. Cuvântul și despărțirea în silabe se
+   scriu ca în caiet, iar rândul c/v/s are regulile lui. */
+function eTranscriere(field) {
+  return !!field && field.classList && field.classList.contains('trans');
+}
+
+/* Toate nodurile de text dintr-un câmp, în ordinea în care se citesc. */
+function noduriText(radacina) {
+  const out = [];
+  const w = document.createTreeWalker(radacina, NodeFilter.SHOW_TEXT);
+  while (w.nextNode()) out.push(w.currentNode);
+  return out;
+}
+
+/* Câmpul în care se află cursorul acum. */
+function campulCursorului() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  const c = sel.getRangeAt(0).startContainer;
+  const el = c.nodeType === Node.TEXT_NODE ? c.parentElement : c;
+  return el && el.closest ? el.closest('.field') : null;
+}
+
+/* Citește cele n caractere dinaintea cursorului.
+   Trece peste hotarul dintre noduri dinadins: fiecare inserare taie textul în
+   noduri noi, așa că după o ștergere cursorul ajunge des la începutul unui nod
+   gol, iar virgula pe care o căutăm stă în nodul dinainte. Dacă ne-am uita
+   numai în nodul curent, am crede că nu e nicio virgulă acolo. */
+function ultimele(n) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return '';
+  const r = sel.getRangeAt(0);
+  const camp = campulCursorului();
+  if (!camp) return '';
+  let text = '';
+  for (const nod of noduriText(camp)) {
+    if (nod === r.startContainer) { text += nod.textContent.slice(0, r.startOffset); break; }
+    text += nod.textContent;
+  }
+  return text.slice(-n);
+}
+
+/* Scoate virgula automată de dinaintea cursorului, dacă acolo e chiar ea.
+   Întoarce true dacă a găsit-o și a scos-o. */
+function stergeVirgula() {
+  if (ultimele(VIRGULA.length) !== VIRGULA) return false;
+  for (let i = 0; i < VIRGULA.length; i++) deletePrevChar();
+  return true;
+}
+
+/* Pune un sunet la cursor. În transcriere, cu virgula lui după el. */
+function insertSunet(text, field) {
+  insertText(eTranscriere(field) ? text + VIRGULA : text);
+}
+
+/* Semnele care NU sunt sunete, deci nu primesc virgulă. Apostroful lipsește
+   dinadins din listă: el nu e sunet nou, ci înmoaie sunetul dinainte (k'),
+   așa că trebuie să rămână lipit de el, fără virgulă între ele. */
+const NU_E_SUNET = new Set([' ', '\u00a0', '[', ']', '(', ')', '/', '.', ':', ';', '!', '?']);
+
+/* Taie virgula rămasă la coadă când elevul pleacă din câmp.
+   Umblă doar pe ultimul nod de text cu conținut, nu pe tot câmpul: dacă am
+   rescrie `textContent`, s-ar pierde simbolurile îngroșate (k̇, ġ), care sunt
+   elemente <b>, nu text simplu. */
+function taieVirgulaFinala(el) {
+  const noduri = [];
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  while (w.nextNode()) noduri.push(w.currentNode);
+  for (let i = noduri.length - 1; i >= 0; i--) {
+    const n = noduri[i];
+    const nou = n.textContent.replace(/,[\s\u00a0]*$/, '');
+    if (nou !== n.textContent) { n.textContent = nou; return; }
+    // nod format numai din spații și paranteza de închidere: sărim peste el
+    if (n.textContent.replace(/[\s\u00a0\]]/g, '') !== '') return;
+  }
+}
+
 const A_VARIANTS = ['ă', 'î', 'â'];   // ciclul pentru Shift+A
 
 /* ---------- Utilitare pentru selecție / cursor ---------- */
@@ -85,9 +175,37 @@ function insertBold(text) {
 }
 
 /* șterge un caracter în stânga cursorului (pentru ciclul ă/î/â) */
+/* Dacă cursorul stă la începutul unui nod de text (sau într-unul gol), îl mută
+   la capătul nodului de dinainte. Fără asta, ștergerea n-ar avea de unde mușca:
+   nodurile se rup la fiecare inserare, iar după o ștergere rămâne des un nod
+   gol sub cursor. Întoarce true dacă a găsit unde să se așeze. */
+function saiInNodulDinainte() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return false;
+  const r = sel.getRangeAt(0);
+  if (r.startContainer.nodeType === Node.TEXT_NODE && r.startOffset > 0) return true;
+  if (r.startContainer.nodeType !== Node.TEXT_NODE) return false;
+  const camp = campulCursorului();
+  if (!camp) return false;
+  const noduri = noduriText(camp);
+  const i = noduri.indexOf(r.startContainer);
+  for (let k = i - 1; k >= 0; k--) {
+    if (noduri[k].length > 0) {
+      const nou = document.createRange();
+      nou.setStart(noduri[k], noduri[k].length);
+      nou.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(nou);
+      return true;
+    }
+  }
+  return false;
+}
+
 function deletePrevChar() {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
+  saiInNodulDinainte();
   const range = sel.getRangeAt(0);
   if (range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
     range.setStart(range.startContainer, range.startOffset - 1);
@@ -121,15 +239,20 @@ function prevChar() {
   return '';
 }
 
-function cycleA() {
+/* Shift+A ciclează ă -> î -> â peste același sunet. În transcriere, sunetul
+   are virgulă după el, deci ca să-l înlocuim trebuie să ștergem întâi
+   virgula, apoi litera, și să le punem pe amândouă la loc. */
+function cycleA(field) {
+  const coada = eTranscriere(field) ? VIRGULA : '';
   if (aCycle.active) {
     aCycle.index = (aCycle.index + 1) % A_VARIANTS.length;
+    for (let i = 0; i < coada.length; i++) deletePrevChar();
     deletePrevChar();
-    insertText(A_VARIANTS[aCycle.index]);
+    insertText(A_VARIANTS[aCycle.index] + coada);
   } else {
     aCycle.active = true;
     aCycle.index = 0;
-    insertText(A_VARIANTS[0]);
+    insertText(A_VARIANTS[0] + coada);
   }
 }
 
@@ -335,10 +458,10 @@ sheet.addEventListener('keydown', (e) => {
   // Shift + a / s / t -> diacritice
   if (e.shiftKey) {
     resetCK();
-    if (e.code === 'KeyA') { e.preventDefault(); cycleA(); return; }
+    if (e.code === 'KeyA') { e.preventDefault(); cycleA(field); return; }
     resetACycle();
-    if (e.code === 'KeyS') { e.preventDefault(); insertText('ș'); return; }
-    if (e.code === 'KeyT') { e.preventDefault(); insertText('ț'); return; }
+    if (e.code === 'KeyS') { e.preventDefault(); insertSunet('ș', field); return; }
+    if (e.code === 'KeyT') { e.preventDefault(); insertSunet('ț', field); return; }
     return; // alte litere cu Shift -> majuscule normale
   }
 
@@ -346,34 +469,67 @@ sheet.addEventListener('keydown', (e) => {
 
   // „c -> k" DOAR în transcriere (dar „c" rămâne „c" înainte de i / e / h)
   if (field.classList.contains('trans')) {
-    // tocmai am pus „k" din „c", iar acum vine i/e/h -> refacem „c"
-    if (ckPending && (e.key === 'i' || e.key === 'e' || e.key === 'h') && prevChar() === 'k') {
+    // Ștergerea ia sunetul CU TOT CU virgula lui, dintr-o singură apăsare.
+    // Virgula a pus-o mașina, nu elevul, deci tot mașina o strânge: altfel ar
+    // trebui să apeși de două ori pentru fiecare greșeală.
+    if (e.key === 'Backspace' && !e.shiftKey && ultimele(VIRGULA.length) === VIRGULA) {
       e.preventDefault();
       resetCK();
-      deletePrevChar();          // scoatem „k"-ul
-      insertText('c' + e.key);   // punem „c" + litera (ci / ce / ch)
+      stergeVirgula();
+      deletePrevChar();
       return;
+    }
+
+    // tocmai am pus „k" din „c", iar acum vine i/e/h -> refacem „c".
+    // Virgula stă între „k" și cursor, așa că o dăm la o parte ca să ajungem
+    // la literă, și o punem înapoi după grupul refăcut.
+    if (ckPending && (e.key === 'i' || e.key === 'e' || e.key === 'h')) {
+      const aveaVirgula = stergeVirgula();
+      if (prevChar() === 'k') {
+        e.preventDefault();
+        resetCK();
+        deletePrevChar();                 // scoatem „k"-ul
+        insertSunet('c' + e.key, field);  // punem „c" + litera (ci / ce / ch)
+        return;
+      }
+      if (aveaVirgula) insertText(VIRGULA); // nu era cazul: punem virgula la loc
     }
     resetCK();
     if (e.key === 'c') {         // „c" -> „k" (implicit dur)
       e.preventDefault();
-      insertText('k');
+      insertSunet('k', field);
       ckPending = true;
       return;
     }
   }
 
   // Cifrele 1-4 -> simbolurile configurabile
-  if (e.code === 'Digit1') { e.preventDefault(); insertSymbol('1'); return; }
-  if (e.code === 'Digit2') { e.preventDefault(); insertSymbol('2'); return; }
-  if (e.code === 'Digit3') { e.preventDefault(); insertSymbol('3'); return; }
-  if (e.code === 'Digit4') { e.preventDefault(); insertSymbol('4'); return; }
+  if (e.code === 'Digit1') { e.preventDefault(); insertSymbol('1'); if (eTranscriere(field)) insertText(VIRGULA); return; }
+  if (e.code === 'Digit2') { e.preventDefault(); insertSymbol('2'); if (eTranscriere(field)) insertText(VIRGULA); return; }
+  if (e.code === 'Digit3') { e.preventDefault(); insertSymbol('3'); if (eTranscriere(field)) insertText(VIRGULA); return; }
+  if (e.code === 'Digit4') { e.preventDefault(); insertSymbol('4'); if (eTranscriere(field)) insertText(VIRGULA); return; }
 
   // Virgulă -> „, ”   (virgulă + spațiu)
   if (e.key === ',') { e.preventDefault(); insertText(', '); return; }
 
-  // Cratimă -> „ - ”  (spațiu înainte și după)
-  if (e.key === '-') { e.preventDefault(); insertText(' - '); return; }
+  // Cratimă -> „ - ”  (spațiu înainte și după).
+  // În transcriere, cratima nu se adaugă lângă virgulă, ci ÎN LOCUL ei: acolo
+  // unde tocmai se despărțeau două sunete, acum se despart două silabe.
+  if (e.key === '-') {
+    e.preventDefault();
+    if (eTranscriere(field)) stergeVirgula();
+    insertText(' - ');
+    return;
+  }
+
+  // Orice alt semn tastat în transcriere e un sunet, deci îl punem noi, cu
+  // virgula lui. Trebuie să fie ULTIMA regulă: dacă ar fi mai sus, ar înghiți
+  // cifrele 1-4, virgula și cratima, care au treaba lor.
+  if (eTranscriere(field) && e.key.length === 1 && !NU_E_SUNET.has(e.key) && e.key !== "'") {
+    e.preventDefault();
+    insertSunet(e.key, field);
+    return;
+  }
 });
 
 /* rupe ciclul ă/î/â și starea c->k dacă utilizatorul dă click aiurea */
@@ -602,6 +758,9 @@ sheet.addEventListener('blur', (e) => {
   if (bare.trim() === '') { field.innerHTML = ''; return; }   // gol -> redă placeholder-ul
   // transcriere cu doar „[  ]" (neatinsă) -> o golim, ca să reapară placeholder-ul
   if (field.classList.contains('trans') && /^\[\s*\]$/.test(bare.trim())) { field.innerHTML = ''; return; }
+  // Virgula de la coadă și-a făcut treaba cât ai scris; acum ar rămâne
+  // atârnată după ultimul sunet, așa că o strângem.
+  if (field.classList.contains('trans')) taieVirgulaFinala(field);
   if (field.classList.contains('types')) {                    // c/v/s -> curăț spațiile de la coadă
     const trimmed = bare.replace(/\s+$/, '');
     if (trimmed !== field.textContent) field.textContent = trimmed;
