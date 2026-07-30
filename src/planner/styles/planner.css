@@ -7,7 +7,13 @@
    Un elev care mută ceva de marți sâmbătă nu trebuie să numere coloane.
    ========================================================= */
 
-.pl-wrap { --pl-row: 26px; --pl-head: 4.2rem; }
+.pl-wrap {
+  --pl-row: 26px; --pl-head: 4.2rem;
+  /* Ziua de azi are culoarea ei, bleu, nu verdele mărcii. Verdele înseamnă
+     deja altceva pe ecranul ăsta: fereastra deschisă elevilor. Două înțelesuri
+     pe aceeași culoare, la un metru de distanță, se încurcă. */
+  --pl-azi: #2563eb;
+}
 
 /* ---- bara de sus: navigarea prin săptămâni ----
    O capsulă plutitoare, CENTRATĂ — săgeți rotunde de o parte și de alta,
@@ -192,17 +198,17 @@
 .pl-colhead__n { font-size: 0.72rem; color: var(--color-text-muted); }
 .pl-colhead__today {
   font-style: normal; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.04em;
-  padding: 0.05rem 0.4rem; border-radius: 999px; background: var(--color-primary); color: #fff;
+  padding: 0.05rem 0.4rem; border-radius: 999px; background: var(--pl-azi); color: #fff;
 }
 .pl-col.is-today .pl-colhead {
-  background: var(--color-primary);
+  background: var(--pl-azi);
 }
 .pl-col.is-today .pl-colhead__d,
 .pl-col.is-today .pl-colhead__n { color: #fff; }
-.pl-col.is-today .pl-colhead__today { background: #fff; color: var(--color-primary); }
+.pl-col.is-today .pl-colhead__today { background: #fff; color: var(--pl-azi); }
 .pl-col.is-today .pl-lane {
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--pl-azi) 7%, var(--color-surface));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pl-azi) 45%, transparent);
 }
 .pl-col.is-past .pl-colhead, .pl-col.is-past .pl-lane { opacity: 0.55; }
 .pl-col.is-vac .pl-lane {
@@ -232,15 +238,35 @@
 }
 .pl-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--color-border); opacity: 0.7; }
 
-/* ---- blocurile ---- */
+/* ---- blocurile ----
+
+   RETRAGERILE, ACELEAȘI CA PE TELEFON.
+   Pe axa timpului (aici verticala) retragerea vine din JS, cu poziție și
+   înălțime. Pe cealaltă axă (aici orizontala) vine din regulile de mai jos, cu
+   ACELEAȘI numere: 1px de gridline, apoi câte 1px de aer după fiecare bordură
+   de fereastră care cuprinde blocul.
+
+     --pl-in-0 = 1px  lucrul desenat direct în bandă
+     --pl-in-1 = 3px  ce stă într-o fereastră
+     --pl-in-2 = 5px  ce stă într-o fereastră dintr-o fereastră
+
+   Adâncimea o spune clasa `is-adanc-N`, pusă din JS: ferestrele și blocurile
+   sunt frați poziționați absolut, nu cutii una în alta, deci CSS-ul singur
+   n-are cum să știe ce stă în ce. */
 .pl-block {
-  position: absolute; left: 3px; right: 3px;
+  position: absolute; left: var(--pl-in-1, 3px); right: var(--pl-in-1, 3px);
   border-radius: 10px; padding: 0.3rem 0.45rem;
   background: color-mix(in srgb, var(--c) 18%, var(--color-bg));
   border-left: 3px solid var(--c);
   display: flex; flex-direction: column; gap: 0.05rem; overflow: hidden;
   font-size: 0.76rem; user-select: none;
 }
+/* Pe verticală fereastra ocupă toată banda, aici ea ocupă toată lățimea: dacă
+   blocul e într-una, o atinge pe amândouă laturile. De-aia aceeași adâncime
+   merge pe stânga și pe dreapta, fără socoteală per latură. */
+.pl-block--cell.is-adanc-0 { left: var(--pl-in-0, 1px); right: var(--pl-in-0, 1px); }
+.pl-block--cell.is-adanc-1 { left: var(--pl-in-1, 3px); right: var(--pl-in-1, 3px); }
+.pl-block--cell.is-adanc-2 { left: var(--pl-in-2, 5px); right: var(--pl-in-2, 5px); }
 .pl-block.can-edit { cursor: grab; }
 .pl-block.can-edit:active { cursor: grabbing; }
 .pl-block.is-mine { background: color-mix(in srgb, var(--c) 26%, var(--color-bg)); }
@@ -273,7 +299,8 @@
 
 /* ---- previzualizarea de sub deget ---- */
 .pl-ghost {
-  position: absolute; left: 3px; right: 3px; top: 0; pointer-events: none;
+  position: absolute; left: var(--pl-in-1, 3px); right: var(--pl-in-1, 3px);
+  top: 0; pointer-events: none;
   border-radius: 10px; padding: 0.3rem 0.45rem;
   border: 2px dashed var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg));
@@ -398,10 +425,12 @@
 }
 .pl-paint.on { border-style: solid; border-color: #15803d; color: #15803d; background: #f0fdf4; }
 .pl-avail {
-  position: absolute; left: 0; right: 0; z-index: 0;
+  position: absolute; left: var(--pl-in-0, 1px); right: var(--pl-in-0, 1px); z-index: 0;
+  box-sizing: border-box;
   background: color-mix(in srgb, #22c55e 14%, transparent);
-  border-left: 3px solid color-mix(in srgb, #22c55e 55%, transparent);
 }
+/* Fereastra de-o-zi stă în cea săptămânală: încă un pas. */
+.pl-avail.is-adanc-1 { left: var(--pl-in-1, 3px); right: var(--pl-in-1, 3px); }
 .pl-body.is-paint .pl-block { pointer-events: none; opacity: 0.45; }
 .pl-body.is-paint .pl-lane { cursor: crosshair; }
 /* Regimul „activitate personală" al creionului: blocurile gri rămân vii —
@@ -551,10 +580,14 @@
    Marius a întrebat „ce e zona verde hașurată?" — răspunsul corect nu e un
    mesaj în chat, ci o interfață care nu mai naște întrebarea: contur punctat
    (regiune, nu obiect), umplere abia vizibilă, etichetă cu intervalul. */
+/* Conturul e de UN pixel, ca pe telefon, nu de doi. Socoteala cuibăririi
+   numără câte borduri stau între gridline și lucrul desenat, cu pasul
+   1 bordură + 1 aer; o bordură de 2px ar strâmba tot lanțul, iar golul de sub
+   ea n-ar mai fi golul cerut. */
 .pl-avail {
   background: color-mix(in srgb, #22c55e 7%, transparent);
-  border: 2px dashed color-mix(in srgb, #16a34a 45%, transparent);
-  border-left-width: 3px; border-radius: 8px;
+  border: var(--pl-hair, 1px) dashed color-mix(in srgb, #16a34a 55%, transparent);
+  border-radius: 8px;
 }
 .pl-avail__tag {
   position: absolute; top: 2px; left: 4px; font-style: normal;
@@ -575,7 +608,7 @@
 .pl-legend__k--personal {
   background: repeating-linear-gradient(135deg, #cbd5e1 0 4px, #f1f5f9 4px 8px);
 }
-.pl-legend__k--today { background: color-mix(in srgb, var(--color-primary) 14%, transparent); border: 1.5px solid var(--color-primary); }
+.pl-legend__k--today { background: color-mix(in srgb, var(--pl-azi) 14%, transparent); border: 1.5px solid var(--pl-azi); }
 .pl-legend__k--vac {
   background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, #0891b2 20%, transparent) 4px 8px);
   border: 1px solid color-mix(in srgb, #0891b2 45%, transparent);
@@ -904,11 +937,21 @@
      între gridline și lucrul desenat. O fereastră portocalie de sine stătătoare
      e la adâncimea 0 ca orice altă fereastră; una așezată într-o verde e la 1.
      La fel pentru blocuri, care pot fi la 0, 1 sau 2. */
+  /* `left: auto; right: auto` pe fiecare: regulile de pe desktop pun retragerea
+     pe orizontală, iar ele au două clase, deci bat `.pl-block` de mai sus
+     oricât de jos ar fi scris el. Aici axele sunt schimbate între ele, așa că
+     orizontala trebuie eliberată anume, nu doar rescrisă verticala. */
   .pl-avail.is-adanc-1,
-  .pl-block--cell.is-adanc-1 { top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px); }
-  .pl-block--cell.is-adanc-2 { top: var(--pl-in-2, 5px); bottom: var(--pl-in-2, 5px); }
+  .pl-block--cell.is-adanc-1 {
+    left: auto; right: auto; top: var(--pl-in-1, 3px); bottom: var(--pl-in-1, 3px);
+  }
+  .pl-block--cell.is-adanc-2 {
+    left: auto; right: auto; top: var(--pl-in-2, 5px); bottom: var(--pl-in-2, 5px);
+  }
   .pl-avail.is-adanc-0,
-  .pl-block--cell.is-adanc-0 { top: var(--pl-in-0, 1px); bottom: var(--pl-in-0, 1px); }
+  .pl-block--cell.is-adanc-0 {
+    left: auto; right: auto; top: var(--pl-in-0, 1px); bottom: var(--pl-in-0, 1px);
+  }
   /* Un pixel de aer față de gridlines, de jur împrejur: 1px sus și jos din
      poziționare, 1px stânga-dreapta din axGap (care scade 2px din lungime) plus
      deplasarea cu un pixel. Blocul rămâne aliniat la ora lui, dar nu se mai

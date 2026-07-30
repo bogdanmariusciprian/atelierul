@@ -135,8 +135,15 @@ const axShift = (px) => (VERT ? `translateY(${px}px)` : `translateX(${px}px)`);
  *    1 = fereastra saptamanala, fata de gridlines
  *    3 = fereastra de-o-zi, fata de conturul verde
  *    3 = blocul elevului cand sta direct in verde
- *    5 = blocul elevului cand sta intr-o fereastra de-o-zi */
-const axInset = (nivel) => (VERT ? 0 : nivel);
+ *    5 = blocul elevului cand sta intr-o fereastra de-o-zi
+ *
+ *  ACEEASI REGULA PE AMANDOUA AXELE. Multa vreme aici scria `VERT ? 0 : nivel`,
+ *  adica retragerea se facea doar pe telefon, unde timpul curge pe orizontala.
+ *  Pe desktop, unde timpul curge pe verticala, blocurile se lipeau cap la cap
+ *  de linia orei si intre ele. Axa nu schimba insa nimic din regula: gridline-ul
+ *  se deseneaza tot la inceputul orei si fura tot un pixel, doar ca acolo se
+ *  numeste „sus", nu „stanga". */
+const axInset = (nivel) => nivel;
 const axGap = (nivel = 1) => (VERT ? 3 : 2 * nivel);
 
 /** Litera cu care încape TOT numele în blocul dat.
@@ -1062,9 +1069,27 @@ function nowLineHtml() {
   return `<span class="pl-now" style="${axPos(Math.max(0, Math.min(ROWS * rowPx(), y)).toFixed(0))}"></span>`;
 }
 
+/** Aceleași numere ale retragerilor, puse și la îndemâna foii de stil.
+ *
+ *  Pe o axă retragerea se face din JS (poziție și lungime), pe cealaltă din
+ *  CSS (`left`/`right` ori `top`/`bottom`). Amândouă trebuie să folosească
+ *  EXACT aceleași numere, altfel golul arată altfel pe lat decât pe lung.
+ *
+ *  Se publică la fiecare randare, pentru amândouă vederile. Erau scrise numai
+ *  în drumurile telefonului (sertarul), deci pe desktop foaia de stil cădea pe
+ *  valorile ei de rezervă și nu ținea seama de adâncime. */
+function publicaRetragerile() {
+  const r = document.documentElement.style;
+  r.setProperty("--pl-hair", `${PL_HAIR}px`);
+  r.setProperty("--pl-in-0", `${plChain(0)}px`);
+  r.setProperty("--pl-in-1", `${plChain(1)}px`);
+  r.setProperty("--pl-in-2", `${plChain(2)}px`);
+}
+
 function render() {
   if (!S.root) return;
   readAxis();          // înainte de orice calcul de geometrie
+  publicaRetragerile();
   if (!VERT) pregatesteMasura();   // fontul cu care măsurăm numele
   const mineCount = S.slots.filter((s) => s.mine).length;
   const body = S.loading
@@ -1420,23 +1445,7 @@ function fitDrawer() {
   // apăsabil) — le ridicăm cu exact cât ocupă sertarul, printr-o variabilă pe
   // care CSS-ul lor o citește. În rest de site rămâne 0 și nu se schimbă nimic.
   document.documentElement.style.setProperty("--pl-drawer-h", `${h}px`);
-  // Aceleasi retrageri, si pentru CSS: verticala se face din reguli, nu din JS,
-  // dar trebuie sa foloseasca EXACT aceleasi numere.
-  const r = document.documentElement.style;
-  r.setProperty("--pl-hair", `${PL_HAIR}px`);
-  // Pe verticala NU se sare peste nicio linie, spre deosebire de orizontala.
-  // Nu pentru ca banda n-ar avea margini, ci pentru ca marginile ei sunt o
-  // `border` CSS, iar un element pozitionat absolut se masoara din padding box
-  // — adica deja din interiorul bordurii. `top: 1px` inseamna deja un pixel de
-  // gol DUPA linie. Gridline-ul, in schimb, e un `<span>` desenat inauntru si
-  // chiar ocupa un pixel din spatiul in care asezam blocul.
-  //
-  // (Am incercat sa adaug +1 si aici, dupa masuratorile de pe hartia
-  // milimetrica; era gresit: hartia deseneaza marginea benzii ca pixel
-  // obisnuit, nu ca border, si de-aia cerea un pixel in plus.)
-  r.setProperty("--pl-in-0", `${plChain(0)}px`);
-  r.setProperty("--pl-in-1", `${plChain(1)}px`);
-  r.setProperty("--pl-in-2", `${plChain(2)}px`);
+  publicaRetragerile();
   // Marcăm pagina: cât timp lucrezi în planner pe telefon, butoanele plutitoare
   // ale site-ului se dau la o parte cu totul. Ridicate, ajungeau peste orar.
   document.body.classList.add("pl-phone");
@@ -1480,23 +1489,7 @@ function installDrawerDrag(mount) {
     const h = Math.max(min, Math.min(max, h0 + dy));
     d.style.height = `${h}px`;
     document.documentElement.style.setProperty("--pl-drawer-h", `${h}px`);
-  // Aceleasi retrageri, si pentru CSS: verticala se face din reguli, nu din JS,
-  // dar trebuie sa foloseasca EXACT aceleasi numere.
-  const r = document.documentElement.style;
-  r.setProperty("--pl-hair", `${PL_HAIR}px`);
-  // Pe verticala NU se sare peste nicio linie, spre deosebire de orizontala.
-  // Nu pentru ca banda n-ar avea margini, ci pentru ca marginile ei sunt o
-  // `border` CSS, iar un element pozitionat absolut se masoara din padding box
-  // — adica deja din interiorul bordurii. `top: 1px` inseamna deja un pixel de
-  // gol DUPA linie. Gridline-ul, in schimb, e un `<span>` desenat inauntru si
-  // chiar ocupa un pixel din spatiul in care asezam blocul.
-  //
-  // (Am incercat sa adaug +1 si aici, dupa masuratorile de pe hartia
-  // milimetrica; era gresit: hartia deseneaza marginea benzii ca pixel
-  // obisnuit, nu ca border, si de-aia cerea un pixel in plus.)
-  r.setProperty("--pl-in-0", `${plChain(0)}px`);
-  r.setProperty("--pl-in-1", `${plChain(1)}px`);
-  r.setProperty("--pl-in-2", `${plChain(2)}px`);
+  publicaRetragerile();
   });
 
   const gata = () => {
