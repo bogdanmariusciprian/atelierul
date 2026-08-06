@@ -1578,9 +1578,8 @@ if (firstField) placeCaret(firstField, true);
    materialul, generatorul le pune la un loc și umple tabla.
    ============================================================ */
 import { aruncare, pas, stat, fataUrmatoare, asezare, INTOARCERI } from './zar-fizica.js';
-import { ETICHETE, TOATE_ETICHETELE, listItems, listAll, addRows, deleteItem, cheia }
-  from '../../shared/scripts/bank-repo.js';
-import { isAdmin } from '../../shared/scripts/session.js';
+import { listItems } from '../../shared/scripts/bank-repo.js';
+import { fataZarului, felulMaterialului } from '../../shared/scripts/board-material.js';
 
 /* Cele șase cerințe, una pe față. Textul lor e al profesorului, nu al meu:
    se schimbă aici, într-un singur loc, și se schimbă peste tot. */
@@ -1703,7 +1702,10 @@ const elGenPentru = document.getElementById('genPentru');
    două exerciții deosebite tot repetare e. */
 const datAzi = new Set();
 
-const NUME_FEL = { cuvant: 'cuvinte', structura: 'structuri fonetice', propozitie: 'propoziții' };
+/* Numele felului, luat din registrul lecției: „cuvinte", „structuri fonetice".
+   Nu-l scriem de mână aici, ca să nu ajungă tabla să spună altceva decât spune
+   panoul profesorului despre același lucru. */
+const numeFel = (kind) => felulMaterialului(LECTIE, kind)?.nume || kind;
 
 function deschideFereastra(d) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
 
@@ -1729,8 +1731,8 @@ function potrivesteFereastraGen() {
     elGenTip.disabled = false;
   }
   if (elGenTema) elGenTema.checked = !!(ex && ex.tema);
-  const cfg = ETICHETE[Number(elGenTip.value)] || ETICHETE[1];
-  if (elGenCe) elGenCe.textContent = NUME_FEL[cfg.kind];
+  const cfg = fataZarului(LECTIE, Number(elGenTip.value)) || fataZarului(LECTIE, 1);
+  if (elGenCe) elGenCe.textContent = numeFel(cfg.kind);
   if (elGenPentru) {
     elGenPentru.textContent = ex
       ? 'Materialul intră în exercițiul ' + (tinta + 1) + (ex.sursa === 'zar' ? ' (de la zar).' : '.')
@@ -1770,14 +1772,14 @@ document.getElementById('genFa')?.addEventListener('click', async () => {
   if (!ex) return;
 
   const fata = Number(elGenTip.value) || 1;
-  const cfg = ETICHETE[fata];
+  const cfg = fataZarului(LECTIE, fata);
   const cate = Math.max(1, Math.min(30, Number(elGenCate.value) || 1));
   const nivel = elGenNivel.value ? Number(elGenNivel.value) : null;
 
   elGenNota.textContent = 'Caut în bancă…';
   const tot = await listItems(LECTIE, fata, { level: nivel });
   if (!tot.length) {
-    elGenNota.textContent = 'Banca n-are încă ' + NUME_FEL[cfg.kind] +
+    elGenNota.textContent = 'Banca n-are încă ' + numeFel(cfg.kind) +
       ' pentru exercițiul ăsta' + (nivel ? ' la dificultatea aleasă' : '') + '.';
     return;
   }
@@ -1807,264 +1809,8 @@ document.getElementById('genFa')?.addEventListener('click', async () => {
   dlgGen.close ? dlgGen.close() : dlgGen.removeAttribute('open');
 });
 
-/* ---------- Banca de material (numai profesorul o scrie) ----------
-
-   Materialul se pune în două mișcări, nu într-una. Întâi lipești lista și ea
-   se așază într-un TABEL nesalvat, ca o foaie de calcul; abia pe urmă, după ce
-   ai bifat pe fiecare rând la ce exerciții se potrivește, apeși „Importă".
-
-   De ce așa. Un cuvânt bun la „litere și sunete" nu e neapărat bun și la
-   „valoarea lui i", iar dacă bifele s-ar pune o dată pentru toată lista, ar
-   trebui lipită lista de patru ori, o dată pentru fiecare potriveală. În tabel
-   pui bifa unde trebuie: pe cap de coloană când merge la toate, pe rând când
-   merge doar la unul. */
-const dlgBank = document.getElementById('dlgBank');
-const elBankBtn = document.getElementById('bankBtn');
-const elBankText = document.getElementById('bankText');
-const elBankKind = document.getElementById('bankKind');
-const elBankMasa = document.getElementById('bankMasa');
-const elBankTabel = document.getElementById('bankTabel');
-const elBankSocoteala = document.getElementById('bankSocoteala');
-const elBankImporta = document.getElementById('bankImporta');
-const elBankLista = document.getElementById('bankLista');
-const elBankNota = document.getElementById('bankNota');
-
-/** Rândurile din tabel, încă nesalvate: `{ body, kind, tags:Set, level, gata }`. */
-let masa = [];
-/** Ce e deja în bancă, după cheia de potrivire. Ca să nu trimitem duplicate. */
-let dejaInBanca = new Set();
-
-const NUMELE_NIVELULUI = { 1: 'ușor', 2: 'mijlociu', 3: 'greu' };
-
-/* Butonul se arată abia după ce știm cine e: rolul vine din sesiune, iar
-   sesiunea se așază după ce pagina a pornit. */
-function potrivesteBanca() {
-  if (elBankBtn) elBankBtn.hidden = !isAdmin();
-}
-potrivesteBanca();
-setTimeout(potrivesteBanca, 1200);
-
-/** Felul pe care îl ține tabelul. Cât are rânduri, el hotărăște, nu selectorul:
- *  coloanele sunt ale unui singur fel deodată. */
-const felulMesei = () => (masa.length ? masa[0].kind : elBankKind.value);
-
-/** Coloanele de bifat, adică etichetele care au înțeles pentru felul de față.
- *  N-are rost să bifezi „propoziții" în dreptul unui cuvânt. */
-const coloaneleMesei = () => TOATE_ETICHETELE.filter((e) => e.kind === felulMesei());
-
-/** „3 cuvinte", „20 de cuvinte": regula lui „de" de la 20 în sus. */
-function cuDe(n, unul, mai) {
-  const rest = n % 100;
-  const are = n >= 20 && !(rest >= 1 && rest <= 19);
-  return n + (are ? ' de ' : ' ') + (n === 1 ? unul : mai);
-}
-
-function optiuniDeNivel(ales, gol) {
-  const capul = gol ? '<option value="">' + gol + '</option>' : '';
-  return capul + [1, 2, 3].map((n) =>
-    '<option value="' + n + '"' + (Number(ales) === n ? ' selected' : '') + '>' +
-    NUMELE_NIVELULUI[n] + '</option>').join('');
-}
-
-/* ---- Tabelul ---- */
-
-function deseneazaMasa() {
-  if (!elBankTabel) return;
-  elBankMasa.hidden = !masa.length;
-  if (!masa.length) { elBankTabel.innerHTML = ''; potrivesteImportul(); return; }
-
-  const cols = coloaneleMesei();
-  /* O coloană e „plină" când toate rândurile care se pot trimite o au bifată.
-     Cele deja în bancă nu se socotesc: ele nu pleacă nicăieri. */
-  const deTrimis = masa.filter((r) => !r.gata);
-  const plina = (et) => deTrimis.length > 0 && deTrimis.every((r) => r.tags.has(et));
-
-  const cap = '<tr>' +
-    '<th class="bank-t__nr"></th>' +
-    '<th class="bank-t__corp">Material</th>' +
-    cols.map((c) => '<th><button type="button" class="bank-cap' +
-      (plina(c.eticheta) ? ' e-plina' : '') + '" data-col="' + c.eticheta + '">' +
-      escapaText(c.nume) + '</button></th>').join('') +
-    '<th><select class="bank-t__niv" data-tot="1" aria-label="Dificultatea tuturor">' +
-      optiuniDeNivel('', 'dificultate') + '</select></th>' +
-    '<th class="bank-t__sterge"></th>' +
-    '</tr>';
-
-  const trup = masa.map((r, i) => '<tr class="bank-r' + (r.gata ? ' e-gata' : '') + '">' +
-    '<td class="bank-t__nr">' + (i + 1) + '.</td>' +
-    '<td class="bank-t__corp">' + escapaText(r.body) +
-      (r.gata ? '<span class="bank-r__gata">e în bancă</span>' : '') + '</td>' +
-    cols.map((c) => '<td><input type="checkbox" data-i="' + i + '" data-et="' + c.eticheta + '"' +
-      (r.tags.has(c.eticheta) ? ' checked' : '') + (r.gata ? ' disabled' : '') +
-      ' aria-label="' + escapaText(c.nume + ': ' + r.body) + '"></td>').join('') +
-    '<td><select class="bank-t__niv" data-i="' + i + '" aria-label="Dificultatea pentru ' +
-      escapaText(r.body) + '"' + (r.gata ? ' disabled' : '') + '>' +
-      optiuniDeNivel(r.level, '') + '</select></td>' +
-    '<td class="bank-t__sterge"><button class="bank-r__x" data-scoate="' + i +
-      '" title="Scoate rândul" aria-label="Scoate rândul">×</button></td>' +
-    '</tr>').join('');
-
-  elBankTabel.innerHTML = '<thead>' + cap + '</thead><tbody>' + trup + '</tbody>';
-  potrivesteImportul();
-}
-
-/** Câte pleacă, câte nu, și de ce. Butonul de import se trezește numai dacă are
- *  ce trimite. */
-function potrivesteImportul() {
-  const gata = masa.filter((r) => r.gata).length;
-  const fara = masa.filter((r) => !r.gata && !r.tags.size).length;
-  const pleaca = masa.length - gata - fara;
-  if (elBankImporta) elBankImporta.disabled = pleaca === 0;
-  if (!elBankSocoteala) return;
-  if (!masa.length) { elBankSocoteala.textContent = ''; return; }
-  const vorbe = [cuDe(pleaca, 'de trimis', 'de trimis')];
-  if (gata) vorbe.push(gata + ' deja în bancă');
-  if (fara) vorbe.push(cuDe(fara, 'fără bifă', 'fără bifă'));
-  elBankSocoteala.textContent = vorbe.join(' · ');
-}
-
-elBankTabel && elBankTabel.addEventListener('click', (e) => {
-  const capul = e.target.closest('[data-col]');
-  if (capul) {
-    const et = capul.dataset.col;
-    const deTrimis = masa.filter((r) => !r.gata);
-    const scoatem = deTrimis.length > 0 && deTrimis.every((r) => r.tags.has(et));
-    deTrimis.forEach((r) => { if (scoatem) r.tags.delete(et); else r.tags.add(et); });
-    deseneazaMasa();
-    return;
-  }
-  const x = e.target.closest('[data-scoate]');
-  if (x) { masa.splice(Number(x.dataset.scoate), 1); deseneazaMasa(); }
-});
-
-elBankTabel && elBankTabel.addEventListener('change', (e) => {
-  const c = e.target;
-  if (c.type === 'checkbox') {
-    const r = masa[Number(c.dataset.i)];
-    if (!r) return;
-    if (c.checked) r.tags.add(c.dataset.et); else r.tags.delete(c.dataset.et);
-    /* Aici NU redesenăm tot tabelul: ar sări bifa de sub deget la fiecare click.
-       Umblăm doar la ce s-a schimbat cu adevărat. */
-    const et = c.dataset.et;
-    const deTrimis = masa.filter((x) => !x.gata);
-    const capul = elBankTabel.querySelector('[data-col="' + et + '"]');
-    if (capul) capul.classList.toggle('e-plina', deTrimis.length > 0 && deTrimis.every((x) => x.tags.has(et)));
-    potrivesteImportul();
-    return;
-  }
-  if (c.classList.contains('bank-t__niv')) {
-    if (c.dataset.tot) {
-      const n = Number(c.value);
-      if (!n) return;
-      masa.forEach((r) => { if (!r.gata) r.level = n; });
-      c.value = '';
-      deseneazaMasa();
-    } else {
-      const r = masa[Number(c.dataset.i)];
-      if (r) r.level = Number(c.value) || 2;
-    }
-  }
-});
-
-/* Schimbarea felului rescrie coloanele, deci nu poate lucra peste rânduri de
-   alt fel. Spunem de ce, în loc să pierdem în tăcere ce e în tabel. */
-elBankKind && elBankKind.addEventListener('change', () => {
-  if (masa.length && masa[0].kind !== elBankKind.value) {
-    elBankKind.value = masa[0].kind;
-    elBankNota.textContent = 'Tabelul ține un singur fel deodată. Importă-l ori golește-l întâi.';
-  }
-});
-
-document.getElementById('bankGoleste')?.addEventListener('click', () => {
-  masa = [];
-  elBankNota.textContent = '';
-  deseneazaMasa();
-});
-
-/* ---- Adăugarea în tabel ---- */
-
-document.getElementById('bankAdauga')?.addEventListener('click', () => {
-  /* Despărțitorul e „;", dar primim și rândul nou: așa vine lista când o copiezi
-     dintr-un document, iar a-l refuza ar fi o pedeapsă fără rost. Virgula NU e
-     despărțitor: propozițiile au virgule în ele. */
-  const bucati = String(elBankText.value || '')
-    .split(/[;\n\r]+/).map((x) => x.trim()).filter(Boolean);
-  if (!bucati.length) { elBankNota.textContent = 'Scrie măcar un cuvânt.'; return; }
-
-  const fel = felulMesei();
-  const inMasa = new Set(masa.map((r) => cheia(r.body)));
-  let sarite = 0;
-  for (const body of bucati) {
-    const k = cheia(body);
-    if (inMasa.has(k)) { sarite++; continue; }   // același cuvânt de două ori în listă
-    inMasa.add(k);
-    masa.push({ body, kind: fel, tags: new Set(), level: 2, gata: dejaInBanca.has(k) });
-  }
-  elBankText.value = '';
-  elBankNota.textContent = sarite
-    ? 'Am lăsat deoparte ' + cuDe(sarite, 'rând scris de două ori', 'rânduri scrise de două ori') + '.'
-    : '';
-  deseneazaMasa();
-});
-
-/* ---- Importul ---- */
-
-elBankImporta?.addEventListener('click', async () => {
-  const deTrimis = masa.filter((r) => !r.gata && r.tags.size);
-  if (!deTrimis.length) { elBankNota.textContent = 'Bifează întâi la ce exerciții se potrivesc.'; return; }
-  elBankImporta.disabled = true;
-  elBankNota.textContent = 'Se salvează…';
-  const { puse, sarite, motiv } = await addRows(LECTIE, deTrimis.map((r) => ({
-    body: r.body, kind: r.kind, tags: [...r.tags], level: r.level,
-  })));
-  if (motiv) { elBankNota.textContent = motiv; potrivesteImportul(); return; }
-
-  /* Ce a intrat iese din tabel; ce n-avea bifă rămâne, ca să nu se piardă din
-     vedere. Așa tabelul arată chiar ce a mai rămas de făcut. */
-  const intrate = new Set(puse.map((p) => cheia(p.body)));
-  puse.forEach((p) => dejaInBanca.add(cheia(p.body)));
-  masa = masa.filter((r) => !intrate.has(cheia(r.body)));
-
-  /* Întâi cerem banca din nou, pe urmă scriem vorba de sfârșit: rândurile rămase
-     află abia acum dacă sunt ori nu deja acolo, iar socoteala trebuie făcută pe
-     adevărul de după salvare, nu pe cel de dinainte. */
-  await deseneazaBanca();
-  const faraBifa = masa.filter((r) => !r.gata && !r.tags.size).length;
-  const vorbe = ['Am pus în bancă ' + cuDe(puse.length, 'intrare', 'intrări') + '.'];
-  if (sarite) vorbe.push(cuDe(sarite, 'era deja acolo', 'erau deja acolo') + '.');
-  if (faraBifa) vorbe.push('În tabel au rămas ' + cuDe(faraBifa, 'rând fără bifă', 'rânduri fără bifă') + '.');
-  elBankNota.textContent = vorbe.join(' ');
-  deseneazaMasa();
-});
-
-/* ---- Ce e deja în bancă ---- */
-
-async function deseneazaBanca() {
-  if (!elBankLista) return;
-  elBankLista.textContent = 'Se încarcă…';
-  const tot = await listAll(LECTIE);
-  dejaInBanca = new Set(tot.map((it) => cheia(it.body)));
-  /* Rândurile din tabel află și ele: dacă tocmai am pus un cuvânt, el nu mai
-     are ce căuta a doua oară. */
-  masa.forEach((r) => { r.gata = dejaInBanca.has(cheia(r.body)); });
-  if (!tot.length) { elBankLista.textContent = 'Banca e goală încă.'; return; }
-  elBankLista.innerHTML = tot.map((it) =>
-    '<span class="bank-it">' + escapaText(it.body) +
-    '<span class="bank-it__n">' + escapaText((it.tags || []).join(' · ')) + ' · ' + it.level + '</span>' +
-    '<button class="bank-it__x" data-sterg="' + it.id + '" title="Scoate din bancă" aria-label="Scoate din bancă">×</button>' +
-    '</span>').join('');
-}
-
-elBankLista && elBankLista.addEventListener('click', async (e) => {
-  const b = e.target.closest('[data-sterg]');
-  if (!b) return;
-  if (await deleteItem(b.dataset.sterg)) { await deseneazaBanca(); deseneazaMasa(); }
-});
-
-elBankBtn && elBankBtn.addEventListener('click', async () => {
-  if (elBankNota) elBankNota.textContent = '';
-  deseneazaMasa();
-  deschideFereastra(dlgBank);
-  await deseneazaBanca();
-  deseneazaMasa();
-});
+/* Banca de material NU se mai scrie de aici.
+   S-a mutat în panoul de administrare, la lecția ei: „Profesor → Lecții →
+   Fonetică, introducere → Tablă". Un lucru, un loc. Tabla doar CITEȘTE banca,
+   prin generatorul de mai sus, iar cine n-are drept de scriere nici nu vede
+   vreun buton care i-ar da speranțe. */

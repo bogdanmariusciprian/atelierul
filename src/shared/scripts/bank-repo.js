@@ -6,28 +6,17 @@
 // numai profesorul (0078). Regula o ține baza, aici doar o folosim: dacă un elev
 // ar chema `addRows`, serverul îl refuză, oricât de bine ar fi scris codul.
 //
-// ETICHETELE sunt cheia. Zarul dă tipul exercițiului, tipul are eticheta lui,
-// iar generatorul cere „material cu eticheta asta". De-aia numele etichetelor
-// stau AICI, într-un singur loc, și nu sunt scrise de mână prin cod: dacă se
-// schimbă una, se schimbă pentru toată lumea deodată.
+// CE FEL DE MATERIAL are fiecare lecție NU se hotărăște aici. Descrierea stă în
+// `board-material.js`, fiindcă ține de pedagogie, nu de baza de date: tabla de
+// fonetică ține cuvinte, cea de la textul argumentativ va ține texte. Fișierul
+// de față nu știe și nu are de ce să știe ce feluri există; el doar cere și
+// scrie ce i se spune.
 // =========================================================
 import { supabase } from "./supabase-client.js";
+import { fataZarului, cheia } from "./board-material.js";
 
-/** Etichetele, pe fețele zarului. Cheia e fața, valoarea e eticheta din bancă.
- *
- *  Numele etichetelor sunt scurte și fără diacritice anume: ajung în baza de
- *  date, unde o listă de text se caută mai lesne fără semne. */
-export const ETICHETE = {
-  1: { eticheta: "litere-sunete", kind: "cuvant",     nume: "Litere și sunete" },
-  2: { eticheta: "grupuri",       kind: "cuvant",     nume: "Grupuri de sunete" },
-  3: { eticheta: "silabe",        kind: "cuvant",     nume: "Despărțire în silabe" },
-  4: { eticheta: "valoarea-i",    kind: "cuvant",     nume: "Valoarea lui i" },
-  5: { eticheta: "structuri",     kind: "structura",  nume: "Structuri fonetice" },
-  6: { eticheta: "propozitii",    kind: "propozitie", nume: "Transcrierea unei propoziții" },
-};
-
-/** Toate etichetele, pentru panoul de admin. */
-export const TOATE_ETICHETELE = Object.values(ETICHETE);
+// Se dă mai departe, ca cine are deja repo-ul s-o poată folosi de aici.
+export { cheia };
 
 /**
  * Materialul potrivit unei fețe de zar.
@@ -38,18 +27,40 @@ export const TOATE_ETICHETELE = Object.values(ETICHETE);
  * Băncile de la o lecție sunt de ordinul sutelor, deci nu e nicio pagubă.
  */
 export async function listItems(lessonSlug, fata, { level } = {}) {
-  const cfg = ETICHETE[fata];
+  const cfg = fataZarului(lessonSlug, fata);
   if (!cfg) return [];
+  return listByTag(lessonSlug, cfg.kind, cfg.eticheta, { level });
+}
+
+/** Materialul de un fel și cu o etichetă anume. Cererea de bază a băncii. */
+export async function listByTag(lessonSlug, kind, eticheta, { level } = {}) {
   let q = supabase
     .from("learn_lessons_items")
     .select("id, body, tags, level")
     .eq("lesson_slug", lessonSlug)
-    .eq("kind", cfg.kind)
-    .contains("tags", [cfg.eticheta]);
+    .eq("kind", kind);
+  if (eticheta) q = q.contains("tags", [eticheta]);
   if (level) q = q.eq("level", level);
   const { data, error } = await q;
-  if (error) { console.warn("listItems:", error.message); return []; }
+  if (error) { console.warn("listByTag:", error.message); return []; }
   return data || [];
+}
+
+/**
+ * Câte intrări are fiecare lecție. Pentru numerele din bara panoului.
+ *
+ * Cerem numai coloana `lesson_slug` și numărăm în browser, în loc să punem un
+ * `group by` la server: n-avem un RPC pentru asta, iar o listă de câteva mii de
+ * sluguri scurte e mai ieftină decât o funcție nouă în bază, întreținută pe veci
+ * pentru un număr afișat într-o bară laterală.
+ */
+export async function countByLesson() {
+  const { data, error } = await supabase
+    .from("learn_lessons_items").select("lesson_slug");
+  if (error) { console.warn("countByLesson:", error.message); return {}; }
+  const socoteala = {};
+  for (const r of data || []) socoteala[r.lesson_slug] = (socoteala[r.lesson_slug] || 0) + 1;
+  return socoteala;
 }
 
 /** Toată banca unei lecții, pentru panoul profesorului. */
@@ -61,18 +72,6 @@ export async function listAll(lessonSlug) {
     .order("created_at", { ascending: false });
   if (error) { console.warn("listAll:", error.message); return []; }
   return data || [];
-}
-
-/**
- * Cheia după care două intrări sunt „același lucru".
- *
- * Trebuie să dea exact ce dă indexul unic din 0078, adică `lower(btrim(body))`:
- * altfel fereastra ar spune „e nou" despre un cuvânt pe care baza îl respinge.
- * Diacriticele NU se scot: „casa" și „casă" sunt două cuvinte deosebite, iar la
- * o lecție de fonetică deosebirea e chiar lucrul care se învață.
- */
-export function cheia(text) {
-  return String(text || "").trim().toLowerCase();
 }
 
 /**

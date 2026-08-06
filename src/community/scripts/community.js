@@ -86,6 +86,11 @@ import { countNoun, plural } from "../../shared/scripts/format.js";
 
 import { fetchDashboard } from "../../shared/scripts/dashboard-repo.js";
 import { dashboardHtml } from "./admin-dashboard.js";
+import { adminNavHtml, citesteRuta, scrieRuta, PARTI_LECTIE } from "./admin-nav.js";
+import { boardPanelHtml, randuriDinLista, socoteala, cuDe } from "./admin-board.js";
+import { materialulLectiei } from "../../shared/scripts/board-material.js";
+import { listAll as bankListAll, addRows as bankAddRows, deleteItem as bankDeleteItem,
+  countByLesson as bankCountByLesson, cheia as bankCheia } from "../../shared/scripts/bank-repo.js";
 // --- Small inline icons for the sidebar (single source, DRY) ----------
 const NAV_ICONS = {
   forum: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 20l1.4-4.2A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg>`,
@@ -271,7 +276,17 @@ export function renderCommunity(basePath = "") {
     groupWarn: null, // under the group post composer
     profileWarn: null, // in the profile edit form
     // Admin dashboard.
-    adminTab: "overview", // "overview" | "users" | "moderation" | "challenges" | "gamification"
+    adminTab: "overview", // vezi INTRARI din admin-nav.js
+    // Cele două intrări care cresc: lecțiile și examenele. `adminPart` e partea
+    // deschisă a unei lecții („lectie" | „exercitii" | „tabla").
+    adminLesson: null,
+    adminPart: null,
+    adminExam: null,
+    adminFold: {},   // ce noduri sunt desfăcute în bară: „dom:fonetica" → true
+    bankCounts: {},  // slug de lecție → câte intrări are în bancă
+    // Panoul „Tablă": tot ce e nesalvat stă AICI, nu în pagină, fiindcă panoul
+    // se redesenează întreg la fiecare bifă.
+    bk: { lectie: null, kind: null, text: "", masa: [], banca: [], incarc: false, nota: "" },
     dash: null,           // dashboard aggregates (server-side), null until loaded
     dashSort: "-joined",  // members table: field, „-" prefix = descending
     adminUserQuery: "",
@@ -315,26 +330,23 @@ export function renderCommunity(basePath = "") {
   const MSG_MAX_PARTS = 5;
   // Unread message count, derived from the REAL conversations.
   const unreadMsgCount = () => state.conversations.reduce((n, c) => n + (c.unread || 0), 0);
-  // Deep links into a specific admin tab: #admin/moderare, #admin/utilizatori…
-  // (used by the floating admin quick-panel, from any page of the site).
-  const ADMIN_TAB_BY_SLUG = { prezentare: "overview", dashboard: "overview", utilizatori: "users", moderare: "moderation", provocari: "challenges", gamificare: "gamification", bonus: "bonus", descarcabile: "downloads" };
-  // Reverse map for building links. „prezentare" is kept as an inbound alias so
-  // old bookmarks still land, but „dashboard" is listed after it and therefore
-  // wins here — outgoing links say the new name.
-  const ADMIN_SLUG_BY_TAB = Object.fromEntries(Object.entries(ADMIN_TAB_BY_SLUG).map(([s, t]) => [t, s]));
+  // Deep links into the admin panel: #admin/moderare, #admin/lectii/<slug>/tabla…
+  // Citirea și scrierea adresei stau în admin-nav.js, lângă bara care le
+  // folosește; aici rămâne doar legătura cu starea.
   function applyAdminHash() {
-    const h = location.hash.slice(1);
-    if (h !== "admin" && !h.startsWith("admin/")) return false;
+    const ruta = citesteRuta(location.hash);
+    if (!ruta) return false;
     if (!isAdmin()) {
       state.section = "forum";
       return true;
     }
     state.section = "admin";
-    // Plain #admin = the dashboard's start (Prezentare); #admin/<slug>
-    // opens that exact tab. Without the reset, the last visited tab stuck
-    // and "Panou admin" vs "Moderare" looked like the same destination.
-    const slug = h.split("/")[1];
-    state.adminTab = slug && ADMIN_TAB_BY_SLUG[slug] ? ADMIN_TAB_BY_SLUG[slug] : "overview";
+    // Fără resetarea asta, ultima filă vizitată rămânea lipită, iar „Panou
+    // admin" și „Moderare" păreau aceeași destinație.
+    state.adminTab = ruta.tab;
+    state.adminLesson = ruta.lectie;
+    state.adminPart = ruta.parte;
+    state.adminExam = ruta.examen;
     return true;
   }
 
@@ -2766,11 +2778,13 @@ export function renderCommunity(basePath = "") {
 
   // Admin proposal history as a sortable, filterable table. Reused in the
   // "Exerciții" tab AND wrapped in a box for the admin panel (DRY).
-  function proposalHistoryTable() {
+  function proposalHistoryTable(doarLectia = null) {
     const filter = state.histFilter || "all";
     const sort = state.histSort || { key: "date", dir: "desc" };
 
-    let rows = state.proposed.filter((e) => e.status !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0));
+    let rows = state.proposed
+      .filter((e) => e.status !== "pending" && (!doarLectia || e.lessonSlug === doarLectia))
+      .sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0));
     if (filter !== "all") rows = rows.filter((e) => e.status === filter);
 
     const cmp = {
@@ -2828,11 +2842,13 @@ export function renderCommunity(basePath = "") {
         </table>
       </div>`;
   }
-  function proposalHistory() {
+  function proposalHistory(doarLectia = null) {
+    const cate = state.proposed
+      .filter((e) => e.status !== "pending" && (!doarLectia || e.lessonSlug === doarLectia)).length;
     return `<div class="cx-box">
-        <div class="cx-admin__head"><h3>Istoric propuneri · ${state.proposed.filter((e) => e.status !== "pending").sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0)).length}</h3></div>
+        <div class="cx-admin__head"><h3>Istoric propuneri · ${cate}</h3></div>
         <p class="cx-muted">Propunerile de exerciții pe care le-ai aprobat sau respins. Cele aprobate apar în lista de exerciții de la lecția lor.</p>
-        ${proposalHistoryTable()}
+        ${proposalHistoryTable(doarLectia)}
       </div>`;
   }
 
@@ -2931,8 +2947,12 @@ export function renderCommunity(basePath = "") {
 
   // Pending exercise proposals, decidable right here (same handlers as the
   // Exerciții section — one flow, two entry points).
-  function adminPendingBox() {
-    const pending = state.proposed.filter((e) => e.status === "pending").sort((a, b) => (b.votes || 0) - (a.votes || 0));
+  /* `doarLectia` filtrează la o singură lecție. Fila „Moderare" o cheamă fără
+     nimic și primește tot, ca înainte; panoul unei lecții îi dă slugul ei. */
+  function adminPendingBox(doarLectia = null) {
+    const pending = state.proposed
+      .filter((e) => e.status === "pending" && (!doarLectia || e.lessonSlug === doarLectia))
+      .sort((a, b) => (b.votes || 0) - (a.votes || 0));
     if (!pending.length) return "";
     const rows = pending
       .map(
@@ -3149,11 +3169,16 @@ export function renderCommunity(basePath = "") {
   // Files stay on the teacher's Drive; only the link lives here. Paste the
   // share link exactly as Drive gives it — the site turns it into a direct
   // download by itself, so there's no URL surgery to learn.
-  function adminTabDownloads() {
+  /* `doarExamenul` restrânge panoul la un singur examen. Fără el iese lista
+     întreagă, ca înainte. Blocurile sunt aceleași, cu aceleași `data-action`:
+     mutarea în bara laterală n-a atins niciun buton, doar ce se desenează. */
+  function adminTabDownloads(doarExamenul = null) {
     const key = state.settings.drive_api_key || "";
+    const cats = doarExamenul
+      ? TEST_CATEGORIES.filter((c) => c.slug === doarExamenul) : TEST_CATEGORIES;
     // One block per category: its Drive folder, a Load button, whatever that
     // load found, and the files already published.
-    const blocks = TEST_CATEGORIES.map((c) => {
+    const blocks = cats.map((c) => {
       const folder = state.settings[`drive_folder_${c.slug}`] || "";
       const st = state.driveFiles[c.slug] || {};
       const mine = state.downloads.filter((d) => d.exam === c.slug);
@@ -3196,7 +3221,23 @@ export function renderCommunity(basePath = "") {
         </div>`;
     }).join("");
 
-    return `<div class="cx-box">
+    // Grila de itemi trăiește în pagina examenului, nu aici. E o unealtă de o
+    // mie de rânduri, cu editare pe celulă; a o muta ar fi însemnat s-o rescriu
+    // pentru un câștig de nimic. Din panou pleacă o legătură spre ea.
+    const cat = doarExamenul ? TEST_CAT_BY_SLUG[doarExamenul] : null;
+    const spreGrila = !cat ? "" : `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Itemii examenului</h3></div>
+        <p class="cx-muted">Banca de itemi se editează în pagina examenului, în grila ei, unde ai
+          toate coloanele deodată: enunț, variante, răspuns, an, stare.</p>
+        <a class="btn btn--sm" href="/teste/${escapeHtml(cat.slug)}/">Deschide grila de itemi →</a>
+      </div>`;
+
+    return `${cat ? `<div class="cx-box">
+        <div class="cx-admin__head"><h3><span aria-hidden="true">${cat.icon}</span> ${escapeHtml(cat.title)}</h3></div>
+        <p class="cx-muted">${escapeHtml(cat.desc)}</p>
+      </div>` : ""}
+      ${spreGrila}
+      <div class="cx-box">
         <div class="cx-admin__head"><h3>🔑 Legătura cu Drive</h3></div>
         <p class="cx-muted">Cheia se citește DOAR din contul tău de profesor — elevii n-o primesc niciodată. Folderele trebuie partajate în Drive ca „oricine are linkul".</p>
         <div class="cx-driverow">
@@ -3269,20 +3310,22 @@ export function renderCommunity(basePath = "") {
   function sectionAdmin() {
     if (!isAdmin()) return sectionForum();
     const modCount = state.contentReports.length + state.heldContent.length + state.proposed.filter((e) => e.status === "pending").length;
-    const TABS = [
-      { id: "overview", label: "Dashboard" },
-      { id: "users", label: "Utilizatori" },
-      { id: "moderation", label: "Moderare", badge: modCount },
-      { id: "challenges", label: "Provocări" },
-      { id: "gamification", label: "Gamificare" },
-      { id: "bonus", label: "Întrebări bonus" },
-      { id: "downloads", label: "Descărcabile" },
-    ];
-    const tabBar = `<div class="cx-tabs cx-tabs--admin">${TABS.map(
-      (t) => `<button class="cx-tabbtn${state.adminTab === t.id ? " on" : ""}" data-action="admin-tab" data-id="${t.id}">
-        ${t.label}${t.badge ? `<span class="cx-tabbtn__n cx-tabbtn__n--hot">${t.badge}</span>` : ""}
-      </button>`
-    ).join("")}</div>`;
+    // Numerele din dreapta intrărilor. Se socotesc AICI, unde e starea, și se
+    // dau barei gata făcute: bara e desen, nu depozit.
+    const propuneriPeLectie = {};
+    for (const e of state.proposed) {
+      if (e.status !== "pending" || !e.lessonSlug) continue;
+      propuneriPeLectie[e.lessonSlug] = (propuneriPeLectie[e.lessonSlug] || 0) + 1;
+    }
+    const fisePeExamen = {};
+    for (const d of state.downloads) fisePeExamen[d.exam] = (fisePeExamen[d.exam] || 0) + 1;
+
+    const nav = adminNavHtml(
+      { tab: state.adminTab, lectie: state.adminLesson, parte: state.adminPart,
+        examen: state.adminExam, deschise: state.adminFold },
+      { moderare: modCount, utilizatori: state.adminUsers.length,
+        propuneriPeLectie, materialPeLectie: state.bankCounts, fisePeExamen }
+    );
 
     const BODY = {
       overview: adminTabOverview,
@@ -3291,12 +3334,100 @@ export function renderCommunity(basePath = "") {
       challenges: adminTabChallenges,
       gamification: adminTabGamification,
       bonus: adminTabBonus,
-      downloads: adminTabDownloads,
+      lessons: adminTabLessons,
+      tests: adminTabTests,
     };
     return `
-      ${sectionHead("Panou de administrare", "Vizibil doar pentru tine. Tot ce ține de administrarea comunității, organizat pe file.")}
-      ${tabBar}
-      ${(BODY[state.adminTab] || adminTabOverview)()}`;
+      ${sectionHead("Panou de administrare", "Vizibil doar pentru tine. Tot ce ține de administrarea comunității.")}
+      <div class="cx-admshell">
+        <aside class="cx-admside">${nav}</aside>
+        <div class="cx-admbody">${(BODY[state.adminTab] || adminTabOverview)()}</div>
+      </div>`;
+  }
+
+  /* Banca lecției, adusă de la server. O cerem când intri pe „Tablă" și după
+     fiecare schimbare, ca lista de jos și semnele „e în bancă" din tabel să
+     spună același lucru. */
+  async function incarcaBanca(slug) {
+    if (!slug) return;
+    state.bk.banca = await bankListAll(slug);
+    const inBanca = new Set(state.bk.banca.map((x) => bankCheia(x.body)));
+    state.bk.masa = state.bk.masa.map((r) => ({ ...r, gata: inBanca.has(bankCheia(r.body)) }));
+    state.bankCounts = { ...state.bankCounts, [slug]: state.bk.banca.length };
+  }
+
+  /* Intrarea pe „Tablă". Dacă e altă lecție decât cea de dinainte, tabelul
+     nesalvat se golește: rândurile lui poartă felul și etichetele lecției de
+     unde au venit, iar a le târî mai departe ar însemna să pui cuvinte de
+     fonetică în banca altei lecții. */
+  function deschideTabla() {
+    const slug = state.adminLesson;
+    if (state.bk.lectie !== slug) {
+      state.bk = {
+        lectie: slug, kind: materialulLectiei(slug)?.feluri[0].kind || null,
+        text: "", masa: [], banca: [], incarc: true, nota: "",
+      };
+    }
+    incarcaBanca(slug).then(() => { state.bk.incarc = false; render(); });
+  }
+
+  /* ---------- Profesor → Lecții ----------
+     Fără lecție aleasă: lista, ca să se vadă dintr-o privire unde e material și
+     unde te așteaptă propuneri. Cu lecție aleasă: una din cele trei părți. */
+  function adminTabLessons() {
+    const lectie = state.adminLesson ? lessonBySlug(state.adminLesson) : null;
+    if (!lectie) return lessonsIndexBox();
+
+    const parte = state.adminPart || "lectie";
+    const cap = `<div class="cx-box cx-lesshead">
+        <div class="cx-admin__head"><h3>${escapeHtml(lectie.title)}</h3></div>
+        <p class="cx-muted">${escapeHtml(lectie.summary || "")}</p>
+        <div class="cx-tabs cx-tabs--sub">${PARTI_LECTIE.map((p) =>
+          `<button class="cx-tabbtn${parte === p.slug ? " on" : ""}" data-action="admin-go"
+            data-tab="lessons" data-lectie="${lectie.slug}" data-parte="${p.slug}">
+            <span class="cx-tabbtn__ic" aria-hidden="true">${p.icon}</span>${p.nume}</button>`
+        ).join("")}</div>
+      </div>`;
+
+    if (parte === "exercitii") {
+      return cap + (adminPendingBox(lectie.slug) || `<div class="cx-box">
+        <p class="cx-muted">Nicio propunere în așteptare la lecția asta.</p></div>`)
+        + proposalHistory(lectie.slug);
+    }
+    if (parte === "tabla") return cap + boardPanelHtml(lectie, state.bk);
+    return cap + `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Textul lecției</h3></div>
+        <p class="cx-muted">Textul lecțiilor stă în paginile lor, nu în bază. Deschide lecția
+          și editează acolo; aici rămân uneltele care atârnă de ea.</p>
+        <a class="btn btn--sm" href="/${escapeHtml(lectie.href || "")}">Deschide lecția →</a>
+      </div>`;
+  }
+
+  function lessonsIndexBox() {
+    const randuri = LESSONS.filter((l) => l.ready).map((l) => {
+      const material = state.bankCounts[l.slug] || 0;
+      const propuneri = state.proposed.filter((e) => e.status === "pending" && e.lessonSlug === l.slug).length;
+      return `<div class="cx-crudrow">
+          <b>${escapeHtml(l.title)}</b>
+          <span class="cx-crudrow__hint cx-muted">${material ? cuDe(material, "intrare în bancă", "intrări în bancă") : "fără material"}${propuneri ? ` · ${propuneri} de aprobat` : ""}</span>
+          <button type="button" class="btn-mini" data-action="admin-go" data-tab="lessons"
+            data-lectie="${l.slug}" data-parte="tabla">Tablă →</button>
+        </div>`;
+    }).join("");
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Lecțiile tale</h3></div>
+        <p class="cx-muted">Fiecare lecție are trei părți: textul ei, exercițiile (cu propunerile
+          elevilor) și tabla, adică materialul din care se face tema.</p>
+        <div class="cx-crud">${randuri}</div>
+      </div>`;
+  }
+
+  /* ---------- Profesor → Teste ----------
+     Un examen se gospodărește dintr-un singur panou: fișele din Drive și
+     legătura spre grila de itemi, care trăiește în pagina examenului. */
+  function adminTabTests() {
+    if (!state.adminExam) return adminTabDownloads();
+    return adminTabDownloads(state.adminExam);
   }
 
   // 20 mini XP-bar skins so the admin can see every level at a glance.
@@ -3390,6 +3521,9 @@ export function renderCommunity(basePath = "") {
       openGroup: state.openGroup,
       viewUser: state.viewUser,
       adminTab: state.adminTab,
+      adminLesson: state.adminLesson,
+      adminPart: state.adminPart,
+      adminExam: state.adminExam,
     };
   }
 
@@ -3537,6 +3671,12 @@ export function renderCommunity(basePath = "") {
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
+        // Numerele de material din bara laterală. O singură cerere pentru toate
+        // lecțiile, nu una pe lecție: bara le arată pe toate deodată.
+        state.bankCounts = await bankCountByLesson();
+        // Intrat direct pe „#admin/lectii/<lectie>/tabla": banca lecției trebuie
+        // adusă acum, altfel panoul s-ar deschide gol până la primul click.
+        if (state.adminTab === "lessons" && state.adminPart === "tabla") deschideTabla();
         // The dashboard's aggregates. Fetched last and not awaited alongside the
         // rest: the panel must open even if the migration behind it isn't applied
         // yet, in which case `dash` stays null and the tab says so.
@@ -3827,7 +3967,10 @@ export function renderCommunity(basePath = "") {
         state.section = btn.dataset.id;
         // "Panou admin" from the sidebar always starts at Prezentare —
         // same rule as the #admin deep link (least surprise).
-        if (state.section === "admin") state.adminTab = "overview";
+        if (state.section === "admin") {
+          state.adminTab = "overview";
+          state.adminLesson = state.adminPart = state.adminExam = null;
+        }
         state.openComments.clear();
         state.openGroup = null;
         state.addMemberOpen = false;
@@ -3850,6 +3993,9 @@ export function renderCommunity(basePath = "") {
         state.openGroup = p.openGroup;
         state.viewUser = p.viewUser;
         state.adminTab = p.adminTab;
+        state.adminLesson = p.adminLesson ?? null;
+        state.adminPart = p.adminPart ?? null;
+        state.adminExam = p.adminExam ?? null;
         state.editingProfile = false;
         history.replaceState(null, "", `#${p.section}`);
         return render();
@@ -4462,13 +4608,91 @@ export function renderCommunity(basePath = "") {
         state.simPrestige = 0;
         setPreview(null, 0);
         return render();
-      case "admin-tab":
+      /* Un singur buton de navigare pentru toată bara: intrări simple, lecții
+         cu partea lor, examene. Adresa se scrie tot aici, ca legătura să poată
+         fi copiată și dată mai departe. */
+      case "admin-go": {
         if (!isAdmin()) return;
-        state.adminTab = btn.dataset.id;
         state.section = "admin";
-        // Shareable, quick-panel-compatible URL for this exact tab.
-        history.replaceState(null, "", `#admin/${ADMIN_SLUG_BY_TAB[state.adminTab] || "prezentare"}`);
+        state.adminTab = btn.dataset.tab || "overview";
+        state.adminLesson = btn.dataset.lectie || null;
+        state.adminExam = btn.dataset.examen || null;
+        // Click pe numele unei lecții deja deschise = strânge-o la loc.
+        state.adminPart = btn.dataset.parte || null;
+        if (state.adminLesson && !state.adminPart) state.adminLesson = null;
+        history.replaceState(null, "", scrieRuta({
+          tab: state.adminTab, lectie: state.adminLesson,
+          parte: state.adminPart, examen: state.adminExam,
+        }));
+        if (state.adminTab === "lessons" && state.adminPart === "tabla") deschideTabla();
         return render();
+      }
+      case "admin-fold": {
+        if (!isAdmin()) return;
+        const cheie = btn.dataset.fold;
+        state.adminFold = { ...state.adminFold, [cheie]: !state.adminFold[cheie] };
+        return render();
+      }
+
+      /* ---- Panoul „Tablă": tabelul de dinainte de import ---- */
+      case "bk-adauga": {
+        const camp = mount.querySelector("#bkText");
+        const text = camp ? camp.value : state.bk.text;
+        const kind = state.bk.kind || materialulLectiei(state.adminLesson)?.feluri[0].kind;
+        const inBanca = new Set((state.bk.banca || []).map((x) => bankCheia(x.body)));
+        const { randuri, sarite } = randuriDinLista(text, { kind, inTabel: state.bk.masa, inBanca });
+        if (!randuri.length && !sarite) { state.bk.nota = "Scrie măcar un cuvânt."; return render(); }
+        state.bk.masa = [...state.bk.masa, ...randuri];
+        state.bk.text = "";
+        state.bk.nota = sarite
+          ? `Am lăsat deoparte ${cuDe(sarite, "rând scris de două ori", "rânduri scrise de două ori")}.`
+          : "";
+        return render();
+      }
+      case "bk-coloana": {
+        const et = btn.dataset.et;
+        const deTrimis = state.bk.masa.filter((r) => !r.gata);
+        const scoatem = deTrimis.length > 0 && deTrimis.every((r) => r.tags.includes(et));
+        state.bk.masa = state.bk.masa.map((r) => r.gata ? r : {
+          ...r, tags: scoatem ? r.tags.filter((t) => t !== et) : [...new Set([...r.tags, et])],
+        });
+        return render();
+      }
+      case "bk-scoate":
+        state.bk.masa = state.bk.masa.filter((_, i) => i !== Number(btn.dataset.i));
+        return render();
+      case "bk-goleste":
+        state.bk.masa = [];
+        state.bk.nota = "";
+        return render();
+      case "bk-importa": {
+        const deTrimis = state.bk.masa.filter((r) => !r.gata && r.tags.length);
+        if (!deTrimis.length) { state.bk.nota = "Bifează întâi la ce exerciții se potrivesc."; return render(); }
+        state.bk.nota = "Se salvează…";
+        render();
+        bankAddRows(state.adminLesson, deTrimis.map((r) => ({
+          body: r.body, kind: r.kind, tags: r.tags, level: r.level,
+        }))).then(async ({ puse, sarite, motiv }) => {
+          if (motiv) { state.bk.nota = motiv; return render(); }
+          const intrate = new Set(puse.map((p) => bankCheia(p.body)));
+          state.bk.masa = state.bk.masa.filter((r) => !intrate.has(bankCheia(r.body)));
+          await incarcaBanca(state.adminLesson);
+          const faraBifa = state.bk.masa.filter((r) => !r.gata && !r.tags.length).length;
+          const vorbe = [`Am pus în bancă ${cuDe(puse.length, "intrare", "intrări")}.`];
+          if (sarite) vorbe.push(`${cuDe(sarite, "era deja acolo", "erau deja acolo")}.`);
+          if (faraBifa) vorbe.push(`În tabel au rămas ${cuDe(faraBifa, "rând fără bifă", "rânduri fără bifă")}.`);
+          state.bk.nota = vorbe.join(" ");
+          render();
+        });
+        return;
+      }
+      case "bk-sterge":
+        bankDeleteItem(btn.dataset.id).then(async (ok) => {
+          if (!ok) { showToast("N-am putut scoate intrarea.", { kind: "error" }); return; }
+          await incarcaBanca(state.adminLesson);
+          render();
+        });
+        return;
       case "gate-toggle": {
         if (!isAdmin()) return;
         const next = !state.gateOff;
@@ -5260,7 +5484,49 @@ export function renderCommunity(basePath = "") {
 
   // Live word counter on the profile status, live searches (forum + admin
   // users) and the admin level simulator.
+  /* Bifele și selectoarele din tabelul băncii. Un singur ascultător, ca la
+     click: câmpurile se nasc și mor la fiecare redesenare, iar unul legat pe
+     fiecare ar trebui legat din nou de fiecare dată. */
+  mount.addEventListener("change", (e) => {
+    const el = e.target;
+    const ce = el.dataset ? el.dataset.action : null;
+    if (!ce || !ce.startsWith("bk-")) return;
+    if (!isAdmin()) return;
+
+    if (ce === "bk-bifa") {
+      const i = Number(el.dataset.i);
+      const et = el.dataset.et;
+      state.bk.masa = state.bk.masa.map((r, k) => k !== i ? r : {
+        ...r, tags: el.checked ? [...new Set([...r.tags, et])] : r.tags.filter((t) => t !== et),
+      });
+      return render();
+    }
+    if (ce === "bk-nivel") {
+      const i = Number(el.dataset.i);
+      const n = Number(el.value) || 2;
+      state.bk.masa = state.bk.masa.map((r, k) => k === i ? { ...r, level: n } : r);
+      return render();
+    }
+    if (ce === "bk-nivel-tot") {
+      const n = Number(el.value);
+      if (!n) return;
+      state.bk.masa = state.bk.masa.map((r) => r.gata ? r : { ...r, level: n });
+      return render();
+    }
+    if (ce === "bk-fel") {
+      // Selectorul e blocat cât timp tabelul are rânduri, deci aici ajungem
+      // doar pe tabel gol. Verificarea rămâne: blocarea e podoabă, nu pază.
+      if (state.bk.masa.length) return render();
+      state.bk.kind = el.value;
+      return render();
+    }
+  });
+
   mount.addEventListener("input", (e) => {
+    /* Lista lipită se ține în stare, dar FĂRĂ redesenare: panoul se reface
+       întreg la orice schimbare, iar o redesenare la fiecare literă ar arunca
+       cursorul afară din câmp. Aici doar ținem minte. */
+    if (e.target.id === "bkText") { state.bk.text = e.target.value; return; }
     if (e.target.id === "cx-feed-search") {
       state.feedQuery = e.target.value;
       state.feedLimit = 6; // new search → first page

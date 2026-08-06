@@ -71,7 +71,6 @@
         <button class="meniu__it" id="saveAsBtn">Salvează ca tablă nouă…</button>
         <button class="meniu__it" id="renameBtn">Redenumește tabla…</button>
         <hr class="meniu__linie">
-        <button class="meniu__it" id="bankBtn" hidden>Banca de material…</button>
         <button class="meniu__it" id="settingsBtn">Simboluri (tastele 1-4)…</button>
         <button class="meniu__it" id="pdfBtn">Tipărește sau salvează PDF</button>
       </div>
@@ -225,51 +224,6 @@
   </div>
   <div class="dlg__jos">
     <button class="btn btn--tare" id="genFa">Generează</button>
-  </div>
-</dialog>
-
-<!-- BANCA DE MATERIAL (numai profesorul) -->
-<dialog class="dlg dlg--lat" id="dlgBank" aria-label="Banca de material">
-  <form method="dialog" class="dlg__cap">
-    <h3>Banca de material</h3>
-    <span class="dlg__imping"></span>
-    <button class="btn" value="inchide">Închide</button>
-  </form>
-  <div class="dlg__corp">
-    <p class="dlg__lamurire">Lipește lista despărțită cu „;". Apoi, în tabel, bifezi
-      la ce exerciții se potrivește fiecare: pe cap de coloană bifezi toată coloana,
-      pe rând bifezi numai cuvântul acela.</p>
-
-    <div class="gen-rand">
-      <label for="bankKind">Fel</label>
-      <select id="bankKind">
-        <option value="cuvant">cuvinte</option>
-        <option value="structura">structuri fonetice</option>
-        <option value="propozitie">propoziții</option>
-      </select>
-    </div>
-
-    <div class="bank-intrare">
-      <textarea id="bankText" rows="2" placeholder="masă; mere; ghiocel; chiar"></textarea>
-      <button class="btn" id="bankAdauga">Adaugă în tabel</button>
-    </div>
-    <p class="dlg__nota" id="bankNota"></p>
-
-    <div class="bank-masa" id="bankMasa" hidden>
-      <div class="bank-masa__sul">
-        <table class="bank-t" id="bankTabel"></table>
-      </div>
-      <div class="bank-masa__jos">
-        <span class="bank-socoteala" id="bankSocoteala"></span>
-        <button class="btn btn--mic" id="bankGoleste">Golește tabelul</button>
-      </div>
-    </div>
-
-    <h4 class="bank-h">Ce e în bancă</h4>
-    <div class="bank-lista" id="bankLista"></div>
-  </div>
-  <div class="dlg__jos">
-    <button class="btn btn--tare" id="bankImporta" disabled>Importă în bancă</button>
   </div>
 </dialog>
 
