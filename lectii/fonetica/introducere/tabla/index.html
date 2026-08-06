@@ -58,6 +58,7 @@
     <div class="tb-dreapta">
       <button class="chip" id="scurtBtn" aria-expanded="false" title="Scurtăturile de tastatură">scurtături</button>
       <button class="chip" id="notesBtn" title="Deschide notițele">notițe</button>
+      <button class="chip" id="genBtn" title="Generează material pentru exercițiu">generator</button>
       <button class="chip chip--stare" id="saveState" hidden>nesalvat</button>
       <button class="btn-save" id="saveBtn" title="Salvează tabla în contul tău (Ctrl+S)">
         <span class="btn-save__icon" aria-hidden="true"></span>
@@ -70,6 +71,7 @@
         <button class="meniu__it" id="saveAsBtn">Salvează ca tablă nouă…</button>
         <button class="meniu__it" id="renameBtn">Redenumește tabla…</button>
         <hr class="meniu__linie">
+        <button class="meniu__it" id="bankBtn" hidden>Banca de material…</button>
         <button class="meniu__it" id="settingsBtn">Simboluri (tastele 1-4)…</button>
         <button class="meniu__it" id="pdfBtn">Tipărește sau salvează PDF</button>
       </div>
@@ -87,11 +89,15 @@
   </div>
 </header>
 
-<!-- Bara „Cerință" – fixă, în afara zonei scrollabile -->
+<!-- TEANCUL DE CERINȚE – fix, în afara zonei scrollabile.
+     O tablă poate ține mai multe exerciții. Cerința celui deschis stă întreagă;
+     cele prin care ai trecut se strâng fiecare pe un rând, deasupra, ca la
+     spoilerele de pe forumuri. Așa vezi tot drumul de azi fără să pierzi din
+     ochi cerința la care lucrezi. -->
 <div class="prompt-wrap">
-  <div class="prompt-bar">
-    <span class="p-label">Cerință</span>
-    <textarea id="promptArea" placeholder="Scrie aici cerința exercițiului… (ex: Despărțiți în silabe și transcrieți fonetic cuvintele de mai jos.)"></textarea>
+  <div class="teanc" id="teanc"></div>
+  <div class="teanc__jos">
+    <button class="teanc__adauga" id="cerintaNoua">+ cerință</button>
   </div>
 </div>
 
@@ -105,6 +111,24 @@
     </div>
   </div>
 </main>
+
+<!-- ZARUL. Stă într-o tăviță a lui, în dreapta jos, ca să aibă de ce se lovi
+     și ca să nu se plimbe peste tot. Fețele sunt șase fețe adevărate, întoarse
+     în spațiu; punctele se desenează din CSS, nu din imagini. -->
+<div class="zar-tavita" id="zarTavita">
+  <div class="zar-tavita__fund"></div>
+  <button class="zar" id="zar" type="button"
+          aria-label="Aruncă zarul: îți dă un tip de exercițiu">
+    <span class="zar__f zar__f--1"><i></i></span>
+    <span class="zar__f zar__f--2"><i></i><i></i></span>
+    <span class="zar__f zar__f--3"><i></i><i></i><i></i></span>
+    <span class="zar__f zar__f--4"><i></i><i></i><i></i><i></i></span>
+    <span class="zar__f zar__f--5"><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="zar__f zar__f--6"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+  </button>
+  <div class="zar-tavita__umbra" id="zarUmbra"></div>
+  <div class="zar-vestire" id="zarVestire" hidden></div>
+</div>
 
 <!-- Panoul de notițe (se deschide/închide DOAR la click) -->
 <aside class="notes" id="notesPanel" aria-hidden="true">
@@ -149,6 +173,96 @@
       <button class="btn-save" value="da" id="dlgDa">Salvează</button>
     </div>
   </form>
+</dialog>
+
+<!-- GENERATORUL -->
+<dialog class="dlg" id="dlgGen" aria-label="Generator de material">
+  <form method="dialog" class="dlg__cap">
+    <h3>Generator</h3>
+    <span class="dlg__imping"></span>
+    <button class="btn" value="inchide">Închide</button>
+  </form>
+  <div class="dlg__corp">
+    <p class="dlg__lamurire" id="genPentru">Alege pentru ce exercițiu vrei material.</p>
+
+    <label class="bif"><input type="checkbox" id="genZar">
+      <span>pentru exercițiul de la zar</span></label>
+    <label class="bif"><input type="checkbox" id="genTema">
+      <span>pentru temă</span></label>
+
+    <div class="gen-rand">
+      <label for="genTip">Tipul exercițiului</label>
+      <select id="genTip">
+        <option value="1">1 · litere și sunete</option>
+        <option value="2">2 · grupuri de sunete</option>
+        <option value="3">3 · despărțire în silabe</option>
+        <option value="4">4 · valoarea lui i</option>
+        <option value="5">5 · structuri fonetice</option>
+        <option value="6">6 · transcrierea unei propoziții</option>
+      </select>
+    </div>
+
+    <div class="gen-rand">
+      <label for="genCate">Câte</label>
+      <input type="number" id="genCate" min="1" max="30" value="8">
+      <span class="gen-rand__ce" id="genCe">cuvinte</span>
+    </div>
+
+    <div class="gen-rand">
+      <label for="genNivel">Dificultate</label>
+      <select id="genNivel">
+        <option value="">oricare</option>
+        <option value="1">ușor</option>
+        <option value="2" selected>mijlociu</option>
+        <option value="3">greu</option>
+      </select>
+    </div>
+
+    <label class="bif"><input type="checkbox" id="genRepeta">
+      <span>lasă-mă să primesc și material pe care l-am mai avut azi</span></label>
+
+    <p class="dlg__nota" id="genNota"></p>
+  </div>
+  <div class="dlg__jos">
+    <button class="btn btn--tare" id="genFa">Generează</button>
+  </div>
+</dialog>
+
+<!-- BANCA DE MATERIAL (numai profesorul) -->
+<dialog class="dlg dlg--lat" id="dlgBank" aria-label="Banca de material">
+  <form method="dialog" class="dlg__cap">
+    <h3>Banca de material</h3>
+    <span class="dlg__imping"></span>
+    <button class="btn" value="inchide">Închide</button>
+  </form>
+  <div class="dlg__corp">
+    <p class="dlg__lamurire">Scrie câte unul pe rând. Bifează la ce exerciții se potrivește.</p>
+    <textarea id="bankText" rows="4" placeholder="masă&#10;mere&#10;chiar"></textarea>
+
+    <div class="gen-rand">
+      <label for="bankKind">Fel</label>
+      <select id="bankKind">
+        <option value="cuvant">cuvinte</option>
+        <option value="structura">structuri fonetice</option>
+        <option value="propozitie">propoziții</option>
+      </select>
+      <label for="bankNivel">Dificultate</label>
+      <select id="bankNivel">
+        <option value="1">ușor</option>
+        <option value="2" selected>mijlociu</option>
+        <option value="3">greu</option>
+      </select>
+    </div>
+
+    <div class="bank-etichete" id="bankEtichete"></div>
+    <p class="dlg__nota" id="bankNota"></p>
+
+    <h4 class="bank-h">Ce e în bancă</h4>
+    <div class="bank-lista" id="bankLista"></div>
+  </div>
+  <div class="dlg__jos">
+    <button class="btn btn--tare" id="bankAdauga">Adaugă în bancă</button>
+  </div>
 </dialog>
 
 <!-- Șablon pentru un rând de lucru -->

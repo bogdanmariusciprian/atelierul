@@ -992,49 +992,216 @@ sheet.addEventListener('blur', (e) => {
 /* ================= Salvare / încărcare / ștergere ================= */
 
 /* adună tot ce a scris userul (cerință, notițe, simboluri, rânduri) */
+/* ============================================================
+   EXERCIȚIILE UNEI TABLE
+
+   O tablă ține mai multe exerciții. Fiecare are cerința lui și rândurile lui.
+
+   HOTĂRÂREA CARE ȚINE TOT: în pagină stau DOAR rândurile exercițiului deschis.
+   Așa tot codul de dinainte („rândurile din `sheet`") rămâne adevărat cuvânt cu
+   cuvânt: adăugarea de rânduri, numerotarea, mersul cu Tab, culesul la salvare.
+   Schimbarea exercițiului nu e altceva decât „pune deoparte rândurile astea,
+   scoate-le pe celelalte".
+   ============================================================ */
+let exercitii = [];
+let deschis = 0;
+
+const elTeanc = document.getElementById('teanc');
+
+function exercitiuNou({ cerinta = '', sursa = 'mana', fata = null, tema = false } = {}) {
+  return { id: 'e' + Date.now() + Math.random().toString(36).slice(2, 6),
+           cerinta, sursa, fata, tema, randuri: [] };
+}
+const exercitiulDeschis = () => exercitii[deschis] || null;
+
+/** Rândurile din pagină, în formă de date. */
+function culegeRanduri() {
+  return Array.from(sheet.querySelectorAll('.row')).map(row => ({
+    word:  (row.querySelector('.word')  || {}).innerHTML || '',
+    syll:  (row.querySelector('.syll')  || {}).innerHTML || '',
+    trans: (row.querySelector('.trans') || {}).innerHTML || '',
+    types: (row.querySelector('.types') || {}).textContent || '',
+    extra: Array.from(row.querySelectorAll('.field.extra')).map(e => e.innerHTML)
+  }));
+}
+
+/** Datele înapoi în pagină. Un rând gol dacă exercițiul n-are niciunul: o
+ *  tablă fără nicio căsuță de scris n-ar spune elevului ce să facă. */
+function aseazaRanduri(randuri) {
+  sheet.innerHTML = '';
+  const lista = (randuri && randuri.length) ? randuri : [null];
+  lista.forEach(r => {
+    const row = createRow();
+    sheet.appendChild(row);
+    if (!r) return;
+    row.querySelector('.word').innerHTML  = r.word  || '';
+    row.querySelector('.syll').innerHTML  = r.syll  || '';
+    row.querySelector('.trans').innerHTML = r.trans || '';
+    imbracaSimboluri(row.querySelector('.trans'));   // tablele vechi: simbolurile intră în cutie
+    row.querySelector('.types').textContent = r.types || '';
+    (r.extra || []).forEach(html => {
+      const arrow = document.createElement('span'); arrow.className = 'arrow'; arrow.textContent = '→';
+      const f = document.createElement('div');
+      f.className = 'field extra'; f.setAttribute('contenteditable', 'true'); f.setAttribute('data-ph', 'etapă');
+      f.innerHTML = html;
+      row.appendChild(arrow); row.appendChild(f);
+    });
+  });
+  renumber();
+}
+
+/** Pune deoparte ce e pe ecran, în exercițiul de care ține. */
+function salveazaDeschisul() {
+  const ex = exercitiulDeschis();
+  if (ex) ex.randuri = culegeRanduri();
+}
+
+/** Deschide alt exercițiu. */
+function deschideExercitiul(i) {
+  if (i === deschis || !exercitii[i]) return;
+  salveazaDeschisul();
+  deschis = i;
+  aseazaRanduri(exercitii[deschis].randuri);
+  deseneazaTeancul();
+}
+
+/* Teancul: cel deschis întreg, celelalte strânse pe un rând.
+   Redesenăm tot, dar NU cât timp scrii: căsuța de text a cerinței deschise
+   și-ar pierde cursorul la fiecare tastă. De-aia scrisul doar ține minte. */
+function deseneazaTeancul() {
+  if (!elTeanc) return;
+  elTeanc.innerHTML = exercitii.map((ex, i) => {
+    const nr = '<span class="cer__nr">' + (i + 1) + '</span>';
+    const semne =
+      (ex.sursa === 'zar' ? '<span class="cer__semn">zar ' + ex.fata + '</span>' : '') +
+      (ex.tema ? '<span class="cer__semn cer__tema">temă</span>' : '');
+    if (i !== deschis) {
+      return '<div class="cer e-stransa" data-ex="' + i + '" role="button" tabindex="0">' +
+        nr + '<span class="cer__text">' + (escapaText(ex.cerinta) || 'fără cerință') + '</span>' +
+        semne + '</div>';
+    }
+    // Cea de la zar nu se scrie: e ce ți-a picat, nu ce vrei tu.
+    const corp = ex.sursa === 'zar'
+      ? '<div class="cer__data">' + escapaText(ex.cerinta) + '</div>'
+      : '<textarea data-cerinta="' + i + '" placeholder="Scrie aici cerința exercițiului…">' +
+        escapaText(ex.cerinta) + '</textarea>';
+    return '<div class="cer e-deschisa" data-ex="' + i + '">' +
+      '<span class="cer__eticheta">Cerință</span>' + nr +
+      '<div class="cer__text">' + corp + '</div>' + semne +
+      '<button class="cer__x" data-sterge="' + i + '" title="Șterge exercițiul" aria-label="Șterge exercițiul"></button>' +
+      '</div>';
+  }).join('');
+}
+
+function escapaText(t) {
+  return String(t == null ? '' : t)
+    .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+elTeanc && elTeanc.addEventListener('click', async (e) => {
+  const x = e.target.closest('[data-sterge]');
+  if (x) {
+    const i = Number(x.dataset.sterge);
+    if (exercitii.length === 1) {
+      if (!await intreaba({ titlu: 'Ștergi exercițiul?',
+        text: 'E singurul de pe tablă. Rămâne o cerință goală și un rând gol.',
+        buton: 'Șterge' })) return;
+      exercitii = [exercitiuNou()];
+      deschis = 0;
+    } else {
+      if (!await intreaba({ titlu: 'Ștergi exercițiul?',
+        text: 'Se duc și rândurile lui. Celelalte exerciții rămân.',
+        buton: 'Șterge' })) return;
+      exercitii.splice(i, 1);
+      deschis = Math.min(deschis > i ? deschis - 1 : deschis, exercitii.length - 1);
+    }
+    aseazaRanduri(exercitii[deschis].randuri);
+    deseneazaTeancul();
+    murdareste(); scheduleSave();
+    return;
+  }
+  const c = e.target.closest('.cer.e-stransa');
+  if (c) deschideExercitiul(Number(c.dataset.ex));
+});
+
+elTeanc && elTeanc.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const c = e.target.closest('.cer.e-stransa');
+  if (!c) return;
+  e.preventDefault();
+  deschideExercitiul(Number(c.dataset.ex));
+});
+
+/* Scrisul în cerință NU redesenează teancul: cursorul ar sări din căsuță la
+   fiecare literă. Ținem minte, atât; teancul se reface când se schimbă ceva
+   care chiar îl privește. */
+elTeanc && elTeanc.addEventListener('input', (e) => {
+  const t = e.target.closest('[data-cerinta]');
+  if (!t) return;
+  const ex = exercitii[Number(t.dataset.cerinta)];
+  if (ex) ex.cerinta = t.value;
+  murdareste(); scheduleSave();
+});
+
+/** Adaugă un exercițiu și îl deschide. */
+function adaugaExercitiu(cfg) {
+  salveazaDeschisul();
+  exercitii.push(exercitiuNou(cfg));
+  deschis = exercitii.length - 1;
+  aseazaRanduri([]);
+  deseneazaTeancul();
+  murdareste(); scheduleSave();
+  return exercitii[deschis];
+}
+
+const elCerintaNoua = document.getElementById('cerintaNoua');
+elCerintaNoua && elCerintaNoua.addEventListener('click', () => {
+  adaugaExercitiu({});
+  const t = elTeanc.querySelector('.cer.e-deschisa textarea');
+  if (t) t.focus();
+});
+
 function collectState() {
+  salveazaDeschisul();
   return {
-    prompt: document.getElementById('promptArea').value,
     notes:  document.getElementById('notesArea').value,
     symbols: symbols,
-    rows: Array.from(sheet.querySelectorAll('.row')).map(row => ({
-      word:  (row.querySelector('.word')  || {}).innerHTML || '',
-      syll:  (row.querySelector('.syll')  || {}).innerHTML || '',
-      trans: (row.querySelector('.trans') || {}).innerHTML || '',
-      types: (row.querySelector('.types') || {}).textContent || '',
-      extra: Array.from(row.querySelectorAll('.field.extra')).map(e => e.innerHTML)
-    }))
+    exercitii: exercitii,
+    deschis: deschis,
   };
 }
 
 /* reconstruiește tabla din starea salvată */
 function applyState(state) {
   if (!state) return;
-  document.getElementById('promptArea').value = state.prompt || '';
   if (state.notes != null) document.getElementById('notesArea').value = state.notes;
   if (state.symbols && state.symbols['1']) { symbols = state.symbols; saveSymbols(); renderSymbolButtons(); renderSettings(); }
 
-  sheet.innerHTML = '';
-  const rows = (state.rows && state.rows.length) ? state.rows : [null];
-  rows.forEach(r => {
-    const row = createRow();
-    sheet.appendChild(row);
-    if (r) {
-      row.querySelector('.word').innerHTML   = r.word  || '';
-      row.querySelector('.syll').innerHTML   = r.syll  || '';
-      row.querySelector('.trans').innerHTML  = r.trans || '';
-      imbracaSimboluri(row.querySelector('.trans'));   // tablele vechi: simbolurile intră în cutie
-      row.querySelector('.types').textContent = r.types || '';
-      (r.extra || []).forEach(html => {
-        const arrow = document.createElement('span'); arrow.className = 'arrow'; arrow.textContent = '→';
-        const f = document.createElement('div');
-        f.className = 'field extra'; f.setAttribute('contenteditable', 'true'); f.setAttribute('data-ph', 'etapă');
-        f.innerHTML = html;
-        row.appendChild(arrow); row.appendChild(f);
-      });
-    }
-  });
-  renumber();
+  exercitii = deslusesteExercitiile(state);
+  deschis = Math.min(Math.max(0, state.deschis | 0), exercitii.length - 1);
+  aseazaRanduri(exercitii[deschis].randuri);
+  deseneazaTeancul();
+}
+
+/** Exercițiile unei table, oricât de veche ar fi ea.
+ *
+ *  Tablele scrise înainte de teanc au o singură cerință (`prompt`) și rândurile
+ *  ei (`rows`). Se deschid ca tablă cu un singur exercițiu, cu cerința aceea:
+ *  nu se pierde nimic și nu i se cere nimănui să mute ceva cu mâna. */
+function deslusesteExercitiile(state) {
+  if (Array.isArray(state.exercitii) && state.exercitii.length) {
+    return state.exercitii.map((e) => ({
+      id: e.id || ('e' + Math.random().toString(36).slice(2, 8)),
+      cerinta: e.cerinta || '',
+      sursa: e.sursa === 'zar' ? 'zar' : 'mana',
+      fata: e.fata || null,
+      tema: !!e.tema,
+      randuri: Array.isArray(e.randuri) ? e.randuri : [],
+    }));
+  }
+  const vechi = exercitiuNou({ cerinta: state.prompt || '' });
+  vechi.randuri = Array.isArray(state.rows) ? state.rows : [];
+  return [vechi];
 }
 
 /* ================= SALVAREA =================
@@ -1375,25 +1542,348 @@ document.getElementById('pdfBtn').addEventListener('click', () => { inchideMeniu
 document.getElementById('clearBtn').addEventListener('click', async () => {
   if (!await intreaba({
         titlu: 'Ștergi tot?',
-        text: 'Se golesc cerința și toate rândurile. Notițele și simbolurile rămân.',
+        text: 'Se duc toate exercițiile, cu cerințele și rândurile lor. Notițele și simbolurile rămân.',
         buton: 'Șterge tot',
       })) return;
-  document.getElementById('promptArea').value = '';
-  sheet.innerHTML = '';
-  addRowAfter(null);
-  renumber();
+  exercitii = [exercitiuNou()];
+  deschis = 0;
+  aseazaRanduri([]);
+  deseneazaTeancul();
   scheduleSave();
   murdareste();
 });
 
-/* ---------- Pornire: restaurează lucrul salvat, sau un rând gol ---------- */
+/* ---------- Pornire: restaurează lucrul salvat, sau o tablă goală ----------
+   Recunoaștem și forma veche (o singură cerință cu rândurile ei) și pe cea nouă
+   (mai multe exerciții): `applyState` le deslușește pe amândouă. */
 const savedState = loadStateLocal();
-if (savedState && savedState.rows && savedState.rows.length) {
+const areCeva = savedState && ((savedState.rows && savedState.rows.length) ||
+                              (savedState.exercitii && savedState.exercitii.length));
+if (areCeva) {
   applyState(savedState);
 } else {
-  addRowAfter(null);
+  exercitii = [exercitiuNou()];
+  deschis = 0;
+  aseazaRanduri([]);
+  deseneazaTeancul();
 }
-renumber();
 aratăStarea();
 const firstField = sheet.querySelector('.field');
 if (firstField) placeCaret(firstField, true);
+
+/* ============================================================
+   ZARUL, GENERATORUL ȘI BANCA
+
+   Trei lucruri legate între ele: zarul spune CE fel de exercițiu, banca ține
+   materialul, generatorul le pune la un loc și umple tabla.
+   ============================================================ */
+import { aruncare, pas, stat, fataUrmatoare, asezare, INTOARCERI } from './zar-fizica.js';
+import { ETICHETE, TOATE_ETICHETELE, listItems, listAll, addItems, deleteItem }
+  from '../../shared/scripts/bank-repo.js';
+import { isAdmin } from '../../shared/scripts/session.js';
+
+/* Cele șase cerințe, una pe față. Textul lor e al profesorului, nu al meu:
+   se schimbă aici, într-un singur loc, și se schimbă peste tot. */
+const CERINTE = {
+  1: 'Precizează numărul de litere și de sunete din cuvintele date.',
+  2: 'Extrage grupurile de sunete din cuvintele date.',
+  3: 'Desparte în silabe cuvintele date.',
+  4: 'Stabilește valoarea fonetică a lui [i] în cuvintele date.',
+  5: 'Oferă cuvinte pentru structurile fonetice date.',
+  6: 'Transcrie fonetic propoziția dată.',
+};
+
+/* ---------- Zarul ---------- */
+const elTavita  = document.getElementById('zarTavita');
+const elZar     = document.getElementById('zar');
+const elUmbra   = document.getElementById('zarUmbra');
+const elVestire = document.getElementById('zarVestire');
+
+let ultimaFata = null;      // ca să nu iasă de două ori la rând aceeași
+let seRostogoleste = false;
+
+/** Cine a cerut mai puțină mișcare primește numărul, nu rostogolirea. */
+const faraMiscare = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function asazaZarul(x, y, h, rx, ry) {
+  if (!elZar) return;
+  elZar.style.transform =
+    `translate3d(${x}px, ${y}px, ${h}px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+  if (elUmbra) {
+    // Umbra rămâne pe fundul tăviței și se strânge cu cât zarul e mai sus:
+    // așa se citește înălțimea săriturii, care altfel nu s-ar vedea deloc.
+    const s = Math.max(0.45, 1 - h / 90);
+    elUmbra.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    elUmbra.style.opacity = String(Math.max(0.08, 0.3 - h / 260));
+  }
+}
+
+function vesteste(fata) {
+  if (!elVestire) return;
+  elVestire.hidden = false;
+  elVestire.innerHTML = '<b>Ți-a picat ' + fata + '</b>' + escapaText(CERINTE[fata]);
+  // Un cadru de așteptare, ca trecerea să pornească de la starea ascunsă:
+  // pusă în aceeași clipă cu `hidden = false`, nu s-ar vedea deloc.
+  requestAnimationFrame(() => elVestire.classList.add('e-vazuta'));
+  clearTimeout(vesteste._t);
+  vesteste._t = setTimeout(() => {
+    elVestire.classList.remove('e-vazuta');
+    setTimeout(() => { elVestire.hidden = true; }, 220);
+  }, 4200);
+}
+
+function aruncaZarul() {
+  if (seRostogoleste || !elZar || !elTavita) return;
+  const fata = fataUrmatoare(ultimaFata);
+  ultimaFata = fata;
+
+  if (faraMiscare()) {
+    const t = INTOARCERI[fata];
+    asazaZarul(0, 0, 0, t.rx, t.ry);
+    gataAruncarea(fata);
+    return;
+  }
+
+  seRostogoleste = true;
+  elZar.style.transition = 'none';
+  const latime = elTavita.clientWidth, inaltime = elTavita.clientHeight;
+  const raza = elZar.offsetWidth / 2 + 4;      // 4px de aer față de perete
+  const st = aruncare({ latime, inaltime, raza });
+
+  let trecut = 0;
+  const PAS = 1 / 120;                          // pași mărunți, ca loviturile
+  let ramas = 0;                                // de perete să nu fie sărite
+  const porni = performance.now();
+  let ultimul = porni;
+
+  function cadru(acum) {
+    const dt = Math.min(0.05, (acum - ultimul) / 1000);
+    ultimul = acum;
+    ramas += dt;
+    while (ramas >= PAS) { pas(st, PAS); ramas -= PAS; }
+    trecut = acum - porni;
+    asazaZarul(st.x - latime / 2, st.y - inaltime / 2, st.h, st.rx, st.ry);
+
+    // Se oprește singur, dar nu-l lăsăm să se legene la nesfârșit: după trei
+    // secunde îl așezăm oricum, ca elevul să nu aștepte după un zar îndărătnic.
+    if (!stat(st) && trecut < 3000) { requestAnimationFrame(cadru); return; }
+
+    const fin = asezare(st, fata, 1);
+    elZar.style.transition = 'transform .42s cubic-bezier(.22,.9,.3,1)';
+    asazaZarul(st.x - latime / 2, st.y - inaltime / 2, 0, fin.rx, fin.ry);
+    setTimeout(() => { elZar.style.transition = 'none'; seRostogoleste = false; gataAruncarea(fata); }, 430);
+  }
+  requestAnimationFrame(cadru);
+}
+
+/** Ce se întâmplă după ce zarul s-a oprit: se vestește și se face exercițiul. */
+function gataAruncarea(fata) {
+  vesteste(fata);
+  adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'zar', fata });
+}
+
+elZar && elZar.addEventListener('click', aruncaZarul);
+
+/* ---------- Generatorul ---------- */
+const dlgGen = document.getElementById('dlgGen');
+const elGenTip = document.getElementById('genTip');
+const elGenZar = document.getElementById('genZar');
+const elGenTema = document.getElementById('genTema');
+const elGenCate = document.getElementById('genCate');
+const elGenCe = document.getElementById('genCe');
+const elGenNivel = document.getElementById('genNivel');
+const elGenRepeta = document.getElementById('genRepeta');
+const elGenNota = document.getElementById('genNota');
+const elGenPentru = document.getElementById('genPentru');
+
+/* Ce a primit elevul CÂT E PE TABLĂ. Se golește la reîncărcare, deci „nu se
+   repetă în aceeași ședere" înseamnă exact ce a cerut Marius: în ședința asta
+   nu, mâine da. Ține minte materialul, nu rândurile: același cuvânt cerut la
+   două exerciții deosebite tot repetare e. */
+const datAzi = new Set();
+
+const NUME_FEL = { cuvant: 'cuvinte', structura: 'structuri fonetice', propozitie: 'propoziții' };
+
+function deschideFereastra(d) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+
+/** Ultimul exercițiu venit de la zar, dacă există. */
+function ultimulDeLaZar() {
+  for (let i = exercitii.length - 1; i >= 0; i--) if (exercitii[i].sursa === 'zar') return i;
+  return -1;
+}
+
+function potrivesteFereastraGen() {
+  const iZar = ultimulDeLaZar();
+  if (elGenZar) elGenZar.disabled = iZar < 0;
+  const spreZar = elGenZar && elGenZar.checked && iZar >= 0;
+  const tinta = spreZar ? iZar : deschis;
+  const ex = exercitii[tinta];
+  // Tipul se ia de la exercițiu când exercițiul îl știe (a venit de la zar), și
+  // atunci nu se poate schimba: altfel ai cere cuvinte pentru o cerință care
+  // vorbește despre propoziții.
+  if (ex && ex.sursa === 'zar') {
+    elGenTip.value = String(ex.fata);
+    elGenTip.disabled = true;
+  } else {
+    elGenTip.disabled = false;
+  }
+  if (elGenTema) elGenTema.checked = !!(ex && ex.tema);
+  const cfg = ETICHETE[Number(elGenTip.value)] || ETICHETE[1];
+  if (elGenCe) elGenCe.textContent = NUME_FEL[cfg.kind];
+  if (elGenPentru) {
+    elGenPentru.textContent = ex
+      ? 'Materialul intră în exercițiul ' + (tinta + 1) + (ex.sursa === 'zar' ? ' (de la zar).' : '.')
+      : 'Nu văd niciun exercițiu.';
+  }
+  if (elGenCate) elGenCate.value = cfg.kind === 'propozitie' ? '1' : elGenCate.value;
+}
+
+document.getElementById('genBtn')?.addEventListener('click', () => {
+  if (elGenNota) elGenNota.textContent = '';
+  potrivesteFereastraGen();
+  deschideFereastra(dlgGen);
+});
+elGenZar && elGenZar.addEventListener('change', potrivesteFereastraGen);
+elGenTip && elGenTip.addEventListener('change', potrivesteFereastraGen);
+
+/** Alege la întâmplare, ocolind ce s-a mai dat, dacă elevul n-a cerut altfel. */
+function alege(lista, cate, cuRepetare) {
+  const libere = cuRepetare ? lista.slice() : lista.filter((x) => !datAzi.has(x.id));
+  // Dacă s-au terminat cele nemaivăzute, luăm de la capăt din tot ce e: mai
+  // bine repetare decât „n-am ce să-ți dau".
+  const din = libere.length ? libere : lista.slice();
+  const ales = [];
+  const copie = din.slice();
+  while (ales.length < cate && copie.length) {
+    ales.push(copie.splice(Math.floor(Math.random() * copie.length), 1)[0]);
+  }
+  ales.forEach((x) => datAzi.add(x.id));
+  return ales;
+}
+
+document.getElementById('genFa')?.addEventListener('click', async () => {
+  const iZar = ultimulDeLaZar();
+  const spreZar = elGenZar && elGenZar.checked && iZar >= 0;
+  const tinta = spreZar ? iZar : deschis;
+  const ex = exercitii[tinta];
+  if (!ex) return;
+
+  const fata = Number(elGenTip.value) || 1;
+  const cfg = ETICHETE[fata];
+  const cate = Math.max(1, Math.min(30, Number(elGenCate.value) || 1));
+  const nivel = elGenNivel.value ? Number(elGenNivel.value) : null;
+
+  elGenNota.textContent = 'Caut în bancă…';
+  const tot = await listItems(LECTIE, fata, { level: nivel });
+  if (!tot.length) {
+    elGenNota.textContent = 'Banca n-are încă ' + NUME_FEL[cfg.kind] +
+      ' pentru exercițiul ăsta' + (nivel ? ' la dificultatea aleasă' : '') + '.';
+    return;
+  }
+  const alese = alege(tot, cate, elGenRepeta && elGenRepeta.checked);
+  const texte = alese.map((x) => x.body);
+
+  // CERINȚA primește materialul, ca elevul să-l vadă și când derulează.
+  ex.cerinta = CERINTE[fata] + '\n' + texte.join(', ');
+  ex.tema = !!(elGenTema && elGenTema.checked);
+  if (ex.sursa !== 'zar') ex.fata = fata;
+
+  // RÂNDURILE, după felul materialului:
+  //  · cuvinte     → un rând pe cuvânt, cu cuvântul pus la locul lui;
+  //  · structuri   → rânduri GOALE: structura e cerința, cuvintele le dă elevul;
+  //  · propoziții  → un rând, cu propoziția în prima căsuță, de transcris.
+  let randuri;
+  if (cfg.kind === 'cuvant')      randuri = texte.map((t) => ({ word: escapaText(t) }));
+  else if (cfg.kind === 'structura') randuri = texte.map(() => ({}));
+  else                            randuri = texte.map((t) => ({ word: escapaText(t) }));
+  ex.randuri = randuri;
+
+  if (tinta !== deschis) { salveazaDeschisul(); deschis = tinta; }
+  aseazaRanduri(ex.randuri);
+  deseneazaTeancul();
+  murdareste(); scheduleSave();
+  elGenNota.textContent = '';
+  dlgGen.close ? dlgGen.close() : dlgGen.removeAttribute('open');
+});
+
+/* ---------- Banca de material (numai profesorul) ---------- */
+const dlgBank = document.getElementById('dlgBank');
+const elBankBtn = document.getElementById('bankBtn');
+const elBankText = document.getElementById('bankText');
+const elBankKind = document.getElementById('bankKind');
+const elBankNivel = document.getElementById('bankNivel');
+const elBankEtichete = document.getElementById('bankEtichete');
+const elBankLista = document.getElementById('bankLista');
+const elBankNota = document.getElementById('bankNota');
+
+let etichetaBifata = new Set();
+
+/* Butonul se arată abia după ce știm cine e: rolul vine din sesiune, iar
+   sesiunea se așază după ce pagina a pornit. */
+function potrivesteBanca() {
+  if (elBankBtn) elBankBtn.hidden = !isAdmin();
+}
+potrivesteBanca();
+setTimeout(potrivesteBanca, 1200);
+
+/** Etichetele care au înțeles pentru felul ales: n-are rost să bifezi
+ *  „propoziții" la un cuvânt. */
+function deseneazaEtichetele() {
+  if (!elBankEtichete) return;
+  const fel = elBankKind.value;
+  elBankEtichete.innerHTML = TOATE_ETICHETELE
+    .filter((e) => e.kind === fel)
+    .map((e) => '<button type="button" class="bank-eticheta' +
+      (etichetaBifata.has(e.eticheta) ? ' e-bifata' : '') +
+      '" data-et="' + e.eticheta + '">' + escapaText(e.nume) + '</button>').join('');
+}
+
+elBankKind && elBankKind.addEventListener('change', () => { etichetaBifata.clear(); deseneazaEtichetele(); });
+elBankEtichete && elBankEtichete.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-et]');
+  if (!b) return;
+  const et = b.dataset.et;
+  if (etichetaBifata.has(et)) etichetaBifata.delete(et); else etichetaBifata.add(et);
+  deseneazaEtichetele();
+});
+
+async function deseneazaBanca() {
+  if (!elBankLista) return;
+  elBankLista.textContent = 'Se încarcă…';
+  const tot = await listAll(LECTIE);
+  if (!tot.length) { elBankLista.textContent = 'Banca e goală încă.'; return; }
+  elBankLista.innerHTML = tot.map((it) =>
+    '<span class="bank-it">' + escapaText(it.body) +
+    '<span class="bank-it__n">' + escapaText((it.tags || []).join(' · ')) + ' · ' + it.level + '</span>' +
+    '<button class="bank-it__x" data-sterg="' + it.id + '" title="Scoate din bancă" aria-label="Scoate din bancă">×</button>' +
+    '</span>').join('');
+}
+
+elBankLista && elBankLista.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-sterg]');
+  if (!b) return;
+  if (await deleteItem(b.dataset.sterg)) deseneazaBanca();
+});
+
+elBankBtn && elBankBtn.addEventListener('click', () => {
+  if (elBankNota) elBankNota.textContent = '';
+  deseneazaEtichetele();
+  deseneazaBanca();
+  deschideFereastra(dlgBank);
+});
+
+document.getElementById('bankAdauga')?.addEventListener('click', async () => {
+  const bucati = String(elBankText.value || '').split('\n').map((x) => x.trim()).filter(Boolean);
+  if (!bucati.length) { elBankNota.textContent = 'Scrie măcar un rând.'; return; }
+  if (!etichetaBifata.size) { elBankNota.textContent = 'Bifează la ce exerciții se potrivește.'; return; }
+  elBankNota.textContent = 'Se adaugă…';
+  const { rand, motiv } = await addItems(
+    LECTIE, elBankKind.value, bucati, [...etichetaBifata], Number(elBankNivel.value) || 2);
+  if (motiv) { elBankNota.textContent = motiv; return; }
+  elBankNota.textContent = rand.length
+    ? 'Am adăugat ' + rand.length + (rand.length === 1 ? ' item.' : ' itemi.')
+    : 'Toate erau deja în bancă.';
+  elBankText.value = '';
+  deseneazaBanca();
+});

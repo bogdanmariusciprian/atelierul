@@ -510,23 +510,80 @@
     flex: 0 0 auto;
     padding: 16px 20px 4px;
   }
-  .prompt-bar {
+  /* ============ TEANCUL DE CERINȚE ============
+     O tablă ține mai multe exerciții. Cerința celui deschis stă întreagă; cele
+     prin care ai trecut se strâng fiecare pe un rând, deasupra ei, ca la
+     spoilerele de pe forumuri: le vezi pe toate, dar nu-ți fură locul.
+
+     Teancul e mărginit în înălțime și derulează pe dinăuntru: la zece exerciții
+     ar fi crescut peste jumătate de ecran și n-ar mai fi rămas loc de scris. */
+  .teanc {
     max-width: 1080px; margin: 0 auto;
+    max-height: 42vh; overflow: auto;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .cer {
     background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-    box-shadow: var(--shadow); padding: 10px 16px;
-    display: flex; align-items: flex-start; gap: 12px;
+    box-shadow: var(--shadow);
   }
-  .prompt-bar .p-label {
+  /* STRÂNSĂ: un singur rând, text mic, tăiat la capăt. */
+  .cer.e-stransa {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer;
+    font-size: 12.5px; color: var(--muted);
+    box-shadow: none; background: #fafbfe;
+  }
+  .cer.e-stransa:hover { background: var(--accent-soft); color: var(--ink); }
+  .cer__nr {
+    flex: none; min-width: 20px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px; background: var(--line); color: var(--ink);
+    font-size: 11px; font-weight: 700;
+  }
+  .cer.e-deschisa .cer__nr { background: var(--accent); color: #fff; }
+  .cer__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* DESCHISĂ: cerința întreagă, cu loc de scris dacă e a ta. */
+  .cer.e-deschisa { padding: 10px 16px; display: flex; align-items: flex-start; gap: 12px; }
+  .cer.e-deschisa .cer__text { white-space: normal; overflow: visible; }
+  .cer__eticheta {
     font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
-    padding-top: 13px; white-space: nowrap; user-select: none;
+    padding-top: 4px; white-space: nowrap; user-select: none;
   }
-  .prompt-bar textarea {
-    flex: 1; border: none; outline: none; resize: vertical;
+  .cer textarea {
+    width: 100%; border: none; outline: none; resize: vertical;
     font-family: var(--ui); font-size: 15px; line-height: 1.5;
     min-height: 44px; max-height: 30vh;
     background: transparent; color: var(--ink); padding: 6px 0;
   }
-  .prompt-bar textarea::placeholder { color: #b7bfce; }
+  .cer textarea::placeholder { color: #b7bfce; }
+  /* Cerința venită de la zar nu se scrie: e ce ți-a picat, nu ce vrei tu. */
+  .cer__data { font-size: 15px; line-height: 1.5; padding: 6px 0; }
+  .cer__semn {
+    flex: none; display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .cer__tema { background: #fef3c7; color: #92400e; }
+  .cer__x {
+    flex: none; position: relative; width: 22px; height: 22px;
+    border: none; border-radius: 6px; background: transparent; cursor: pointer;
+    opacity: 0; transition: opacity .12s;
+  }
+  .cer:hover .cer__x { opacity: 1; }
+  .cer__x:hover { background: #fdecea; }
+  .cer__x::before, .cer__x::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    width: 11px; height: 1.6px; border-radius: 2px; background: #a4271f;
+  }
+  .cer__x::before { transform: translate(-50%,-50%) rotate(45deg); }
+  .cer__x::after  { transform: translate(-50%,-50%) rotate(-45deg); }
+
+  .teanc__jos { max-width: 1080px; margin: 4px auto 0; }
+  .teanc__adauga {
+    border: 1px dashed var(--line); border-radius: 10px; background: transparent;
+    color: var(--muted); font: inherit; font-size: 12.5px; padding: 4px 12px; cursor: pointer;
+  }
+  .teanc__adauga:hover { border-color: var(--accent); color: var(--accent); }
 
   @media (max-width: 640px) {
     .brand { width: 100%; }
@@ -665,3 +722,162 @@
   line-height: 1.5;
 }
 .dlg__eroare[hidden] { display: none; }
+
+
+/* ============ ZARUL ============
+   Stă într-o tăviță a lui, în dreapta jos. Tăvița nu e podoabă: zarul are de
+   ce se lovi, iar rostogolirea rămâne într-un loc știut, în loc să traverseze
+   tabla. Cele șase fețe sunt fețe adevărate, întoarse în spațiu; punctele se
+   desenează din CSS, nu din poze, ca să rămână curate la orice mărime. */
+.zar-tavita {
+  position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  width: 150px; height: 150px;
+  perspective: 700px;
+  user-select: none;
+}
+.zar-tavita__fund {
+  position: absolute; inset: 0; border-radius: 18px;
+  background: radial-gradient(circle at 35% 30%, #f8fafd, #e6ebf5 70%);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow), inset 0 2px 10px rgba(31, 36, 48, .08);
+}
+/* Umbra e a ei, nu a zarului: se mișcă odată cu el pe fundul tăviței și se
+   strânge când zarul sare, ca să se citească înălțimea săriturii. */
+.zar-tavita__umbra {
+  position: absolute; left: 50%; top: 50%; width: 46px; height: 14px;
+  margin: -7px 0 0 -23px; border-radius: 50%;
+  background: rgba(31, 36, 48, .22); filter: blur(4px);
+  pointer-events: none; will-change: transform, opacity;
+}
+.zar {
+  position: absolute; left: 50%; top: 50%; width: 46px; height: 46px;
+  margin: -23px 0 0 -23px; padding: 0; border: 0; background: none;
+  transform-style: preserve-3d; cursor: pointer;
+  will-change: transform;
+}
+.zar:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 8px; }
+.zar__f {
+  position: absolute; inset: 0; border-radius: 8px;
+  background: linear-gradient(150deg, #ffffff, #eef1f8);
+  border: 1px solid #d7dcea;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+  display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px;
+  backface-visibility: hidden;
+}
+.zar__f i {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #2b3242; align-self: center; justify-self: center;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,.35);
+}
+.zar__f--1 { transform: translateZ(23px); }
+.zar__f--6 { transform: rotateY(180deg) translateZ(23px); }
+.zar__f--2 { transform: rotateY(90deg)  translateZ(23px); }
+.zar__f--5 { transform: rotateY(-90deg) translateZ(23px); }
+.zar__f--3 { transform: rotateX(90deg)  translateZ(23px); }
+.zar__f--4 { transform: rotateX(-90deg) translateZ(23px); }
+/* Punctele, ca pe un zar adevărat. */
+.zar__f--1 i { grid-area: 2 / 2; }
+.zar__f--2 i:nth-child(1) { grid-area: 1 / 1; }
+.zar__f--2 i:nth-child(2) { grid-area: 3 / 3; }
+.zar__f--3 i:nth-child(1) { grid-area: 1 / 1; }
+.zar__f--3 i:nth-child(2) { grid-area: 2 / 2; }
+.zar__f--3 i:nth-child(3) { grid-area: 3 / 3; }
+.zar__f--4 i:nth-child(1) { grid-area: 1 / 1; }
+.zar__f--4 i:nth-child(2) { grid-area: 1 / 3; }
+.zar__f--4 i:nth-child(3) { grid-area: 3 / 1; }
+.zar__f--4 i:nth-child(4) { grid-area: 3 / 3; }
+.zar__f--5 i:nth-child(1) { grid-area: 1 / 1; }
+.zar__f--5 i:nth-child(2) { grid-area: 1 / 3; }
+.zar__f--5 i:nth-child(3) { grid-area: 2 / 2; }
+.zar__f--5 i:nth-child(4) { grid-area: 3 / 1; }
+.zar__f--5 i:nth-child(5) { grid-area: 3 / 3; }
+.zar__f--6 i:nth-child(1) { grid-area: 1 / 1; }
+.zar__f--6 i:nth-child(2) { grid-area: 1 / 3; }
+.zar__f--6 i:nth-child(3) { grid-area: 2 / 1; }
+.zar__f--6 i:nth-child(4) { grid-area: 2 / 3; }
+.zar__f--6 i:nth-child(5) { grid-area: 3 / 1; }
+.zar__f--6 i:nth-child(6) { grid-area: 3 / 3; }
+
+/* Vestirea: ce a picat, arătat sub tăviță, ca elevul să lege numărul de
+   exercițiu chiar în clipa în care zarul se oprește. */
+.zar-vestire {
+  position: absolute; right: 0; bottom: calc(100% + 8px);
+  width: 230px; padding: 8px 11px; border-radius: 12px;
+  background: var(--ink); color: #fff; font-size: 12.5px; line-height: 1.4;
+  box-shadow: var(--shadow);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.zar-vestire.e-vazuta { opacity: 1; transform: translateY(0); }
+.zar-vestire[hidden] { display: none; }
+.zar-vestire b { display: block; margin-bottom: 2px; }
+
+/* Pe telefon tăvița se face mai mică și urcă puțin, ca să nu stea peste
+   butoanele de jos ale tablei. */
+@media (max-width: 640px) {
+  .zar-tavita { width: 104px; height: 104px; right: 10px; bottom: 66px; }
+  .zar { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+  .zar__f { padding: 4px; }
+  .zar__f i { width: 6px; height: 6px; }
+  .zar__f--1 { transform: translateZ(17px); }
+  .zar__f--6 { transform: rotateY(180deg) translateZ(17px); }
+  .zar__f--2 { transform: rotateY(90deg)  translateZ(17px); }
+  .zar__f--5 { transform: rotateY(-90deg) translateZ(17px); }
+  .zar__f--3 { transform: rotateX(90deg)  translateZ(17px); }
+  .zar__f--4 { transform: rotateX(-90deg) translateZ(17px); }
+  .zar-vestire { width: 200px; }
+}
+/* Cine a cerut mai puțină mișcare primește numărul, nu rostogolirea. */
+@media (prefers-reduced-motion: reduce) {
+  .zar { transition: none !important; }
+}
+
+/* ============ Ferestrele de lucru (generator, bancă) ============ */
+.dlg {
+  width: min(520px, 92vw); max-height: 86vh; padding: 0;
+  border: 1px solid var(--line); border-radius: 16px;
+  background: var(--card); color: var(--ink);
+  flex-direction: column; overflow: hidden;
+}
+.dlg--lat { width: min(760px, 94vw); }
+/* Numai deschisă e „flex": altfel ar sta la vedere cât e închisă. */
+.dlg[open] { display: flex; }
+.dlg::backdrop { background: rgba(31, 36, 48, .35); }
+.dlg__cap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fafbfe;
+}
+.dlg__cap h3 { margin: 0; font-size: 15px; }
+.dlg__imping { margin-left: auto; }
+.dlg__corp { flex: 1; overflow: auto; padding: 16px; }
+.dlg__jos { padding: 12px 16px; border-top: 1px solid var(--line); text-align: right; }
+.dlg__lamurire { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
+.dlg__nota { margin: 10px 0 0; font-size: 12.5px; color: #a06a14; min-height: 1.2em; }
+.dlg textarea, .dlg input[type="number"], .dlg select {
+  font: inherit; font-size: 14px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px;
+  background: var(--field-bg); outline: none;
+}
+.dlg textarea { width: 100%; resize: vertical; font-family: var(--mono); }
+.dlg textarea:focus, .dlg input:focus, .dlg select:focus { border-color: var(--accent); background: #fff; }
+.bif { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; cursor: pointer; }
+.gen-rand { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 14px; flex-wrap: wrap; }
+.gen-rand input[type="number"] { width: 72px; }
+.gen-rand__ce { color: var(--muted); }
+
+.bank-etichete { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.bank-eticheta {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
+  font-size: 12.5px; cursor: pointer; background: var(--card);
+}
+.bank-eticheta.e-bifata { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.bank-h { margin: 20px 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.bank-lista { display: flex; flex-wrap: wrap; gap: 5px; }
+.bank-it {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px;
+  font-size: 12.5px; font-family: var(--mono); background: var(--field-bg);
+}
+.bank-it__n { font-family: var(--ui); font-size: 10px; color: var(--muted); }
+.bank-it__x { border: 0; background: none; color: #a4271f; cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; }
