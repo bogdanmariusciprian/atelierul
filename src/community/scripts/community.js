@@ -3766,6 +3766,17 @@ export function renderCommunity(basePath = "") {
         return fallback;
       }
     };
+    /* Panoul de administrare capătă toată lățimea ecranului, restul hubului nu.
+       Motivul e că sunt două feluri de pagină: una de CITIT, unde rândul lung
+       obosește ochiul și de-aia textul stă strâns la 1120px, și una de LUCRAT,
+       cu tabele și coloane, unde îngustimea nu ajută pe nimeni.
+       Semnul se pune pe `body`, nu pe hub, fiindcă lățimea o ține containerul
+       din pagină, care e deasupra noastră. Fără `transform` și fără margini
+       negative anume: un `transform` pe un părinte rupe `position: fixed` la
+       toți copiii, iar în hub sunt câteva (butonul de mesaje, panoul plutitor
+       de admin, lightboxul). */
+    document.body.classList.toggle("is-admin-larg", state.section === "admin" && isAdmin());
+
     const sectionHtml = guard(
       () => (SECTION_RENDER[state.section] || sectionForum)(),
       `section "${state.section}"`,

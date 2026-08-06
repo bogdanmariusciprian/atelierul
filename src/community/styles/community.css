@@ -3046,9 +3046,25 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
    nu în lățime. Bara stă lipită sus, ca lista lungă de dedesubt să se poată
    derula fără s-o pierzi din ochi.
    ========================================================= */
+/* PAGINA DE ADMIN E LATĂ, ANUME.
+
+   Restul sitului stă strâns la 1120px fiindcă e de citit: rândul prea lung
+   obosește ochiul, care pierde începutul rândului următor. Panoul de admin nu e
+   de citit, e de LUCRAT: tabele cu șase coloane, liste de sute de cuvinte,
+   grafice. Acolo îngustimea nu apără pe nimeni, doar îngrămădește.
+
+   Semnul stă pe `body` fiindcă lățimea o ține containerul paginii, care e
+   deasupra hubului. Fără `transform` și fără margini negative: un `transform`
+   pe un părinte ar rupe `position: fixed` la toți copiii, iar hubul are câțiva
+   (butonul de mesaje, panoul plutitor de admin, lightboxul). */
+body.is-admin-larg main.container { max-width: 1800px; }
+/* Bara hubului rămâne cât era: ea ține meniul, nu conținut. Tot spațiul
+   câștigat se duce în panou, unde e nevoie de el. */
+body.is-admin-larg .cx-shell { --side-w: 250px; }
+
 .cx-admshell {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: 264px minmax(0, 1fr);
   gap: var(--space-lg);
   align-items: start;
 }
@@ -3126,6 +3142,14 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
 /* Sulul stă pe cutia din jur, nu pe tabel: un tabel cu `overflow` își pierde
    capul lipit sus. */
 .cxbk__sul { max-height: 46vh; overflow: auto; }
+/* Pe ecran lat, capetele de coloană stau drept: scrisul vertical era o
+   strâmtorare, nu o alegere. Peste 1500px încape orice etichetă la orizontală. */
+@media (min-width: 1500px) {
+  .cxbk__sul { max-height: 64vh; }
+  .cxbk__cap { writing-mode: horizontal-tb; transform: none; padding: 0.5rem 0.6rem; }
+  .cxbk__t { font-size: 0.88rem; }
+  .cxbk__t th, .cxbk__t td { padding: 0.35rem 0.6rem; }
+}
 .cxbk__t { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
 .cxbk__t th, .cxbk__t td {
   border-bottom: 1px solid var(--color-border);
@@ -3163,7 +3187,9 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
 .cxbk__jos { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem; background: var(--color-surface); border-top: 1px solid var(--color-border); flex-wrap: wrap; }
 .cxbk__jos .cx-muted { margin-right: auto; font-size: 0.78rem; }
 
-.cxbk__lista { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+/* Banca poate avea sute de intrări. Lista se derulează pe dinăuntru, altfel ar
+   împinge tabelul de lucru cu un ecran mai jos. */
+.cxbk__lista { display: flex; flex-wrap: wrap; gap: 0.3rem; max-height: 34vh; overflow: auto; }
 .cxbk__it {
   display: inline-flex; align-items: center; gap: 0.35rem;
   border: 1px solid var(--color-border); border-radius: 8px;
