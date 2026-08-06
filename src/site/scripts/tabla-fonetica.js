@@ -52,8 +52,21 @@ function insertSymbol(key, field) {
   const range = sel.getRangeAt(0);
   range.deleteContents();
 
+  /* CÂMPUL SE IA DE LA CURSOR, NU DE LA FOCUS.
+     Butonul din bară îl afla prin `document.activeElement`, iar acela poate fi
+     cu totul altceva: ajunge un clic pe cerință, pe notițe sau pe fundal, și
+     focusul pleacă din câmp, deși selecția rămâne acolo unde era. Simbolul se
+     ducea atunci la locul lui, dar fără virgulă, fiindcă din câmpul „nul" nu
+     se putea afla că e o transcriere.
+     Cursorul, în schimb, e chiar locul unde scriem: el nu poate minți. */
+  const camp = campulCursorului() || field;
+  virgulaLipsa(camp);
+
   const cutie = cutieDeSimbol(s);
-  range.insertNode(cutie);
+  /* După o virgulă pusă acum, selecția s-a mutat: luăm intervalul din nou,
+     altfel am insera acolo unde era cursorul ÎNAINTE de virgulă. */
+  const loc = sel.getRangeAt(0);
+  loc.insertNode(cutie);
 
   /* CURSORUL ARE NEVOIE DE UN LOC ADEVĂRAT DUPĂ CUTIE.
      Aici era buba: după cutie lăsam cursorul „între noduri", iar poziția aia e
@@ -65,12 +78,12 @@ function insertSymbol(key, field) {
      Un cursor așezat ÎNTR-UN TEXT n-are ce să rezolve, e limpede de la sine.
      De-aia punem după cutie un nod de text și intrăm în el. În transcriere
      textul acela e chiar virgula care desparte sunetele, deci nu costă nimic. */
-  const coada = document.createTextNode(eTranscriere(field) ? VIRGULA : '');
+  const coada = document.createTextNode(eTranscriere(camp) ? VIRGULA : '');
   cutie.after(coada);
-  range.setStart(coada, coada.length);
-  range.collapse(true);
+  loc.setStart(coada, coada.length);
+  loc.collapse(true);
   sel.removeAllRanges();
-  sel.addRange(range);
+  sel.addRange(loc);
 }
 
 /* Cutia unui simbol, făcută într-un singur loc: o folosesc și inserarea, și
@@ -168,8 +181,26 @@ function stergeVirgula() {
   return true;
 }
 
+/* Virgula care ar fi trebuit să fie ÎNAINTEA sunetului nou.
+
+   La ieșirea din câmp, virgula atârnată de la coadă se strânge, cum se cuvine.
+   Dar când te întorci să scrii mai departe, ea nu mai e acolo, iar sunetul nou
+   s-ar lipi de cel dinainte: „ma" în loc de „m, a". Același lucru se întâmplă
+   după o transcriere lipită de altundeva.
+
+   Regula rămâne cea de la început: virgulele le pune mașina, nu elevul. Deci,
+   dacă înaintea cursorului stă un sunet fără despărțitor, îl punem noi. */
+function virgulaLipsa(camp) {
+  if (!eTranscriere(camp)) return;
+  const inainte = ultimele(1);
+  if (!inainte) return;                          // suntem la începutul câmpului
+  if (/[\s,\-[(]/.test(inainte)) return;          // e deja despărțit
+  insertText(VIRGULA);
+}
+
 /* Pune un sunet la cursor. În transcriere, cu virgula lui după el. */
 function insertSunet(text, field) {
+  virgulaLipsa(field);
   insertText(eTranscriere(field) ? text + VIRGULA : text);
 }
 
