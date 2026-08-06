@@ -236,8 +236,9 @@
     <button class="btn" value="inchide">Închide</button>
   </form>
   <div class="dlg__corp">
-    <p class="dlg__lamurire">Scrie câte unul pe rând. Bifează la ce exerciții se potrivește.</p>
-    <textarea id="bankText" rows="4" placeholder="masă&#10;mere&#10;chiar"></textarea>
+    <p class="dlg__lamurire">Lipește lista despărțită cu „;". Apoi, în tabel, bifezi
+      la ce exerciții se potrivește fiecare: pe cap de coloană bifezi toată coloana,
+      pe rând bifezi numai cuvântul acela.</p>
 
     <div class="gen-rand">
       <label for="bankKind">Fel</label>
@@ -246,22 +247,29 @@
         <option value="structura">structuri fonetice</option>
         <option value="propozitie">propoziții</option>
       </select>
-      <label for="bankNivel">Dificultate</label>
-      <select id="bankNivel">
-        <option value="1">ușor</option>
-        <option value="2" selected>mijlociu</option>
-        <option value="3">greu</option>
-      </select>
     </div>
 
-    <div class="bank-etichete" id="bankEtichete"></div>
+    <div class="bank-intrare">
+      <textarea id="bankText" rows="2" placeholder="masă; mere; ghiocel; chiar"></textarea>
+      <button class="btn" id="bankAdauga">Adaugă în tabel</button>
+    </div>
     <p class="dlg__nota" id="bankNota"></p>
+
+    <div class="bank-masa" id="bankMasa" hidden>
+      <div class="bank-masa__sul">
+        <table class="bank-t" id="bankTabel"></table>
+      </div>
+      <div class="bank-masa__jos">
+        <span class="bank-socoteala" id="bankSocoteala"></span>
+        <button class="btn btn--mic" id="bankGoleste">Golește tabelul</button>
+      </div>
+    </div>
 
     <h4 class="bank-h">Ce e în bancă</h4>
     <div class="bank-lista" id="bankLista"></div>
   </div>
   <div class="dlg__jos">
-    <button class="btn btn--tare" id="bankAdauga">Adaugă în bancă</button>
+    <button class="btn btn--tare" id="bankImporta" disabled>Importă în bancă</button>
   </div>
 </dialog>
 

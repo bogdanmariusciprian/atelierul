@@ -2,8 +2,9 @@
 // Banca de material a lecțiilor: date REALE (`learn_lessons_items`).
 //
 // Din ea scoate generatorul cuvintele, structurile fonetice și propozițiile cu
-// care se umple tabla. Profesorul o scrie, elevul doar o citește: migrarea 0078
-// ține regula, aici doar o folosim.
+// care se umple tabla. O CITEȘTE oricine, și cine n-are cont (0079); o SCRIE
+// numai profesorul (0078). Regula o ține baza, aici doar o folosim: dacă un elev
+// ar chema `addRows`, serverul îl refuză, oricât de bine ar fi scris codul.
 //
 // ETICHETELE sunt cheia. Zarul dă tipul exercițiului, tipul are eticheta lui,
 // iar generatorul cere „material cu eticheta asta". De-aia numele etichetelor
@@ -63,32 +64,64 @@ export async function listAll(lessonSlug) {
 }
 
 /**
- * Adaugă material. Întoarce `{ rand, motiv }`.
+ * Cheia după care două intrări sunt „același lucru".
  *
- * Se poate scrie mai mult deodată, câte unul pe rând: profesorul are de obicei
- * o listă gata făcută, iar introducerea unul câte unul ar fi o pedeapsă.
+ * Trebuie să dea exact ce dă indexul unic din 0078, adică `lower(btrim(body))`:
+ * altfel fereastra ar spune „e nou" despre un cuvânt pe care baza îl respinge.
+ * Diacriticele NU se scot: „casa" și „casă" sunt două cuvinte deosebite, iar la
+ * o lecție de fonetică deosebirea e chiar lucrul care se învață.
  */
-export async function addItems(lessonSlug, kind, bodies, tags, level) {
+export function cheia(text) {
+  return String(text || "").trim().toLowerCase();
+}
+
+/**
+ * Pune în bancă rândurile pregătite în fereastră. Întoarce `{ puse, sarite, motiv }`.
+ *
+ * Fiecare rând vine gata cu felul, etichetele și dificultatea lui, fiindcă
+ * profesorul le potrivește unul câte unul în tabel: două cuvinte din aceeași
+ * listă lipită pot sluji la exerciții deosebite.
+ *
+ * NU folosim `upsert`: Postgres cere ca lista din `on conflict` să fie exact
+ * cheia unui index unic, iar indexul băncii e pus pe `lower(btrim(body))`, nu pe
+ * coloana `body` goală. Așa că trimitem un insert curat, iar dacă totuși se
+ * strecoară un duplicat (cineva a adăugat între timp de pe alt calculator),
+ * reluăm rând cu rând: un rând stricat n-are voie să strice tot transportul.
+ */
+export async function addRows(lessonSlug, randuri) {
   const { data: u } = await supabase.auth.getUser();
   const uid = u && u.user ? u.user.id : null;
-  const randuri = bodies
-    .map((b) => String(b || "").trim())
-    .filter(Boolean)
-    .map((body) => ({ lesson_slug: lessonSlug, kind, body, tags, level, created_by: uid }));
-  if (!randuri.length) return { rand: [], motiv: "n-ai scris nimic" };
+  const gata = (randuri || [])
+    .map((r) => ({
+      lesson_slug: lessonSlug,
+      kind: r.kind,
+      body: String(r.body || "").trim(),
+      tags: r.tags || [],
+      level: r.level || 2,
+      created_by: uid,
+    }))
+    .filter((r) => r.body && r.tags.length);
+  if (!gata.length) return { puse: [], sarite: 0, motiv: "n-ai bifat nimic" };
 
-  // `upsert` cu `ignoreDuplicates`: un cuvânt pus a doua oară nu e o greșeală
-  // de semnalat, ci un lucru care se întâmplă des când lipești o listă peste
-  // alta. Îl trecem cu vederea în tăcere, în loc să oprim toată salvarea.
+  const COLOANE = "id, kind, body, tags, level";
   const { data, error } = await supabase
-    .from("learn_lessons_items")
-    .upsert(randuri, { onConflict: "lesson_slug,kind,body", ignoreDuplicates: true })
-    .select("id, kind, body, tags, level");
-  if (error) {
-    console.error("addItems a picat:", { code: error.code, message: error.message });
-    return { rand: [], motiv: motivul(error) };
+    .from("learn_lessons_items").insert(gata).select(COLOANE);
+  if (!error) return { puse: data || [], sarite: 0, motiv: null };
+  if (error.code !== "23505") {
+    console.error("addRows a picat:", { code: error.code, message: error.message });
+    return { puse: [], sarite: 0, motiv: motivul(error) };
   }
-  return { rand: data || [], motiv: null };
+
+  const puse = [];
+  let sarite = 0;
+  for (const rand of gata) {
+    const { data: unul, error: e } = await supabase
+      .from("learn_lessons_items").insert(rand).select(COLOANE).single();
+    if (!e) { puse.push(unul); continue; }
+    if (e.code === "23505") { sarite++; continue; }
+    return { puse, sarite, motiv: motivul(e) };
+  }
+  return { puse, sarite, motiv: null };
 }
 
 export async function updateItem(id, schimbari) {
