@@ -149,9 +149,16 @@ const NAV_GROUPS = [
 
 // Flat list of every section id (for hash validation) + label lookup.
 const ALL_SECTIONS = [...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id)), "admin"];
-// Member-only sections: the ADMIN (teacher) has no wall, points or badges —
-// gamification belongs to students. (The "Logat" demo role previews those.)
-const ADMIN_HIDDEN_SECTIONS = new Set(["pagina-mea", "puncte", "insigne"]);
+/* Ce NU vede profesorul în bara din stânga. Două feluri de intrări:
+   1. Cele ale JOCULUI, în care el nu intră: peretele lui, punctele, insignele,
+      provocarea zilei (el o programează, n-o rezolvă), lecțiile lui terminate.
+   2. Cele care s-au MUTAT în arborele de administrare și acum s-ar repeta:
+      „Exerciții" (le aprobă la lecția lor) și „Membri" (îi vede la Conturi,
+      unde are și e-mailul, și data înscrierii).
+   Elevii le văd pe toate mai departe: lista de față e numai a profesorului. */
+const ADMIN_HIDDEN_SECTIONS = new Set([
+  "pagina-mea", "puncte", "insigne", "provocare", "lectii", "exercitii", "membri",
+]);
 // Every lesson in the "morfologie" domain — the "all of morphology" badge is
 // earned only when ALL of them are really completed (lesson_progress).
 const MORFOLOGIE_SLUGS = LESSONS.filter((l) => l.domain === "morfologie").map((l) => l.slug);
@@ -781,7 +788,6 @@ export function renderCommunity(basePath = "") {
           return guest ? GUEST_SECTIONS.has(i.id) && i.id !== "profil" : !isAdmin() || !ADMIN_HIDDEN_SECTIONS.has(i.id);
         }),
       })).filter((g) => g.items.length),
-      ...(isAdmin() ? [{ title: "Administrare", items: [{ id: "admin", label: "Panou admin" }] }] : []),
     ];
     const groups = navGroups
       .map(
@@ -828,11 +834,46 @@ export function renderCommunity(basePath = "") {
            </div>
          </div>`;
 
+    /* ARBORELE DE ADMINISTRARE STĂ TOT AICI, nu într-o a doua bară lângă
+       conținut. Două bare una lângă alta însemnau două locuri de căutat și un
+       drum în doi pași („Panou admin", apoi unealta). Acum e o singură coloană
+       de navigare, iar zona de lucru rămâne singură pe toată lățimea.
+
+       Grupurile lui (USERI, PROFESOR, WEBSITE) intră ca frați ai celor de sus,
+       nu îndesate sub un titlu „Administrare": un titlu deasupra altor titluri
+       n-ar fi adăugat niciun înțeles, doar o retragere în plus. */
+    const arbore = isAdmin() ? adminNavHtml(
+      { tab: state.section === "admin" ? state.adminTab : null,
+        lectie: state.adminLesson, parte: state.adminPart,
+        examen: state.adminExam, deschise: state.adminFold },
+      numereleBarei()
+    ) : "";
+
     return `
-      <aside class="cx-side">
+      <aside class="cx-side${isAdmin() ? " cx-side--admin" : ""}">
         ${meBox}
         <nav class="cx-side__nav">${groups}</nav>
+        ${arbore ? `<div class="cx-side__linie" role="presentation"></div>${arbore}` : ""}
       </aside>`;
+  }
+
+  /* Numerele din dreapta intrărilor de administrare. Stau într-o funcție a lor
+     fiindcă le cer două locuri: bara și, la nevoie, orice altceva care ar vrea
+     să spună „ai trei lucruri de făcut". */
+  function numereleBarei() {
+    const modCount = state.contentReports.length + state.heldContent.length
+      + state.proposed.filter((e) => e.status === "pending").length;
+    const propuneriPeLectie = {};
+    for (const e of state.proposed) {
+      if (e.status !== "pending" || !e.lessonSlug) continue;
+      propuneriPeLectie[e.lessonSlug] = (propuneriPeLectie[e.lessonSlug] || 0) + 1;
+    }
+    const fisePeExamen = {};
+    for (const d of state.downloads) fisePeExamen[d.exam] = (fisePeExamen[d.exam] || 0) + 1;
+    return {
+      moderare: modCount, utilizatori: state.adminUsers.length,
+      propuneriPeLectie, materialPeLectie: state.bankCounts, fisePeExamen,
+    };
   }
 
   // ---------- Post composer (forum + wall). Choosing the "Grup" type turns
@@ -3307,26 +3348,10 @@ export function renderCommunity(basePath = "") {
       </div>`;
   }
 
+  /* Zona de lucru a panoului. Navigarea NU mai e aici: s-a mutat în bara din
+     stânga, lângă restul hubului, deci ce urmează primește toată lățimea. */
   function sectionAdmin() {
     if (!isAdmin()) return sectionForum();
-    const modCount = state.contentReports.length + state.heldContent.length + state.proposed.filter((e) => e.status === "pending").length;
-    // Numerele din dreapta intrărilor. Se socotesc AICI, unde e starea, și se
-    // dau barei gata făcute: bara e desen, nu depozit.
-    const propuneriPeLectie = {};
-    for (const e of state.proposed) {
-      if (e.status !== "pending" || !e.lessonSlug) continue;
-      propuneriPeLectie[e.lessonSlug] = (propuneriPeLectie[e.lessonSlug] || 0) + 1;
-    }
-    const fisePeExamen = {};
-    for (const d of state.downloads) fisePeExamen[d.exam] = (fisePeExamen[d.exam] || 0) + 1;
-
-    const nav = adminNavHtml(
-      { tab: state.adminTab, lectie: state.adminLesson, parte: state.adminPart,
-        examen: state.adminExam, deschise: state.adminFold },
-      { moderare: modCount, utilizatori: state.adminUsers.length,
-        propuneriPeLectie, materialPeLectie: state.bankCounts, fisePeExamen }
-    );
-
     const BODY = {
       overview: adminTabOverview,
       users: adminTabUsers,
@@ -3337,13 +3362,19 @@ export function renderCommunity(basePath = "") {
       lessons: adminTabLessons,
       tests: adminTabTests,
     };
+    /* Titlul spune unde ești ACUM, nu „Panou de administrare": panoul e locul
+       de unde ai pornit, iar unealta deschisă e ce te interesează. */
+    const unde = NUME_PANOU[state.adminTab] || "Panou de administrare";
     return `
-      ${sectionHead("Panou de administrare", "Vizibil doar pentru tine. Tot ce ține de administrarea comunității.")}
-      <div class="cx-admshell">
-        <aside class="cx-admside">${nav}</aside>
-        <div class="cx-admbody">${(BODY[state.adminTab] || adminTabOverview)()}</div>
-      </div>`;
+      ${sectionHead(unde, "Vizibil doar pentru tine.")}
+      <div class="cx-admbody">${(BODY[state.adminTab] || adminTabOverview)()}</div>`;
   }
+
+  const NUME_PANOU = {
+    overview: "Statistici", users: "Conturi", moderation: "Moderare",
+    challenges: "Provocarea zilei", gamification: "Puncte și insigne",
+    bonus: "Întrebări bonus", lessons: "Lecții", tests: "Teste",
+  };
 
   /* Banca lecției, adusă de la server. O cerem când intri pe „Tablă" și după
      fiecare schimbare, ca lista de jos și semnele „e în bancă" din tabel să

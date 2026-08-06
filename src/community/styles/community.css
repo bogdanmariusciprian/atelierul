@@ -3058,37 +3058,39 @@ button.cx-adminstat:hover { border-color: var(--color-primary); transform: trans
    pe un părinte ar rupe `position: fixed` la toți copiii, iar hubul are câțiva
    (butonul de mesaje, panoul plutitor de admin, lightboxul). */
 body.is-admin-larg main.container { max-width: 1800px; }
-/* Bara hubului rămâne cât era: ea ține meniul, nu conținut. Tot spațiul
-   câștigat se duce în panou, unde e nevoie de el. */
-body.is-admin-larg .cx-shell { --side-w: 250px; }
 
-.cx-admshell {
-  display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
-  gap: var(--space-lg);
-  align-items: start;
-}
-.cx-admside {
-  position: sticky;
-  top: var(--sticky-top, 104px);
-  padding: 0.6rem 0.4rem;
-  border-radius: var(--cx-radius);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-  max-height: calc(100vh - var(--sticky-top, 104px) - 2rem);
-  overflow: auto;
-}
-/* `minmax(0, 1fr)` mai sus, nu `1fr`: altfel un tabel lat dinăuntru împinge
-   coloana peste marginea paginii, iar bara se strânge. */
 .cx-admbody { min-width: 0; }
 
-.cxnav__grup + .cxnav__grup { margin-top: 0.7rem; }
+/* ---- Bara profesorului ----
+   Arborele de administrare stă în ACEEAȘI bară cu restul hubului, nu într-a
+   doua, lângă conținut. Două bare însemnau două locuri de căutat și un drum în
+   doi pași. De-aia bara profesorului e mai lată decât a elevului: ea poartă
+   lecțiile desfăcute pe trei niveluri, iar „Transcrierea unei propoziții"
+   trebuie să încapă fără să se taie. */
+.cx-shell:has(.cx-side--admin) { --side-w: 288px; }
+/* Fără `:has` (browsere vechi) bara rămâne la 250px și textul se taie cu „…";
+   nimic nu se rupe, doar se citește mai greu. */
+.cx-side--admin {
+  max-height: calc(100vh - var(--sticky-top, 104px) - 1.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cx-side__linie {
+  height: 1px;
+  margin: 0.55rem 0.2rem 0.1rem;
+  background: var(--color-border);
+}
+
+.cxnav { display: flex; flex-direction: column; gap: 0.4rem; }
+/* Titlurile arborelui arată la fel cu ale hubului: e aceeași bară, deci
+   aceeași voce. Dacă ar fi altfel, ochiul ar citi două meniuri lipite. */
 .cxnav__titlu {
-  font-size: 0.66rem;
+  font-size: 0.7rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
-  padding: 0.5rem 0.55rem 0.25rem;
+  padding: 0.35rem 0.5rem 0.15rem;
   user-select: none;
 }
 .cxnav__it {
@@ -3096,7 +3098,7 @@ body.is-admin-larg .cx-shell { --side-w: 250px; }
   align-items: center;
   gap: 0.45rem;
   width: 100%;
-  padding: 0.35rem 0.55rem;
+  padding: 0.42rem 0.55rem;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -3127,8 +3129,7 @@ body.is-admin-larg .cx-shell { --side-w: 250px; }
 .cxnav__it--2.e-desfacut { color: var(--color-text); font-weight: 600; }
 
 @media (max-width: 860px) {
-  .cx-admshell { grid-template-columns: 1fr; }
-  .cx-admside { position: static; max-height: none; }
+  .cx-side--admin { max-height: none; overflow: visible; }
 }
 
 /* ---- Panoul „Tablă": tabelul de dinainte de import ---- */
