@@ -44,7 +44,7 @@ let symbols = loadSymbols();
    din fontul monospațiat al calculatorului, iar atunci browserul le împrumută
    din alt font, cu altă lățime. De-aici venea deplasarea mică de dedesubt.
    Cutia de 1ch le ține pe toate într-o singură celulă, oricum ar fi desenate. */
-function insertSymbol(key) {
+function insertSymbol(key, field) {
   const s = symbols[key];
   if (!s || !s.char) return;
   const sel = window.getSelection();
@@ -52,8 +52,40 @@ function insertSymbol(key) {
   const range = sel.getRangeAt(0);
   range.deleteContents();
 
+  const cutie = cutieDeSimbol(s);
+  range.insertNode(cutie);
+
+  /* CURSORUL ARE NEVOIE DE UN LOC ADEVĂRAT DUPĂ CUTIE.
+     Aici era buba: după cutie lăsam cursorul „între noduri", iar poziția aia e
+     ambiguă pentru browser. Lângă o cutie `inline-block` el o rezolvă cel mai
+     des ÎNĂUNTRUL cutiei, mai ales când cutia e ultimul lucru din câmp și n-are
+     ce urma după ea. De acolo, sunetul următor se scria în celula de o literă
+     și nu se mai vedea nicăieri: părea că tabla nu te lasă să scrii.
+
+     Un cursor așezat ÎNTR-UN TEXT n-are ce să rezolve, e limpede de la sine.
+     De-aia punem după cutie un nod de text și intrăm în el. În transcriere
+     textul acela e chiar virgula care desparte sunetele, deci nu costă nimic. */
+  const coada = document.createTextNode(eTranscriere(field) ? VIRGULA : '');
+  cutie.after(coada);
+  range.setStart(coada, coada.length);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+/* Cutia unui simbol, făcută într-un singur loc: o folosesc și inserarea, și
+   îmbrăcarea simbolurilor dintr-o tablă salvată. Dacă se schimbă ceva la ea,
+   se schimbă pentru amândouă. */
+function cutieDeSimbol(s) {
   const cutie = document.createElement('span');
   cutie.className = 'sym';
+  /* Cutia e un LUCRU ÎNTREG, nu un loc de scris. Așa browserul n-are voie să
+     ducă cursorul înăuntrul ei, oricât ar încerca să-l „îndrepte", iar la
+     ștergere sunetul special piere dintr-o singură apăsare, cum se și cuvine:
+     e un sunet, nu două litere. */
+  // Scris ca ATRIBUT, nu prin însușirea `contentEditable`: atributul se vede
+  // și în HTML-ul salvat, deci tabla adusă înapoi din cont păstrează paza.
+  cutie.setAttribute('contenteditable', 'false');
   if (s.bold) {
     const b = document.createElement('b');
     b.textContent = s.char;
@@ -61,11 +93,7 @@ function insertSymbol(key) {
   } else {
     cutie.textContent = s.char;
   }
-  range.insertNode(cutie);
-  range.setStartAfter(cutie);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
+  return cutie;
 }
 
 /* ================= Virgula automată din transcriere =================
@@ -115,12 +143,21 @@ function ultimele(n) {
   const r = sel.getRangeAt(0);
   const camp = campulCursorului();
   if (!camp) return '';
-  let text = '';
-  for (const nod of noduriText(camp)) {
-    if (nod === r.startContainer) { text += nod.textContent.slice(0, r.startOffset); break; }
-    text += nod.textContent;
+  /* Un range de la începutul câmpului până la cursor, și îl citim.
+     Varianta dinainte umbla din nod în nod și se oprea la nodul cursorului.
+     Mergea cât timp cursorul stătea într-un text, dar nu și când stătea ÎNTRE
+     noduri (după o cutie de simbol, de pildă): atunci `startContainer` e un
+     element, egalitatea nu se potrivea niciodată, iar noi citeam tot câmpul,
+     inclusiv ce era DUPĂ cursor. Așa, ștergerea vedea o virgulă care nu era
+     acolo unde credea ea. */
+  try {
+    const pana = document.createRange();
+    pana.setStart(camp, 0);
+    pana.setEnd(r.startContainer, r.startOffset);
+    return pana.toString().slice(-n);
+  } catch (e) {
+    return '';
   }
-  return text.slice(-n);
 }
 
 /* Scoate virgula automată de dinaintea cursorului, dacă acolo e chiar ea.
@@ -172,8 +209,7 @@ function imbracaSimboluri(el) {
   if (!lista.length) return;
 
   const cutieCu = (nod) => {
-    const c = document.createElement('span');
-    c.className = 'sym';
+    const c = cutieDeSimbol({ char: '' });   // cutia goală, cu toate însușirile ei
     c.appendChild(nod);
     return c;
   };
@@ -586,10 +622,10 @@ sheet.addEventListener('keydown', (e) => {
   }
 
   // Cifrele 1-4 -> simbolurile configurabile
-  if (e.code === 'Digit1') { e.preventDefault(); insertSymbol('1'); if (eTranscriere(field)) insertText(VIRGULA); return; }
-  if (e.code === 'Digit2') { e.preventDefault(); insertSymbol('2'); if (eTranscriere(field)) insertText(VIRGULA); return; }
-  if (e.code === 'Digit3') { e.preventDefault(); insertSymbol('3'); if (eTranscriere(field)) insertText(VIRGULA); return; }
-  if (e.code === 'Digit4') { e.preventDefault(); insertSymbol('4'); if (eTranscriere(field)) insertText(VIRGULA); return; }
+  if (e.code === 'Digit1') { e.preventDefault(); insertSymbol('1', field); return; }
+  if (e.code === 'Digit2') { e.preventDefault(); insertSymbol('2', field); return; }
+  if (e.code === 'Digit3') { e.preventDefault(); insertSymbol('3', field); return; }
+  if (e.code === 'Digit4') { e.preventDefault(); insertSymbol('4', field); return; }
 
   // Virgulă -> „, ”   (virgulă + spațiu)
   if (e.key === ',') { e.preventDefault(); insertText(', '); return; }
@@ -687,7 +723,10 @@ toolbar.addEventListener('click', (e) => {
     return;
   }
   // simbolurile configurabile (tastele 1-4)
-  if (btn.dataset.symkey)      { insertSymbol(btn.dataset.symkey); return; }
+  // Butonul face exact ce face tasta, virgulă cu virgulă: altfel simbolul pus
+  // cu mausul rămânea fără virgulă, iar rândul c/v/s de dedesubt nu mai avea
+  // după ce să se alinieze.
+  if (btn.dataset.symkey)      { insertSymbol(btn.dataset.symkey, activeField()); return; }
   // perechi de paranteze
   if (btn.dataset.pair)        { insertPair(btn.dataset.pair); return; }
 });
