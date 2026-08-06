@@ -226,6 +226,36 @@ function taieVirgulaFinala(el) {
   }
 }
 
+/* ÎNDREPTAREA CUTIILOR UMFLATE.
+
+   Cât timp cursorul lăsat după cutie cădea înapoi în ea, virgula și sunetele
+   scrise mai departe intrau ÎNĂUNTRUL cutiei, care are lățimea unei singure
+   litere. Pe ecran se vedea „ġo" lipit, iar virgula părea că lipsește: de fapt
+   era acolo, dar ascunsă în celulă, împreună cu restul.
+
+   Bugul e reparat, dar tablele scrise atunci au rămas strâmbe. Aici le
+   desfacem: în cutie rămâne simbolul, restul iese după ea, la locul lui.
+   Se cheamă la deschiderea tablei și la ieșirea din câmp, deci vechiul se
+   îndreaptă de la sine, pe măsură ce lucrezi. */
+function desumflaCutiile(el, lista) {
+  el.querySelectorAll('.sym').forEach((c) => {
+    const tot = c.textContent;
+    const sim = lista.find((x) => tot.startsWith(x));
+    if (!sim || tot === sim) return;              // cutia e curată
+    const rest = tot.slice(sim.length);
+    const eIngrosat = !!c.querySelector('b');
+    c.textContent = '';
+    if (eIngrosat) {
+      const b = document.createElement('b');
+      b.textContent = sim;
+      c.appendChild(b);
+    } else {
+      c.textContent = sim;
+    }
+    c.after(document.createTextNode(rest));
+  });
+}
+
 /* ================= Îmbrăcarea simbolurilor deja scrise =================
    Cutia de o celulă se pune la inserare, dar tablele scrise ÎNAINTE de asta au
    simbolurile ca text gol, deci s-ar purta mai departe după lățimea pe care
@@ -238,6 +268,8 @@ function imbracaSimboluri(el) {
   if (!el) return;
   const lista = Object.values(symbols).map(s => s && s.char).filter(Boolean);
   if (!lista.length) return;
+
+  desumflaCutiile(el, lista);
 
   const cutieCu = (nod) => {
     const c = cutieDeSimbol({ char: '' });   // cutia goală, cu toate însușirile ei
