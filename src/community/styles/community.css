@@ -3223,14 +3223,36 @@ body.is-admin-larg main.container { max-width: 1800px; }
 .cxbk__jos { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem; background: var(--color-surface); border-top: 1px solid var(--color-border); flex-wrap: wrap; }
 .cxbk__jos .cx-muted { margin-right: auto; font-size: 0.78rem; }
 
-/* Banca poate avea sute de intrări. Lista se derulează pe dinăuntru, altfel ar
-   împinge tabelul de lucru cu un ecran mai jos. */
-.cxbk__lista { display: flex; flex-wrap: wrap; gap: 0.3rem; max-height: 34vh; overflow: auto; }
-.cxbk__it {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  border: 1px solid var(--color-border); border-radius: 8px;
-  padding: 0.15rem 0.45rem; font-size: 0.8rem;
-  font-family: var(--font-mono, monospace); background: var(--color-surface);
+/* ---- Banca de acum: căutare, filtre, tabel ----
+   Grămada de pastile de dinainte mergea la douăzeci de intrări. La o sută,
+   ochiul nu mai găsea nimic, iar o etichetă greșită se repara ștergând
+   cuvântul. Acum e același tabel ca cel de dinainte de import: o singură
+   deprindere pentru aceeași treabă. */
+.cxbk__unelte { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0 0.5rem; }
+.cxbk__cauta { max-width: 22rem; }
+.cxbk__cate { font-size: 0.8rem; white-space: nowrap; }
+
+.cxbk__filtre { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+.cxbk__flabel {
+  font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--color-text-muted); width: 5.5rem; flex: none; user-select: none;
 }
-.cxbk__itn { font-family: inherit; font-size: 0.66rem; color: var(--color-text-muted); }
-.cxbk__itx { border: 0; background: none; color: #a4271f; cursor: pointer; font-size: 0.85rem; line-height: 1; padding: 0 0.1rem; }
+.cxbk__chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  border: 1px solid var(--color-border); border-radius: 999px;
+  background: var(--color-bg); color: var(--color-text-muted);
+  padding: 0.15rem 0.6rem; font-size: 0.78rem; cursor: pointer; user-select: none;
+}
+.cxbk__chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.cxbk__chip.on { background: var(--cx-grad); color: #fff; border-color: transparent; }
+.cxbk__chipn { font-size: 0.68rem; opacity: 0.75; }
+
+/* Capul care sortează. Săgeata arată ordinea de acum, nu pe cea următoare:
+   e o stare, nu o poruncă. */
+.cxbk__sort {
+  border: 0; background: none; cursor: pointer; color: inherit; font: inherit;
+  padding: 0.5rem 0.6rem; width: 100%; text-align: left; white-space: nowrap;
+}
+.cxbk__sort:hover, .cxbk__sort.on { color: var(--color-primary); }
+.cxbk__sul--banca { max-height: 48vh; }
+.cxbk__nimic { margin-top: 0.6rem; display: flex; align-items: center; gap: 0.5rem; }

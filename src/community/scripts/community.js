@@ -90,7 +90,8 @@ import { adminNavHtml, citesteRuta, scrieRuta, PARTI_LECTIE } from "./admin-nav.
 import { boardPanelHtml, randuriDinLista, socoteala, cuDe } from "./admin-board.js";
 import { materialulLectiei, felulMaterialului } from "../../shared/scripts/board-material.js";
 import { listAll as bankListAll, addRows as bankAddRows, deleteItem as bankDeleteItem,
-  countByLesson as bankCountByLesson, cheia as bankCheia } from "../../shared/scripts/bank-repo.js";
+  updateItem as bankUpdateItem, countByLesson as bankCountByLesson,
+  cheia as bankCheia } from "../../shared/scripts/bank-repo.js";
 // --- Small inline icons for the sidebar (single source, DRY) ----------
 const NAV_ICONS = {
   forum: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 20l1.4-4.2A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/></svg>`,
@@ -294,7 +295,9 @@ export function renderCommunity(basePath = "") {
     // Panoul „Tablă": tot ce e nesalvat stă AICI, nu în pagină, fiindcă panoul
     // se redesenează întreg la fiecare bifă.
     bk: { lectie: null, kind: null, text: "", masa: [], banca: [], incarc: false,
-          nota: "", notaBuna: false },
+          nota: "", notaBuna: false,
+          // Filtrele tabelului băncii de acum (cel de sub „Importă").
+          q: "", fFel: null, fEt: "", fNiv: "", sort: { key: "nou", dir: "desc" } },
     dash: null,           // dashboard aggregates (server-side), null until loaded
     dashSort: "-joined",  // members table: field, „-" prefix = descending
     adminUserQuery: "",
@@ -3420,9 +3423,11 @@ export function renderCommunity(basePath = "") {
   function deschideTabla() {
     const slug = state.adminLesson;
     if (state.bk.lectie !== slug) {
+      const felDintai = materialulLectiei(slug)?.feluri[0].kind || null;
       state.bk = {
-        lectie: slug, kind: materialulLectiei(slug)?.feluri[0].kind || null,
-        text: "", masa: [], banca: [], incarc: true, nota: "",
+        lectie: slug, kind: felDintai,
+        text: "", masa: [], banca: [], incarc: true, nota: "", notaBuna: false,
+        q: "", fFel: felDintai, fEt: "", fNiv: "", sort: { key: "nou", dir: "desc" },
       };
     }
     incarcaBanca(slug).then(() => { state.bk.incarc = false; render(); });
@@ -4756,6 +4761,30 @@ export function renderCommunity(basePath = "") {
       case "bk-scoate":
         state.bk.masa = state.bk.masa.filter((_, i) => i !== Number(btn.dataset.i));
         return render();
+
+      /* ---- Tabelul băncii de acum: filtre, sortare ---- */
+      case "bkb-fel":
+        // Felul schimbă COLOANELE, deci filtrul de etichetă nu mai are înțeles.
+        state.bk.fFel = btn.dataset.val;
+        state.bk.fEt = "";
+        return render();
+      case "bkb-et":
+        state.bk.fEt = btn.dataset.val;
+        return render();
+      case "bkb-niv":
+        state.bk.fNiv = btn.dataset.val;
+        return render();
+      case "bkb-sort": {
+        const k = btn.dataset.val;
+        const acum = state.bk.sort || {};
+        state.bk.sort = acum.key === k
+          ? { key: k, dir: acum.dir === "asc" ? "desc" : "asc" }
+          : { key: k, dir: "asc" };
+        return render();
+      }
+      case "bkb-curata":
+        state.bk.q = ""; state.bk.fEt = ""; state.bk.fNiv = "";
+        return render();
       case "bk-goleste":
         state.bk.masa = [];
         state.bk.nota = "";
@@ -5616,6 +5645,43 @@ export function renderCommunity(basePath = "") {
       state.bk.masa = state.bk.masa.map((r, k) => k === i ? { ...r, level: n } : r);
       return;
     }
+    /* ---- Tabelul băncii: fiecare bifă e o SCRIERE, nu o intenție ----
+       Umblăm întâi în memorie, ca bifa să răspundă pe loc, și trimitem pe urmă.
+       Dacă serverul refuză, punem starea înapoi cum era și spunem de ce: o bifă
+       care rămâne pusă deși n-a fost salvată e mai rea decât una care sare
+       înapoi, fiindcă te minte. */
+    if (ce === "bkb-bifa") {
+      const id = el.dataset.id;
+      const et = el.dataset.et;
+      const vechi = state.bk.banca.find((x) => x.id === id);
+      if (!vechi) return;
+      const inainte = vechi.tags || [];
+      const acum = el.checked
+        ? [...new Set([...inainte, et])] : inainte.filter((t) => t !== et);
+      state.bk.banca = state.bk.banca.map((x) => x.id === id ? { ...x, tags: acum } : x);
+      bankUpdateItem(id, { tags: acum }).then((bine) => {
+        if (bine) return;
+        state.bk.banca = state.bk.banca.map((x) => x.id === id ? { ...x, tags: inainte } : x);
+        showToast("N-am putut salva eticheta.", { kind: "error" });
+        render();
+      });
+      return;
+    }
+    if (ce === "bkb-nivel") {
+      const id = el.dataset.id;
+      const n = Number(el.value) || 2;
+      const vechi = state.bk.banca.find((x) => x.id === id);
+      if (!vechi) return;
+      const inainte = vechi.level;
+      state.bk.banca = state.bk.banca.map((x) => x.id === id ? { ...x, level: n } : x);
+      bankUpdateItem(id, { level: n }).then((bine) => {
+        if (bine) return;
+        state.bk.banca = state.bk.banca.map((x) => x.id === id ? { ...x, level: inainte } : x);
+        showToast("N-am putut salva dificultatea.", { kind: "error" });
+        render();
+      });
+      return;
+    }
     if (ce === "bk-nivel-tot") {
       const n = Number(el.value);
       if (!n) return;
@@ -5636,6 +5702,10 @@ export function renderCommunity(basePath = "") {
        întreg la orice schimbare, iar o redesenare la fiecare literă ar arunca
        cursorul afară din câmp. Aici doar ținem minte. */
     if (e.target.id === "bkText") { state.bk.text = e.target.value; return; }
+    if (e.target.id === "bkQ") {
+      state.bk.q = e.target.value;
+      return rerenderKeepingFocus("bkQ");
+    }
     if (e.target.id === "cx-feed-search") {
       state.feedQuery = e.target.value;
       state.feedLimit = 6; // new search → first page

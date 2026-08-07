@@ -166,18 +166,140 @@ function tabelul(masa, fel, s) {
     </div>`;
 }
 
+/* ---------- Banca de acum: tabel căutabil, filtrabil, re-etichetabil ----------
+
+   A fost o vreme o grămadă de pastile, una lângă alta. Mergea la douăzeci de
+   intrări; la o sută, ochiul nu mai găsea nimic, iar ca să schimbi o etichetă
+   trebuia să ștergi cuvântul și să-l pui din nou. Acum e același tabel ca cel de
+   dinainte de import, ca să nu se învețe două lucruri pentru aceeași treabă.
+
+   DEOSEBIREA E CĂ AICI RÂNDURILE SUNT ADEVĂRATE. În tabelul de sus bifele stau
+   în memorie până la „Importă"; aici fiecare bifă e o scriere în bază, pe loc.
+   De-aia acțiunile au alt nume („bkb-", de la banca), ca să nu se amestece. */
+
+const FARA_ETICHETA = "__fara__";
+
+/** Ce rânduri se văd, după fel, etichetă, dificultate și căutare. */
+export function filtreazaBanca(banca, f = {}) {
+  const q = cheia(f.q || "");
+  return (banca || []).filter((it) => {
+    if (f.fel && it.kind !== f.fel) return false;
+    if (f.eticheta === FARA_ETICHETA) { if ((it.tags || []).length) return false; }
+    else if (f.eticheta && !(it.tags || []).includes(f.eticheta)) return false;
+    if (f.nivel && Number(it.level) !== Number(f.nivel)) return false;
+    if (q && !cheia(it.body).includes(q)) return false;
+    return true;
+  });
+}
+
+/** Aceeași listă, așezată. Alfabetic e singura ordine care ajută la căutat cu
+ *  ochiul; „cele mai noi întâi" ajută imediat după import, deci o păstrăm. */
+export function sorteazaBanca(randuri, sort = {}) {
+  const cheiaSort = sort.key || "nou";
+  const semn = sort.dir === "asc" ? 1 : -1;
+  const asezate = [...randuri];
+  if (cheiaSort === "corp") {
+    asezate.sort((a, b) => cheia(a.body).localeCompare(cheia(b.body), "ro"));
+    if (sort.dir === "desc") asezate.reverse();
+  } else if (cheiaSort === "nivel") {
+    asezate.sort((a, b) => (Number(a.level) - Number(b.level)) * (sort.dir === "desc" ? -1 : 1));
+  } else {
+    asezate.sort((a, b) => (String(a.created_at || "") < String(b.created_at || "") ? 1 : -1) * (semn === 1 ? -1 : 1));
+  }
+  return asezate;
+}
+
 function bancaDeAcum(lectie, st) {
-  const tot = st.banca || [];
   if (st.incarc) return `<div class="cx-box"><p class="cx-muted">Se încarcă banca…</p></div>`;
+  const desc = materialulLectiei(lectie.slug);
+  const tot = st.banca || [];
+  if (!tot.length) {
+    return `<div class="cx-box">
+      <div class="cx-admin__head"><h3>Ce e în bancă</h3></div>
+      <p class="cx-muted">Banca e goală încă. Lipește prima listă sus.</p></div>`;
+  }
+
+  const fel = st.fFel || desc.feluri[0].kind;
+  const felDesc = felulMaterialului(lectie.slug, fel) || desc.feluri[0];
+  const cols = felDesc.etichete;
+  const vazute = sorteazaBanca(
+    filtreazaBanca(tot, { fel, eticheta: st.fEt, nivel: st.fNiv, q: st.q }),
+    st.sort || {}
+  );
+
+  /* Numerele de pe filtre se socotesc pe felul ales, nu pe toată banca: altfel
+     ai vedea „silabe · 40" și, după ce alegi, un tabel gol, fiindcă cele 40 erau
+     de alt fel. Un număr care minte e mai rău decât niciun număr. */
+  const dinFel = filtreazaBanca(tot, { fel });
+  const catePeFel = (k) => tot.filter((it) => it.kind === k).length;
+  const catePeEticheta = (et) => et === FARA_ETICHETA
+    ? dinFel.filter((it) => !(it.tags || []).length).length
+    : dinFel.filter((it) => (it.tags || []).includes(et)).length;
+
+  const chip = (activ, actiune, val, text, nr) =>
+    `<button type="button" class="cxbk__chip${activ ? " on" : ""}" data-action="${actiune}" data-val="${val}">
+      ${esc(text)}${nr === undefined ? "" : `<span class="cxbk__chipn">${nr}</span>`}</button>`;
+
+  const sageata = (k) => (st.sort?.key === k ? (st.sort.dir === "desc" ? " ▼" : " ▲") : "");
+  const capSort = (k, text, clasa) =>
+    `<th class="${clasa}"><button type="button" class="cxbk__sort${st.sort?.key === k ? " on" : ""}"
+      data-action="bkb-sort" data-val="${k}">${esc(text)}${sageata(k)}</button></th>`;
+
   return `<div class="cx-box">
       <div class="cx-admin__head"><h3>Ce e în bancă · ${tot.length}</h3></div>
-      ${tot.length ? `<div class="cxbk__lista">${tot.map((it) => `
-        <span class="cxbk__it">${esc(it.body)}
-          <span class="cxbk__itn">${esc((it.tags || []).join(" · ") || "fără etichetă")} · ${NIVELE[it.level] || it.level}</span>
-          <button type="button" class="cxbk__itx" data-action="bk-sterge" data-id="${esc(it.id)}"
-            title="Scoate din bancă" aria-label="Scoate din bancă">×</button>
-        </span>`).join("")}</div>`
-        : `<p class="cx-muted">Banca e goală încă. Lipește prima listă sus.</p>`}
+
+      <div class="cxbk__unelte">
+        <input class="cx-input cxbk__cauta" id="bkQ" type="search" autocomplete="off"
+          placeholder="caută în bancă…" value="${esc(st.q || "")}" aria-label="Caută în bancă">
+        <span class="cx-muted cxbk__cate">${vazute.length === tot.length
+          ? cuDe(tot.length, "intrare", "intrări")
+          : `${vazute.length} din ${tot.length}`}</span>
+      </div>
+
+      <div class="cxbk__filtre">
+        <span class="cxbk__flabel">Fel</span>
+        ${desc.feluri.map((f) => chip(fel === f.kind, "bkb-fel", f.kind, f.nume, catePeFel(f.kind))).join("")}
+      </div>
+      <div class="cxbk__filtre">
+        <span class="cxbk__flabel">Etichetă</span>
+        ${chip(!st.fEt, "bkb-et", "", "toate", dinFel.length)}
+        ${cols.map((c) => chip(st.fEt === c.slug, "bkb-et", c.slug, c.nume, catePeEticheta(c.slug))).join("")}
+        ${chip(st.fEt === FARA_ETICHETA, "bkb-et", FARA_ETICHETA, "fără etichetă", catePeEticheta(FARA_ETICHETA))}
+      </div>
+      <div class="cxbk__filtre">
+        <span class="cxbk__flabel">Dificultate</span>
+        ${chip(!st.fNiv, "bkb-niv", "", "oricare")}
+        ${[1, 2, 3].map((n) => chip(Number(st.fNiv) === n, "bkb-niv", n, NIVELE[n],
+          dinFel.filter((it) => Number(it.level) === n).length)).join("")}
+      </div>
+
+      ${vazute.length ? `<div class="cxbk__masa">
+        <div class="cxbk__sul cxbk__sul--banca"><table class="cxbk__t">
+          <thead><tr>
+            <th class="cxbk__nr"></th>
+            ${capSort("corp", "Material", "cxbk__corp")}
+            ${cols.map((c) => `<th>${esc(c.nume)}</th>`).join("")}
+            ${capSort("nivel", "Dificultate", "")}
+            <th class="cxbk__x"></th>
+          </tr></thead>
+          <tbody>${vazute.map((it, i) => `<tr class="cxbk__r">
+            <td class="cxbk__nr">${i + 1}.</td>
+            <td class="cxbk__corp">${esc(it.body)}</td>
+            ${cols.map((c) => `<td><input type="checkbox" data-action="bkb-bifa"
+              data-id="${esc(it.id)}" data-et="${c.slug}"
+              ${(it.tags || []).includes(c.slug) ? "checked" : ""}
+              aria-label="${esc(c.nume + ": " + it.body)}"></td>`).join("")}
+            <td><select class="cx-input cxbk__niv" data-action="bkb-nivel" data-id="${esc(it.id)}"
+              aria-label="Dificultatea pentru ${esc(it.body)}">
+              ${[1, 2, 3].map((n) => `<option value="${n}"${Number(it.level) === n ? " selected" : ""}>${NIVELE[n]}</option>`).join("")}
+            </select></td>
+            <td class="cxbk__x"><button type="button" class="cxbk__scoate" data-action="bk-sterge"
+              data-id="${esc(it.id)}" title="Scoate din bancă" aria-label="Scoate din bancă">×</button></td>
+          </tr>`).join("")}</tbody>
+        </table></div>
+      </div>`
+      : `<p class="cx-muted cxbk__nimic">Nimic nu se potrivește cu ce ai cerut.
+          <button type="button" class="btn-mini" data-action="bkb-curata">Șterge filtrele</button></p>`}
     </div>`;
 }
 
