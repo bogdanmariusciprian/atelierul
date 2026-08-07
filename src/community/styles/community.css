@@ -3197,6 +3197,23 @@ body.is-admin-larg main.container { max-width: 1800px; }
 }
 .cxbk__cap:hover, .cxbk__cap.e-plina { color: var(--color-primary); }
 .cxbk__niv { width: auto; font-size: 0.76rem; padding: 0.15rem 0.35rem; height: auto; }
+/* RÂNDUL DE SUB CURSOR SE APRINDE.
+   La o sută de rânduri și patru coloane de bifat, ochiul are de făcut un drum
+   lung de la cuvânt până la bifa lui, peste celule aproape goale. Un rând
+   luminat ține linia în locul tău, ca rigla pusă pe caiet. Culoarea e cea a
+   sitului, subțiată, ca să se vadă fără să strige.
+
+   Se pune pe CELULE, nu pe rând: rândurile care sunt deja în bancă au fundalul
+   lor pe `tr`, iar un fundal pus tot pe `tr` s-ar fi bătut cu el și n-ar fi
+   luminat nimic. Celula e deasupra rândului, deci câștigă mereu. */
+.cxbk__t tbody tr:hover > td {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-bg));
+}
+.cxbk__t tbody tr:hover > td:first-child { border-radius: 6px 0 0 6px; }
+.cxbk__t tbody tr:hover > td:last-child { border-radius: 0 6px 6px 0; }
+/* Cuvântul se îngroașă puțin: te uiți la el, nu la bife. */
+.cxbk__t tbody tr:hover > .cxbk__corp { font-weight: 600; }
+
 /* Rândul care e deja în bancă se vede, dar nu pleacă a doua oară. Rămâne la
    vedere anume, ca să știi de ce n-au intrat toate cuvintele. */
 .cxbk__r.e-gata { background: var(--color-surface); color: var(--color-text-muted); }
