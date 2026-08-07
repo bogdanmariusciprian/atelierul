@@ -3154,13 +3154,6 @@ body.is-admin-larg main.container { max-width: 1800px; }
 .cxbk__sul { max-height: 46vh; overflow: auto; }
 /* Pe ecran lat, capetele de coloană stau drept: scrisul vertical era o
    strâmtorare, nu o alegere. Peste 1500px încape orice etichetă la orizontală. */
-/* Pe ecran lat, tabelul respiră: rânduri mai înalte, scris mai mare, mai multe
-   rânduri deodată sub ochi. */
-@media (min-width: 1500px) {
-  .cxbk__sul { max-height: 64vh; }
-  .cxbk__t { font-size: 0.88rem; }
-  .cxbk__t th, .cxbk__t td { padding: 0.35rem 0.6rem; }
-}
 .cxbk__t { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
 .cxbk__t th, .cxbk__t td {
   border-bottom: 1px solid var(--color-border);
@@ -3207,12 +3200,29 @@ body.is-admin-larg main.container { max-width: 1800px; }
    lor pe `tr`, iar un fundal pus tot pe `tr` s-ar fi bătut cu el și n-ar fi
    luminat nimic. Celula e deasupra rândului, deci câștigă mereu. */
 .cxbk__t tbody tr:hover > td {
-  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-bg));
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-bg));
 }
-.cxbk__t tbody tr:hover > td:first-child { border-radius: 6px 0 0 6px; }
+.cxbk__t tbody tr:hover > td:first-child {
+  border-radius: 6px 0 0 6px;
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
 .cxbk__t tbody tr:hover > td:last-child { border-radius: 0 6px 6px 0; }
 /* Cuvântul se îngroașă puțin: te uiți la el, nu la bife. */
-.cxbk__t tbody tr:hover > .cxbk__corp { font-weight: 600; }
+.cxbk__t tbody tr:hover > .cxbk__corp { font-weight: 600; color: var(--color-text); }
+/* Rândul din bancă are fundalul lui pe `tr`; cel de sub cursor trebuie să-l
+   acopere, altfel tocmai rândurile dungate ar rămâne singurele neluminate. */
+.cxbk__r.e-gata:hover > td {
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+}
+
+/* Pe ecran lat, tabelul respiră: rânduri mai înalte, scris mai mare, mai multe
+   rânduri deodată sub ochi. Blocul stă DUPĂ regulile de bază, altfel ele l-ar
+   întoarce: la aceeași putere, câștigă cea scrisă mai jos. */
+@media (min-width: 1500px) {
+  .cxbk__sul { max-height: 64vh; }
+  .cxbk__t { font-size: 0.88rem; }
+  .cxbk__t th, .cxbk__t td { padding: 0.4rem 0.6rem; }
+}
 
 /* Rândul care e deja în bancă se vede, dar nu pleacă a doua oară. Rămâne la
    vedere anume, ca să știi de ce n-au intrat toate cuvintele. */
