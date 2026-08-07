@@ -31,6 +31,10 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 
 let radacina = null;
 let toate = [];
+/* Ce n-a mers la ultima încercare. Se arată în panou, nu se înghite: o notiță
+   care nu se salvează și nu spune de ce e mai rea decât una care nu se scrie
+   deloc, fiindcă tu crezi că ai scris-o. */
+let motiv = "";
 let fila = "aici";      // „aici" | „toate"
 let deschis = false;
 let bazaSitului = "";
@@ -95,6 +99,7 @@ function deseneaza() {
         <button type="button" class="${fila === "aici" ? "on" : ""}" data-todo="fila" data-val="aici">Aici</button>
         <button type="button" class="${fila === "toate" ? "on" : ""}" data-todo="fila" data-val="toate">Toate</button>
       </div>
+      ${motiv ? `<p class="todo-motiv" role="alert">${esc(motiv)}</p>` : ""}
       <div class="todo-scris">
         <textarea data-todo="camp" rows="1" placeholder="Ce ai de făcut aici?"
           aria-label="Notiță nouă"></textarea>
@@ -113,8 +118,16 @@ async function adauga() {
   const camp = radacina.querySelector('[data-todo="camp"]');
   const text = camp ? camp.value.trim() : "";
   if (!text) { camp?.focus(); return; }
-  const rand = await addTodo(text, cheiaPaginii(), numelePaginii());
-  if (!rand) return;
+  const { rand, motiv: rau } = await addTodo(text, cheiaPaginii(), numelePaginii());
+  if (!rand) {
+    // Textul NU se pierde: rămâne în câmp, ca să-l poți încerca din nou.
+    motiv = rau || "n-am putut salva";
+    deseneaza();
+    const c = radacina.querySelector('[data-todo="camp"]');
+    if (c) { c.value = text; c.focus(); }
+    return;
+  }
+  motiv = "";
   toate = [rand, ...toate];
   deseneaza();
   radacina.querySelector('[data-todo="camp"]')?.focus();
@@ -136,7 +149,9 @@ function leagaEvenimente() {
     if (!nota) return;
     const id = nota.dataset.id;
     if (ce === "sterge") {
-      if (!(await removeTodo(id))) return;
+      const rau = await removeTodo(id);
+      if (rau) { motiv = rau; return deseneaza(); }
+      motiv = "";
       toate = toate.filter((t) => t.id !== id);
       return deseneaza();
     }
@@ -150,9 +165,13 @@ function leagaEvenimente() {
     if (!id) return;
     const gata = el.checked;
     toate = toate.map((t) => (t.id === id ? { ...t, done: gata } : t));
+    motiv = "";
     deseneaza();
-    if (await setTodoDone(id, gata)) return;
+    const rau = await setTodoDone(id, gata);
+    if (!rau) return;
+    // N-a mers: punem bifa înapoi cum era și spunem de ce.
     toate = toate.map((t) => (t.id === id ? { ...t, done: !gata } : t));
+    motiv = rau;
     deseneaza();
   });
 
@@ -174,8 +193,10 @@ function leagaEvenimente() {
     const vechi = toate.find((x) => x.id === id);
     if (!id || !text || !vechi || text === vechi.body) { deseneaza(); return; }
     toate = toate.map((x) => (x.id === id ? { ...x, body: text } : x));
-    if (!(await setTodoBody(id, text))) {
+    const rau = await setTodoBody(id, text);
+    if (rau) {
       toate = toate.map((x) => (x.id === id ? { ...x, body: vechi.body } : x));
+      motiv = rau;
     }
     deseneaza();
   });
@@ -211,6 +232,8 @@ export async function initTodo(basePath = "") {
   leagaEvenimente();
   deseneaza();
 
-  toate = await listTodos();
+  const { note, motiv: rau } = await listTodos();
+  toate = note;
+  motiv = rau || "";
   deseneaza();
 }

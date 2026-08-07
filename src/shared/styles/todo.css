@@ -107,6 +107,19 @@
 }
 .todo-file button.on { background: #1f2430; color: #fff; border-color: transparent; }
 
+/* De ce n-a mers. Stă între file și câmpul de scris, adică exact acolo unde te
+   uiți după ce ai apăsat, nu într-un colț pe care nu-l bagi în seamă. */
+.todo-motiv {
+  margin: 8px 12px 0;
+  padding: 7px 10px;
+  border: 1px solid #e24b4a;
+  border-radius: 10px;
+  background: #fdeceb;
+  color: #a3312a;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .todo-scris { display: flex; gap: 6px; padding: 10px 12px; }
 .todo-scris textarea {
   flex: 1; min-height: 38px; max-height: 120px; resize: vertical;

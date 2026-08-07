@@ -31,6 +31,32 @@ export function numelePaginii(doc = document) {
   return String(doc.title || "").split(/\s+[–|]\s+/)[0].trim() || "Pagină";
 }
 
+/**
+ * Eroarea bazei, tălmăcită în ceva de arătat pe ecran.
+ *
+ * Fără asta, o notiță care nu se salvează pur și simplu nu apare, iar tu nu
+ * afli niciodată de ce: tabelul lipsește? te-a scos sesiunea? n-ai semnal?
+ * O scriere care pică în tăcere e cel mai rău fel de stricăciune, fiindcă îți
+ * mănâncă lucrul fără să sufle o vorbă.
+ */
+export function motivul(error) {
+  const cod = error && error.code;
+  const txt = ((error && error.message) || "").toLowerCase();
+  if (cod === "42P01" || txt.includes("does not exist") || txt.includes("schema cache")) {
+    return "tabelul lipsește: aplică migrarea 0081";
+  }
+  if (cod === "42501" || txt.includes("row-level security") || txt.includes("policy")) {
+    return "serverul refuză: intră cu contul de profesor";
+  }
+  if (txt.includes("jwt") || txt.includes("token") || cod === "PGRST301") {
+    return "sesiunea a expirat: intră din nou în cont";
+  }
+  if (txt.includes("failed to fetch") || txt.includes("networkerror")) {
+    return "fără legătură la server";
+  }
+  return `${cod || "eroare"}: ${(error && error.message) || "necunoscută"}`;
+}
+
 /** Toate notițele, cele mai noi întâi. Sunt zeci, nu mii: le aducem pe toate
  *  și le împărțim pe pagini în browser, ca fila „Toate" să fie gata pe loc. */
 export async function listTodos() {
@@ -38,44 +64,51 @@ export async function listTodos() {
     .from("admin_todos")
     .select("id, path, title, body, done, created_at")
     .order("created_at", { ascending: false });
-  if (error) { console.warn("listTodos:", error.message); return []; }
-  return data || [];
+  if (error) {
+    console.warn("listTodos:", error.code, error.message);
+    return { note: [], motiv: motivul(error) };
+  }
+  return { note: data || [], motiv: null };
 }
 
-/** Adaugă o notiță pe pagina de față. Întoarce rândul, ori `null`. */
+/** Adaugă o notiță pe pagina de față. Întoarce `{ rand, motiv }`. */
 export async function addTodo(body, path, title) {
   const text = String(body || "").trim();
-  if (!text) return null;
+  if (!text) return { rand: null, motiv: "n-ai scris nimic" };
   const { data: u } = await supabase.auth.getUser();
+  if (!u?.user) return { rand: null, motiv: "nu ești logat: intră în cont" };
   const { data, error } = await supabase
     .from("admin_todos")
-    .insert({ path, title, body: text, created_by: u?.user?.id ?? null })
+    .insert({ path, title, body: text, created_by: u.user.id })
     .select("id, path, title, body, done, created_at")
     .single();
-  if (error) { console.warn("addTodo:", error.message); return null; }
-  return data;
+  if (error) {
+    console.error("addTodo a picat:", { code: error.code, message: error.message });
+    return { rand: null, motiv: motivul(error) };
+  }
+  return { rand: data, motiv: null };
 }
 
 /** Bifează sau debifează. */
 export async function setTodoDone(id, done) {
   const { error } = await supabase.from("admin_todos").update({ done }).eq("id", id);
-  if (error) { console.warn("setTodoDone:", error.message); return false; }
-  return true;
+  if (error) { console.warn("setTodoDone:", error.message); return motivul(error); }
+  return null;
 }
 
 /** Schimbă textul unei notițe. */
 export async function setTodoBody(id, body) {
   const text = String(body || "").trim();
-  if (!text) return false;
+  if (!text) return "n-ai scris nimic";
   const { error } = await supabase.from("admin_todos").update({ body: text }).eq("id", id);
-  if (error) { console.warn("setTodoBody:", error.message); return false; }
-  return true;
+  if (error) { console.warn("setTodoBody:", error.message); return motivul(error); }
+  return null;
 }
 
 export async function removeTodo(id) {
   const { error } = await supabase.from("admin_todos").delete().eq("id", id);
-  if (error) { console.warn("removeTodo:", error.message); return false; }
-  return true;
+  if (error) { console.warn("removeTodo:", error.message); return motivul(error); }
+  return null;
 }
 
 /** Notițele așezate pe pagini, pentru fila „Toate". Paginile cu treabă
