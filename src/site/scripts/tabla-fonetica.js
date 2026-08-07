@@ -1206,6 +1206,41 @@ function caretLaCoada(camp) {
    Schimbarea exercițiului nu e altceva decât „pune deoparte rândurile astea,
    scoate-le pe celelalte".
    ============================================================ */
+/* Cele șase cerințe, una pe față. Textul lor e al profesorului, nu al meu:
+   se schimbă aici, într-un singur loc, și se schimbă peste tot. */
+const CERINTE = {
+  1: 'Precizează numărul de litere și de sunete din cuvintele date:',
+  2: 'Extrage grupurile de sunete din cuvintele date:',
+  3: 'Desparte în silabe cuvintele date:',
+  4: 'Stabilește valoarea fonetică a lui [i] în cuvintele date:',
+  5: 'Oferă cuvinte pentru structurile fonetice date:',
+  6: 'Transcrie fonetic propoziția dată:',
+};
+
+/* CERINȚA UNUI FEL NU SE ȚINE MINTE PE EXERCIȚIU.
+   O vreme am scris-o în fiecare exercițiu, la facere. Mergea, dar mințea:
+   dacă schimbam textul de mai sus, tablele scrise ieri rămâneau cu cel vechi,
+   deși „un singur loc" era chiar ce promitea comentariul. Acum exercițiul ține
+   minte NUMĂRUL felului, iar textul se citește de fiecare dată de aici. Cine
+   și-a scris singur cerința o ține pe a lui, cum se cuvine. */
+
+/** Textul cerinței, fără cuvinte: al felului, ori al lui. */
+function bazaCerintei(ex) {
+  if (!ex) return '';
+  if (ex.sursa !== 'mana' && ex.fata && CERINTE[ex.fata]) return CERINTE[ex.fata];
+  return ex.cerinta || '';
+}
+
+/** Ce față are un text care seamănă cu unul dintre cele șase șabloane.
+    Semnul de la coadă nu contează: tablele vechi se sfârșeau cu punct. */
+function fataDupaText(text) {
+  const curat = (t) => String(t || '').trim().replace(/[.:;]+$/, '').toLowerCase();
+  const c = curat(text);
+  if (!c) return null;
+  for (const f of [1, 2, 3, 4, 5, 6]) if (curat(CERINTE[f]) === c) return f;
+  return null;
+}
+
 let exercitii = [];
 let deschis = 0;
 
@@ -1230,7 +1265,7 @@ function exercitiuNou({ cerinta = '', sursa = 'mana', fata = null, tema = false 
 /** Cerința așa cum se citește pe tablă: textul, apoi cuvintele, în continuare. */
 function textulCerintei(ex) {
   if (!ex) return '';
-  const c = ex.cerinta || '';
+  const c = bazaCerintei(ex);
   const cuv = (ex.cuvinte || []).join(', ');
   if (!cuv) return c;
   return c ? c + ' ' + cuv : cuv;
@@ -1392,7 +1427,7 @@ function adaugaExercitiu(cfg) {
 const elCerintaNoua = document.getElementById('cerintaNoua');
 elCerintaNoua && elCerintaNoua.addEventListener('click', () => {
   ceFel(true, (fata) => {
-    adaugaExercitiu(fata ? { cerinta: CERINTE[fata], sursa: 'tip', fata } : {});
+    adaugaExercitiu(fata ? { sursa: 'tip', fata } : {});
     const t = elTeanc.querySelector('.cer.e-deschisa textarea');
     if (t) t.focus();
   });
@@ -1434,11 +1469,17 @@ function deslusesteExercitiile(state) {
       const bucati = String(e.cerinta || '').split('\n');
       const cuvinte = Array.isArray(e.cuvinte) ? e.cuvinte
         : bucati.slice(1).join(' ').split(',').map((x) => x.trim()).filter(Boolean);
+      /* Un text care seamănă cu unul dintre cele șase șabloane E textul acelui
+         fel, chiar dacă tabla e scrisă acum o lună și se sfârșea cu punct. Așa
+         se îndreaptă singure și cerințele vechi, fără să umble nimeni prin ele. */
+      const dupaSablon = fataDupaText(bucati[0]);
+      const sursa = e.sursa === 'zar' ? 'zar'
+                  : (dupaSablon || e.sursa === 'tip') ? 'tip' : 'mana';
       return {
         id: e.id || ('e' + Math.random().toString(36).slice(2, 8)),
         cerinta: bucati[0] || '',
-        sursa: e.sursa === 'zar' ? 'zar' : (e.sursa === 'tip' ? 'tip' : 'mana'),
-        fata: e.fata || null,
+        sursa,
+        fata: e.fata || dupaSablon || null,
         tema: !!e.tema,
         cuvinte,
         randuri: Array.isArray(e.randuri) ? e.randuri : [],
@@ -1828,17 +1869,6 @@ import { listItems } from '../../shared/scripts/bank-repo.js';
 import { fataZarului, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
   from '../../shared/scripts/board-material.js';
 
-/* Cele șase cerințe, una pe față. Textul lor e al profesorului, nu al meu:
-   se schimbă aici, într-un singur loc, și se schimbă peste tot. */
-const CERINTE = {
-  1: 'Precizează numărul de litere și de sunete din cuvintele date:',
-  2: 'Extrage grupurile de sunete din cuvintele date:',
-  3: 'Desparte în silabe cuvintele date:',
-  4: 'Stabilește valoarea fonetică a lui [i] în cuvintele date:',
-  5: 'Oferă cuvinte pentru structurile fonetice date:',
-  6: 'Transcrie fonetic propoziția dată:',
-};
-
 /* ---------- Zarul ---------- */
 const elTavita  = document.getElementById('zarTavita');
 const elZar     = document.getElementById('zar');
@@ -1946,7 +1976,7 @@ function aruncaZarul() {
    ori. */
 function gataAruncarea(fata) {
   try {
-    adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'zar', fata });
+    adaugaExercitiu({ sursa: 'zar', fata });
   } catch (e) {
     console.error('exercițiul de la zar nu s-a putut face:', e);
   }
@@ -2141,7 +2171,7 @@ function potrivesteFereastraGen() {
     if (elGenTintaK) elGenTintaK.textContent = 'Cerința în care intră';
     if (elGenTintaT) {
       const ex = exercitii[deschis];
-      elGenTintaT.textContent = (ex && ex.cerinta.trim()) || 'exercițiul deschis';
+      elGenTintaT.textContent = (ex && bazaCerintei(ex).trim()) || 'exercițiul deschis';
     }
     return;
   }
@@ -2157,7 +2187,7 @@ function potrivesteFereastraGen() {
   if (elGenTintaT) {
     // La un exercițiu care are deja cerința scrisă, arătăm chiar textul lui, nu
     // șablonul: altfel fereastra ar promite altceva decât scrie pe tablă.
-    const scrisa = !nou && ex ? (ex.cerinta || '').trim() : '';
+    const scrisa = !nou && ex ? bazaCerintei(ex).trim() : '';
     elGenTintaT.textContent = scrisa || CERINTE[fata];
   }
   if (elGenCe) elGenCe.textContent = numeFel(cfg.kind);
@@ -2274,7 +2304,7 @@ elGenFa && elGenFa.addEventListener('click', async () => {
   // fel (cerință scrisă de mână), îl capătă acum și nu va mai fi întrebat.
   let ex;
   if ((elGenNou && elGenNou.checked) || !exercitii[deschis]) {
-    ex = adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'tip', fata });
+    ex = adaugaExercitiu({ sursa: 'tip', fata });
   } else {
     ex = exercitii[deschis];
     if (!ex.fata) ex.fata = fata;
@@ -2283,7 +2313,6 @@ elGenFa && elGenFa.addEventListener('click', async () => {
   /* CUVINTELE stau lângă cerință, ca elevul să le vadă și când derulează, dar
      nu ÎN ea: la a doua generare le înlocuim, nu le îngrămădim. Cerința scrisă
      de mână rămâne cum a scris-o; șablonul e numai pentru cea goală. */
-  if (!ex.cerinta.trim()) ex.cerinta = CERINTE[fata];
   ex.cuvinte = texte;
   ex.tema = !!(elGenTema && elGenTema.checked);
 
