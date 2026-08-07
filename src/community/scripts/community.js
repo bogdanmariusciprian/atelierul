@@ -88,7 +88,7 @@ import { fetchDashboard } from "../../shared/scripts/dashboard-repo.js";
 import { dashboardHtml } from "./admin-dashboard.js";
 import { adminNavHtml, citesteRuta, scrieRuta, PARTI_LECTIE } from "./admin-nav.js";
 import { boardPanelHtml, randuriDinLista, socoteala, cuDe } from "./admin-board.js";
-import { materialulLectiei } from "../../shared/scripts/board-material.js";
+import { materialulLectiei, felulMaterialului } from "../../shared/scripts/board-material.js";
 import { listAll as bankListAll, addRows as bankAddRows, deleteItem as bankDeleteItem,
   countByLesson as bankCountByLesson, cheia as bankCheia } from "../../shared/scripts/bank-repo.js";
 // --- Small inline icons for the sidebar (single source, DRY) ----------
@@ -4700,6 +4700,19 @@ export function renderCommunity(basePath = "") {
         state.bk.masa = state.bk.masa.map((r) => r.gata ? r : {
           ...r, tags: scoatem ? r.tags.filter((t) => t !== et) : [...new Set([...r.tags, et])],
         });
+        return render();
+      }
+      /* Toate etichetele, la toate rândurile. Al doilea click le scoate, ca la
+         capul de coloană: același gest, aceeași urmare, la altă întindere. */
+      case "bk-tot": {
+        const cols = (felulMaterialului(state.adminLesson, state.bk.kind)
+          || materialulLectiei(state.adminLesson)?.feluri[0])?.etichete || [];
+        const toate = cols.map((c) => c.slug);
+        const deTrimis = state.bk.masa.filter((r) => !r.gata);
+        const scoatem = deTrimis.length > 0
+          && deTrimis.every((r) => toate.every((t) => r.tags.includes(t)));
+        state.bk.masa = state.bk.masa.map((r) => r.gata ? r
+          : { ...r, tags: scoatem ? [] : [...toate] });
         return render();
       }
       case "bk-scoate":

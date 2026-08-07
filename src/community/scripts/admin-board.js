@@ -142,11 +142,23 @@ function tabelul(masa, fel, s) {
   if (s.gata) vorbe.push(`${s.gata} deja în bancă`);
   if (s.fara) vorbe.push(cuDe(s.fara, "fără bifă", "fără bifă"));
 
+  /* BIFEAZĂ TOT. Uneori e mai scurt drumul invers: pui bifa peste tot și pe
+     urmă scoți de la cele câteva cuvinte care nu se potrivesc. La o listă de
+     o sută de cuvinte și patru etichete, asta înseamnă un click în loc de
+     patru, iar restul lucrului e oricum de făcut cu ochiul pe fiecare rând.
+     Butonul spune ce URMEAZĂ să facă, nu în ce stare e: „Bifează tot" când mai
+     e ceva de bifat, „Scoate toate bifele" când e plin. */
+  const totBifat = deTrimis.length > 0
+    && deTrimis.every((r) => cols.every((c) => r.tags.includes(c.slug)));
+
   return `<div class="cxbk__masa">
       <div class="cxbk__sul"><table class="cxbk__t">
         <thead>${cap}</thead><tbody>${trup}</tbody></table></div>
       <div class="cxbk__jos">
         <span class="cx-muted">${esc(vorbe.join(" · "))}</span>
+        <button type="button" class="btn-mini" data-action="bk-tot"
+          title="Toate etichetele, la toate rândurile care încă n-au intrat în bancă">
+          ${totBifat ? "Scoate toate bifele" : "Bifează tot"}</button>
         <button type="button" class="btn-mini" data-action="bk-goleste">Golește tabelul</button>
         <button type="button" class="btn btn--primary btn--sm" data-action="bk-importa"
           ${s.pleaca ? "" : "disabled"}>Importă în bancă</button>
