@@ -3154,9 +3154,10 @@ body.is-admin-larg main.container { max-width: 1800px; }
 .cxbk__sul { max-height: 46vh; overflow: auto; }
 /* Pe ecran lat, capetele de coloană stau drept: scrisul vertical era o
    strâmtorare, nu o alegere. Peste 1500px încape orice etichetă la orizontală. */
+/* Pe ecran lat, tabelul respiră: rânduri mai înalte, scris mai mare, mai multe
+   rânduri deodată sub ochi. */
 @media (min-width: 1500px) {
   .cxbk__sul { max-height: 64vh; }
-  .cxbk__cap { writing-mode: horizontal-tb; transform: none; padding: 0.5rem 0.6rem; }
   .cxbk__t { font-size: 0.88rem; }
   .cxbk__t th, .cxbk__t td { padding: 0.35rem 0.6rem; }
 }
@@ -3178,13 +3179,21 @@ body.is-admin-larg main.container { max-width: 1800px; }
 .cxbk__corp { text-align: left; font-family: var(--font-mono, monospace); }
 .cxbk__x { width: 1.8rem; }
 /* Capul de coloană e buton: un click bifează toată coloana, al doilea o
-   dezbifează. Scrisul stă vertical, altfel patru etichete lungi ar face
-   tabelul mai lat decât panoul. */
+   dezbifează.
+
+   Scrisul stă DREPT. A stat o vreme pe verticală, de pe vremea când panoul era
+   strâmt și patru etichete lungi ar fi făcut tabelul mai lat decât fereastra.
+   Acum panoul are 1800px, deci strâmtoarea a dispărut, iar un cap de tabel
+   întors pe o parte se citește cu capul aplecat: e o piedică pe care n-o mai
+   plătește nimeni.
+
+   Ca să nu se lățească totuși coloanele peste măsură, eticheta se rupe pe două
+   rânduri („Despărțire în / silabe") în loc să întindă celula. */
 .cxbk__cap {
   border: 0; background: none; cursor: pointer; color: inherit; font: inherit;
-  padding: 0.5rem 0.15rem; width: 100%;
-  writing-mode: vertical-rl; transform: rotate(180deg);
-  white-space: nowrap; line-height: 1.1;
+  padding: 0.5rem 0.6rem; width: 100%;
+  max-width: 8.5rem; margin-inline: auto;
+  white-space: normal; line-height: 1.25; text-align: center;
 }
 .cxbk__cap:hover, .cxbk__cap.e-plina { color: var(--color-primary); }
 .cxbk__niv { width: auto; font-size: 0.76rem; padding: 0.15rem 0.35rem; height: auto; }
