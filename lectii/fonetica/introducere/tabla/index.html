@@ -273,6 +273,26 @@
   </div>
 </dialog>
 
+<!-- Șablon pentru un rând de PROPOZIȚIE.
+
+     Alt fel de exercițiu, alt fel de rând. La un cuvânt lucrezi pe etape, una
+     lângă alta: cuvânt → silabe → transcriere. O propoziție nu se desparte în
+     silabe și nu încape pe o etapă îngustă, așa că are numai două câmpuri, unul
+     sub altul și cât rândul de late.
+
+     Parantezele stau montate din capul locului, nu se pun la prima atingere:
+     câmpul e mare și gol, iar fără ele nu s-ar vedea de la o poștă că acolo se
+     scrie o transcriere. -->
+<template id="rowTemplateFraza">
+  <div class="row row--fraza">
+    <div class="rownum"></div>
+    <div class="fraza-teanc">
+      <div class="field fraza" contenteditable="true" data-ph="propoziția"></div>
+      <div class="field trans trans-fraza" contenteditable="true">[  ]</div>
+    </div>
+  </div>
+</template>
+
 <!-- Șablon pentru un rând de lucru -->
 <template id="rowTemplate">
   <div class="row">

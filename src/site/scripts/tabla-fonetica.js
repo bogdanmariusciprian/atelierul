@@ -82,7 +82,7 @@ function insertSymbol(key, field) {
      Un cursor așezat ÎNTR-UN TEXT n-are ce să rezolve, e limpede de la sine.
      De-aia punem după cutie un nod de text și intrăm în el. În transcriere
      textul acela e chiar virgula care desparte sunetele, deci nu costă nimic. */
-  const coada = document.createTextNode(eTranscriere(camp) ? VIRGULA : '');
+  const coada = document.createTextNode(cuVirgule(camp) ? VIRGULA : '');
   cutie.after(coada);
   loc.setStart(coada, coada.length);
   loc.collapse(true);
@@ -131,6 +131,20 @@ const VIRGULA = ', ';
 function eTranscriere(field) {
   return !!field && field.classList && field.classList.contains('trans');
 }
+
+/* TRANSCRIEREA UNEI PROPOZIȚII E TOT TRANSCRIERE, DAR FĂRĂ VIRGULE.
+
+   La un cuvânt, virgula desparte sunetele: „k, a, s, ă". La o propoziție
+   întreagă ar ieși un șirag de virgule în care nu se mai vede nimic, așa că
+   acolo sunetele se scriu unul după altul, iar SPAȚIUL desparte cuvintele.
+   Virgula rămâne pentru virgula din enunț, cratima pentru ortograme.
+
+   Toate celelalte reguli sunt aceleași: „c" tot „k" se face, sunetele speciale
+   tot în cutiile lor stau, diacriticele de pe Shift la fel. Se schimbă un
+   singur lucru, deci întrebăm un singur lucru. */
+const eFrazaTrans = (field) =>
+  !!field && field.classList && field.classList.contains('trans-fraza');
+const cuVirgule = (field) => eTranscriere(field) && !eFrazaTrans(field);
 
 /* Toate nodurile de text dintr-un câmp, în ordinea în care se citesc. */
 function noduriText(radacina) {
@@ -316,7 +330,7 @@ function stergeVirgula() {
    Regula rămâne cea de la început: virgulele le pune mașina, nu elevul. Deci,
    dacă înaintea cursorului stă un sunet fără despărțitor, îl punem noi. */
 function virgulaLipsa(camp) {
-  if (!eTranscriere(camp)) return;
+  if (!cuVirgule(camp)) return;
   const inainte = ultimele(1);
   if (!inainte) return;                          // suntem la începutul câmpului
   if (/[\s,\-[(]/.test(inainte)) return;          // e deja despărțit
@@ -326,7 +340,7 @@ function virgulaLipsa(camp) {
 /* Pune un sunet la cursor. În transcriere, cu virgula lui după el. */
 function insertSunet(text, field) {
   virgulaLipsa(field);
-  insertText(eTranscriere(field) ? text + VIRGULA : text);
+  insertText(cuVirgule(field) ? text + VIRGULA : text);
 }
 
 /* Semnele care NU sunt sunete, deci nu primesc virgulă. Apostroful lipsește
@@ -800,7 +814,8 @@ sheet.addEventListener('keydown', (e) => {
     // Ștergerea ia sunetul CU TOT CU virgula lui, dintr-o singură apăsare.
     // Virgula a pus-o mașina, nu elevul, deci tot mașina o strânge: altfel ar
     // trebui să apeși de două ori pentru fiecare greșeală.
-    if (e.key === 'Backspace' && !e.shiftKey && ultimele(VIRGULA.length) === VIRGULA) {
+    if (e.key === 'Backspace' && !e.shiftKey && cuVirgule(field) &&
+        ultimele(VIRGULA.length) === VIRGULA) {
       e.preventDefault();
       resetCK();
       stergeVirgula();
@@ -843,8 +858,12 @@ sheet.addEventListener('keydown', (e) => {
   // Cratimă -> „ - ”  (spațiu înainte și după).
   // În transcriere, cratima nu se adaugă lângă virgulă, ci ÎN LOCUL ei: acolo
   // unde tocmai se despărțeau două sunete, acum se despart două silabe.
+  /* Cratima: la cuvinte desparte silabele, deci stă cu aer în jur și ia locul
+     virgulei. La propoziții e semnul unei ortograme („s-a", „într-un"), deci se
+     lipește de sunetele dintre care stă. */
   if (e.key === '-') {
     e.preventDefault();
+    if (eFrazaTrans(field)) { insertText('-'); return; }
     if (eTranscriere(field)) stergeVirgula();
     insertText(' - ');
     return;
@@ -889,9 +908,23 @@ function placeCaret(el, atStart) {
   sel.addRange(range);
 }
 
-/* ---------- Creare / adăugare rânduri ---------- */
-function createRow() {
-  return rowTemplate.content.firstElementChild.cloneNode(true);
+/* ---------- Creare / adăugare rânduri ----------
+   Două șabloane, două feluri de rând: cel obișnuit (cuvânt → silabe →
+   transcriere → c/v/s) și cel de propoziție (propoziția, iar sub ea
+   transcrierea ei, cu parantezele montate). */
+const rowTemplateFraza = document.getElementById('rowTemplateFraza');
+
+function createRow(deFraza) {
+  const sablon = deFraza && rowTemplateFraza ? rowTemplateFraza : rowTemplate;
+  return sablon.content.firstElementChild.cloneNode(true);
+}
+
+/** Rândul ăsta e de propoziție? Îl întrebăm pe el, nu ținem minte pe alături. */
+const eRandDeFraza = (row) => !!row && row.classList.contains('row--fraza');
+
+/** Fața asta de zar cere propoziții? */
+function fataCereFraza(fata) {
+  return !!fata && fataZarului(LECTIE, Number(fata))?.kind === 'propozitie';
 }
 
 function renumber() {
@@ -901,7 +934,10 @@ function renumber() {
 }
 
 function addRowAfter(row) {
-  const newRow = createRow();
+  // Rândul nou seamănă cu cel de lângă care se naște: într-un exercițiu de
+  // propoziții adaugi tot o propoziție, nu un cuvânt.
+  const newRow = createRow(eRandDeFraza(row) ||
+    (!row && fataCereFraza(exercitiulDeschis()?.fata)));
   if (row && row.nextSibling) sheet.insertBefore(newRow, row.nextSibling);
   else sheet.appendChild(newRow);
   renumber();
@@ -971,7 +1007,7 @@ function currentRow() {
 }
 
 function addStageToRow(row) {
-  if (!row) return null;
+  if (!row || eRandDeFraza(row)) return null;
   const arrow = document.createElement('span');
   arrow.className = 'arrow';
   arrow.textContent = '→';
@@ -1124,12 +1160,17 @@ sheet.addEventListener('blur', (e) => {
   const field = e.target.closest && e.target.closest('.field');
   if (!field) return;
   const bare = field.textContent.replace(/​/g, '');
-  if (bare.trim() === '') { field.innerHTML = ''; return; }   // gol -> redă placeholder-ul
+  // Parantezele frazei rămân montate chiar și goale: ele arată unde se scrie.
+  if (bare.trim() === '' && !eFrazaTrans(field)) { field.innerHTML = ''; return; }
   // transcriere cu doar „[  ]" (neatinsă) -> o golim, ca să reapară placeholder-ul
-  if (field.classList.contains('trans') && /^\[\s*\]$/.test(bare.trim())) { field.innerHTML = ''; return; }
+  if (field.classList.contains('trans') && !eFrazaTrans(field) &&
+      /^\[\s*\]$/.test(bare.trim())) { field.innerHTML = ''; return; }
   // Virgula de la coadă și-a făcut treaba cât ai scris; acum ar rămâne
   // atârnată după ultimul sunet, așa că o strângem.
-  if (field.classList.contains('trans')) { taieVirgulaFinala(field); imbracaSimboluri(field); }
+  if (field.classList.contains('trans')) {
+    if (cuVirgule(field)) taieVirgulaFinala(field);   // fraza n-are virgulă de coadă
+    imbracaSimboluri(field);
+  }
   if (field.classList.contains('types')) {                    // c/v/s -> curăț spațiile de la coadă
     const trimmed = bare.replace(/\s+$/, '');
     if (trimmed !== field.textContent) field.textContent = trimmed;
@@ -1214,7 +1255,7 @@ const CERINTE = {
   3: 'Desparte în silabe cuvintele date:',
   4: 'Stabilește valoarea fonetică a lui [i] în cuvintele date:',
   5: 'Oferă cuvinte pentru structurile fonetice date:',
-  6: 'Transcrie fonetic propoziția dată:',
+  6: 'Transcrie fonetic propozițiile de mai jos:',
 };
 
 /* CERINȚA UNUI FEL NU SE ȚINE MINTE PE EXERCIȚIU.
@@ -1277,24 +1318,50 @@ const exercitiulDeschis = () => exercitii[deschis] || null;
 
 /** Rândurile din pagină, în formă de date. */
 function culegeRanduri() {
-  return Array.from(sheet.querySelectorAll('.row')).map(row => ({
-    word:  (row.querySelector('.word')  || {}).innerHTML || '',
-    syll:  (row.querySelector('.syll')  || {}).innerHTML || '',
-    trans: (row.querySelector('.trans') || {}).innerHTML || '',
-    types: (row.querySelector('.types') || {}).textContent || '',
-    extra: Array.from(row.querySelectorAll('.field.extra')).map(e => e.innerHTML)
-  }));
+  return Array.from(sheet.querySelectorAll('.row')).map((row) => {
+    if (eRandDeFraza(row)) {
+      const fr = row.querySelector('.fraza');
+      return {
+        fraza: fr ? fr.innerHTML : '',
+        trans: (row.querySelector('.trans') || {}).innerHTML || '',
+        blocata: !!fr && fr.getAttribute('contenteditable') === 'false',
+      };
+    }
+    return {
+      word:  (row.querySelector('.word')  || {}).innerHTML || '',
+      syll:  (row.querySelector('.syll')  || {}).innerHTML || '',
+      trans: (row.querySelector('.trans') || {}).innerHTML || '',
+      types: (row.querySelector('.types') || {}).textContent || '',
+      extra: Array.from(row.querySelectorAll('.field.extra')).map((e) => e.innerHTML),
+    };
+  });
 }
 
 /** Datele înapoi în pagină. Un rând gol dacă exercițiul n-are niciunul: o
  *  tablă fără nicio căsuță de scris n-ar spune elevului ce să facă. */
-function aseazaRanduri(randuri) {
+function aseazaRanduri(randuri, deFraza) {
   sheet.innerHTML = '';
   const lista = (randuri && randuri.length) ? randuri : [null];
-  lista.forEach(r => {
-    const row = createRow();
+  // Un exercițiu gol de propoziții tot un rând de propoziție primește: felul îl
+  // spune exercițiul, nu rândurile care încă nu există.
+  const frazaImplicit = deFraza !== undefined ? deFraza
+    : fataCereFraza(exercitiulDeschis()?.fata);
+  lista.forEach((r) => {
+    const eFraza = r ? r.fraza !== undefined : frazaImplicit;
+    const row = createRow(eFraza);
     sheet.appendChild(row);
     if (!r) return;
+    if (eFraza) {
+      const fr = row.querySelector('.fraza');
+      fr.innerHTML = r.fraza || '';
+      // Propoziția venită de la generator nu se schimbă: e materialul, nu lucrul
+      // elevului. Cea adăugată de mână se scrie.
+      if (r.blocata) fr.setAttribute('contenteditable', 'false');
+      const tr = row.querySelector('.trans');
+      if (r.trans) tr.innerHTML = r.trans;
+      imbracaSimboluri(tr);
+      return;
+    }
     row.querySelector('.word').innerHTML  = r.word  || '';
     row.querySelector('.syll').innerHTML  = r.syll  || '';
     row.querySelector('.trans').innerHTML = r.trans || '';
@@ -2194,12 +2261,6 @@ function potrivesteFereastraGen() {
   if (elGenNoiT) elGenNoiT.textContent = 'numai ' + numeFel(cfg.kind) + ' noi';
   if (elGenTema) elGenTema.checked = !nou && !!(ex && ex.tema);
 
-  // O propoziție se transcrie una câte una: n-are noimă să ceri opt.
-  const unaSingura = cfg.kind === 'propozitie';
-  if (elGenCate) {
-    elGenCate.disabled = unaSingura;
-    if (unaSingura) elGenCate.value = '1';
-  }
   improspatatePlafonul();
 }
 
@@ -2215,8 +2276,8 @@ async function improspatatePlafonul() {
 
   const nivel = nivelAles();
   const doarNoi = !!(elGenNoi && elGenNoi.checked);
-  const libere = libereDin(tot, nivel, doarNoi).length;
-  const plafon = cfg.kind === 'propozitie' ? Math.min(1, libere) : libere;
+  const plafon = libereDin(tot, nivel, doarNoi).length;
+  const libere = plafon;
 
   elGenCate.max = String(Math.max(1, plafon));
   if (Number(elGenCate.value) > plafon) elGenCate.value = String(Math.max(1, plafon));
@@ -2313,18 +2374,29 @@ elGenFa && elGenFa.addEventListener('click', async () => {
   /* CUVINTELE stau lângă cerință, ca elevul să le vadă și când derulează, dar
      nu ÎN ea: la a doua generare le înlocuim, nu le îngrămădim. Cerința scrisă
      de mână rămâne cum a scris-o; șablonul e numai pentru cea goală. */
-  ex.cuvinte = texte;
+  /* Propozițiile NU intră în cerință: ele se văd oricum, fiecare pe rândul ei.
+     Puse și acolo, s-ar citi de două ori, iar virgulele dinăuntrul lor s-ar
+     amesteca cu virgulele care le despart. Cuvintele și structurile, în schimb,
+     n-au unde se vedea altundeva, deci stau în cerință. */
+  ex.cuvinte = cfg.kind === 'propozitie' ? [] : texte;
   ex.tema = !!(elGenTema && elGenTema.checked);
 
   // RÂNDURILE, după felul materialului:
   //  · cuvinte     → un rând pe cuvânt, cu cuvântul pus la locul lui;
   //  · structuri   → rânduri GOALE: structura e cerința, cuvintele le dă elevul;
   //  · propoziții  → un rând, cu propoziția în prima căsuță, de transcris.
-  ex.randuri = cfg.kind === 'structura'
-    ? texte.map(() => ({}))
-    : texte.map((t) => ({ word: escapaText(t) }));
+  //  · cuvinte     → un rând pe cuvânt, cu cuvântul pus la locul lui;
+  //  · structuri   → rânduri GOALE: structura e cerința, cuvintele le dă elevul;
+  //  · propoziții  → rând de propoziție: enunțul sus, blocat, transcrierea jos.
+  if (cfg.kind === 'propozitie') {
+    ex.randuri = texte.map((t) => ({ fraza: escapaText(t), trans: '', blocata: true }));
+  } else if (cfg.kind === 'structura') {
+    ex.randuri = texte.map(() => ({}));
+  } else {
+    ex.randuri = texte.map((t) => ({ word: escapaText(t) }));
+  }
 
-  aseazaRanduri(ex.randuri);
+  aseazaRanduri(ex.randuri, cfg.kind === 'propozitie');
   deseneazaTeancul();
   murdareste(); scheduleSave();
   inchideFereastra(dlgGen);

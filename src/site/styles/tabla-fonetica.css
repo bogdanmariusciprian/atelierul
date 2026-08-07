@@ -343,6 +343,29 @@
     user-select: none;
   }
 
+  /* RÂNDUL DE PROPOZIȚIE.
+     Fără săgeți și fără etape: o propoziție nu se desparte în silabe, iar
+     transcrierea ei nu încape într-o casetă îngustă de lângă. Cele două câmpuri
+     stau unul sub altul și iau tot rândul. */
+  .fraza-teanc {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .fraza-teanc .field { width: 100%; max-width: none; flex: 0 0 auto; }
+
+  /* Propoziția vine de la generator, deci nu se scrie peste ea: se vede că e
+     dată, nu că e o casetă uitată goală. */
+  .field.fraza[contenteditable="false"] {
+    background: transparent;
+    border-color: transparent;
+    padding-left: 0;
+    color: var(--ink);
+    cursor: default;
+  }
+
   /* câmpurile editabile de lucru – font monospace, se dimensionează după conținut */
   .field {
     font-family: var(--mono);
