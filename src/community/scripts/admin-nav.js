@@ -126,64 +126,89 @@ export function adminNavHtml(stare, numere = {}) {
   const n = (x) => (x ? `<b class="cxnav__n">${x}</b>` : "");
   const fierbinte = (x) => (x ? `<b class="cxnav__n cxnav__n--hot">${x}</b>` : "");
 
+  /* ADÂNCIMEA SE VEDE DIN CUIBĂRIRE, NU DIN RETRAGERI PUSE DE MÂNĂ.
+     Prima dată dădusem fiecărei trepte o clasă cu retragerea ei scrisă în CSS
+     („--2", „--3"). Greșeala se vede de la o poștă în urmă: domeniul și lecția
+     purtau amândouă „--2", deci stăteau la aceeași distanță de margine, iar
+     arborele arăta ca o listă turtită.
+
+     Acum fiecare treaptă are cutia ei, `.cxnav__sub`, iar retragerea și linia
+     de ghidaj vin din cuibărire. Nu se mai poate greși: dacă lecția stă în
+     cutia domeniului, ea E mai adâncă, n-are cum să nu fie. */
+  const nodul = ({ tip, deschis, marca, eticheta, numar, atribute, dedesubt }) =>
+    `<button type="button" class="cxnav__it${tip ? " " + tip : ""}"${atribute}>
+      <span class="cxnav__ch${deschis === null ? " cxnav__ch--gol" : ""}" aria-hidden="true"
+        >${deschis === null ? "" : deschis ? "▾" : "▸"}</span>
+      ${marca ? `<span class="cxnav__ic" aria-hidden="true">${marca}</span>` : ""}
+      <span class="cxnav__lb">${esc(eticheta)}</span>${numar || ""}</button>${dedesubt || ""}`;
+
   const intrareSimpla = (it) => {
     const nr = it.id === "moderation" ? fierbinte(numere.moderare)
       : it.id === "users" ? n(numere.utilizatori) : "";
-    return `<button type="button" class="cxnav__it${tab === it.id ? " on" : ""}"
-      data-action="admin-go" data-tab="${it.id}">
-      <span class="cxnav__ic" aria-hidden="true">${it.icon}</span>
-      <span class="cxnav__lb">${esc(it.nume)}</span>${nr}</button>`;
+    return nodul({
+      tip: tab === it.id ? "on" : "", deschis: null, marca: it.icon,
+      eticheta: it.nume, numar: nr,
+      atribute: ` data-action="admin-go" data-tab="${it.id}"`,
+    });
   };
 
   const nodLectii = () => {
     const desfacut = deschise.lessons !== false && (tab === "lessons" || deschise.lessons === true);
     const totalLectii = LESSONS.filter((l) => l.ready).length;
-    let dedesubt = "";
-    if (desfacut) {
-      dedesubt = `<div class="cxnav__sub">${lectiiPeDomenii().map((d) => {
-        const domDesfacut = deschise[`dom:${d.slug}`] === true ||
-          d.lectii.some((l) => l.slug === lectie);
-        const lectiile = !domDesfacut ? "" : d.lectii.map((l) => {
-          const eDeschisa = l.slug === lectie;
-          const parti = !eDeschisa ? "" : PARTI_LECTIE.map((p) => {
-            const nr = p.slug === "exercitii" ? fierbinte((numere.propuneriPeLectie || {})[l.slug])
-              : p.slug === "tabla" ? n((numere.materialPeLectie || {})[l.slug]) : "";
-            return `<button type="button" class="cxnav__it cxnav__it--3${parte === p.slug ? " on" : ""}"
-              data-action="admin-go" data-tab="lessons" data-lectie="${l.slug}" data-parte="${p.slug}">
-              <span class="cxnav__ic" aria-hidden="true">${p.icon}</span>
-              <span class="cxnav__lb">${esc(p.nume)}</span>${nr}</button>`;
-          }).join("");
-          return `<button type="button" class="cxnav__it cxnav__it--2${eDeschisa ? " e-desfacut" : ""}"
-              data-action="admin-go" data-tab="lessons" data-lectie="${l.slug}" data-parte="${eDeschisa ? "" : "lectie"}">
-              <span class="cxnav__ch" aria-hidden="true">${eDeschisa ? "▾" : "▸"}</span>
-              <span class="cxnav__lb">${esc(l.title)}</span></button>${parti}`;
-        }).join("");
-        return `<button type="button" class="cxnav__it cxnav__it--2"
-            data-action="admin-fold" data-fold="dom:${d.slug}">
-            <span class="cxnav__ch" aria-hidden="true">${domDesfacut ? "▾" : "▸"}</span>
-            <span class="cxnav__lb">${esc(d.label)}</span>${n(d.lectii.length)}</button>${lectiile}`;
+
+    const cutiaDomeniilor = !desfacut ? "" : `<div class="cxnav__sub">${lectiiPeDomenii().map((d) => {
+      const domDesfacut = deschise[`dom:${d.slug}`] === true ||
+        d.lectii.some((l) => l.slug === lectie);
+
+      const cutiaLectiilor = !domDesfacut ? "" : `<div class="cxnav__sub">${d.lectii.map((l) => {
+        const eDeschisa = l.slug === lectie;
+
+        const cutiaPartilor = !eDeschisa ? "" : `<div class="cxnav__sub">${PARTI_LECTIE.map((p) => {
+          const nr = p.slug === "exercitii" ? fierbinte((numere.propuneriPeLectie || {})[l.slug])
+            : p.slug === "tabla" ? n((numere.materialPeLectie || {})[l.slug]) : "";
+          return nodul({
+            tip: parte === p.slug ? "on" : "", deschis: null, marca: p.icon,
+            eticheta: p.nume, numar: nr,
+            atribute: ` data-action="admin-go" data-tab="lessons" data-lectie="${l.slug}" data-parte="${p.slug}"`,
+          });
+        }).join("")}</div>`;
+
+        return nodul({
+          tip: eDeschisa ? "e-desfacut" : "", deschis: eDeschisa, marca: "",
+          eticheta: l.title,
+          atribute: ` data-action="admin-go" data-tab="lessons" data-lectie="${l.slug}" data-parte="${eDeschisa ? "" : "lectie"}"`,
+          dedesubt: cutiaPartilor,
+        });
       }).join("")}</div>`;
-    }
-    return `<button type="button" class="cxnav__it${tab === "lessons" && !lectie ? " on" : ""}"
-        data-action="admin-go" data-tab="lessons">
-        <span class="cxnav__ch" aria-hidden="true">${desfacut ? "▾" : "▸"}</span>
-        <span class="cxnav__ic" aria-hidden="true">📚</span>
-        <span class="cxnav__lb">Lecții</span>${n(totalLectii)}</button>${dedesubt}`;
+
+      return nodul({
+        tip: "", deschis: domDesfacut, marca: "", eticheta: d.label, numar: n(d.lectii.length),
+        atribute: ` data-action="admin-fold" data-fold="dom:${d.slug}"`,
+        dedesubt: cutiaLectiilor,
+      });
+    }).join("")}</div>`;
+
+    return nodul({
+      tip: tab === "lessons" && !lectie ? "on" : "", deschis: desfacut, marca: "📚",
+      eticheta: "Lecții", numar: n(totalLectii),
+      atribute: ` data-action="admin-go" data-tab="lessons"`,
+      dedesubt: cutiaDomeniilor,
+    });
   };
 
   const nodTeste = () => {
     const desfacut = deschise.tests !== false && (tab === "tests" || deschise.tests === true);
-    const dedesubt = !desfacut ? "" : `<div class="cxnav__sub">${TEST_CATEGORIES.map((c) =>
-      `<button type="button" class="cxnav__it cxnav__it--2${examen === c.slug ? " on" : ""}"
-        data-action="admin-go" data-tab="tests" data-examen="${c.slug}">
-        <span class="cxnav__ic" aria-hidden="true">${c.icon}</span>
-        <span class="cxnav__lb">${esc(c.title)}</span>${n((numere.fisePeExamen || {})[c.slug])}</button>`
-    ).join("")}</div>`;
-    return `<button type="button" class="cxnav__it${tab === "tests" && !examen ? " on" : ""}"
-        data-action="admin-go" data-tab="tests">
-        <span class="cxnav__ch" aria-hidden="true">${desfacut ? "▾" : "▸"}</span>
-        <span class="cxnav__ic" aria-hidden="true">🎓</span>
-        <span class="cxnav__lb">Teste</span>${n(TEST_CATEGORIES.length)}</button>${dedesubt}`;
+    const cutia = !desfacut ? "" : `<div class="cxnav__sub">${TEST_CATEGORIES.map((c) => nodul({
+      tip: examen === c.slug ? "on" : "", deschis: null, marca: c.icon,
+      eticheta: c.title, numar: n((numere.fisePeExamen || {})[c.slug]),
+      atribute: ` data-action="admin-go" data-tab="tests" data-examen="${c.slug}"`,
+    })).join("")}</div>`;
+    return nodul({
+      tip: tab === "tests" && !examen ? "on" : "", deschis: desfacut, marca: "🎓",
+      eticheta: "Teste", numar: n(TEST_CATEGORIES.length),
+      atribute: ` data-action="admin-go" data-tab="tests"`,
+      dedesubt: cutia,
+    });
   };
 
   return `<nav class="cxnav" aria-label="Secțiunile panoului">${GRUPURI.map((g) => `

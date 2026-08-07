@@ -3120,7 +3120,10 @@ body.is-admin-larg main.container { max-width: 1800px; }
 .cxnav__it:hover { background: var(--color-surface); color: var(--color-text); }
 .cxnav__it.on { background: var(--cx-grad); color: #fff; }
 .cxnav__ic { flex: none; width: 1.1rem; text-align: center; }
-.cxnav__ch { flex: none; width: 0.7rem; font-size: 0.7rem; opacity: 0.7; }
+.cxnav__ch {
+  flex: none; width: 0.75rem; font-size: 0.62rem; opacity: 0.75;
+  text-align: center; line-height: 1;
+}
 .cxnav__lb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cxnav__n {
   flex: none;
@@ -3130,12 +3133,31 @@ body.is-admin-larg main.container { max-width: 1800px; }
 }
 .cxnav__n--hot { color: #b45309; }
 .cxnav__it.on .cxnav__n { color: rgba(255, 255, 255, 0.9); }
-/* Adâncimea se citește din retragere ȘI dintr-o linie: numai retragerea se
-   pierde din ochi când lista trece de zece rânduri. */
-.cxnav__sub { border-left: 1px solid var(--color-border); margin-left: 0.75rem; }
-.cxnav__it--2 { padding-left: 0.75rem; font-size: 0.82rem; }
-.cxnav__it--3 { padding-left: 1.5rem; font-size: 0.8rem; }
-.cxnav__it--2.e-desfacut { color: var(--color-text); font-weight: 600; }
+/* ARBORELE.
+   Fiecare treaptă stă în cutia ei, iar retragerea vine din cuibărire, nu dintr-o
+   clasă cu numărul treptei scris de mână. Cu clase scrise de mână se greșește:
+   domeniul și lecția purtaseră aceeași clasă, deci stăteau la aceeași distanță
+   de margine, și arborele arăta ca o listă turtită. Cuibărit, nu se mai poate:
+   dacă lecția stă ÎN cutia domeniului, e mai adâncă, n-are încotro.
+
+   Linia din stânga nu e podoabă. La opt rânduri, retragerea singură se citește;
+   la treizeci, ochiul pierde șirul, iar linia îi ține locul degetului. */
+.cxnav__sub {
+  border-left: 1px solid var(--color-border);
+  margin-left: 0.68rem;
+  padding-left: 0.28rem;
+}
+/* Cu cât intri mai adânc, cu atât scrisul se subțiază puțin: e o ierarhie, iar
+   ochiul o citește din mărime înainte s-o citească din poziție. */
+.cxnav__sub .cxnav__it { font-size: 0.82rem; }
+.cxnav__sub .cxnav__sub .cxnav__it { font-size: 0.8rem; }
+/* Nodul deschis rămâne mai apăsat decât frații lui: e drumul pe care ai venit. */
+.cxnav__it.e-desfacut { color: var(--color-text); font-weight: 600; }
+
+/* Săgeata are lățime fixă, ca etichetele să cadă toate pe aceeași verticală,
+   fie că nodul se desface, fie că nu. Frunzele primesc o săgeată goală, nu
+   niciuna: altfel textul lor ar sări cu un pas la stânga. */
+.cxnav__ch--gol { visibility: hidden; }
 
 @media (max-width: 860px) {
   .cx-side--admin { max-height: none; overflow: visible; }
