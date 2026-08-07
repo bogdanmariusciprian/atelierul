@@ -29,8 +29,29 @@ import {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+/* Notițele, ținute minte pe calculatorul ăsta.
+
+   NU ca să lucreze fără internet, ci ca NUMĂRUL DE PE BUTON să fie drept din
+   prima clipă. Fără el, deschizi o pagină, butonul iese gol, și abia după ce
+   răspunde serverul apare cifra: pe o legătură leneșă, sunt secunde bune în
+   care butonul te minte că n-ai nimic de făcut acolo. Adevărul de la server
+   vine tot, imediat ce sosește, și îl întrece pe ăsta. */
+const CHEIE_MEMORIE = "atelier:todo";
+
+function dinMemorie() {
+  try {
+    const brut = localStorage.getItem(CHEIE_MEMORIE);
+    const note = brut ? JSON.parse(brut) : [];
+    return Array.isArray(note) ? note : [];
+  } catch { return []; }
+}
+function inMemorie(note) {
+  try { localStorage.setItem(CHEIE_MEMORIE, JSON.stringify(note)); } catch { /* plin ori oprit */ }
+}
+
 let radacina = null;
 let toate = [];
+let cheiaDeAcum = "";   // pe ce pagină eram la ultima desenare
 /* Ce n-a mers la ultima încercare. Se arată în panou, nu se înghite: o notiță
    care nu se salvează și nu spune de ce e mai rea decât una care nu se scrie
    deloc, fiindcă tu crezi că ai scris-o. */
@@ -86,6 +107,7 @@ function listaHtml() {
 
 function deseneaza() {
   if (!radacina) return;
+  cheiaDeAcum = cheiaPaginii();
   const n = deFacutAici();
   radacina.innerHTML = `
     <div class="todo-panel"${deschis ? "" : " hidden"}>
@@ -129,6 +151,7 @@ async function adauga() {
   }
   motiv = "";
   toate = [rand, ...toate];
+  inMemorie(toate);
   deseneaza();
   radacina.querySelector('[data-todo="camp"]')?.focus();
 }
@@ -153,6 +176,7 @@ function leagaEvenimente() {
       if (rau) { motiv = rau; return deseneaza(); }
       motiv = "";
       toate = toate.filter((t) => t.id !== id);
+      inMemorie(toate);
       return deseneaza();
     }
   });
@@ -168,7 +192,7 @@ function leagaEvenimente() {
     motiv = "";
     deseneaza();
     const rau = await setTodoDone(id, gata);
-    if (!rau) return;
+    if (!rau) { inMemorie(toate); return; }
     // N-a mers: punem bifa înapoi cum era și spunem de ce.
     toate = toate.map((t) => (t.id === id ? { ...t, done: !gata } : t));
     motiv = rau;
@@ -198,6 +222,7 @@ function leagaEvenimente() {
       toate = toate.map((x) => (x.id === id ? { ...x, body: vechi.body } : x));
       motiv = rau;
     }
+    inMemorie(toate);
     deseneaza();
   });
 
@@ -210,10 +235,36 @@ function leagaEvenimente() {
     }
   });
 
-  /* În hub, uneltele se schimbă din hash, nu din adresă nouă. Notițele trebuie
-     să se schimbe odată cu ele, altfel ai vedea nota de la moderare stând peste
-     tabla de fonetică. */
-  window.addEventListener("hashchange", deseneaza);
+  /* CÂND SE SCHIMBĂ PAGINA, SE SCHIMBĂ ȘI NUMĂRUL DE PE BUTON.
+     Aici era o scăpare care se vedea: `hashchange` NU se aprinde când adresa se
+     schimbă din cod, prin `history.replaceState`, iar exact așa umblă hubul
+     între uneltele de administrare. Ieșea că treceai de la „Moderare" la
+     „Tablă" și butonul rămânea cu numărul de la moderare.
+
+     De-aia îmbrăcăm cele două porunci de istoric o singură dată și scoatem din
+     ele un semn al nostru. Îmbrăcarea doar cheamă porunca adevărată și dă de
+     veste; nu schimbă nimic pentru ceilalți. */
+  imbracaIstoricul();
+  const laSchimbare = () => { if (cheiaPaginii() !== cheiaDeAcum) deseneaza(); };
+  window.addEventListener("hashchange", laSchimbare);
+  window.addEventListener("popstate", laSchimbare);
+  window.addEventListener("atelier:locchange", laSchimbare);
+}
+
+/** Îmbracă `pushState` și `replaceState` o singură dată, ca schimbările de
+ *  adresă făcute din cod să dea de veste. */
+function imbracaIstoricul() {
+  if (window.__atelierLocChange) return;
+  window.__atelierLocChange = true;
+  for (const nume of ["pushState", "replaceState"]) {
+    const veche = history[nume];
+    if (typeof veche !== "function") continue;
+    history[nume] = function (...args) {
+      const r = veche.apply(this, args);
+      window.dispatchEvent(new Event("atelier:locchange"));
+      return r;
+    };
+  }
 }
 
 /**
@@ -230,10 +281,14 @@ export async function initTodo(basePath = "") {
   radacina.className = "todo-fab-wrap";
   document.body.appendChild(radacina);
   leagaEvenimente();
+
+  /* Desenăm ÎNTÂI cu ce știam de data trecută, ca numărul să fie acolo din
+     prima clipă, și abia pe urmă cerem adevărul de la server. */
+  toate = dinMemorie();
   deseneaza();
 
   const { note, motiv: rau } = await listTodos();
-  toate = note;
+  if (!rau) { toate = note; inMemorie(note); }
   motiv = rau || "";
   deseneaza();
 }
