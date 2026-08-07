@@ -1211,10 +1211,33 @@ let deschis = 0;
 
 const elTeanc = document.getElementById('teanc');
 
+/* CERINȚA ȘI CUVINTELE STAU DESPĂRȚITE ÎN MEMORIE, LIPITE PE ECRAN.
+   Pe tablă se citesc ca un singur rând: „Desparte în silabe cuvintele date:
+   iarnă, piatră". În date, însă, sunt două lucruri deosebite: cerința e a
+   profesorului, cuvintele le aduce generatorul și le poate schimba de zece ori.
+   Lipite într-un singur șir, a doua generare n-ar mai ști unde se sfârșește
+   cerința și ar scrie cuvinte peste cuvinte.
+
+   DE UNDE VINE CERINȚA hotărăște și dacă se poate scrie în ea:
+     'zar'  = ți-a picat, n-ai ce schimba;
+     'tip'  = ai ales unul dintre cele șase feluri, deci textul e cel al felului;
+     'mana' = ai scris-o tu, și rămâne a ta. */
 function exercitiuNou({ cerinta = '', sursa = 'mana', fata = null, tema = false } = {}) {
   return { id: 'e' + Date.now() + Math.random().toString(36).slice(2, 6),
-           cerinta, sursa, fata, tema, randuri: [] };
+           cerinta, sursa, fata, tema, cuvinte: [], randuri: [] };
 }
+
+/** Cerința așa cum se citește pe tablă: textul, apoi cuvintele, în continuare. */
+function textulCerintei(ex) {
+  if (!ex) return '';
+  const c = ex.cerinta || '';
+  const cuv = (ex.cuvinte || []).join(', ');
+  if (!cuv) return c;
+  return c ? c + ' ' + cuv : cuv;
+}
+
+/** Se poate scrie în cerința asta? Numai cele scrise de mână. */
+const eDeScris = (ex) => !!ex && ex.sursa === 'mana';
 const exercitiulDeschis = () => exercitii[deschis] || null;
 
 /** Rândurile din pagină, în formă de date. */
@@ -1280,14 +1303,18 @@ function deseneazaTeancul() {
       (ex.tema ? '<span class="cer__semn cer__tema">temă</span>' : '');
     if (i !== deschis) {
       return '<div class="cer e-stransa" data-ex="' + i + '" role="button" tabindex="0">' +
-        nr + '<span class="cer__text">' + (escapaText(ex.cerinta) || 'fără cerință') + '</span>' +
+        nr + '<span class="cer__text">' + (escapaText(textulCerintei(ex)) || 'fără cerință') + '</span>' +
         semne + '</div>';
     }
-    // Cea de la zar nu se scrie: e ce ți-a picat, nu ce vrei tu.
-    const corp = ex.sursa === 'zar'
-      ? '<div class="cer__data">' + escapaText(ex.cerinta) + '</div>'
-      : '<textarea data-cerinta="' + i + '" placeholder="Scrie aici cerința exercițiului…">' +
-        escapaText(ex.cerinta) + '</textarea>';
+    /* Cea de la zar nu se scrie: e ce ți-a picat, nu ce vrei tu. Nici cea a unui
+       fel ales din listă: textul ei e al felului, unul singur pentru toată
+       tabla, și se schimbă în cod, nu ici-colo pe câte o tablă. */
+    const corp = eDeScris(ex)
+      ? '<textarea data-cerinta="' + i + '" placeholder="Scrie aici cerința exercițiului…">' +
+        escapaText(ex.cerinta) + '</textarea>' +
+        (ex.cuvinte && ex.cuvinte.length
+          ? '<div class="cer__cuvinte">' + escapaText(ex.cuvinte.join(', ')) + '</div>' : '')
+      : '<div class="cer__data">' + escapaText(textulCerintei(ex)) + '</div>';
     return '<div class="cer e-deschisa" data-ex="' + i + '">' +
       '<span class="cer__eticheta">Cerință</span>' + nr +
       '<div class="cer__text">' + corp + '</div>' + semne +
@@ -1365,7 +1392,7 @@ function adaugaExercitiu(cfg) {
 const elCerintaNoua = document.getElementById('cerintaNoua');
 elCerintaNoua && elCerintaNoua.addEventListener('click', () => {
   ceFel(true, (fata) => {
-    adaugaExercitiu(fata ? { cerinta: CERINTE[fata], sursa: 'mana', fata } : {});
+    adaugaExercitiu(fata ? { cerinta: CERINTE[fata], sursa: 'tip', fata } : {});
     const t = elTeanc.querySelector('.cer.e-deschisa textarea');
     if (t) t.focus();
   });
@@ -1400,14 +1427,23 @@ function applyState(state) {
  *  nu se pierde nimic și nu i se cere nimănui să mute ceva cu mâna. */
 function deslusesteExercitiile(state) {
   if (Array.isArray(state.exercitii) && state.exercitii.length) {
-    return state.exercitii.map((e) => ({
-      id: e.id || ('e' + Math.random().toString(36).slice(2, 8)),
-      cerinta: e.cerinta || '',
-      sursa: e.sursa === 'zar' ? 'zar' : 'mana',
-      fata: e.fata || null,
-      tema: !!e.tema,
-      randuri: Array.isArray(e.randuri) ? e.randuri : [],
-    }));
+    return state.exercitii.map((e) => {
+      /* Tablele scrise înainte țineau cuvintele lipite de cerință, despărțite cu
+         un rând nou. Le despărțim la citire, o dată, ca de-acolo încolo să fie
+         două lucruri, ca la toate celelalte. */
+      const bucati = String(e.cerinta || '').split('\n');
+      const cuvinte = Array.isArray(e.cuvinte) ? e.cuvinte
+        : bucati.slice(1).join(' ').split(',').map((x) => x.trim()).filter(Boolean);
+      return {
+        id: e.id || ('e' + Math.random().toString(36).slice(2, 8)),
+        cerinta: bucati[0] || '',
+        sursa: e.sursa === 'zar' ? 'zar' : (e.sursa === 'tip' ? 'tip' : 'mana'),
+        fata: e.fata || null,
+        tema: !!e.tema,
+        cuvinte,
+        randuri: Array.isArray(e.randuri) ? e.randuri : [],
+      };
+    });
   }
   const vechi = exercitiuNou({ cerinta: state.prompt || '' });
   vechi.randuri = Array.isArray(state.rows) ? state.rows : [];
@@ -1795,12 +1831,12 @@ import { fataZarului, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
 /* Cele șase cerințe, una pe față. Textul lor e al profesorului, nu al meu:
    se schimbă aici, într-un singur loc, și se schimbă peste tot. */
 const CERINTE = {
-  1: 'Precizează numărul de litere și de sunete din cuvintele date.',
-  2: 'Extrage grupurile de sunete din cuvintele date.',
-  3: 'Desparte în silabe cuvintele date.',
-  4: 'Stabilește valoarea fonetică a lui [i] în cuvintele date.',
-  5: 'Oferă cuvinte pentru structurile fonetice date.',
-  6: 'Transcrie fonetic propoziția dată.',
+  1: 'Precizează numărul de litere și de sunete din cuvintele date:',
+  2: 'Extrage grupurile de sunete din cuvintele date:',
+  3: 'Desparte în silabe cuvintele date:',
+  4: 'Stabilește valoarea fonetică a lui [i] în cuvintele date:',
+  5: 'Oferă cuvinte pentru structurile fonetice date:',
+  6: 'Transcrie fonetic propoziția dată:',
 };
 
 /* ---------- Zarul ---------- */
@@ -2105,7 +2141,7 @@ function potrivesteFereastraGen() {
     if (elGenTintaK) elGenTintaK.textContent = 'Cerința în care intră';
     if (elGenTintaT) {
       const ex = exercitii[deschis];
-      elGenTintaT.textContent = (ex && ex.cerinta.split('\n')[0].trim()) || 'exercițiul deschis';
+      elGenTintaT.textContent = (ex && ex.cerinta.trim()) || 'exercițiul deschis';
     }
     return;
   }
@@ -2121,7 +2157,7 @@ function potrivesteFereastraGen() {
   if (elGenTintaT) {
     // La un exercițiu care are deja cerința scrisă, arătăm chiar textul lui, nu
     // șablonul: altfel fereastra ar promite altceva decât scrie pe tablă.
-    const scrisa = !nou && ex ? ex.cerinta.split('\n')[0].trim() : '';
+    const scrisa = !nou && ex ? (ex.cerinta || '').trim() : '';
     elGenTintaT.textContent = scrisa || CERINTE[fata];
   }
   if (elGenCe) elGenCe.textContent = numeFel(cfg.kind);
@@ -2238,16 +2274,17 @@ elGenFa && elGenFa.addEventListener('click', async () => {
   // fel (cerință scrisă de mână), îl capătă acum și nu va mai fi întrebat.
   let ex;
   if ((elGenNou && elGenNou.checked) || !exercitii[deschis]) {
-    ex = adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'mana', fata });
+    ex = adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'tip', fata });
   } else {
     ex = exercitii[deschis];
     if (!ex.fata) ex.fata = fata;
   }
 
-  // CERINȚA primește materialul, ca elevul să-l vadă și când derulează. Păstrăm
-  // textul scris de profesor, dacă a scris unul: șablonul e doar pentru gol.
-  const baza = (ex.cerinta || '').split('\n')[0].trim() || CERINTE[fata];
-  ex.cerinta = baza + '\n' + texte.join(', ');
+  /* CUVINTELE stau lângă cerință, ca elevul să le vadă și când derulează, dar
+     nu ÎN ea: la a doua generare le înlocuim, nu le îngrămădim. Cerința scrisă
+     de mână rămâne cum a scris-o; șablonul e numai pentru cea goală. */
+  if (!ex.cerinta.trim()) ex.cerinta = CERINTE[fata];
+  ex.cuvinte = texte;
   ex.tema = !!(elGenTema && elGenTema.checked);
 
   // RÂNDURILE, după felul materialului:

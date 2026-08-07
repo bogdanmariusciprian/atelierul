@@ -563,6 +563,11 @@
   .cer textarea::placeholder { color: #b7bfce; }
   /* Cerința venită de la zar nu se scrie: e ce ți-a picat, nu ce vrei tu. */
   .cer__data { font-size: 15px; line-height: 1.5; padding: 6px 0; }
+
+  /* Cuvintele aduse de generator la o cerință scrisă de mână: acolo cerința e
+     o căsuță de scris, deci n-au unde să intre în continuarea ei. Stau sub ea,
+     dar se citesc ca urmarea ei. */
+  .cer__cuvinte { font-size: 15px; line-height: 1.5; padding: 2px 0 4px; }
   .cer__semn {
     flex: none; display: inline-flex; align-items: center; gap: 4px;
     font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
