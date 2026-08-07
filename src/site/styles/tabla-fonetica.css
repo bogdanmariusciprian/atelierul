@@ -411,6 +411,11 @@
     width: 1ch;
     text-align: center;
     font-variant-ligatures: none;
+    /* Plasă de siguranță: dacă vreodată ajunge mai mult decât un sunet în
+       celulă, iese în lateral, nu se așază pe verticală. Un teanc de litere
+       una sub alta arată ca o tablă stricată; un semn care iese puțin în
+       dreapta arată ca o greșeală de îndreptat. */
+    white-space: nowrap;
   }
   /* Golită de ștergere, cutia trebuie să dispară cu totul: altfel ar rămâne o
      celulă goală care ar împinge mai departe tot ce urmează. */

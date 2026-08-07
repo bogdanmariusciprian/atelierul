@@ -49,8 +49,12 @@ function insertSymbol(key, field) {
   if (!s || !s.char) return;
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
+  // Cutia e închisă: dacă cursorul a nimerit înăuntrul uneia, iese întâi afară.
+  // Fără asta, sunetul nou s-ar scrie în celula de o literă a celui vechi.
+  scoateCursorulDinCutie();
   const range = sel.getRangeAt(0);
   range.deleteContents();
+  curataCutiile(campulCursorului());
 
   /* CÂMPUL SE IA DE LA CURSOR, NU DE LA FOCUS.
      Butonul din bară îl afla prin `document.activeElement`, iar acela poate fi
@@ -145,6 +149,127 @@ function campulCursorului() {
   return el && el.closest ? el.closest('.field') : null;
 }
 
+/* ================= CUTIA E ÎNCHISĂ PENTRU CURSOR =================
+
+   Cutia unui sunet special are lățimea unei singure litere, fiindcă rândul
+   c/v/s de dedesubt numără coloane. Dacă ajunge cursorul înăuntrul ei, tot ce
+   scrii mai departe se îngrămădește în celula aceea și se așază pe verticală,
+   una sub alta: pe ecran pare că tabla a înnebunit.
+
+   `contenteditable="false"` oprește tastatura, dar NU oprește o selecție pusă
+   din cod. Iar noi punem selecții din cod la fiecare ștergere, ca să găsim
+   litera dinainte. De-acolo venea stricăciunea: ștergeai o virgulă, cursorul
+   sărea în nodul de text din cutie, și acolo rămânea.
+
+   Regula de aici e simplă și se ține într-un singur loc: ÎNAINTE de orice
+   scriere sau ștergere, cursorul e scos din cutie. Cutia e un sunet, nu un loc
+   de scris.
+   ================================================================= */
+
+/** Cutia de simbol în care stă nodul dat, dacă stă în vreuna. */
+function cutiaLui(nod) {
+  const el = nod && nod.nodeType === Node.TEXT_NODE ? nod.parentElement : nod;
+  return el && el.closest ? el.closest('.sym') : null;
+}
+
+/** Scoate cursorul din cutie, dacă a nimerit înăuntru. */
+function scoateCursorulDinCutie() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return false;
+  const r = sel.getRangeAt(0);
+  const cutie = cutiaLui(r.startContainer);
+  if (!cutie) return false;
+
+  // Lipit de marginea din stânga înseamnă „înaintea cutiei"; orice altceva
+  // înseamnă „după ea". Nu există un al treilea loc: cutia n-are mijloc.
+  const laInceput = r.startOffset === 0 &&
+    (r.startContainer === cutie || cutie.firstChild === r.startContainer);
+  const vecin = laInceput ? cutie.previousSibling : cutie.nextSibling;
+  let loc = vecin && vecin.nodeType === Node.TEXT_NODE ? vecin : null;
+  if (!loc) {
+    loc = document.createTextNode('');
+    if (laInceput) cutie.before(loc); else cutie.after(loc);
+  }
+  const nou = document.createRange();
+  nou.setStart(loc, laInceput ? 0 : loc.length);
+  nou.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(nou);
+  return true;
+}
+
+/** Cutia care stă exact înaintea cursorului, dacă acolo e una. */
+function cutiaDinainteaCursorului() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  const r = sel.getRangeAt(0);
+  let nod;
+  if (r.startContainer.nodeType === Node.TEXT_NODE) {
+    if (r.startOffset > 0) return null;            // mai e text de șters înainte
+    nod = r.startContainer.previousSibling;
+  } else {
+    nod = r.startContainer.childNodes[r.startOffset - 1] || null;
+  }
+  // Nodurile de text goale rămân după fiecare inserare; nu sunt nimic de șters.
+  while (nod && nod.nodeType === Node.TEXT_NODE && nod.textContent === '') nod = nod.previousSibling;
+  return nod && nod.nodeType === Node.ELEMENT_NODE && nod.classList &&
+         nod.classList.contains('sym') ? nod : null;
+}
+
+/* SELECȚIA CARE IESE DIN CÂMP.
+
+   Cu mouse-ul poți trage o selecție din cuvânt până în transcriere, ba chiar
+   peste două rânduri. Dacă apoi scrii o literă, ștergerea selecției ar tăia și
+   peste ce e ÎNTRE câmpuri: nu doar textul, ci chiar căsuțele. Un rând poate
+   rămâne fără transcriere, iar tabla fără o coloană.
+
+   Regula: se scrie în câmpul în care ai apăsat tasta, și numai în el. Selecția
+   care iese afară se strânge la capătul dinăuntru, adică acolo unde ai isprăvit
+   de tras cu mouse-ul. */
+function strangeSelectiaLaCamp(camp) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !camp) return;
+  const r = sel.getRangeAt(0);
+  const inceputulE = camp.contains(r.startContainer);
+  const sfarsitulE = camp.contains(r.endContainer);
+  if (inceputulE && sfarsitulE) return;             // totul într-un câmp: e bine
+  if (!inceputulE && !sfarsitulE) { caretLaCoada(camp); return; }
+
+  const nou = document.createRange();
+  if (sfarsitulE) nou.setStart(r.endContainer, r.endOffset);
+  else nou.setStart(r.startContainer, r.startOffset);
+  nou.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(nou);
+}
+
+/** Nodurile de text în care chiar se poate scrie: cele din cutii nu se pun. */
+function noduriDeScris(radacina) {
+  return noduriText(radacina).filter(
+    (n) => !n.parentElement || !n.parentElement.closest('.sym'));
+}
+
+/* Semnele combinate rămase singure: punctul de deasupra lui „k̇" fără „k"-ul lui.
+   Nu sunt litere, ci semne care se desenează PESTE litera dinainte; rămase
+   singure, se lipesc de ce nimeresc și par murdărie pe tablă. */
+const faraSemneSingure = (t) => String(t || '').replace(/[̀-ͯ]/g, '');
+
+/* O selecție care taie PRIN mijlocul unei cutii îi poate scoate jumătate din
+   sunet: rămâne o celulă cu „k" fără punct, ori numai cu punctul. Nici una,
+   nici alta nu mai e un sunet, deci cutia se desface pe loc: ce a mai rămas
+   iese ca text simplu, iar dacă n-a rămas nimic de citit, piere cu totul. */
+function curataCutiile(camp) {
+  if (!camp) return;
+  const lista = Object.values(symbols).map((s) => s && s.char).filter(Boolean);
+  camp.querySelectorAll('.sym').forEach((c) => {
+    const tot = c.textContent;
+    if (lista.includes(tot)) return;                 // sunet întreg, o lăsăm în pace
+    const ramas = faraSemneSingure(tot);
+    if (!ramas) { c.remove(); return; }
+    c.replaceWith(document.createTextNode(ramas));
+  });
+}
+
 /* Citește cele n caractere dinaintea cursorului.
    Trece peste hotarul dintre noduri dinadins: fiecare inserare taie textul în
    noduri noi, așa că după o ștergere cursorul ajunge des la începutul unui nod
@@ -209,6 +334,13 @@ function insertSunet(text, field) {
    așa că trebuie să rămână lipit de el, fără virgulă între ele. */
 const NU_E_SUNET = new Set([' ', '\u00a0', '[', ']', '(', ')', '/', '.', ':', ';', '!', '?']);
 
+/* Ce desparte dou\u0103 sunete, pentru r\u00e2ndul c/v/s de dedesubt: tot ce nu e sunet,
+   plus semnele de desp\u0103r\u021bire. Se face din lista de mai sus, nu se scrie a doua
+   oar\u0103: dac\u0103 un semn nu e sunet, atunci nici coloan\u0103 de c/v/s nu i se cuvine.
+   Apostroful lipse\u0219te dinadins din am\u00e2ndou\u0103: el \u00eenmoaie sunetul dinainte \u0219i st\u0103
+   pe coloana lui, nu pe una nou\u0103. */
+const DESPARTITORI = new Set([...NU_E_SUNET, ',', '-', '\u2013']);
+
 /* Taie virgula rămasă la coadă când elevul pleacă din câmp.
    Umblă doar pe ultimul nod de text cu conținut, nu pe tot câmpul: dacă am
    rescrie `textContent`, s-ar pierde simbolurile îngroșate (k̇, ġ), care sunt
@@ -240,19 +372,17 @@ function taieVirgulaFinala(el) {
 function desumflaCutiile(el, lista) {
   el.querySelectorAll('.sym').forEach((c) => {
     const tot = c.textContent;
-    const sim = lista.find((x) => tot.startsWith(x));
-    if (!sim || tot === sim) return;              // cutia e curată
-    const rest = tot.slice(sim.length);
-    const eIngrosat = !!c.querySelector('b');
-    c.textContent = '';
-    if (eIngrosat) {
-      const b = document.createElement('b');
-      b.textContent = sim;
-      c.appendChild(b);
-    } else {
-      c.textContent = sim;
-    }
-    c.after(document.createTextNode(rest));
+    if (lista.includes(tot)) return;              // cutia e curată, o lăsăm în pace
+    // Golită de ștergere, ori rămasă doar cu un semn combinat: n-are ce citi
+    // nimeni în ea.
+    if (!faraSemneSingure(tot)) { c.remove(); return; }
+    /* Orice altceva o desfacem CU TOTUL și lăsăm îmbrăcarea s-o ia de la capăt.
+       Așa se îndreaptă și cutiile cu un singur sunet lipit de altceva, și cele
+       în care au încăput șase sunete cu virgulele lor: nu ne mai trebuie o
+       socoteală aparte pentru fiecare fel de stricăciune. Îngroșarea nu se
+       pierde, fiindcă <b>-urile ies afară așa cum sunt, iar îmbrăcarea le
+       recunoaște. */
+    c.replaceWith(...Array.from(c.childNodes));
   });
 }
 
@@ -310,6 +440,10 @@ function imbracaSimboluri(el) {
     }
     nod.replaceWith(frag);
   }
+
+  /* Fiecare inserare rupe textul în noduri noi. Lipite la loc, ștergerea are de
+     unde mușca și nu mai trebuie să sară din nod în nod. */
+  el.normalize();
 }
 
 const A_VARIANTS = ['ă', 'î', 'â'];   // ciclul pentru Shift+A
@@ -325,32 +459,16 @@ function activeField() {
 function insertText(text, caretBack = 0) {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
+  scoateCursorulDinCutie();
+  const camp = campulCursorului();
   const range = sel.getRangeAt(0);
   range.deleteContents();
+  curataCutiile(camp);                 // selecția putea tăia peste o cutie
   const node = document.createTextNode(text);
   range.insertNode(node);
   const pos = Math.max(0, node.length - caretBack);
   range.setStart(node, pos);
   range.setEnd(node, pos);
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
-/* inserează un caracter îngroșat (bold), cu cursorul plasat în afara elementului bold */
-function insertBold(text) {
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
-  const range = sel.getRangeAt(0);
-  range.deleteContents();
-  const b = document.createElement('b');
-  b.textContent = text;
-  range.insertNode(b);
-  // un text node gol după <b>, ca tastarea următoare să NU fie bold
-  const after = document.createTextNode('​'); // zero-width, îl curățăm dacă rămâne singur
-  if (b.nextSibling) b.parentNode.insertBefore(after, b.nextSibling);
-  else b.parentNode.appendChild(after);
-  range.setStart(after, after.length);
-  range.setEnd(after, after.length);
   sel.removeAllRanges();
   sel.addRange(range);
 }
@@ -368,7 +486,7 @@ function saiInNodulDinainte() {
   if (r.startContainer.nodeType !== Node.TEXT_NODE) return false;
   const camp = campulCursorului();
   if (!camp) return false;
-  const noduri = noduriText(camp);
+  const noduri = noduriDeScris(camp);
   const i = noduri.indexOf(r.startContainer);
   for (let k = i - 1; k >= 0; k--) {
     if (noduri[k].length > 0) {
@@ -386,6 +504,24 @@ function saiInNodulDinainte() {
 function deletePrevChar() {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
+  scoateCursorulDinCutie();
+
+  /* Un sunet special piere dintr-o singură apăsare, cu cutie cu tot. Altfel
+     ștergerea ar mușca o bucată din el („k̇" e literă plus semn combinat, două
+     puncte de cod) și ar rămâne o cutie cu un sunet schilod înăuntru. */
+  const cutie = cutiaDinainteaCursorului();
+  if (cutie) {
+    const loc = document.createTextNode('');
+    cutie.before(loc);
+    cutie.remove();
+    const r = document.createRange();
+    r.setStart(loc, 0);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    return;
+  }
+
   saiInNodulDinainte();
   const range = sel.getRangeAt(0);
   if (range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
@@ -394,9 +530,13 @@ function deletePrevChar() {
     sel.removeAllRanges();
     sel.addRange(range);
   } else if (sel.modify) {
+    /* Ultima portiță: lăsăm browserul să mute el capătul selecției. E singurul
+       loc de aici care nu știe de cutii, așa că poate mușca dintr-un sunet
+       special și să lase celula goală. De-aia trecem curățenia pe urma lui. */
     sel.modify('extend', 'backward', 'character');
     sel.deleteFromDocument();
   }
+  curataCutiile(campulCursorului());
 }
 
 /* ---------- Ciclul Shift+A: ă → î → â → ă ... ---------- */
@@ -482,7 +622,7 @@ function insertPair(pair) {
 function soundColumns(transEl) {
   if (!transEl) return [];
   const s = transEl.textContent || '';
-  const seps = new Set(['[', ']', '(', ')', ',', '-', '–', '–', ' ', ' ', '/']);
+  const seps = DESPARTITORI;
   const cols = [];
   let col = 0;
   let inSound = false;
@@ -610,6 +750,13 @@ function focusTrans(transEl) {
 sheet.addEventListener('keydown', (e) => {
   const field = e.target.closest && e.target.closest('.field');
   if (!field) return;
+
+  /* PRIMUL LUCRU: cursorul iese din cutie, dacă a nimerit înăuntru.
+     Se face AICI, înaintea oricărei hotărâri, fiindcă tot ce urmează citește
+     ce e înaintea cursorului: dacă îl mutam mai încolo, virgula s-ar fi pus de
+     două ori („ĉ, , a"), iar ștergerea ar fi crezut că n-are ce șterge. */
+  strangeSelectiaLaCamp(field);
+  scoateCursorulDinCutie();
 
   // tastele modificatoare apăsate singure nu fac nimic și NU rup ciclul ă/î/â
   // (altfel, keydown-ul lui Shift ar reseta ciclul înainte de a ajunge la „A”)
@@ -988,6 +1135,62 @@ sheet.addEventListener('blur', (e) => {
     if (trimmed !== field.textContent) field.textContent = trimmed;
   }
 }, true);
+
+/* ================= LIPIREA ȘI TRASUL CU MOUSE-UL =================
+
+   Un câmp de lucru e o singură linie de text, nu o pagină. Lipit de-a dreptul,
+   un text copiat din Word aduce cu el tot ce-l îmbracă acolo: tabele, <div>-uri,
+   fonturi, culori. De-acolo încolo rândul c/v/s nu mai poate număra coloane,
+   fiindcă textul nu mai e o linie, ci un teanc de blocuri.
+
+   Așa că lipim NUMAI textul curat, pe o singură linie, și trecem transcrierea
+   prin îmbrăcarea simbolurilor: dacă ai lipit un „ĉ", el capătă cutia lui, ca
+   și cum l-ai fi tastat.
+
+   Trasul cu mouse-ul îl oprim de tot. Browserul îl lasă să cadă oriunde,
+   inclusiv în mijlocul unei cutii, și n-avem cum ști dinainte unde. Un drum pe
+   care nu-l putem păzi e mai bine închis decât lăsat să strice pe tăcute.
+   ================================================================= */
+sheet.addEventListener('paste', (e) => {
+  const field = e.target.closest && e.target.closest('.field');
+  if (!field) return;
+  e.preventDefault();
+  scoateCursorulDinCutie();          // aceeași pază ca la tastatură
+  const bruta = (e.clipboardData || window.clipboardData || { getData: () => '' })
+    .getData('text/plain') || '';
+  const curat = bruta.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (!curat) return;
+  insertText(curat);
+  if (field.classList.contains('trans')) {
+    // Îmbrăcarea reface nodurile, deci cursorul se pierde: îl punem la coadă,
+    // adică exact unde te aștepți să scrii mai departe după o lipire.
+    imbracaSimboluri(field);
+    caretLaCoada(field);
+  }
+  murdareste(); scheduleSave();
+});
+
+sheet.addEventListener('drop', (e) => {
+  if (e.target.closest && e.target.closest('.field')) e.preventDefault();
+});
+
+/* Cursorul la capătul câmpului, ÎNTR-UN NOD DE TEXT.
+   `selectNodeContents` plus `collapse(false)` ar lăsa cursorul „între noduri",
+   iar lângă o cutie browserul rezolvă poziția aia cel mai des înăuntrul ei. */
+function caretLaCoada(camp) {
+  camp.focus();
+  let ultim = camp.lastChild;
+  if (!ultim || ultim.nodeType !== Node.TEXT_NODE) {
+    ultim = document.createTextNode('');
+    camp.appendChild(ultim);
+  }
+  const r = document.createRange();
+  r.setStart(ultim, ultim.length);
+  r.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
 
 /* ================= Salvare / încărcare / ștergere ================= */
 
