@@ -71,6 +71,24 @@ export const MATERIAL_PE_LECTIE = {
   },
 };
 
+/**
+ * Lecțiile care au o pagină de tablă (#LaTablă).
+ *
+ * E o listă aparte de registrul de mai sus, și nu din lene: sunt două lucruri
+ * deosebite. Registrul spune CE MATERIAL ține tabla; lista de față spune că
+ * EXISTĂ o pagină de tablă. Sintaxa frazei are tablă, dar nu ține încă material
+ * în bancă; o lecție viitoare ar putea ține material fără să aibă tablă.
+ *
+ * Adresa paginii se face din adresa lecției plus „tabla/", fiindcă așa sunt
+ * așezate în folder. Dacă vreodată nu va mai fi așa, aici se schimbă.
+ */
+export const LECTII_CU_TABLA = ["fonetica-introducere", "sintaxa-frazei-introducere"];
+
+/** Are lecția asta o tablă de deschis? */
+export function areTabla(lessonSlug) {
+  return LECTII_CU_TABLA.includes(lessonSlug);
+}
+
 /** Descrierea materialului unei lecții, ori `null` dacă lecția n-are încă tablă. */
 export function materialulLectiei(lessonSlug) {
   return MATERIAL_PE_LECTIE[lessonSlug] || null;

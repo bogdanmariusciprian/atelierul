@@ -3070,6 +3070,24 @@ body.is-admin-larg main.container { max-width: 1800px; }
 
 .cx-admbody { min-width: 0; }
 
+/* ---- De la panou la lucrul pe care îl administrează ----
+   Butoanele astea nu duc „undeva în site", ci EXACT la ce se vede din ce ai
+   schimbat aici: de la banca de material la tabla care o folosește, de la
+   moderare la forumul curățat. De-aia stau sus, lângă titlu, nu îngropate în
+   josul panoului: se apasă des, după fiecare schimbare, ca să verifici. */
+.cx-legaturi { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.cx-legatura {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  border: 1px solid var(--color-border); border-radius: 999px;
+  padding: 0.25rem 0.8rem; font-size: 0.82rem;
+  color: var(--color-text); text-decoration: none; background: var(--color-bg);
+  transition: border-color 0.12s, color 0.12s;
+}
+.cx-legatura:hover { border-color: var(--color-primary); color: var(--color-primary); }
+/* Semnul că pleci din pagină. Se pune din CSS, nu din HTML, ca să nu poată fi
+   uitat la vreo legătură nouă. */
+.cx-legatura[target="_blank"]::after { content: "↗"; font-size: 0.76rem; opacity: 0.6; }
+
 /* ---- Bara profesorului ----
    Arborele de administrare stă în ACEEAȘI bară cu restul hubului, nu într-a
    doua, lângă conținut. Două bare însemnau două locuri de căutat și un drum în

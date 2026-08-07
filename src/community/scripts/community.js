@@ -88,7 +88,7 @@ import { fetchDashboard } from "../../shared/scripts/dashboard-repo.js";
 import { dashboardHtml } from "./admin-dashboard.js";
 import { adminNavHtml, citesteRuta, scrieRuta, PARTI_LECTIE } from "./admin-nav.js";
 import { boardPanelHtml, randuriDinLista, socoteala, cuDe } from "./admin-board.js";
-import { materialulLectiei, felulMaterialului } from "../../shared/scripts/board-material.js";
+import { materialulLectiei, felulMaterialului, areTabla } from "../../shared/scripts/board-material.js";
 import { listAll as bankListAll, addRows as bankAddRows, deleteItem as bankDeleteItem,
   updateItem as bankUpdateItem, countByLesson as bankCountByLesson,
   cheia as bankCheia } from "../../shared/scripts/bank-repo.js";
@@ -3097,7 +3097,12 @@ export function renderCommunity(basePath = "") {
   }
 
   function adminTabModeration() {
-    return `${moderationBox()}${adminPendingBox()}${proposalHistory()}`;
+    return `<div class="cx-box">
+        <div class="cx-admin__head"><h3>Ce ai de hotărât</h3></div>
+        <p class="cx-muted">Raportările, ce a reținut filtrul și propunerile de exerciții, la un loc.</p>
+        ${legaturiPanou([{ href: "#forum", eticheta: "Deschide forumul", icon: "💬" }])}
+      </div>
+      ${moderationBox()}${adminPendingBox()}${proposalHistory()}`;
   }
 
   // ---- Admin: schedule the daily challenges ----
@@ -3273,13 +3278,16 @@ export function renderCommunity(basePath = "") {
     const spreGrila = !cat ? "" : `<div class="cx-box">
         <div class="cx-admin__head"><h3>Itemii examenului</h3></div>
         <p class="cx-muted">Banca de itemi se editează în pagina examenului, în grila ei, unde ai
-          toate coloanele deodată: enunț, variante, răspuns, an, stare.</p>
-        <a class="btn btn--sm" href="/teste/${escapeHtml(cat.slug)}/">Deschide grila de itemi →</a>
+          toate coloanele deodată: enunț, variante, răspuns, an, stare. Butonul de sus te duce
+          acolo.</p>
       </div>`;
 
     return `${cat ? `<div class="cx-box">
         <div class="cx-admin__head"><h3><span aria-hidden="true">${cat.icon}</span> ${escapeHtml(cat.title)}</h3></div>
         <p class="cx-muted">${escapeHtml(cat.desc)}</p>
+        ${legaturiPanou([
+          { href: `${basePath}teste/${cat.slug}/`, eticheta: "Deschide examenul", icon: cat.icon },
+        ])}
       </div>` : ""}
       ${spreGrila}
       <div class="cx-box">
@@ -3328,6 +3336,7 @@ export function renderCommunity(basePath = "") {
     return `
       <div class="cx-box">
         <div class="cx-admin__head"><h3>Simulează nivelul (test)</h3></div>
+        ${legaturiPanou([{ href: "#clasament", eticheta: "Vezi clasamentul", icon: "🏆" }])}
         <p class="cx-muted">Mișcă sliderele ca să vezi bara reală de sus: nivelul (skinul + valurile la 20 + rama de pagină) și prestige-ul (stelele care apar după ce completezi bara 20). Nu-ți modifică punctele.</p>
         <div class="cx-simlevel">
           <label class="cx-simlbl">Nivel</label>
@@ -3444,6 +3453,7 @@ export function renderCommunity(basePath = "") {
     const cap = `<div class="cx-box cx-lesshead">
         <div class="cx-admin__head"><h3>${escapeHtml(lectie.title)}</h3></div>
         <p class="cx-muted">${escapeHtml(lectie.summary || "")}</p>
+        ${legaturiPanou(legaturileLectiei(lectie))}
         <div class="cx-tabs cx-tabs--sub">${PARTI_LECTIE.map((p) =>
           `<button class="cx-tabbtn${parte === p.slug ? " on" : ""}" data-action="admin-go"
             data-tab="lessons" data-lectie="${lectie.slug}" data-parte="${p.slug}">
@@ -3459,9 +3469,8 @@ export function renderCommunity(basePath = "") {
     if (parte === "tabla") return cap + boardPanelHtml(lectie, state.bk);
     return cap + `<div class="cx-box">
         <div class="cx-admin__head"><h3>Textul lecției</h3></div>
-        <p class="cx-muted">Textul lecțiilor stă în paginile lor, nu în bază. Deschide lecția
-          și editează acolo; aici rămân uneltele care atârnă de ea.</p>
-        <a class="btn btn--sm" href="/${escapeHtml(lectie.href || "")}">Deschide lecția →</a>
+        <p class="cx-muted">Textul lecțiilor stă în paginile lor, nu în bază: îl editezi în cod,
+          nu de aici. Butoanele de sus te duc la lecție și la tabla ei.</p>
       </div>`;
   }
 
@@ -3545,6 +3554,36 @@ export function renderCommunity(basePath = "") {
     }).join("");
     const earnedCount = BADGES.filter(badgeEarned).length;
     return `${sectionHead("Insigne", `Ai câștigat ${earnedCount} din ${BADGES.length}. Continuă și le deblochezi pe toate!`)}<div class="cx-badges-grid">${cards}</div>`;
+  }
+
+  /* DE LA UNEALTĂ LA LUCRUL PE CARE ÎL ADMINISTREAZĂ, DINTR-UN CLICK.
+     Panourile de administrare vorbesc DESPRE ceva ce elevul vede altundeva:
+     banca de material hrănește tabla, moderarea curăță forumul, punctele se
+     citesc în clasament. Fără o legătură la vedere, ca să verifici ce tocmai ai
+     schimbat trebuia să ții minte adresa și s-o cauți de mână.
+
+     Legăturile spre pagini din AFARA hubului se deschid în filă nouă: te întorci
+     la panou fără să pierzi ce aveai deschis. Cele din hub (forum, clasament)
+     rămân în aceeași filă, fiindcă sunt tot aici. */
+  function legaturiPanou(lista) {
+    const bune = lista.filter((l) => l && l.href);
+    if (!bune.length) return "";
+    return `<div class="cx-legaturi">${bune.map((l) => {
+      const afara = !l.href.startsWith("#");
+      return `<a class="cx-legatura" href="${escapeHtml(l.href)}"${
+        afara ? ' target="_blank" rel="noopener"' : ""}>
+        <span aria-hidden="true">${l.icon || "↗"}</span>${escapeHtml(l.eticheta)}
+      </a>`;
+    }).join("")}</div>`;
+  }
+
+  /** Adresa unei lecții și, dacă are, a tablei ei. */
+  function legaturileLectiei(lectie) {
+    const href = lectie.href ? `${basePath}${lectie.href}` : "";
+    return [
+      { href, eticheta: "Deschide lecția", icon: "📄" },
+      areTabla(lectie.slug) ? { href: `${href}tabla/`, eticheta: "Deschide tabla", icon: "🔤" } : null,
+    ];
   }
 
   function sectionHead(title, sub) {
