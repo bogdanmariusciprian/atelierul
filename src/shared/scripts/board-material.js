@@ -37,6 +37,8 @@ export const MATERIAL_PE_LECTIE = {
         etichete: [
           { slug: "litere-sunete", nume: "Litere și sunete" },
           { slug: "grupuri", nume: "Grupuri de sunete" },
+          { slug: "pseudogrup", nume: "Pseudogrup" },
+          { slug: "consoane-speciale", nume: "Consoane speciale" },
           { slug: "silabe", nume: "Despărțire în silabe" },
           { slug: "valoarea-i", nume: "Valoarea lui i" },
         ],
