@@ -20,6 +20,7 @@ import { isAdmin } from "../scripts/session.js";
 import { LESSONS } from "../scripts/lessons-index.js";
 import { LESSON_DOMAINS } from "../scripts/domains.js";
 import { initUserMenu } from "../scripts/user-menu.js";
+import { initTodo } from "./todo-fab.js";
 import { fetchOpenModerationCount } from "../scripts/forum-repo.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications, clearAllNotifications } from "../scripts/notif.js";
@@ -86,6 +87,7 @@ export async function renderChrome(basePath = "") {
   safe(initAdminFrame, "adminFrame"); // pulsing page border in the admin role
   safe(() => initAdminQuickPanel(basePath), "adminQuickPanel"); // floating 🛡️ toolbox (admin)
   safe(() => initMessenger(basePath), "messenger"); // floating 💬 Messenger + guest contact
+  safe(() => initTodo(basePath), "todo"); // floating „TO-DO" bottom-left (admin only)
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
   safe(addPlannerLink, "plannerLink"); // „Meditații" — added only if allowed

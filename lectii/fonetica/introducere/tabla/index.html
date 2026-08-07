@@ -253,6 +253,11 @@
   if (await enforceGate()) {
     await import("../../../../src/site/scripts/tabla-fonetica.js");
     revealGate();
+  /* Butonul „TO-DO" al profesorului. Pagina asta nu cheamă bara sitului, deci
+     nu-l primește de la sine; îl chemăm de mână, cu drumul până la rădăcină. */
+    import("../../../../src/shared/components/todo-fab.js")
+      .then((m) => m.initTodo("../../../../"))
+      .catch(() => {});
   }
 </script>
 </body>

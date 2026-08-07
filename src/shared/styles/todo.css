@@ -1,0 +1,165 @@
+/* =========================================================
+   Butonul „TO-DO" al profesorului, în stânga jos, pe toate paginile.
+
+   STILURILE ÎȘI POARTĂ SINGURE CULORILE, nu le iau din `variables.css`.
+   Motivul e practic: widgetul trebuie să meargă și pe paginile care nu încarcă
+   foaia sitului, adică pe cele două table (#LaTablă) și pe atelierul de
+   redactare, care își au tema lor, cu alt set de variabile. Dacă m-aș fi
+   sprijinit pe variabilele sitului, butonul ar fi ieșit acolo fără culoare, iar
+   greșeala s-ar fi văzut abia peste săptămâni.
+
+   De-aia fișierul e adus de widget, nu din `main.css`: o pagină care cheamă
+   `initTodo()` primește și stilurile odată cu el, fără să știe de ele.
+   ========================================================= */
+
+.todo-fab-wrap {
+  position: fixed;
+  left: 22px;
+  bottom: 26px;
+  /* Sub toasturi, dar peste rama de admin și peste conținut. Aceeași treaptă cu
+     trusa 🛡️ din colțul celălalt: sunt frați, n-au de ce se acoperi. */
+  z-index: 2147482100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.todo-fab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 42px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: #1f2430;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 12px 28px -10px rgba(31, 36, 48, 0.65);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.todo-fab:hover { background: #2b3242; transform: translateY(-1px); }
+.todo-fab:active { transform: translateY(0); }
+.todo-fab__n {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #422006;
+  font-size: 0.7rem;
+  line-height: 18px;
+  font-weight: 800;
+}
+
+.todo-panel {
+  width: 340px;
+  max-width: calc(100vw - 44px);
+  max-height: min(560px, calc(100vh - 130px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #1f2430;
+  border: 1px solid #e2e6ef;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px -16px rgba(31, 36, 48, 0.35);
+}
+.todo-panel[hidden] { display: none; }
+
+.todo-panel__cap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e6ef;
+  background: #fafbfe;
+}
+.todo-panel__cap b { font-size: 0.86rem; }
+.todo-panel__unde {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.74rem;
+  color: #7b8494;
+}
+.todo-panel__x {
+  border: 0; background: none; color: #7b8494; cursor: pointer;
+  font-size: 1.1rem; line-height: 1; padding: 0 2px;
+}
+.todo-panel__x:hover { color: #1f2430; }
+
+.todo-file { display: flex; gap: 4px; padding: 8px 12px 0; }
+.todo-file button {
+  border: 1px solid #e2e6ef; border-radius: 999px; background: #fff;
+  color: #7b8494; font: inherit; font-size: 0.76rem; padding: 3px 12px; cursor: pointer;
+}
+.todo-file button.on { background: #1f2430; color: #fff; border-color: transparent; }
+
+.todo-scris { display: flex; gap: 6px; padding: 10px 12px; }
+.todo-scris textarea {
+  flex: 1; min-height: 38px; max-height: 120px; resize: vertical;
+  font: inherit; font-size: 0.84rem; line-height: 1.45; color: #1f2430;
+  border: 1px solid #e2e6ef; border-radius: 10px; padding: 7px 9px;
+  background: #fbfcff; outline: none;
+}
+.todo-scris textarea:focus { border-color: #4f6ef2; background: #fff; }
+.todo-scris button {
+  align-self: flex-end; border: none; border-radius: 10px; height: 34px; padding: 0 14px;
+  background: #4f6ef2; color: #fff; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.todo-scris button:hover { background: #3f5ee0; }
+
+.todo-lista { flex: 1; overflow: auto; padding: 0 12px 12px; }
+.todo-gol { color: #7b8494; font-size: 0.8rem; line-height: 1.5; margin: 4px 2px 10px; }
+
+.todo-nota {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 4px; border-bottom: 1px solid #eef1f8;
+}
+.todo-nota:last-child { border-bottom: 0; }
+.todo-nota input[type="checkbox"] { margin-top: 3px; flex: none; cursor: pointer; }
+.todo-nota__t {
+  flex: 1; min-width: 0; font-size: 0.83rem; line-height: 1.45;
+  overflow-wrap: anywhere; cursor: text;
+}
+/* Bifată, nota nu dispare: rămâne la vedere, ștearsă, ca să știi ce ai făcut.
+   O listă care se golește singură nu se deosebește de una pierdută. */
+.todo-nota.e-facuta .todo-nota__t { text-decoration: line-through; color: #9aa2b1; }
+.todo-nota__x {
+  border: 0; background: none; color: #a4271f; cursor: pointer;
+  font-size: 0.95rem; line-height: 1; padding: 0 2px; opacity: 0;
+  transition: opacity 0.12s;
+}
+.todo-nota:hover .todo-nota__x { opacity: 1; }
+
+/* Fila „Toate": notițele stau grupate pe paginile lor, iar numele paginii duce
+   acolo. Fără legătură, ai ști CE ai de făcut, dar nu și UNDE. */
+.todo-pag { margin-top: 10px; }
+.todo-pag__cap {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 0.78rem; font-weight: 700; color: #1f2430;
+  padding: 4px 2px; text-decoration: none;
+}
+.todo-pag__cap:hover { color: #4f6ef2; }
+.todo-pag__n { font-size: 0.7rem; font-weight: 700; color: #a16207; }
+.todo-pag__cale {
+  font-size: 0.68rem; color: #9aa2b1; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .todo-fab-wrap { left: 12px; bottom: 12px; }
+  .todo-fab { height: 38px; padding: 0 13px; }
+}
