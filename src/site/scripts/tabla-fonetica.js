@@ -1154,11 +1154,18 @@ function adaugaExercitiu(cfg) {
   return exercitii[deschis];
 }
 
+/* „+ cerință" întreabă întâi CE FEL de exercițiu se face, fiindcă felul e al
+   exercițiului, nu al generatorului: dacă îl știm de la început, generatorul nu
+   mai are ce întreba, iar cerința vine scrisă și numai de îndreptat. Cine vrea
+   să scrie de la zero alege „scriu eu cerința", și atunci exercițiul rămâne
+   fără fel până când generatorul chiar are nevoie de el. */
 const elCerintaNoua = document.getElementById('cerintaNoua');
 elCerintaNoua && elCerintaNoua.addEventListener('click', () => {
-  adaugaExercitiu({});
-  const t = elTeanc.querySelector('.cer.e-deschisa textarea');
-  if (t) t.focus();
+  ceFel(true, (fata) => {
+    adaugaExercitiu(fata ? { cerinta: CERINTE[fata], sursa: 'mana', fata } : {});
+    const t = elTeanc.querySelector('.cer.e-deschisa textarea');
+    if (t) t.focus();
+  });
 });
 
 function collectState() {
@@ -1630,7 +1637,6 @@ function vesteste(fata) {
     elVestire.classList.remove('e-vazuta');
     setTimeout(() => { elVestire.hidden = true; }, 220);
   }, 4200);
-  cheamaGeneratorul();
 }
 
 /* Zarul a spus CE fel de exercițiu; pasul următor e să aduci materialul pentru
@@ -1691,25 +1697,55 @@ function aruncaZarul() {
   requestAnimationFrame(cadru);
 }
 
-/** Ce se întâmplă după ce zarul s-a oprit: se vestește și se face exercițiul. */
+/* Ce se întâmplă după ce zarul s-a oprit: se face exercițiul și se deschide
+   generatorul, fiindcă zarul a spus CE fel de exercițiu, iar pasul următor e
+   întotdeauna „cu ce cuvinte". Rezultatul aruncării intră în capul ferestrei.
+
+   Vestirea plutitoare rămâne numai pentru cazul în care fereastra nu se poate
+   deschide: altfel s-ar acoperi una pe alta și ar spune același lucru de două
+   ori. */
 function gataAruncarea(fata) {
-  vesteste(fata);
   adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'zar', fata });
+  if (deschideGeneratorul({ dinZar: fata })) return;
+  vesteste(fata);
+  cheamaGeneratorul();
 }
 
 elZar && elZar.addEventListener('click', aruncaZarul);
 
-/* ---------- Generatorul ---------- */
+/* ============================================================
+   GENERATORUL
+
+   Fereastra răspunde la trei întrebări, ținute despărțite fiindcă sunt lucruri
+   deosebite: UNDE intră cuvintele, CÂTE și CUM le vrei, și dacă exercițiul e
+   temă. Tipul exercițiului nu mai e printre ele: el e al exercițiului, hotărât
+   de zar ori la „+ cerință", și n-are ce căuta într-o fereastră care aduce
+   material. Dacă exercițiul chiar n-are tip (cerință scrisă de mână), fereastra
+   îl întreabă o singură dată și îl ține minte pe exercițiu.
+
+   PLAFONUL. Nu se poate cere mai mult decât are banca. Numărul de sus îl
+   socotim din ce e chiar acum în bancă, la felul și dificultatea alese, fără
+   cele date deja azi dacă e bifat „numai cuvinte noi". Așa nu ceri zece și
+   primești patru fără să înțelegi de ce.
+   ============================================================ */
 const dlgGen = document.getElementById('dlgGen');
-const elGenTip = document.getElementById('genTip');
-const elGenZar = document.getElementById('genZar');
+const elGenTintaZar = document.getElementById('genTintaZar');
+const elGenTintaK = document.getElementById('genTintaK');
+const elGenTintaT = document.getElementById('genTintaT');
+const elGenFel = document.getElementById('genFel');
+const elGenFelLista = document.getElementById('genFelLista');
+const elGenParte = document.getElementById('genParte');
+const elGenJos = document.getElementById('genJos');
 const elGenTema = document.getElementById('genTema');
 const elGenCate = document.getElementById('genCate');
 const elGenCe = document.getElementById('genCe');
+const elGenDin = document.getElementById('genDin');
 const elGenNivel = document.getElementById('genNivel');
-const elGenRepeta = document.getElementById('genRepeta');
+const elGenNoi = document.getElementById('genNoi');
+const elGenNoiT = document.getElementById('genNoiT');
+const elGenNou = document.getElementById('genNou');
 const elGenNota = document.getElementById('genNota');
-const elGenPentru = document.getElementById('genPentru');
+const elGenFa = document.getElementById('genFa');
 
 /* Ce a primit elevul CÂT E PE TABLĂ. Se golește la reîncărcare, deci „nu se
    repetă în aceeași ședere" înseamnă exact ce a cerut Marius: în ședința asta
@@ -1717,61 +1753,221 @@ const elGenPentru = document.getElementById('genPentru');
    două exerciții deosebite tot repetare e. */
 const datAzi = new Set();
 
+/* Felul ales adineauri în fereastră, pentru o cerință scrisă de mână. Trăiește
+   până se închide fereastra; de acolo încolo îl ține exercițiul. */
+let felAles = null;
+
+/* Banca, cerută o dată pe fereastră deschisă. O ținem ca să putem socoti
+   plafonul din mers, când schimbi dificultatea ori bifa: altfel ar fi o cerere
+   la server la fiecare apăsare. Se golește la închidere, ca fereastra
+   următoare să vadă ce ai mai adăugat între timp în panoul de admin. */
+const banca = new Map();
+
 /* Numele felului, luat din registrul lecției: „cuvinte", „structuri fonetice".
    Nu-l scriem de mână aici, ca să nu ajungă tabla să spună altceva decât spune
    panoul profesorului despre același lucru. */
 const numeFel = (kind) => felulMaterialului(LECTIE, kind)?.nume || kind;
+const numeFelArticulat = (kind) =>
+  felulMaterialului(LECTIE, kind)?.numeArticulat || numeFel(kind);
 
-function deschideFereastra(d) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+function deschideFereastra(d) { if (!d) return false; if (d.showModal) d.showModal(); else d.setAttribute('open', ''); return true; }
+function inchideFereastra(d) { if (!d) return; if (d.close) d.close(); else d.removeAttribute('open'); }
 
-/** Ultimul exercițiu venit de la zar, dacă există. */
-function ultimulDeLaZar() {
-  for (let i = exercitii.length - 1; i >= 0; i--) if (exercitii[i].sursa === 'zar') return i;
-  return -1;
+/* ---------- Ce fel de exercițiu ----------
+   O singură listă, folosită și de fereastra de la „+ cerință", și de întrebarea
+   dinăuntrul generatorului. Se face din `CERINTE` și din registrul lecției:
+   dacă se schimbă o cerință, se schimbă în amândouă locurile deodată. */
+function feluriHtml(cuLiber) {
+  let h = '';
+  for (const fata of [1, 2, 3, 4, 5, 6]) {
+    const cfg = fataZarului(LECTIE, fata);
+    if (!cfg) continue;
+    h += '<button class="fel" type="button" data-fata="' + fata + '">' +
+           '<span class="fel__n">' + fata + '</span>' +
+           '<span class="fel__t"><b>' + escapaText(cfg.nume) + '</b>' +
+           '<i>' + escapaText(CERINTE[fata]) + '</i></span></button>';
+  }
+  if (cuLiber) {
+    h += '<button class="fel fel--liber" type="button" data-fata="0">' +
+           '<span class="fel__n">✎</span>' +
+           '<span class="fel__t"><b>scriu eu cerința</b>' +
+           '<i>Exercițiul rămâne fără fel; generatorul te întreabă la nevoie.</i>' +
+           '</span></button>';
+  }
+  return h;
 }
+
+const dlgFel = document.getElementById('dlgFel');
+const elFelLista = document.getElementById('felLista');
+let raspundeLaFel = null;
+
+/** Întreabă ce fel de exercițiu și cheamă `apoi(fata)`. `0` = scrie el cerința. */
+function ceFel(cuLiber, apoi) {
+  if (!dlgFel || !elFelLista) { apoi(0); return; }
+  elFelLista.innerHTML = feluriHtml(cuLiber);
+  raspundeLaFel = apoi;
+  deschideFereastra(dlgFel);
+}
+
+elFelLista && elFelLista.addEventListener('click', (e) => {
+  const b = e.target.closest('.fel');
+  if (!b) return;
+  const fata = Number(b.dataset.fata) || 0;
+  inchideFereastra(dlgFel);
+  const apoi = raspundeLaFel;
+  raspundeLaFel = null;
+  if (apoi) apoi(fata);
+});
+
+/* ---------- Ținta și felul în lucru ---------- */
+
+/** Felul cu care lucrăm acum: cel ales adineauri ori cel al exercițiului. */
+function fataInLucru() {
+  if (felAles) return felAles;
+  const ex = exercitii[deschis];
+  return ex && ex.fata ? Number(ex.fata) : null;
+}
+
+const nivelAles = () => {
+  const b = elGenNivel && elGenNivel.querySelector('.cip.e-aleasa');
+  return b && b.dataset.nivel ? Number(b.dataset.nivel) : null;
+};
+
+/** Banca pentru o față, cerută o singură dată cât e fereastra deschisă. */
+async function bancaPentru(fata) {
+  if (!banca.has(fata)) banca.set(fata, await listItems(LECTIE, fata, {}));
+  return banca.get(fata);
+}
+
+/** Ce mai e de dat: după dificultate și, dacă se cere, fără cele date azi. */
+function libereDin(lista, nivel, doarNoi) {
+  let l = lista || [];
+  if (nivel) l = l.filter((x) => Number(x.level) === nivel);
+  if (doarNoi) l = l.filter((x) => !datAzi.has(x.id));
+  return l;
+}
+
+/* ---------- Fereastra ---------- */
 
 function potrivesteFereastraGen() {
-  const iZar = ultimulDeLaZar();
-  if (elGenZar) elGenZar.disabled = iZar < 0;
-  const spreZar = elGenZar && elGenZar.checked && iZar >= 0;
-  const tinta = spreZar ? iZar : deschis;
-  const ex = exercitii[tinta];
-  // Tipul se ia de la exercițiu când exercițiul îl știe (a venit de la zar), și
-  // atunci nu se poate schimba: altfel ai cere cuvinte pentru o cerință care
-  // vorbește despre propoziții.
-  if (ex && ex.sursa === 'zar') {
-    elGenTip.value = String(ex.fata);
-    elGenTip.disabled = true;
-  } else {
-    elGenTip.disabled = false;
+  const fata = fataInLucru();
+  const areFel = !!fata;
+  if (elGenFel) elGenFel.hidden = areFel;
+  if (elGenParte) elGenParte.hidden = !areFel;
+  if (elGenJos) elGenJos.hidden = !areFel;
+  if (!areFel) {
+    if (elGenFelLista && !elGenFelLista.innerHTML) elGenFelLista.innerHTML = feluriHtml(false);
+    if (elGenTintaK) elGenTintaK.textContent = 'Cerința în care intră';
+    if (elGenTintaT) {
+      const ex = exercitii[deschis];
+      elGenTintaT.textContent = (ex && ex.cerinta.split('\n')[0].trim()) || 'exercițiul deschis';
+    }
+    return;
   }
-  if (elGenTema) elGenTema.checked = !!(ex && ex.tema);
-  const cfg = fataZarului(LECTIE, Number(elGenTip.value)) || fataZarului(LECTIE, 1);
+
+  const cfg = fataZarului(LECTIE, fata);
+  const ex = exercitii[deschis];
+  const nou = elGenNou && elGenNou.checked;
+
+  if (elGenTintaK) {
+    elGenTintaK.textContent = numeFelArticulat(cfg.kind) + ' intră ' +
+      (nou || !ex ? 'într-un exercițiu nou' : 'în exercițiul ' + (deschis + 1));
+  }
+  if (elGenTintaT) {
+    // La un exercițiu care are deja cerința scrisă, arătăm chiar textul lui, nu
+    // șablonul: altfel fereastra ar promite altceva decât scrie pe tablă.
+    const scrisa = !nou && ex ? ex.cerinta.split('\n')[0].trim() : '';
+    elGenTintaT.textContent = scrisa || CERINTE[fata];
+  }
   if (elGenCe) elGenCe.textContent = numeFel(cfg.kind);
-  if (elGenPentru) {
-    elGenPentru.textContent = ex
-      ? 'Materialul intră în exercițiul ' + (tinta + 1) + (ex.sursa === 'zar' ? ' (de la zar).' : '.')
-      : 'Nu văd niciun exercițiu.';
+  if (elGenNoiT) elGenNoiT.textContent = 'numai ' + numeFel(cfg.kind) + ' noi';
+  if (elGenTema) elGenTema.checked = !nou && !!(ex && ex.tema);
+
+  // O propoziție se transcrie una câte una: n-are noimă să ceri opt.
+  const unaSingura = cfg.kind === 'propozitie';
+  if (elGenCate) {
+    elGenCate.disabled = unaSingura;
+    if (unaSingura) elGenCate.value = '1';
   }
-  if (elGenCate) elGenCate.value = cfg.kind === 'propozitie' ? '1' : elGenCate.value;
+  improspatatePlafonul();
 }
 
-document.getElementById('genBtn')?.addEventListener('click', () => {
-  if (elGenNota) elGenNota.textContent = '';
-  potrivesteFereastraGen();
-  deschideFereastra(dlgGen);
-});
-elGenZar && elGenZar.addEventListener('change', potrivesteFereastraGen);
-elGenTip && elGenTip.addEventListener('change', potrivesteFereastraGen);
+/** Câte mai are banca și, pe loc, plafonul câmpului. */
+async function improspatatePlafonul() {
+  const fata = fataInLucru();
+  if (!fata || !elGenCate) return;
+  const cfg = fataZarului(LECTIE, fata);
+  if (elGenDin) elGenDin.textContent = 'caut în bancă…';
+  const tot = await bancaPentru(fata);
+  // Între timp poți fi schimbat felul; atunci răspunsul ăsta e vechi.
+  if (fataInLucru() !== fata) return;
 
-/** Alege la întâmplare, ocolind ce s-a mai dat, dacă elevul n-a cerut altfel. */
-function alege(lista, cate, cuRepetare) {
-  const libere = cuRepetare ? lista.slice() : lista.filter((x) => !datAzi.has(x.id));
-  // Dacă s-au terminat cele nemaivăzute, luăm de la capăt din tot ce e: mai
-  // bine repetare decât „n-am ce să-ți dau".
-  const din = libere.length ? libere : lista.slice();
+  const nivel = nivelAles();
+  const doarNoi = !!(elGenNoi && elGenNoi.checked);
+  const libere = libereDin(tot, nivel, doarNoi).length;
+  const plafon = cfg.kind === 'propozitie' ? Math.min(1, libere) : libere;
+
+  elGenCate.max = String(Math.max(1, plafon));
+  if (Number(elGenCate.value) > plafon) elGenCate.value = String(Math.max(1, plafon));
+  if (elGenDin) {
+    elGenDin.textContent = libere
+      ? 'din ' + libere + ' în bancă'
+      : 'banca e goală aici';
+  }
+  if (elGenFa) elGenFa.disabled = plafon < 1;
+  if (elGenNota) {
+    elGenNota.textContent = plafon >= 1 ? '' :
+      (tot.length
+        ? 'Ai dat azi toate ' + numeFel(cfg.kind) + ' de aici' +
+          (nivel ? ' la dificultatea asta' : '') + '. Scoate bifa ori schimbă dificultatea.'
+        : 'Banca n-are încă ' + numeFel(cfg.kind) + ' pentru exercițiul ăsta.');
+  }
+}
+
+/** Deschide generatorul. `dinZar` = fața care tocmai a picat, dacă e cazul. */
+function deschideGeneratorul({ dinZar = null } = {}) {
+  if (!dlgGen) return false;
+  felAles = null;
+  banca.clear();
+  if (elGenNota) elGenNota.textContent = '';
+  if (elGenNou) elGenNou.checked = false;
+  if (elGenTintaZar) {
+    elGenTintaZar.hidden = !dinZar;
+    if (dinZar) elGenTintaZar.textContent = '🎲 ți-a picat ' + dinZar;
+  }
+  potrivesteFereastraGen();
+  return deschideFereastra(dlgGen);
+}
+
+document.getElementById('genBtn')?.addEventListener('click', () => deschideGeneratorul());
+dlgGen && dlgGen.addEventListener('close', () => { felAles = null; banca.clear(); });
+
+elGenNou && elGenNou.addEventListener('change', potrivesteFereastraGen);
+elGenNoi && elGenNoi.addEventListener('change', improspatatePlafonul);
+elGenNivel && elGenNivel.addEventListener('click', (e) => {
+  const b = e.target.closest('.cip');
+  if (!b) return;
+  elGenNivel.querySelectorAll('.cip').forEach((x) => x.classList.toggle('e-aleasa', x === b));
+  improspatatePlafonul();
+});
+elGenFelLista && elGenFelLista.addEventListener('click', (e) => {
+  const b = e.target.closest('.fel');
+  if (!b) return;
+  felAles = Number(b.dataset.fata) || null;
+  potrivesteFereastraGen();
+});
+
+/* Plafonul se ține și la tastare, nu doar prin atributul `max`: `max` oprește
+   săgețile, dar nu oprește pe cineva care scrie 40 cu mâna. */
+elGenCate && elGenCate.addEventListener('input', () => {
+  const plafon = Number(elGenCate.max) || 1;
+  if (Number(elGenCate.value) > plafon) elGenCate.value = String(plafon);
+});
+
+/** Alege `cate` la întâmplare din ce e liber. */
+function alege(lista, cate) {
   const ales = [];
-  const copie = din.slice();
+  const copie = lista.slice();
   while (ales.length < cate && copie.length) {
     ales.push(copie.splice(Math.floor(Math.random() * copie.length), 1)[0]);
   }
@@ -1779,49 +1975,46 @@ function alege(lista, cate, cuRepetare) {
   return ales;
 }
 
-document.getElementById('genFa')?.addEventListener('click', async () => {
-  const iZar = ultimulDeLaZar();
-  const spreZar = elGenZar && elGenZar.checked && iZar >= 0;
-  const tinta = spreZar ? iZar : deschis;
-  const ex = exercitii[tinta];
-  if (!ex) return;
-
-  const fata = Number(elGenTip.value) || 1;
+elGenFa && elGenFa.addEventListener('click', async () => {
+  const fata = fataInLucru();
+  if (!fata) return;                       // fereastra e la întrebarea de fel
   const cfg = fataZarului(LECTIE, fata);
-  const cate = Math.max(1, Math.min(30, Number(elGenCate.value) || 1));
-  const nivel = elGenNivel.value ? Number(elGenNivel.value) : null;
 
-  elGenNota.textContent = 'Caut în bancă…';
-  const tot = await listItems(LECTIE, fata, { level: nivel });
-  if (!tot.length) {
-    elGenNota.textContent = 'Banca n-are încă ' + numeFel(cfg.kind) +
-      ' pentru exercițiul ăsta' + (nivel ? ' la dificultatea aleasă' : '') + '.';
-    return;
+  const tot = await bancaPentru(fata);
+  const libere = libereDin(tot, nivelAles(), !!(elGenNoi && elGenNoi.checked));
+  if (!libere.length) { improspatatePlafonul(); return; }
+
+  const cate = Math.max(1, Math.min(libere.length, Number(elGenCate.value) || 1));
+  const texte = alege(libere, cate).map((x) => x.body);
+
+  // UNDE INTRĂ. Un exercițiu nou capătă felul ăsta; cel deschis, dacă n-avea
+  // fel (cerință scrisă de mână), îl capătă acum și nu va mai fi întrebat.
+  let ex;
+  if ((elGenNou && elGenNou.checked) || !exercitii[deschis]) {
+    ex = adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'mana', fata });
+  } else {
+    ex = exercitii[deschis];
+    if (!ex.fata) ex.fata = fata;
   }
-  const alese = alege(tot, cate, elGenRepeta && elGenRepeta.checked);
-  const texte = alese.map((x) => x.body);
 
-  // CERINȚA primește materialul, ca elevul să-l vadă și când derulează.
-  ex.cerinta = CERINTE[fata] + '\n' + texte.join(', ');
+  // CERINȚA primește materialul, ca elevul să-l vadă și când derulează. Păstrăm
+  // textul scris de profesor, dacă a scris unul: șablonul e doar pentru gol.
+  const baza = (ex.cerinta || '').split('\n')[0].trim() || CERINTE[fata];
+  ex.cerinta = baza + '\n' + texte.join(', ');
   ex.tema = !!(elGenTema && elGenTema.checked);
-  if (ex.sursa !== 'zar') ex.fata = fata;
 
   // RÂNDURILE, după felul materialului:
   //  · cuvinte     → un rând pe cuvânt, cu cuvântul pus la locul lui;
   //  · structuri   → rânduri GOALE: structura e cerința, cuvintele le dă elevul;
   //  · propoziții  → un rând, cu propoziția în prima căsuță, de transcris.
-  let randuri;
-  if (cfg.kind === 'cuvant')      randuri = texte.map((t) => ({ word: escapaText(t) }));
-  else if (cfg.kind === 'structura') randuri = texte.map(() => ({}));
-  else                            randuri = texte.map((t) => ({ word: escapaText(t) }));
-  ex.randuri = randuri;
+  ex.randuri = cfg.kind === 'structura'
+    ? texte.map(() => ({}))
+    : texte.map((t) => ({ word: escapaText(t) }));
 
-  if (tinta !== deschis) { salveazaDeschisul(); deschis = tinta; }
   aseazaRanduri(ex.randuri);
   deseneazaTeancul();
   murdareste(); scheduleSave();
-  elGenNota.textContent = '';
-  dlgGen.close ? dlgGen.close() : dlgGen.removeAttribute('open');
+  inchideFereastra(dlgGen);
 });
 
 /* Banca de material NU se mai scrie de aici.

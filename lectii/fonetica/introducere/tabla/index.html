@@ -189,56 +189,87 @@
   </form>
 </dialog>
 
-<!-- GENERATORUL -->
-<dialog class="dlg" id="dlgGen" aria-label="Generator de material">
+<!-- GENERATORUL
+
+     Fereastra răspunde la trei întrebări, în ordinea asta și despărțite pe
+     ecran, fiindcă sunt lucruri deosebite:
+       1. UNDE intră cuvintele  → cartonașul de sus și bifa din subsol;
+       2. CÂTE și CUM           → numărul, dificultatea, „numai cuvinte noi";
+       3. CE FEL DE SARCINĂ e   → tema, dincolo de linia punctată, fiindcă ține
+                                   de exercițiu, nu de cuvinte.
+     Tipul exercițiului NU se mai alege aici: el e al exercițiului, hotărât de
+     zar ori la „+ cerință". Generatorul îl întreabă doar când exercițiul chiar
+     nu-l are, și atunci o singură dată. -->
+<dialog class="dlg dlg--gen" id="dlgGen" aria-label="Generator">
   <form method="dialog" class="dlg__cap">
     <h3>Generator</h3>
     <span class="dlg__imping"></span>
     <button class="btn" value="inchide">Închide</button>
   </form>
   <div class="dlg__corp">
-    <p class="dlg__lamurire" id="genPentru">Alege pentru ce exercițiu vrei material.</p>
 
-    <label class="bif"><input type="checkbox" id="genZar">
-      <span>pentru exercițiul de la zar</span></label>
-    <label class="bif"><input type="checkbox" id="genTema">
-      <span>pentru temă</span></label>
-
-    <div class="gen-rand">
-      <label for="genTip">Tipul exercițiului</label>
-      <select id="genTip">
-        <option value="1">1 · litere și sunete</option>
-        <option value="2">2 · grupuri de sunete</option>
-        <option value="3">3 · despărțire în silabe</option>
-        <option value="4">4 · valoarea lui i</option>
-        <option value="5">5 · structuri fonetice</option>
-        <option value="6">6 · transcrierea unei propoziții</option>
-      </select>
+    <!-- UNDE INTRĂ: cerința întreagă, ca să se vadă la ce slujesc cuvintele. -->
+    <div class="gen-tinta" id="genTinta">
+      <span class="gen-tinta__zar" id="genTintaZar" hidden></span>
+      <span class="gen-tinta__k" id="genTintaK">Cuvintele intră în</span>
+      <span class="gen-tinta__t" id="genTintaT">–</span>
     </div>
 
-    <div class="gen-rand">
-      <label for="genCate">Câte</label>
-      <input type="number" id="genCate" min="1" max="30" value="8">
-      <span class="gen-rand__ce" id="genCe">cuvinte</span>
+    <!-- Se arată NUMAI la cerințele scrise de mână, care n-au fel. -->
+    <div class="gen-fel" id="genFel" hidden>
+      <p class="gen-fel__i">Cerința asta e scrisă de mână. Ce fel de exercițiu e?</p>
+      <div class="fel-lista" id="genFelLista"></div>
     </div>
 
-    <div class="gen-rand">
-      <label for="genNivel">Dificultate</label>
-      <select id="genNivel">
-        <option value="">oricare</option>
-        <option value="1">ușor</option>
-        <option value="2" selected>mijlociu</option>
-        <option value="3">greu</option>
-      </select>
+    <div class="gen-parte" id="genParte">
+      <div class="gen-camp">
+        <label for="genCate">Câte</label>
+        <span class="gen-camp__c">
+          <input type="number" id="genCate" min="1" value="8" inputmode="numeric">
+          <span class="gen-camp__ce" id="genCe">cuvinte</span>
+          <span class="gen-din" id="genDin"></span>
+        </span>
+      </div>
+
+      <div class="gen-camp">
+        <label id="genNivelE">Dificultate</label>
+        <span class="cipuri" id="genNivel" role="group" aria-labelledby="genNivelE">
+          <button class="cip e-aleasa" type="button" data-nivel="">oricare</button>
+          <button class="cip" type="button" data-nivel="1">ușor</button>
+          <button class="cip" type="button" data-nivel="2">mijlociu</button>
+          <button class="cip" type="button" data-nivel="3">greu</button>
+        </span>
+      </div>
+
+      <label class="bif"><input type="checkbox" id="genNoi" checked>
+        <span id="genNoiT">numai cuvinte noi</span></label>
+
+      <hr class="gen-taietura">
+
+      <label class="bif"><input type="checkbox" id="genTema">
+        <span>însemnează exercițiul ca temă</span></label>
+
+      <p class="dlg__nota" id="genNota"></p>
     </div>
-
-    <label class="bif"><input type="checkbox" id="genRepeta">
-      <span>lasă-mă să primesc și material pe care l-am mai avut azi</span></label>
-
-    <p class="dlg__nota" id="genNota"></p>
   </div>
-  <div class="dlg__jos">
+  <div class="dlg__jos dlg__jos--gen" id="genJos">
+    <label class="bif bif--jos"><input type="checkbox" id="genNou">
+      <span>într-un exercițiu nou</span></label>
+    <span class="dlg__imping"></span>
     <button class="btn btn--tare" id="genFa">Generează</button>
+  </div>
+</dialog>
+
+<!-- CE FEL DE EXERCIȚIU. Se deschide de la „+ cerință". Lista se face din
+     aceleași cerințe pe care le știe zarul: un singur loc, un singur adevăr. -->
+<dialog class="dlg" id="dlgFel" aria-label="Ce fel de exercițiu">
+  <form method="dialog" class="dlg__cap">
+    <h3>Ce fel de exercițiu?</h3>
+    <span class="dlg__imping"></span>
+    <button class="btn" value="inchide">Închide</button>
+  </form>
+  <div class="dlg__corp">
+    <div class="fel-lista" id="felLista"></div>
   </div>
 </dialog>
 

@@ -18,6 +18,12 @@
 //   eticheta = la ce exercițiu se potrivește. Ajunge în lista `tags`.
 //   fața     = numărul de pe zar, pentru tablele care au zar.
 //
+// `nume` e forma nearticulată („cuvinte"), bună după un număr: „8 cuvinte".
+// `numeArticulat` e cea articulată și cu literă mare („Cuvintele"), bună la
+// începutul unei propoziții: „Cuvintele intră în exercițiul 3". Le scriem pe
+// amândouă, în loc să lipim un „-le" în cod: româna nu e atât de simplă, iar
+// „structuri fonetice" ar fi ieșit „structuri foneticele".
+//
 // Un material are UN fel și POATE AVEA MAI MULTE etichete: „iarnă" e bun și la
 // litere și sunete, și la despărțirea în silabe. De-aia felul e coloană, iar
 // eticheta e listă.
@@ -32,6 +38,7 @@ export const MATERIAL_PE_LECTIE = {
       {
         kind: "cuvant",
         nume: "cuvinte",
+        numeArticulat: "Cuvintele",
         unul: "cuvânt",
         pilda: "iarnă; piatră; împărăteasă",
         etichete: [
@@ -46,6 +53,7 @@ export const MATERIAL_PE_LECTIE = {
       {
         kind: "structura",
         nume: "structuri fonetice",
+        numeArticulat: "Structurile fonetice",
         unul: "structură",
         pilda: "cvcv; ccvc; cvcvc",
         etichete: [{ slug: "structuri", nume: "Structuri fonetice" }],
@@ -53,6 +61,7 @@ export const MATERIAL_PE_LECTIE = {
       {
         kind: "propozitie",
         nume: "propoziții",
+        numeArticulat: "Propozițiile",
         unul: "propoziție",
         pilda: "Ana are mere.",
         etichete: [{ slug: "propozitii", nume: "Transcrierea unei propoziții" }],
