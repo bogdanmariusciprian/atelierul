@@ -3269,6 +3269,11 @@ body.is-admin-larg main.container { max-width: 1800px; }
 .cxbk__r.e-gata { background: var(--color-surface); color: var(--color-text-muted); }
 .cxbk__r.e-gata .cxbk__corp { text-decoration: line-through; }
 .cxbk__gata { font-family: inherit; font-size: 0.68rem; color: var(--color-text-muted); margin-left: 0.5rem; text-decoration: none; display: inline-block; }
+
+/* Bifa care n-are ce căuta acolo: eticheta cere ceva de la cuvânt, iar cuvântul
+   ăsta nu are. Se vede stinsă, nu ascunsă: coloanele trebuie să rămână drepte,
+   iar golul ar arăta ca o scăpare, nu ca o hotărâre. */
+.cxbk__nu { opacity: 0.22; cursor: not-allowed; }
 .cxbk__scoate { border: 0; background: none; color: #a4271f; cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0 0.15rem; }
 .cxbk__jos { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem; background: var(--color-surface); border-top: 1px solid var(--color-border); flex-wrap: wrap; }
 .cxbk__jos .cx-muted { margin-right: auto; font-size: 0.78rem; }

@@ -1789,7 +1789,8 @@ if (firstField) placeCaret(firstField, true);
    ============================================================ */
 import { aruncare, pas, stat, fataUrmatoare, asezare, INTOARCERI } from './zar-fizica.js';
 import { listItems } from '../../shared/scripts/bank-repo.js';
-import { fataZarului, felulMaterialului } from '../../shared/scripts/board-material.js';
+import { fataZarului, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
+  from '../../shared/scripts/board-material.js';
 
 /* Cele șase cerințe, una pe față. Textul lor e al profesorului, nu al meu:
    se schimbă aici, într-un singur loc, și se schimbă peste tot. */
@@ -1908,8 +1909,22 @@ function aruncaZarul() {
    deschide: altfel s-ar acoperi una pe alta și ar spune același lucru de două
    ori. */
 function gataAruncarea(fata) {
-  adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'zar', fata });
-  if (deschideGeneratorul({ dinZar: fata })) return;
+  try {
+    adaugaExercitiu({ cerinta: CERINTE[fata], sursa: 'zar', fata });
+  } catch (e) {
+    console.error('exercițiul de la zar nu s-a putut face:', e);
+  }
+  /* Deschiderea e păzită anume. Dacă vreodată crapă ceva înăuntru, elevul
+     rămânea cu tabla mută: nici fereastră, nici vestire, nici semn. Așa,
+     orice s-ar întâmpla, tot capătă numărul picat și butonul arătat cu
+     degetul, iar în consolă rămâne scris de ce n-a mers. */
+  let sADeschis = false;
+  try {
+    sADeschis = deschideGeneratorul({ dinZar: fata });
+  } catch (e) {
+    console.error('generatorul nu s-a deschis singur:', e);
+  }
+  if (sADeschis) return;
   vesteste(fata);
   cheamaGeneratorul();
 }
@@ -1973,7 +1988,23 @@ const numeFel = (kind) => felulMaterialului(LECTIE, kind)?.nume || kind;
 const numeFelArticulat = (kind) =>
   felulMaterialului(LECTIE, kind)?.numeArticulat || numeFel(kind);
 
-function deschideFereastra(d) { if (!d) return false; if (d.showModal) d.showModal(); else d.setAttribute('open', ''); return true; }
+/* Deschide o fereastră și SPUNE DACĂ S-A DESCHIS CU ADEVĂRAT.
+   Varianta dinainte răspundea „da" fără să se uite. Dar `showModal()` poate
+   arunca (o fereastră deja deschisă, de pildă), iar atunci cel care ne-a chemat
+   credea că totul e bine și nu mai încerca nimic: pe ecran nu se întâmpla
+   nimic, fără o vorbă. Acum, dacă modalul nu merge, o deschidem măcar simplu,
+   și dacă nici așa, o spunem cinstit. */
+function deschideFereastra(d) {
+  if (!d) return false;
+  try {
+    if (d.showModal && !d.open) d.showModal();
+    else d.setAttribute('open', '');
+  } catch (e) {
+    console.warn('fereastra nu s-a putut deschide ca modal:', e && e.message);
+    try { d.setAttribute('open', ''); } catch (e2) { return false; }
+  }
+  return !!d.open;
+}
 function inchideFereastra(d) { if (!d) return; if (d.close) d.close(); else d.removeAttribute('open'); }
 
 /* ---------- Ce fel de exercițiu ----------
@@ -2036,9 +2067,20 @@ const nivelAles = () => {
   return b && b.dataset.nivel ? Number(b.dataset.nivel) : null;
 };
 
-/** Banca pentru o față, cerută o singură dată cât e fereastra deschisă. */
+/* Banca pentru o față, cerută o singură dată cât e fereastra deschisă.
+
+   CERNEREA. Unele etichete cer ceva de la cuvânt: la „valoarea lui i" n-are ce
+   căuta un cuvânt fără „i", fiindcă n-ai ce valoare să-i stabilești. Regula stă
+   în registrul lecției, nu aici, iar noi o ascultăm chiar în locul ăsta: așa
+   plafonul, numărul de pe ecran și cuvintele generate vorbesc toate despre
+   același morman. Dacă am fi cernut abia la generare, fereastra ți-ar fi promis
+   zece cuvinte și ți-ar fi dat patru. */
 async function bancaPentru(fata) {
-  if (!banca.has(fata)) banca.set(fata, await listItems(LECTIE, fata, {}));
+  if (!banca.has(fata)) {
+    const cfg = fataZarului(LECTIE, fata);
+    const tot = await listItems(LECTIE, fata, {});
+    banca.set(fata, tot.filter((x) => seCuvineEticheta(LECTIE, cfg.eticheta, x.body)));
+  }
   return banca.get(fata);
 }
 
@@ -2119,11 +2161,13 @@ async function improspatatePlafonul() {
   }
   if (elGenFa) elGenFa.disabled = plafon < 1;
   if (elGenNota) {
+    const cere = deCeCereEticheta(LECTIE, cfg.eticheta);
     elGenNota.textContent = plafon >= 1 ? '' :
       (tot.length
         ? 'Ai dat azi toate ' + numeFel(cfg.kind) + ' de aici' +
           (nivel ? ' la dificultatea asta' : '') + '. Scoate bifa ori schimbă dificultatea.'
-        : 'Banca n-are încă ' + numeFel(cfg.kind) + ' pentru exercițiul ăsta.');
+        : 'Banca n-are încă ' + numeFel(cfg.kind) + ' pentru exercițiul ăsta' +
+          (cere ? ' (aici fiecare cuvânt ' + cere + ')' : '') + '.');
   }
 }
 

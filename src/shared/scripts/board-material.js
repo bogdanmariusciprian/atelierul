@@ -47,7 +47,14 @@ export const MATERIAL_PE_LECTIE = {
           { slug: "pseudogrup", nume: "Pseudogrup" },
           { slug: "consoane-speciale", nume: "Consoane speciale" },
           { slug: "silabe", nume: "Despărțire în silabe" },
-          { slug: "valoarea-i", nume: "Valoarea lui i" },
+          {
+            slug: "valoarea-i",
+            nume: "Valoarea lui i",
+            // Un cuvânt fără „i" n-are ce căuta la exercițiul ăsta: n-are ce
+            // valoare să i se stabilească. Vezi `seCuvineEticheta`.
+            cere: "i",
+            deCe: "trebuie să aibă litera i",
+          },
         ],
       },
       {
@@ -125,15 +132,51 @@ export function fataZarului(lessonSlug, fata) {
   return materialulLectiei(lessonSlug)?.fete?.[fata] || null;
 }
 
-/** Numele etichetei, pentru afișare („litere-sunete" → „Litere și sunete"). */
-export function numeleEtichetei(lessonSlug, eticheta) {
+/**
+ * Eticheta întreagă, cu tot ce se știe despre ea.
+ *
+ * Unele etichete cer ceva de la material, nu doar îl numesc: „valoarea lui i"
+ * are noimă numai la cuvintele care chiar au un „i" în ele. Regula stă AICI,
+ * lângă eticheta pe care o privește, ca s-o vadă și generatorul (când alege
+ * cuvinte), și panoul profesorului (când le bifează). Un singur adevăr, două
+ * locuri care-l ascultă.
+ */
+export function eticheta(lessonSlug, slug) {
   const m = materialulLectiei(lessonSlug);
-  if (!m) return eticheta;
+  if (!m) return null;
   for (const fel of m.feluri) {
-    const e = fel.etichete.find((x) => x.slug === eticheta);
-    if (e) return e.nume;
+    const e = fel.etichete.find((x) => x.slug === slug);
+    if (e) return e;
   }
-  return eticheta;
+  return null;
+}
+
+/**
+ * Se potrivește materialul ăsta cu eticheta asta? Fără regulă, orice se potrivește.
+ *
+ * Ia eticheta ÎNTREAGĂ, nu slugul ei, fiindcă cine desenează un tabel de
+ * etichete o are deja în mână și n-are de ce s-o mai caute o dată.
+ */
+export function seCuvine(eticheta, text) {
+  if (!eticheta || !eticheta.cere) return true;
+  // Fără diacritice puse la socoteală: „î" e altă literă decât „i", iar la o
+  // lecție de fonetică deosebirea asta e chiar lucrul care se învață.
+  return cheia(text).includes(eticheta.cere);
+}
+
+/** Aceeași întrebare, când ai la îndemână numai slugul. */
+export function seCuvineEticheta(lessonSlug, slug, text) {
+  return seCuvine(eticheta(lessonSlug, slug), text);
+}
+
+/** De ce n-a trecut, în cuvinte de arătat pe ecran. */
+export function deCeCereEticheta(lessonSlug, slug) {
+  return eticheta(lessonSlug, slug)?.deCe || null;
+}
+
+/** Numele etichetei, pentru afișare („litere-sunete" → „Litere și sunete"). */
+export function numeleEtichetei(lessonSlug, slug) {
+  return eticheta(lessonSlug, slug)?.nume || slug;
 }
 
 /**

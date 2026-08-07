@@ -21,7 +21,8 @@
 // sta într-un `<textarea>`, ar pieri la prima bifă.
 // Content Romanian, identifiers English.
 // =========================================================
-import { materialulLectiei, felulMaterialului, cheia } from "../../shared/scripts/board-material.js";
+import { materialulLectiei, felulMaterialului, cheia, seCuvine }
+  from "../../shared/scripts/board-material.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -128,9 +129,21 @@ function tabelul(masa, fel, s) {
   const trup = masa.map((r, i) => `<tr class="cxbk__r${r.gata ? " e-gata" : ""}">
     <td class="cxbk__nr">${i + 1}.</td>
     <td class="cxbk__corp">${esc(r.body)}${r.gata ? `<span class="cxbk__gata">e în bancă</span>` : ""}</td>
-    ${cols.map((c) => `<td><input type="checkbox" data-action="bk-bifa" data-i="${i}" data-et="${c.slug}"
-      ${r.tags.includes(c.slug) ? "checked" : ""}${r.gata ? " disabled" : ""}
-      aria-label="${esc(c.nume + ": " + r.body)}"></td>`).join("")}
+    ${cols.map((c) => {
+      /* Unele etichete cer ceva de la cuvânt („valoarea lui i" vrea un i în
+         el). Bifa nici nu se poate pune acolo unde n-are noimă: altfel ar
+         intra în bancă un cuvânt pe care generatorul l-ar sări oricum, iar
+         numărul din fereastră n-ar mai semăna cu tabelul de aici. */
+      const secuvine = seCuvine(c, r.body);
+      const bifat = r.tags.includes(c.slug);
+      // Bifa care n-are noimă se închide, DAR una pusă din greșeală mai demult
+      // rămâne de scos: altfel ar fi ferecată acolo pe veci.
+      const inchisa = r.gata || (!secuvine && !bifat);
+      return `<td><input type="checkbox" data-action="bk-bifa" data-i="${i}" data-et="${c.slug}"
+      ${bifat ? "checked" : ""}${inchisa ? " disabled" : ""}
+      ${secuvine ? "" : `class="cxbk__nu" title="${esc(c.nume + ": " + c.deCe)}"`}
+      aria-label="${esc(c.nume + ": " + r.body)}"></td>`;
+    }).join("")}
     <td><select class="cx-input cxbk__niv" data-action="bk-nivel" data-i="${i}"${r.gata ? " disabled" : ""}
       aria-label="Dificultatea pentru ${esc(r.body)}">
       ${[1, 2, 3].map((n) => `<option value="${n}"${r.level === n ? " selected" : ""}>${NIVELE[n]}</option>`).join("")}
@@ -285,10 +298,15 @@ function bancaDeAcum(lectie, st) {
           <tbody>${vazute.map((it, i) => `<tr class="cxbk__r">
             <td class="cxbk__nr">${i + 1}.</td>
             <td class="cxbk__corp">${esc(it.body)}</td>
-            ${cols.map((c) => `<td><input type="checkbox" data-action="bkb-bifa"
+            ${cols.map((c) => {
+              const secuvine = seCuvine(c, it.body);
+              const bifat = (it.tags || []).includes(c.slug);
+              return `<td><input type="checkbox" data-action="bkb-bifa"
               data-id="${esc(it.id)}" data-et="${c.slug}"
-              ${(it.tags || []).includes(c.slug) ? "checked" : ""}
-              aria-label="${esc(c.nume + ": " + it.body)}"></td>`).join("")}
+              ${bifat ? "checked" : ""}${!secuvine && !bifat ? " disabled" : ""}
+              ${secuvine ? "" : `class="cxbk__nu" title="${esc(c.nume + ": " + c.deCe)}"`}
+              aria-label="${esc(c.nume + ": " + it.body)}"></td>`;
+            }).join("")}
             <td><select class="cx-input cxbk__niv" data-action="bkb-nivel" data-id="${esc(it.id)}"
               aria-label="Dificultatea pentru ${esc(it.body)}">
               ${[1, 2, 3].map((n) => `<option value="${n}"${Number(it.level) === n ? " selected" : ""}>${NIVELE[n]}</option>`).join("")}
