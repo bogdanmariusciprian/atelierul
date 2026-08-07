@@ -2102,6 +2102,15 @@
   color: #b91c1c;
   font-size: 0.84rem;
 }
+/* Aceeași casetă, altă veste. „Am pus în bancă 100 de intrări" ieșea cu ramă
+   roșie, ca o greșeală, fiindcă folosea singura casetă de mesaj care exista.
+   Culoarea unui mesaj e jumătate din mesaj: roșu spune „oprește-te", iar aici
+   n-avea ce opri. */
+.cx-warn--bine {
+  border-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 8%, var(--color-bg));
+  color: #15803d;
+}
 
 /* =========================================================
    Notifications v2 — friendly, self-explaining cards: a kind label in

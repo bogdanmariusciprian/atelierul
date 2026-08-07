@@ -101,7 +101,7 @@ export function boardPanelHtml(lectie, st) {
           placeholder="${esc(fel.pilda)}">${esc(st.text || "")}</textarea>
         <button type="button" class="btn btn--sm" data-action="bk-adauga">Adaugă în tabel</button>
       </div>
-      ${st.nota ? `<p class="cx-warn" role="status">${esc(st.nota)}</p>` : ""}
+      ${st.nota ? `<p class="cx-warn${st.notaBuna ? " cx-warn--bine" : ""}" role="status">${esc(st.nota)}</p>` : ""}
 
       ${masa.length ? tabelul(masa, fel, s) : ""}
     </div>

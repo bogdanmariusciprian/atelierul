@@ -293,7 +293,8 @@ export function renderCommunity(basePath = "") {
     bankCounts: {},  // slug de lecție → câte intrări are în bancă
     // Panoul „Tablă": tot ce e nesalvat stă AICI, nu în pagină, fiindcă panoul
     // se redesenează întreg la fiecare bifă.
-    bk: { lectie: null, kind: null, text: "", masa: [], banca: [], incarc: false, nota: "" },
+    bk: { lectie: null, kind: null, text: "", masa: [], banca: [], incarc: false,
+          nota: "", notaBuna: false },
     dash: null,           // dashboard aggregates (server-side), null until loaded
     dashSort: "-joined",  // members table: field, „-" prefix = descending
     adminUserQuery: "",
@@ -4683,6 +4684,7 @@ export function renderCommunity(basePath = "") {
         const kind = state.bk.kind || materialulLectiei(state.adminLesson)?.feluri[0].kind;
         const inBanca = new Set((state.bk.banca || []).map((x) => bankCheia(x.body)));
         const { randuri, sarite } = randuriDinLista(text, { kind, inTabel: state.bk.masa, inBanca });
+        state.bk.notaBuna = false;
         if (!randuri.length && !sarite) { state.bk.nota = "Scrie măcar un cuvânt."; return render(); }
         state.bk.masa = [...state.bk.masa, ...randuri];
         state.bk.text = "";
@@ -4709,6 +4711,7 @@ export function renderCommunity(basePath = "") {
         return render();
       case "bk-importa": {
         const deTrimis = state.bk.masa.filter((r) => !r.gata && r.tags.length);
+        state.bk.notaBuna = false;
         if (!deTrimis.length) { state.bk.nota = "Bifează întâi la ce exerciții se potrivesc."; return render(); }
         state.bk.nota = "Se salvează…";
         render();
@@ -4724,6 +4727,7 @@ export function renderCommunity(basePath = "") {
           if (sarite) vorbe.push(`${cuDe(sarite, "era deja acolo", "erau deja acolo")}.`);
           if (faraBifa) vorbe.push(`În tabel au rămas ${cuDe(faraBifa, "rând fără bifă", "rânduri fără bifă")}.`);
           state.bk.nota = vorbe.join(" ");
+          state.bk.notaBuna = true;   // a mers: verde, nu roșu
           render();
         });
         return;
