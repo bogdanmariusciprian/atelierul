@@ -3377,6 +3377,31 @@ export function renderCommunity(basePath = "") {
     bonus: "Întrebări bonus", lessons: "Lecții", tests: "Teste",
   };
 
+  /* Rândul de jos al tabelului: socoteala, butonul „bifează tot" și importul.
+     Se rescrie de mână, fără redesenarea panoului, ca sulul și bifa de sub deget
+     să rămână la locul lor. Textele sunt aceleași cu cele din `admin-board.js`;
+     dacă se schimbă acolo, se schimbă și aici. */
+  function improspateazaJosul() {
+    const s = socoteala(state.bk.masa);
+    const vorbe = [cuDe(s.pleaca, "de trimis", "de trimis")];
+    if (s.gata) vorbe.push(`${s.gata} deja în bancă`);
+    if (s.fara) vorbe.push(cuDe(s.fara, "fără bifă", "fără bifă"));
+
+    const jos = mount.querySelector(".cxbk__jos .cx-muted");
+    if (jos) jos.textContent = vorbe.join(" · ");
+
+    const imp = mount.querySelector('[data-action="bk-importa"]');
+    if (imp) imp.disabled = s.pleaca === 0;
+
+    const cols = (felulMaterialului(state.adminLesson, state.bk.kind)
+      || materialulLectiei(state.adminLesson)?.feluri[0])?.etichete || [];
+    const deTrimis = state.bk.masa.filter((r) => !r.gata);
+    const totBifat = deTrimis.length > 0
+      && deTrimis.every((r) => cols.every((c) => r.tags.includes(c.slug)));
+    const tot = mount.querySelector('[data-action="bk-tot"]');
+    if (tot) tot.textContent = totBifat ? "Scoate toate bifele" : "Bifează tot";
+  }
+
   /* Banca lecției, adusă de la server. O cerem când intri pe „Tablă" și după
      fiecare schimbare, ca lista de jos și semnele „e în bancă" din tabel să
      spună același lucru. */
@@ -3815,6 +3840,14 @@ export function renderCommunity(basePath = "") {
       `<div class="cx-emptybox"><h2>Această secțiune n-a putut fi afișată.</h2>
        <p class="cx-muted">Reîncarcă pagina; dacă problema persistă, anunță profesorul.</p></div>`
     );
+
+    /* SULUL TABELULUI DE MATERIAL SE ȚINE MINTE peste redesenare.
+       Panoul se reface întreg la orice schimbare, iar `innerHTML` naște un
+       container NOU, cu sulul la zero. La o sută de rânduri, o bifă te arunca
+       înapoi în capul listei și pierdeai locul unde erai. Ținem minte cât era
+       derulat și îl punem la loc pe cel nou. */
+    const sulInainte = mount.querySelector(".cxbk__sul")?.scrollTop || 0;
+
     mount.innerHTML = `
       <div class="cx-shell">
         ${guard(sidebar, "sidebar", `<aside class="cx-side"><a class="cx-side__join" href="${basePath}">← Înapoi la site</a></aside>`)}
@@ -3824,6 +3857,11 @@ export function renderCommunity(basePath = "") {
         </div>
       </div>
       ${guard(lightboxHtml, "lightbox")}`;
+
+    if (sulInainte) {
+      const sulAcum = mount.querySelector(".cxbk__sul");
+      if (sulAcum) sulAcum.scrollTop = sulInainte;
+    }
 
     // The gamification simulator's local preview mirrors the current sim.
     if (state.section === "admin" && state.adminTab === "gamification") {
@@ -5552,19 +5590,31 @@ export function renderCommunity(basePath = "") {
     if (!ce || !ce.startsWith("bk-")) return;
     if (!isAdmin()) return;
 
+    /* O bifă pusă pe un rând NU redesenează panoul.
+       Ar fi fost mai simplu să chem `render()`, dar la o sută de rânduri asta
+       înseamnă să arunci tot tabelul și să-l faci din nou la fiecare click:
+       bifa clipește, iar ochiul pierde rândul. Umblăm doar la ce s-a schimbat
+       cu adevărat: bifa e deja pusă de browser, deci rămâne capul coloanei și
+       socoteala de jos. */
     if (ce === "bk-bifa") {
       const i = Number(el.dataset.i);
       const et = el.dataset.et;
       state.bk.masa = state.bk.masa.map((r, k) => k !== i ? r : {
         ...r, tags: el.checked ? [...new Set([...r.tags, et])] : r.tags.filter((t) => t !== et),
       });
-      return render();
+      const deTrimis = state.bk.masa.filter((x) => !x.gata);
+      const capul = mount.querySelector(`.cxbk__cap[data-et="${et}"]`);
+      if (capul) capul.classList.toggle("e-plina",
+        deTrimis.length > 0 && deTrimis.every((x) => x.tags.includes(et)));
+      improspateazaJosul();
+      return;
     }
+    /* La fel și dificultatea: selectorul arată deja ce ai ales. */
     if (ce === "bk-nivel") {
       const i = Number(el.dataset.i);
       const n = Number(el.value) || 2;
       state.bk.masa = state.bk.masa.map((r, k) => k === i ? { ...r, level: n } : r);
-      return render();
+      return;
     }
     if (ce === "bk-nivel-tot") {
       const n = Number(el.value);
