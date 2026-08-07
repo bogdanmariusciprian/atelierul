@@ -729,8 +729,48 @@
    ce se lovi, iar rostogolirea rămâne într-un loc știut, în loc să traverseze
    tabla. Cele șase fețe sunt fețe adevărate, întoarse în spațiu; punctele se
    desenează din CSS, nu din poze, ca să rămână curate la orice mărime. */
-.zar-tavita {
+/* MĂNUNCHIUL PLUTITOR din dreapta jos: generatorul deasupra, zarul dedesubt.
+   Cele două sunt aceeași treabă în doi pași, deci stau lipite: zarul spune ce
+   fel de exercițiu pică, generatorul aduce materialul pentru el. Cât timp
+   butonul de generator a stat sus, în capul paginii, legătura dintre ele
+   trebuia ținută minte de elev.
+
+   Coordonatele sunt pe MĂNUNCHI, nu pe fiecare în parte: așa se mișcă împreună
+   și nu se pot despărți din greșeală la vreo schimbare de așezare. */
+.unelte-jos {
   position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+  user-select: none;
+}
+
+.gen-fab {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 40px; padding: 0 17px;
+  border: none; border-radius: 999px;
+  background: linear-gradient(135deg, #4f6ef2, #7c3aed);
+  color: #fff; font-family: var(--ui); font-size: 13px; font-weight: 700;
+  letter-spacing: .01em; cursor: pointer;
+  box-shadow: 0 12px 26px -10px rgba(79, 110, 242, .75);
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+.gen-fab:hover { transform: translateY(-2px); box-shadow: 0 16px 30px -10px rgba(79, 110, 242, .85); }
+.gen-fab:active { transform: translateY(0); }
+.gen-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.gen-fab__ic { font-size: 15px; line-height: 1; }
+
+/* După ce zarul se oprește, generatorul e pasul următor: îl arătăm cu degetul o
+   dată, scurt, și tace. Un semn care pulsează la nesfârșit nu mai spune nimic. */
+.gen-fab.e-chemat { animation: gen-bate 1.6s ease-in-out 2; }
+@keyframes gen-bate {
+  0%, 100% { transform: translateY(0); box-shadow: 0 12px 26px -10px rgba(79, 110, 242, .75); }
+  50% { transform: translateY(-3px); box-shadow: 0 18px 34px -8px rgba(124, 58, 237, .9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gen-fab.e-chemat { animation: none; filter: brightness(1.12); }
+}
+
+.zar-tavita {
+  position: relative;
   width: 150px; height: 150px;
   perspective: 700px;
   user-select: none;
@@ -815,7 +855,9 @@
 /* Pe telefon tăvița se face mai mică și urcă puțin, ca să nu stea peste
    butoanele de jos ale tablei. */
 @media (max-width: 640px) {
-  .zar-tavita { width: 104px; height: 104px; right: 10px; bottom: 66px; }
+  .unelte-jos { right: 10px; bottom: 66px; gap: 8px; }
+  .zar-tavita { width: 104px; height: 104px; }
+  .gen-fab { height: 34px; padding: 0 13px; font-size: 12px; }
   .zar { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
   .zar__f { padding: 4px; }
   .zar__f i { width: 6px; height: 6px; }

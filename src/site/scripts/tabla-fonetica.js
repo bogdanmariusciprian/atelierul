@@ -1630,6 +1630,21 @@ function vesteste(fata) {
     elVestire.classList.remove('e-vazuta');
     setTimeout(() => { elVestire.hidden = true; }, 220);
   }, 4200);
+  cheamaGeneratorul();
+}
+
+/* Zarul a spus CE fel de exercițiu; pasul următor e să aduci materialul pentru
+   el. Arătăm butonul cu degetul o dată, scurt, și tace: un semn care pulsează
+   la nesfârșit nu mai spune nimic, ajunge zgomot de fundal. */
+function cheamaGeneratorul() {
+  const b = document.getElementById('genBtn');
+  if (!b) return;
+  b.classList.remove('e-chemat');
+  // Un cadru de așteptare: pusă și scoasă în aceeași clipă, clasa n-ar reporni
+  // deloc mișcarea, fiindcă browserul n-ar apuca să vadă starea dintre.
+  requestAnimationFrame(() => b.classList.add('e-chemat'));
+  clearTimeout(cheamaGeneratorul._t);
+  cheamaGeneratorul._t = setTimeout(() => b.classList.remove('e-chemat'), 3400);
 }
 
 function aruncaZarul() {

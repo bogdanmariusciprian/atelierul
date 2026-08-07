@@ -58,7 +58,6 @@
     <div class="tb-dreapta">
       <button class="chip" id="scurtBtn" aria-expanded="false" title="Scurtăturile de tastatură">scurtături</button>
       <button class="chip" id="notesBtn" title="Deschide notițele">notițe</button>
-      <button class="chip" id="genBtn" title="Generează material pentru exercițiu">generator</button>
       <button class="chip chip--stare" id="saveState" hidden>nesalvat</button>
       <button class="btn-save" id="saveBtn" title="Salvează tabla în contul tău (Ctrl+S)">
         <span class="btn-save__icon" aria-hidden="true"></span>
@@ -111,9 +110,22 @@
   </div>
 </main>
 
-<!-- ZARUL. Stă într-o tăviță a lui, în dreapta jos, ca să aibă de ce se lovi
-     și ca să nu se plimbe peste tot. Fețele sunt șase fețe adevărate, întoarse
-     în spațiu; punctele se desenează din CSS, nu din imagini. -->
+<!-- MĂNUNCHIUL DIN DREAPTA JOS: generatorul deasupra, zarul dedesubt.
+     Stau împreună fiindcă sunt aceeași treabă în doi pași: zarul spune CE fel
+     de exercițiu, generatorul aduce materialul pentru el. Cât au stat despărțite
+     (unul în capul paginii, altul în colț), legătura dintre ele trebuia ținută
+     minte; acum se vede.
+
+     ZARUL are tăvița lui, ca să aibă de ce se lovi și ca să nu se plimbe peste
+     tot. Fețele sunt șase fețe adevărate, întoarse în spațiu; punctele se
+     desenează din CSS, nu din imagini. -->
+<div class="unelte-jos">
+  <button class="gen-fab" id="genBtn" type="button"
+          title="Generează material pentru exercițiu"
+          aria-label="Generează material pentru exercițiu">
+    <span class="gen-fab__ic" aria-hidden="true">✨</span>
+    <span class="gen-fab__t">generator</span>
+  </button>
 <div class="zar-tavita" id="zarTavita">
   <div class="zar-tavita__fund"></div>
   <button class="zar" id="zar" type="button"
@@ -126,6 +138,9 @@
     <span class="zar__f zar__f--6"><i></i><i></i><i></i><i></i><i></i><i></i></span>
   </button>
   <div class="zar-tavita__umbra" id="zarUmbra"></div>
+</div>
+  <!-- Vestirea stă în afara tăviței, ca să se așeze deasupra ÎNTREGULUI
+       mănunchi. Lăsată înăuntru, ar fi căzut fix peste butonul de generator. -->
   <div class="zar-vestire" id="zarVestire" hidden></div>
 </div>
 
