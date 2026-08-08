@@ -809,18 +809,34 @@
   perspective: 700px;
   user-select: none;
 }
+/* FUNDUL TĂVIȚEI: SCÂNDURĂ DE STEJAR.
+
+   Fibra e făcută din gradienți suprapuși, nu dintr-o poză: nu costă niciun
+   kilobyte în plus, nu se pixelează la niciun ecran și se schimbă dintr-o
+   culoare. Trei straturi fac lemnul: două de fibră deasă, unul de „inimă" mai
+   caldă în stânga sus, iar dedesubt culoarea de bază.
+
+   Umbra dinăuntru e caldă, nu albăstruie: o scândură nu are umbre reci. */
 .zar-tavita__fund {
   position: absolute; inset: 0; border-radius: 18px;
-  background: radial-gradient(circle at 35% 30%, #f8fafd, #e6ebf5 70%);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow), inset 0 2px 10px rgba(31, 36, 48, .08);
+  background:
+    repeating-linear-gradient(96deg, rgba(120, 72, 30, .10) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(92deg, rgba(90, 52, 18, .13) 0 1px, transparent 1px 13px),
+    radial-gradient(ellipse 120% 40% at 20% 30%, rgba(160, 105, 45, .30), transparent 60%),
+    linear-gradient(100deg, #d8ac74, #c99a5f 45%, #d3a76d);
+  box-shadow:
+    0 12px 30px rgba(31, 36, 48, .20),
+    inset 0 2px 12px rgba(60, 32, 10, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .30),
+    inset 0 0 0 1px rgba(60, 34, 12, .30);
 }
 /* Umbra e a ei, nu a zarului: se mișcă odată cu el pe fundul tăviței și se
-   strânge când zarul sare, ca să se citească înălțimea săriturii. */
+   strânge când zarul sare, ca să se citească înălțimea săriturii. Cade pe lemn,
+   deci e caldă și puțin mai apăsată decât una de pe hârtie. */
 .zar-tavita__umbra {
   position: absolute; left: 50%; top: 50%; width: 46px; height: 14px;
   margin: -7px 0 0 -23px; border-radius: 50%;
-  background: rgba(31, 36, 48, .22); filter: blur(4px);
+  background: rgba(48, 26, 8, .48); filter: blur(5px);
   pointer-events: none; will-change: transform, opacity;
 }
 .zar {
@@ -830,18 +846,30 @@
   will-change: transform;
 }
 .zar:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 8px; }
+/* FEȚELE: PLASTIC ALB, DUR.
+
+   Trei lucruri fac plasticul, și niciunul nu e culoarea: muchia strânsă (rază
+   mică, contur închis la culoare), o dungă subțire de luciu chiar pe marginea
+   de sus, și o umbră scurtă înăuntru, jos. Ele spun ochiului că e o piesă
+   turnată, cu grosime, nu un pătrat desenat. */
 .zar__f {
-  position: absolute; inset: 0; border-radius: 8px;
-  background: linear-gradient(150deg, #ffffff, #eef1f8);
-  border: 1px solid #d7dcea;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+  position: absolute; inset: 0; border-radius: 7px;
+  background: linear-gradient(148deg, #ffffff, #f4f6fa 60%, #dbe1ec);
+  border: 1px solid rgba(40, 48, 66, .26);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .95),
+    inset 0 -4px 7px rgba(0, 0, 0, .12);
   display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px;
   backface-visibility: hidden;
 }
+/* Punctele par găurite, nu lipite: inelul de umbră de sus și firul de lumină
+   de jos sunt exact ce vezi într-o adâncitură. */
 .zar__f i {
   width: 8px; height: 8px; border-radius: 50%;
-  background: #2b3242; align-self: center; justify-self: center;
-  box-shadow: inset 0 1px 1px rgba(0,0,0,.35);
+  background: #232937; align-self: center; justify-self: center;
+  box-shadow:
+    inset 0 1.5px 1.5px rgba(0, 0, 0, .55),
+    0 1px 0 rgba(255, 255, 255, .55);
 }
 .zar__f--1 { transform: translateZ(23px); }
 .zar__f--6 { transform: rotateY(180deg) translateZ(23px); }
