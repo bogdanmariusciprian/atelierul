@@ -2058,7 +2058,7 @@ function asazaZarul(x, y, h, rx, ry) {
      pixeli care să se strice la alt ecran. */
   if (zar3d) {
     const L = elTavita ? (elTavita.clientWidth || 150) : 150;
-    zar3d.aseaza(x / (L / 2), y / (L / 2), h / L, rx, ry);
+    zar3d.aseaza(x / margineaDrumului(L), y / margineaDrumului(L), h / L, rx, ry);
     return;
   }
 
@@ -2103,6 +2103,22 @@ function cheamaGeneratorul() {
   cheamaGeneratorul._t = setTimeout(() => b.classList.remove('e-chemat'), 3400);
 }
 
+/* CÂT DE MARE E ZARUL ȘI PÂNĂ UNDE POATE MERGE.
+
+   Două socoteli de care se leagă și fizica, și desenul, deci se fac o singură
+   dată, aici. Cu zarul din CSS le știm din pagină: butonul CHIAR e zarul. Cu
+   scena, butonul e cât toată caseta, iar caseta e mai mare decât lemnul (are
+   marginea dinăuntru), așa că mărimea zarului n-o mai putem citi din pagină:
+   ne-o spune scena, prin `razaInCaseta`.
+
+   Erau, până adineauri, două numere scrise de mână care trebuiau să se
+   potrivească între două fișiere. Aveam să le uit pe amândouă. */
+const razaZarului = (latime) =>
+  (zar3d ? latime * zar3d.razaInCaseta : elZar.offsetWidth / 2) + 4;
+
+/** Până unde poate ajunge MIJLOCUL zarului, în pixeli de casetă. */
+const margineaDrumului = (latime) => Math.max(1, latime / 2 - razaZarului(latime));
+
 /* AMESTECUL DIN PALMĂ.
 
    Un zar nu pleacă din nemișcare: întâi îl frămânți în pumn, apoi îl scapi.
@@ -2125,8 +2141,9 @@ function amestecaZarul(ms = 460) {
       const putere = Math.sin(Math.PI * t);
       rx += 13 + putere * 16;
       ry += 17 + putere * 14;
-      const jx = (Math.random() - 0.5) * 0.13 * putere * L;
-      const jy = (Math.random() - 0.5) * 0.13 * putere * L;
+      const m = margineaDrumului(L);
+      const jx = (Math.random() - 0.5) * 0.5 * putere * m;
+      const jy = (Math.random() - 0.5) * 0.5 * putere * m;
       asazaZarul(jx, jy, (0.05 + 0.30 * t * t) * L, rx, ry);
       if (t < 1) requestAnimationFrame(pas); else gata();
     })(pornit);
@@ -2150,10 +2167,7 @@ async function aruncaZarul() {
   await amestecaZarul();
   elZar.style.transition = 'none';
   const latime = elTavita.clientWidth, inaltime = elTavita.clientHeight;
-  /* Raza zarului. În 3D butonul e cât toată tăvița, deci n-o mai pot lua din
-     mărimea lui: o socotesc din tăviță, în aceeași proporție ca la CSS (46 la
-     150). Așa drumul rămâne același, oricât de mare ar fi tăvița. */
-  const raza = (zar3d ? latime * 0.1533 : elZar.offsetWidth / 2) + 4;
+  const raza = razaZarului(latime);
   const st = aruncare({ latime, inaltime, raza });
 
   let trecut = 0;

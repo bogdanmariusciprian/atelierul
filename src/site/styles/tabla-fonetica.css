@@ -866,24 +866,36 @@
    pagina arată zarul din CSS, gata de apăsat: nimeni nu stă în fața unui gol
    așteptând să vină o bibliotecă. Dacă scena nu vine, clasa nu se pune și
    rămâne totul cum era. */
-/* PÂNZA IESE DIN CHENARUL TĂVIȚEI, ȘI N-ARE NICI RAMĂ, NICI UMBRĂ.
+/* PÂNZA N-ARE NICI RAMĂ, NICI UMBRĂ, ȘI NU IESE DIN CASETA EI.
 
-   Avea și una, și alta, iar asta era greșeala: tăvița desenată nu umple un
-   pătrat, fiindcă e privită dintr-o parte, așa că restul pânzei rămânea gol.
-   Cu colțuri rotunde și umbră pe pânză, golul se citea ca un panou alb din care
-   tăvița pare decupată. Nu era niciun panou: era chiar rama pânzei.
+   Rama era prima greșeală: tăvița desenată nu umple un pătrat, fiindcă e
+   privită dintr-o parte, iar restul pânzei rămâne gol. Cu colțuri rotunde și
+   umbră pe pânză, golul acela se citea ca un panou alb din care tăvița pare
+   decupată. Nu era niciun panou: era chiar rama pânzei. Umbra o aruncă acum
+   tăvița însăși, în scenă, pe o masă nevăzută.
 
-   Acum pânza n-are nici rază, nici umbră (umbra o aruncă tăvița, în scenă), și
-   se întinde cu un sfert dincolo de tăviță de fiecare parte, ca înclinarea și
-   umbra să aibă loc fără să fie tăiate. Nu prinde apăsările, deci butonul de
-   dedesubt rămâne al ei. */
+   A doua greșeală a fost leacul: am întins pânza dincolo de casetă, ca să
+   încapă umbra. Dar caseta stă într-un colț fixat, cu butonul „generator"
+   chiar deasupra și cu marginea ferestrei la 18 pixeli în dreapta, așa că pânza
+   s-a suit peste buton și a ieșit din fereastră. Un lucru care crește în afara
+   casetei lui calcă întotdeauna pe altcineva.
+
+   Acum pânza umple exact caseta, iar marginea se ia pe dinăuntru: camera
+   cuprinde mai mult decât lemnul, deci golul rămâne în pânză. Caseta e cu
+   aceeași măsură mai mare cât marginea, ca lemnul să iasă pe ecran tot de 150
+   de pixeli, cum era. */
 .zar-panza {
-  position: absolute;
-  left: -25%; top: -25%; width: 150%; height: 150%;
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
   pointer-events: none;
   opacity: 0;
   transition: opacity .28s ease;
 }
+
+/* Caseta crește cu marginea dinăuntru (150 → 180), ca lemnul să rămână la
+   mărimea lui. Mănunchiul e prins de colțul din dreapta jos, deci creșterea se
+   duce în sus și spre stânga: nici peste buton, nici peste marginea ferestrei. */
+.zar-tavita.e-3d { width: 180px; height: 180px; }
 
 /* SCHIMBUL SE FACE PRIN TOPIRE, NU DINTR-O SĂRITURĂ.
 
@@ -1011,6 +1023,8 @@
 @media (max-width: 640px) {
   .unelte-jos { right: 10px; bottom: 66px; gap: 8px; }
   .zar-tavita { width: 104px; height: 104px; }
+  /* Aceeași margine dinăuntru, la scara telefonului: lemnul rămâne de 104. */
+  .zar-tavita.e-3d { width: 125px; height: 125px; }
   .gen-fab { height: 34px; padding: 0 13px; font-size: 12px; }
   .zar { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
   .zar__f { padding: 4px; }

@@ -198,20 +198,22 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   const DESIME = 2.5;
   randor.setPixelRatio(Math.min((window.devicePixelRatio || 1) * DESIME, 4));
 
-  /* PÂNZA E MAI MARE DECÂT TĂVIȚA, ȘI DE-AIA.
+  /* MARGINEA SE IA PE DINĂUNTRU, NU PE DINAFARĂ.
 
-     Pânza cât tăvița era o capcană: tăvița desenată, privită dintr-o parte, nu
-     umple un pătrat, iar restul pânzei rămâne gol. Cu colțuri rotunde și umbră
-     pe pânză, golul acela se citea ca un panou alb din care tăvița pare
-     decupată. Nu era niciun panou, era chiar rama pânzei.
+     Prima oară am mărit PÂNZA, ca să încapă umbra și înclinarea. A fost o
+     greșeală de așezare în pagină, nu de scenă: tăvița stă într-un colț fixat,
+     cu butonul „generator" chiar deasupra ei și cu marginea ferestrei la 18
+     pixeli în dreapta. O pânză mai lată decât caseta ei se suie peste buton și
+     iese din fereastră. Un lucru care crește în afara casetei lui calcă
+     întotdeauna pe altcineva.
 
-     Acum pânza e cu jumătate mai lată de fiecare parte și n-are nici colțuri,
-     nici umbră: se vede numai ce desenăm în ea, iar în jur trece pagina.
-     Marginea în plus mai are un rost: acolo încape umbra tăviței și tot acolo
-     are loc înclinarea, fără să fie tăiată. */
-  const MARGINE = 1.5;
-  const panzaLatura = Math.round(latura * MARGINE);
-  randor.setSize(panzaLatura, panzaLatura, false);
+     Acum pânza umple exact caseta, nici un pixel mai mult, iar marginea o las
+     ÎN SCENĂ: camera cuprinde mai mult decât lemnul, așa că în jurul tăviței
+     rămâne loc gol, chiar în pânză. Umbra are unde cădea, înclinarea are unde
+     se lăți, iar pagina nu simte nimic. */
+  const MARGINE = 1.2;
+  const panzaPx = Math.round(tavita.clientWidth || latura * MARGINE);
+  randor.setSize(panzaPx, panzaPx, false);
   randor.shadowMap.enabled = true;
   randor.shadowMap.type = THREE.PCFSoftShadowMap;
   randor.toneMapping = THREE.ACESFilmicToneMapping;
@@ -236,12 +238,19 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
      Unghiul de deschidere e mic (26°) dinadins: un obiectiv larg ar umfla zarul
      la mijloc și ar strâmba pereții, ca într-o poză făcută de prea aproape. */
-  /* Camera cuprinde acum toată pânza, nu doar tăvița: 225 de unități în loc de
-     150. Iar înclinarea se poate întoarce, fiindcă nu mai taie nimic marginile:
-     la 68 de grade tăvița se vede a tăviță, cu pereții ei, dar rămâne destul de
+  /* Camera cuprinde 180 de unități, deși lemnul are 150: cele 30 rămase sunt
+     marginea dinăuntru, în care încap umbra și înclinarea. Fiindcă pânza umple
+     caseta, iar caseta e cu aceeași măsură mai mare, lemnul iese pe ecran exact
+     cât era înainte, 150 de pixeli. Nimic nu s-a micșorat și nimic n-a ieșit
+     din chenar.
+
+     La 68 de grade tăvița se vede a tăviță, cu pereții ei, dar rămâne destul de
      dreaptă cât să nu pară masa strâmbă. */
-  const camera = new THREE.PerspectiveCamera(26, 1, 200, 900);
-  camera.position.set(0, 452, 182);
+  const CUPRINS = latura * MARGINE;                 // 180 de unități
+  const DEPARTARE = CUPRINS / (2 * Math.tan(THREE.MathUtils.degToRad(13)));
+  const INCLINARE = THREE.MathUtils.degToRad(68);
+  const camera = new THREE.PerspectiveCamera(26, 1, DEPARTARE * 0.4, DEPARTARE * 2.2);
+  camera.position.set(0, DEPARTARE * Math.sin(INCLINARE), DEPARTARE * Math.cos(INCLINARE));
   camera.lookAt(0, 0, 0);
 
   /* ---------- lumina ----------
@@ -382,12 +391,14 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      adică 0.87, nu 0.5. Cu 0.5 ar fi intrat cu colțul în lemn de fiecare dată
      când se răsucea lângă perete.
 
-     Fizica își ține zarul cam în două treimi din tăviță, nu până la margine, așa
-     că întindem puțin drumul ca mișcarea să se vadă; și tot îl strângem la
-     capăt, ca nicio socoteală de dincolo să nu-l poată împinge în perete. */
+     `nx` și `ny` vin ca „cât de departe de mijloc, din tot ce se poate": -1 e
+     peretele din stânga, 1 cel din dreapta. Cine ne cheamă socotește asta din
+     `razaInCaseta`, pe care i-o dăm mai jos: așa nu mai există două numere
+     magice care trebuie să se potrivească între două fișiere. Strângerea de la
+     capăt rămâne totuși, ca nicio greșeală de dincolo să nu împingă zarul în
+     lemn. */
   const RAZA_DRUMULUI = INTERIOR / 2 - marime * 0.87;
-  const INTINDERE = 1 / 0.64;
-  const strange = (v) => Math.max(-RAZA_DRUMULUI, Math.min(RAZA_DRUMULUI, v * INTINDERE));
+  const strange = (v) => Math.max(-RAZA_DRUMULUI, Math.min(RAZA_DRUMULUI, v));
 
   const q = new THREE.Quaternion();
   const qTinta = new THREE.Quaternion();
@@ -442,13 +453,19 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   return {
     panza,
+    /* Cât ține jumătate de zar din caseta întreagă. Caseta e mai mare decât
+       lemnul, cu marginea dinăuntru, iar cine socotește drumul zarului trebuie
+       să afle asta de la noi, nu s-o ghicească. */
+    razaInCaseta: marime / 2 / (latura * MARGINE),
     aseaza,
     asazaFata,
     ridicaPentruAmestec,
     deseneaza,
     /** Tăvița își schimbă mărimea pe telefon: pânza o urmează. */
-    potriveste(nouaLatura) {
-      const p = Math.round(nouaLatura * MARGINE);
+    /* Caseta se schimbă pe telefon; pânza o urmează întocmai, fără să crească
+       peste ea. Scena rămâne aceeași: se schimbă doar câți pixeli o desenează. */
+    potriveste(pxCaseta) {
+      const p = Math.round(pxCaseta || panzaPx);
       randor.setSize(p, p, false);
       deseneaza();
     },
