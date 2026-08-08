@@ -2400,12 +2400,19 @@ function leagana() {
      întinde puțin, apoi stă. De el ține tot ce e mecanic, adică aplecarea și
      urnirea tăviței.
 
-     `departe` spune cât de departe ai DUS zarul, și crește mult mai încet,
-     fiindcă mâna poate merge oricât. De el ține tot ce e de adâncime: cât de
-     sus ții zarul și cât de tare se topește pagina din spate. Astea două chiar
-     trebuie să meargă împreună, și nu cu banda: zarul dus în celălalt colț al
-     ecranului n-a mai întins banda mai mult, dar l-ai ridicat mai sus. */
-  const DEPARTE = 520;      // pixeli de dus după care zarul e cu totul „la tine"
+     `departe` spune cât de departe ai DUS zarul, și NU se măsoară în pixeli, ci
+     în părți din cât se poate: 0 la peretele tăviței, 1 în colțul ecranului cel
+     mai depărtat de ea. De el ține tot ce e de adâncime: cât de sus ții zarul
+     și cât de tare se topește pagina din spate.
+
+     De ce în părți, și nu în pixeli. „Cinci sute de pixeli" nu înseamnă nimic
+     în sine: pe un ecran lat e un pas, pe un telefon e tot drumul. Ce înseamnă
+     ceva e „l-am dus până la jumătatea a cât se poate". Numărul scris de mână
+     nu poate ști cât e ecranul; partea din întreg știe întotdeauna, fiindcă se
+     socotește din chiar ecranul de sub deget.
+
+     Iar `intins` rămâne în pixeli, și e drept să rămână: o bandă are o lungime
+     a ei, aceeași pe orice masă. Depărtarea n-are: e a odăii. */
   const SUS_INTINS = 0.40;  // cât se mai ridică zarul când l-ai dus cât se poate
   /* CÂT DE TARE SE TOPEȘTE PAGINA, LA CAPĂT.
      Cinci pixeli, nu zece. La zece, pagina se face o pâclă albă în care nu mai
@@ -2476,16 +2483,27 @@ function leagana() {
    * mâna sub putere, iar putere n-are un cursor. Un lucru pe care-l apuci merge
    * unde-l duci; ce se schimbă e cât te costă și cât îți dă înapoi.
    */
-  function catDeIntinsa(px, py, L) {
+  /** Cât de departe POATE fi dus zarul: până în colțul cel mai depărtat de tăviță. */
+  function catSePoate(c) {
+    const mx = c.left + c.width / 2, my = c.top + c.height / 2;
+    const W = window.innerWidth, H = window.innerHeight;
+    return Math.max(Math.hypot(mx, my), Math.hypot(W - mx, my),
+                    Math.hypot(mx, H - my), Math.hypot(W - mx, H - my));
+  }
+
+  function catDeIntinsa(px, py, c) {
     /* Hotarul e chiar acolo unde zarul ar da de peretele tăviței, nu unde ar
        ieși din casetă. Le încurcasem: banda se simțea abia după ce zarul
        trecuse demult peste perete, iar la eliberare trebuia adus înapoi cu
        treizeci de unități dintr-odată, adică o săritură. */
+    const L = c.width;
     const m = zar3d ? zar3d.razaDrumului * (L / zar3d.latimeaScenei) : margineaDrumului(L);
     const d = Math.hypot(px, py);
     if (d <= m) return { intins: 0, departe: 0 };
-    return { intins: Math.tanh((d - m) / ELASTIC),
-             departe: Math.tanh((d - m) / DEPARTE) };
+    return {
+      intins: Math.tanh((d - m) / ELASTIC),
+      departe: Math.min(1, (d - m) / Math.max(1, catSePoate(c) - m)),
+    };
   }
 
   /** Îl desenează acolo unde-l ține degetul acum, în planul de deasupra. */
@@ -2493,7 +2511,7 @@ function leagana() {
     const gol = { intins: 0, departe: 0 };
     if (!prins) { zar3d.plimba(0, 0, inaltimea, dx, dy); return gol; }
     const c = elTavita.getBoundingClientRect();
-    const cat = catDeIntinsa(prins.x, prins.y, c.width);
+    const cat = catDeIntinsa(prins.x, prins.y, c);
     zar3d.laDeget(prins.cx, prins.cy, inaltimea + cat.departe * SUS_INTINS, dx, dy);
     return cat;
   }
