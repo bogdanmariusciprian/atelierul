@@ -2407,7 +2407,13 @@ function leagana() {
      ecranului n-a mai întins banda mai mult, dar l-ai ridicat mai sus. */
   const DEPARTE = 520;      // pixeli de dus după care zarul e cu totul „la tine"
   const SUS_INTINS = 0.40;  // cât se mai ridică zarul când l-ai dus cât se poate
-  const CEATA_MAX = 10;     // cât se topește pagina din spate, în pixeli de blur
+  /* CÂT DE TARE SE TOPEȘTE PAGINA, LA CAPĂT.
+     Cinci pixeli, nu zece. La zece, pagina se face o pâclă albă în care nu mai
+     e nimic: ai pierdut și zarul, fiindcă un lucru se vede „în față" numai dacă
+     mai e ceva în spatele lui față de care să fie în față. La cinci, literele
+     se topesc, dar rândurile rămân rânduri și tabla rămâne tablă: vezi că e o
+     pagină acolo, doar că nu mai e a ta acum. */
+  const CEATA_MAX = 5;      // cât se topește pagina din spate, în pixeli de blur
   /* CÂT SE DĂ PESTE CAP ÎN ZBOR, față de cât s-ar da rostogolindu-se pe masă.
      Un lucru care se rostogolește pe o suprafață se învârte cu `v/r`, fiindcă
      nu alunecă. Unul zvârlit prin aer nu e ținut de nimic, deci se dă peste cap
@@ -2440,10 +2446,17 @@ function leagana() {
       ceata.className = 'zar-ceata';
       document.body.appendChild(ceata);
     }
+    /* PAGINA NU IESE DIN FOCAR DINTR-ODATĂ.
+       Un obiectiv are o adâncime de câmp: cât timp fundalul e înăuntrul ei, nu
+       se schimbă mai nimic, iar topirea se face de-abia după ce a ieșit din ea,
+       și atunci repede. De-aia ceața nu merge după `departe`, ci după pătratul
+       lui: primii pași abia se simt, iar pâcla vine la capăt. Așa zarul purtat
+       prin apropiere lasă pagina în pace, cum și trebuie. */
+    const gros = cat * cat;
     ceata.style.transition = lin ? 'backdrop-filter .42s ease, background-color .42s ease' : 'none';
     ceata.style.backdropFilter =
-      cat <= 0.001 ? 'none' : 'blur(' + (cat * CEATA_MAX).toFixed(2) + 'px)';
-    ceata.style.backgroundColor = 'rgba(247, 248, 252, ' + (cat * 0.22).toFixed(3) + ')';
+      gros <= 0.001 ? 'none' : 'blur(' + (gros * CEATA_MAX).toFixed(2) + 'px)';
+    ceata.style.backgroundColor = 'rgba(247, 248, 252, ' + (gros * 0.10).toFixed(3) + ')';
   }
 
   const inTavita = (e) => {
