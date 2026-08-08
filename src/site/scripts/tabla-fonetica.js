@@ -2332,6 +2332,13 @@ function zarulDinScena() {
   return st;
 }
 
+/* CÂT LOC ÎI TREBUIE TĂVIȚEI CÂND SE LEAGĂNĂ.
+   La 38 de grade și 30 de unități de urnit, colțul ei ajunge la vreo 140 de
+   unități de mijloc, iar caseta ține numai 90: s-ar tăia. Pânza se face deci
+   ceva mai lată cât ține legănatul, și se strânge la loc când tăvița s-a
+   îndreptat și zarul a adormit. La mărimea asta desimea rămâne întreagă. */
+const LARG_LEGANAT = 1.9;
+
 function leagana() {
   if (!zar3d || leagana._merge) return;
   leagana._merge = true;
@@ -2349,9 +2356,20 @@ function leagana() {
 
     if (!zarulOprit) zarulOprit = zarulDinScena();
     const u = zar3d.inclinarea();
+    const strambata = Math.abs(u.x) > 0.003 || Math.abs(u.z) > 0.003;
+    if (strambata) zar3d.larg(LARG_LEGANAT);
     const unde = { x: zarulOprit.r.x, z: zarulOprit.r.z };
     inclina(zarulOprit, u.x, u.z);
-    if (zarulOprit.doarme) { leagana._merge = false; return; }
+    /* CUM SE MIȘCĂ TĂVIȚA îi spun zarului la fiecare cadru: din asta ies
+       forțele sistemului legănat, adică smucitura care-l poate răsturna.
+       RĂSTURNAREA ASTA NU E O ARUNCARE: nu se alege nicio față, nu se face
+       niciun exercițiu. E doar un zar zgâlțâit pe masă. */
+    zarulOprit.cadru = zar3d.miscarea();
+    if (zarulOprit.doarme) {
+      if (!strambata) { zar3d.stramt(); leagana._merge = false; return; }
+      requestAnimationFrame(cadru);
+      return;
+    }
 
     /* Pași mărunți, ca la aruncare: la 240 de pași pe secundă nicio atingere de
        perete nu e sărită. Aceeași încetinire ca la aruncare, altfel s-ar vedea
@@ -2365,7 +2383,7 @@ function leagana() {
     zar3d.aseazaBrut(zarulOprit.r, zarulOprit.q);
     nemiscat = Math.hypot(zarulOprit.r.x - unde.x, zarulOprit.r.z - unde.z) < 0.02
       ? nemiscat + 1 : 0;
-    if (nemiscat > 24) { leagana._merge = false; return; }
+    if (nemiscat > 24 && !strambata) { zar3d.stramt(); leagana._merge = false; return; }
     requestAnimationFrame(cadru);
   })(performance.now());
 }

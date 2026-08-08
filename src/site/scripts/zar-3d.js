@@ -284,8 +284,14 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      Lumina NU se înclină odată cu tăvița, fiindcă lumina e a odăii, nu a mesei.
      De-aia, cât o legeni, lucirea se plimbă pe lemn și pe zar. Ăsta e semnul
      că lucrul are volum, și tocmai el lipsea. */
-  const INCLINARE_MAX = THREE.MathUtils.degToRad(28);
-  const TRAGERE = 14;       // cât se urnește tăvița din loc, trasă de bandă
+  const INCLINARE_MAX = THREE.MathUtils.degToRad(38);
+  const TRAGERE = 30;       // cât se urnește tăvița din loc, trasă de bandă
+  /* CÂT DE IUTE AJUNGE UNDE E DEGETUL. Alunecarea era la 0,14 pe cadru, adică
+     un sfert de secundă până să ajungă: destul cât o mână iute să fie mereu
+     înaintea tăviței, și atunci nu se mai simte că-i răspunde. La 0,38 ajunge în
+     trei cadre, deci se lipește de deget, dar nu sare, ca să rămână greutate în
+     ea, nu nervi. */
+  const ALUNECARE = 0.38;
   const tinta = { x: 0, z: 0 };
   const acum = { x: 0, z: 0 };
   let aluneca = false;
@@ -728,6 +734,36 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      dintr-odată la fiecare zvâcnire de maus dă amețeală; una care se duce lin
      se simte ca o greutate adevărată. Alunecarea se oprește singură când a
      ajuns, ca să nu desenăm de pomană. */
+  /* CÂT DE IUTE SE MIȘCĂ CHIAR TĂVIȚA.
+     Fizica are nevoie de asta ca să știe cum s-o simtă zarul: o tăviță legănată
+     iute nu e un sistem cinstit, iar zarul din ea e împins de forțele care ies
+     din schimbarea de sistem (vezi legea 28 din `zar-fizica`). Le citesc din
+     două cadre de desen, deci sunt zgomotoase; de-aia le trec printr-o sită,
+     lăsând să treacă doar jumătate din noutate la fiecare cadru. */
+  const miscarea = { a: { x: 0, y: 0, z: 0 }, w: { x: 0, y: 0, z: 0 },
+                     alfa: { x: 0, y: 0, z: 0 }, viu: false };
+  let candAfost = 0, pozAnt = { x: 0, z: 0 }, vitAnt = { x: 0, z: 0 };
+  const sita = (vechi, nou) => vechi + (nou - vechi) * 0.5;
+
+  function masoaraMiscarea() {
+    const acumCand = performance.now();
+    const dt = Math.min(0.1, Math.max(1 / 240, (acumCand - candAfost) / 1000));
+    candAfost = acumCand;
+    const wx = sita(miscarea.w.x, (masa.rotation.x - pozAnt.x) / dt);
+    const wz = sita(miscarea.w.z, (masa.rotation.z - pozAnt.z) / dt);
+    miscarea.alfa.x = sita(miscarea.alfa.x, (wx - miscarea.w.x) / dt);
+    miscarea.alfa.z = sita(miscarea.alfa.z, (wz - miscarea.w.z) / dt);
+    miscarea.w.x = wx; miscarea.w.z = wz;
+    const vx = (masa.position.x - vitAnt.x) / dt, vz = (masa.position.z - vitAnt.z) / dt;
+    miscarea.a.x = sita(miscarea.a.x, (vx - (miscarea.vx || 0)) / dt);
+    miscarea.a.z = sita(miscarea.a.z, (vz - (miscarea.vz || 0)) / dt);
+    miscarea.vx = vx; miscarea.vz = vz;
+    pozAnt = { x: masa.rotation.x, z: masa.rotation.z };
+    vitAnt = { x: masa.position.x, z: masa.position.z };
+    miscarea.viu = Math.hypot(wx, wz) > 0.05 ||
+                   Math.hypot(miscarea.a.x, miscarea.a.z) > 20;
+  }
+
   function inclinaMasa() {
     /* Tăvița se lasă SUB deget, nu se ferește de el: degetul la dreapta coboară
        latura dreaptă, degetul în jos coboară latura dinspre tine. Așa se simte
@@ -740,6 +776,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
        cât să pară că se plimbă. */
     masa.position.x = acum.x * TRAGERE;
     masa.position.z = acum.z * TRAGERE;
+    masoaraMiscarea();
   }
 
   function porneșteAlunecarea() {
@@ -747,8 +784,8 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     aluneca = true;
     (function pas() {
       const dx = tinta.x - acum.x, dz = tinta.z - acum.z;
-      acum.x += dx * 0.14;
-      acum.z += dz * 0.14;
+      acum.x += dx * ALUNECARE;
+      acum.z += dz * ALUNECARE;
       inclinaMasa();
       deseneaza();
       if (Math.abs(dx) > 0.002 || Math.abs(dz) > 0.002) requestAnimationFrame(pas);
@@ -884,6 +921,8 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     stramt,
     /** Cât s-a lăsat tăvița chiar acum, în radiani. Fizica are nevoie de asta. */
     inclinarea: () => ({ x: masa.rotation.x, z: masa.rotation.z }),
+    /** Cum se mișcă CHIAR tăvița: pentru forțele din sistemul ei (legea 28). */
+    miscarea: () => miscarea,
     /** Unde stă zarul chiar acum. De aici se face starea de repaus a fizicii. */
     locul: () => ({
       r: { x: zar.position.x, y: zar.position.y, z: zar.position.z },

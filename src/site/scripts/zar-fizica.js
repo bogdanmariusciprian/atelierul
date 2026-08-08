@@ -356,6 +356,40 @@ export function pas(st, dt) {
      după cum îi îngăduie frecarea. N-am scris nicăieri „lunecă". */
   const g = st.g || v3(0, -1, 0);
   st.v = aduna(st.v, inmulteste(g, GRAVITATIE * dt));
+
+  /* LEGEA 28: TĂVIȚA CARE SE MIȘCĂ NU E UN SISTEM CINSTIT.
+
+     Toată socoteala se face în sistemul tăviței. Cât ea stă locului, sistemul e
+     cinstit și n-avem de adăugat nimic. Dar când o legeni iute cu degetul,
+     sistemul se învârte și se mută, iar într-un asemenea sistem lucrurile par
+     împinse de forțe care nu vin de nicăieri. Nu-s născociri: sunt chiar
+     socoteala schimbării de sistem, și-s cele patru pe care le știe orice carte:
+
+       · a INERȚIEI, `−a`: smucești tăvița la stânga, zarul rămâne în urmă;
+       · a lui EULER, `−α×r`: o răsucești, iar zarul de la margine e biciuit;
+       · CENTRIFUGA, `−ω×(ω×r)`: învârtită, îl azvârle spre pereți;
+       · a lui CORIOLIS, `−2ω×v`: pe cel care deja se mișcă, îl abate lateral.
+
+     Din ele iese singură răsturnarea la o mișcare bruscă: forța apucă zarul de
+     mijloc, în timp ce frecarea îl ține de talpă, iar din cele două perechi de
+     mâini care trag de el în locuri deosebite iese un moment care-l culcă.
+     N-am scris nicăieri „răstoarnă-te la mișcare bruscă".
+
+     Sunt mărginite la de patru ori greutatea: nu de dragul realității, ci
+     fiindcă `α` se citește din două cadre de desen, iar o citire greșită dintr-o
+     mie ar zvârli zarul din tăviță pentru totdeauna. */
+  const cadru = st.cadru;
+  if (cadru && (cadru.viu)) {
+    const r = st.r;
+    const w = cadru.w, al = cadru.alfa;
+    const euler = produsVectorial(al, r);
+    const centri = produsVectorial(w, produsVectorial(w, r));
+    const coriolis = inmulteste(produsVectorial(w, st.v), 2);
+    let ps = inmulteste(aduna(aduna(cadru.a, euler), aduna(centri, coriolis)), -1);
+    const cat = lungime(ps);
+    if (cat > 4 * GRAVITATIE) ps = inmulteste(ps, (4 * GRAVITATIE) / cat);
+    st.v = aduna(st.v, inmulteste(ps, dt));
+  }
   const vit = lungime(st.v);
   if (vit > 1e-6) st.v = scade(st.v, inmulteste(st.v, AER * vit * dt));
 
