@@ -21,18 +21,57 @@ const toolbar     = document.getElementById('toolbar');
 const DEFAULT_SYMBOLS = {
   '1': { char: 'ĉ',  bold: false },
   '2': { char: 'ĝ',  bold: false },
-  '3': { char: 'k̇', bold: true  },
-  '4': { char: 'ġ',  bold: true  }
+  '3': { char: 'Ķ',  bold: true  },
+  '4': { char: 'Ģ',  bold: true  }
 };
+/* ================= SEMNELE SCOASE DIN UZ =================
+
+   Semnele celor patru taste se pot schimba, iar când se schimbă rămân în urmă
+   două feluri de moștenire:
+
+   1. ALEGEREA DIN BROWSER. Setul se ține în localStorage, iar ce e salvat bate
+      ce scrie în cod. Fără o versiune pe el, ai schimba semnul aici și n-ai
+      vedea nicio schimbare pe ecran: browserul ar da mai departe semnul vechi.
+
+   2. TABLELE DEJA SCRISE. Semnul vechi stă ca text în transcrieri. Nemaifiind
+      în listă, și-ar pierde cutia de o celulă, iar rândul c/v/s de dedesubt
+      n-ar mai cădea sub sunetul lui.
+
+   Harta de mai jos le rezolvă pe amândouă: setul salvat se îndreaptă la
+   citire, tablele se îndreaptă la deschidere. Când se mai schimbă vreun semn,
+   se adaugă o pereche aici și se ridică versiunea, atât. */
+const SIMBOLURI_RETRASE = { 'k̇': 'Ķ', 'ġ': 'Ģ' };
+const VERSIUNEA_SIMBOLURILOR = 2;
+
 function loadSymbols() {
   try {
     const raw = localStorage.getItem('fonetica_symbols');
-    if (raw) { const o = JSON.parse(raw); if (o && o['1'] && o['2'] && o['3'] && o['4']) return o; }
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && o['1'] && o['2'] && o['3'] && o['4']) {
+        const taste = { '1': o['1'], '2': o['2'], '3': o['3'], '4': o['4'] };
+        if (Number(o.v) !== VERSIUNEA_SIMBOLURILOR) {
+          // Numai semnele retrase se schimbă. Dacă ți-ai pus tu alt semn pe o
+          // tastă, alegerea ta rămâne: n-am de ce s-o calc.
+          for (const k of ['1', '2', '3', '4']) {
+            const nou = SIMBOLURI_RETRASE[taste[k].char];
+            if (nou) taste[k] = { ...taste[k], char: nou };
+          }
+        }
+        return taste;
+      }
+    }
   } catch (e) {}
   return JSON.parse(JSON.stringify(DEFAULT_SYMBOLS));
 }
-function saveSymbols() { try { localStorage.setItem('fonetica_symbols', JSON.stringify(symbols)); } catch (e) {} }
+function saveSymbols() {
+  try {
+    localStorage.setItem('fonetica_symbols',
+      JSON.stringify({ v: VERSIUNEA_SIMBOLURILOR, ...symbols }));
+  } catch (e) {}
+}
 let symbols = loadSymbols();
+saveSymbols();          // ridicăm versiunea pe loc, ca îndreptarea să nu se repete
 
 /* Inserează simbolul asociat unei taste (1-4), bold sau normal, după setare.
    Simbolul intră într-o cutie de o celulă (span.sym, lat 1ch), nu ca text gol.
@@ -40,9 +79,10 @@ let symbols = loadSymbols();
    DE CE: rândul c/v/s de dedesubt se aliniază numărând coloane, adică se
    bizuie pe faptul că fiecare semn ocupă exact o celulă de monospațiat. Asta e
    adevărat pentru literele obișnuite, dar nu și pentru sunetele speciale:
-   „k̇" e literă plus semn combinat, două puncte de cod; „ĉ" și „ĝ" pot lipsi
-   din fontul monospațiat al calculatorului, iar atunci browserul le împrumută
-   din alt font, cu altă lățime. De-aici venea deplasarea mică de dedesubt.
+   „ĉ" și „ĝ" pot lipsi din fontul monospațiat al calculatorului, iar atunci
+   browserul le împrumută din alt font, cu altă lățime. Iar un semn poate fi
+   chiar din două puncte de cod: așa era „k̇", literă plus punct combinat, până
+   să-i ia locul „Ķ". De-aici venea deplasarea mică de dedesubt.
    Cutia de 1ch le ține pe toate într-o singură celulă, oricum ar fi desenate. */
 function insertSymbol(key, field) {
   const s = symbols[key];
@@ -408,11 +448,28 @@ function desumflaCutiile(el, lista) {
 
    Se cheamă la deschiderea unei table și la ieșirea din câmp, deci vechiul se
    îndreaptă de la sine, pe măsură ce lucrezi. */
+/* Semnele vechi, prefăcute în cele noi chiar acolo unde stau scrise. Umblă și
+   prin cutii, ca o cutie cu semnul vechi să rămână cutie cu semnul nou, nu să
+   fie desfăcută ca una stricată. */
+function inlocuiesteSemneleRetrase(el) {
+  const perechi = Object.entries(SIMBOLURI_RETRASE);
+  if (!perechi.length) return;
+  for (const nod of noduriText(el)) {
+    let t = nod.textContent;
+    let schimbat = false;
+    for (const [vechi, nou] of perechi) {
+      if (t.includes(vechi)) { t = t.split(vechi).join(nou); schimbat = true; }
+    }
+    if (schimbat) nod.textContent = t;
+  }
+}
+
 function imbracaSimboluri(el) {
   if (!el) return;
   const lista = Object.values(symbols).map(s => s && s.char).filter(Boolean);
   if (!lista.length) return;
 
+  inlocuiesteSemneleRetrase(el);
   desumflaCutiile(el, lista);
 
   const cutieCu = (nod) => {

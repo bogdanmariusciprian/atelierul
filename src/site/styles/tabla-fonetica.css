@@ -426,9 +426,10 @@
   /* Sunetele speciale (tastele 1-4) stau fiecare într-o celulă de exact o
      literă. Rândul c/v/s se aliniază numărând coloane, deci are nevoie ca
      fiecare semn să ocupe o celulă și nici un fir de pixel în plus. Literele
-     obișnuite o fac de la sine, fiind monospațiate; „k̇" (literă plus semn
-     combinat) și „ĉ", „ĝ" (care pot lipsi din fontul monospațiat și atunci se
-     împrumută din altul) nu. Cutia le potrivește pe toate. */
+     obișnuite o fac de la sine, fiind monospațiate; „ĉ" și „ĝ" (care pot lipsi
+     din fontul monospațiat și atunci se împrumută din altul) nu, iar un semn
+     poate fi și din două puncte de cod, cum era „k̇" până să-i ia locul „Ķ".
+     Cutia le potrivește pe toate. */
   .field .sym {
     display: inline-block;
     width: 1ch;
