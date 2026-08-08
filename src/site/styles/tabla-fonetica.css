@@ -872,10 +872,26 @@
   /* Umbra tăviței rămâne a foii de stil: pânza desenează lemnul și zarul, dar
      nu poate desena în afara ei. */
   box-shadow: 0 12px 30px rgba(31, 36, 48, .22);
+  opacity: 0;
+  transition: opacity .28s ease;
 }
+
+/* SCHIMBUL SE FACE PRIN TOPIRE, NU DINTR-O SĂRITURĂ.
+
+   Pagina se deschide cu tăvița din CSS, gata de apăsat. Când scena e gata, ea
+   îi ia locul. Făcut dintr-odată, schimbul se vede ca o pâlpâire și pare o
+   scăpare. Topite una într-alta într-o treime de secundă, se citește ca o
+   imagine care se limpezește.
+
+   `visibility` în loc de `display`, fiindcă un lucru ascuns cu `display` nu se
+   poate stinge treptat: piere pe loc, și tocmai asta voiam să nu se întâmple. */
+.zar-tavita.e-3d .zar-panza { opacity: 1; }
+.zar-tavita .zar-tavita__fund,
+.zar-tavita .zar-tavita__umbra,
+.zar-tavita .zar__f { transition: opacity .28s ease; }
 .zar-tavita.e-3d .zar-tavita__fund,
 .zar-tavita.e-3d .zar-tavita__umbra,
-.zar-tavita.e-3d .zar__f { display: none; }
+.zar-tavita.e-3d .zar__f { opacity: 0; visibility: hidden; }
 
 /* Butonul se întinde peste toată tăvița: e mai ușor de nimerit decât un cub de
    46 de pixeli, iar cubul desenat stă oricum dedesubt, în pânză. */

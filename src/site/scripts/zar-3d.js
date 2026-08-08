@@ -78,7 +78,7 @@ function panzaFetei(numar, latura = 256) {
   /* Fondul feței nu e alb curat, ci un alb-albăstrui potolit. Albul curat, sub
      lumină și cu lac deasupra, se arde: fața iese o pată fără desen, iar
      punctele par lipite pe hârtie. */
-  g.fillStyle = "#e6eaf2";
+  g.fillStyle = "#dcdfe8";
   g.fillRect(0, 0, latura, latura);
   const raza = latura * 0.085;
   for (const [x, y] of PUNCTE[numar] || []) {
@@ -186,12 +186,25 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   const panza = randor.domElement;
   panza.className = "zar-panza";
-  randor.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  /* DESENĂM MAI MARE DECÂT SE VEDE.
+
+     Tăvița are 150 de pixeli pe ecran. Desenată în 150 de pixeli, o muchie
+     rotundă are la dispoziție trei-patru pixeli ca să se curbeze, iar din atâta
+     nu iese o curbă, iese o scară. De-aia desenăm de două ori și jumătate mai
+     mare și lăsăm browserul să strângă imaginea la loc: fiecare pixel de pe
+     ecran se face atunci din vreo șase desenate, iar marginile ies netede.
+     La un pătrat de 150 de pixeli asta nu costă nimic. */
+  const DESIME = 2.5;
+  randor.setPixelRatio(Math.min((window.devicePixelRatio || 1) * DESIME, 4));
   randor.setSize(latura, latura, false);
   randor.shadowMap.enabled = true;
   randor.shadowMap.type = THREE.PCFSoftShadowMap;
   randor.toneMapping = THREE.ACESFilmicToneMapping;
-  randor.toneMappingExposure = 0.95;
+  /* Expunerea. Ca la un aparat de fotografiat: cu cât e mai mare, cu atât intră
+     mai multă lumină și cu atât se ard alburile. Un zar alb sub lumină puternică
+     își pierde desenul și rămâne o pată. */
+  randor.toneMappingExposure = 0.72;
   tavita.insertBefore(panza, tavita.firstChild);
 
   const scena = new THREE.Scene();
@@ -229,20 +242,20 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     console.warn("mediul de lumină n-a mers:", e && e.message);
   }
 
-  const cheie = new THREE.DirectionalLight(0xfff6e8, 1.7);
+  const cheie = new THREE.DirectionalLight(0xfff6e8, 1.15);
   cheie.position.set(-120, 210, 95);
   cheie.castShadow = true;
-  cheie.shadow.mapSize.set(1024, 1024);
+  cheie.shadow.mapSize.set(2048, 2048);   // pe măsura desenului mai des
   cheie.shadow.radius = 3;
   cheie.shadow.bias = -0.0012;
   const uc = cheie.shadow.camera;
   uc.left = -110; uc.right = 110; uc.top = 110; uc.bottom = -110; uc.near = 40; uc.far = 460;
   scena.add(cheie);
 
-  const umplutura = new THREE.DirectionalLight(0xdfe8ff, 0.22);
+  const umplutura = new THREE.DirectionalLight(0xdfe8ff, 0.16);
   umplutura.position.set(140, 90, 60);
   scena.add(umplutura);
-  scena.add(new THREE.HemisphereLight(0xffffff, 0x6b4a26, 0.20));
+  scena.add(new THREE.HemisphereLight(0xffffff, 0x6b4a26, 0.16));
 
   /* ---------- lemnul ---------- */
   const texturaLemn = new THREE.CanvasTexture(panzaLemnului());
@@ -255,7 +268,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     // Lemnul lăcuit nu e nici oglindă, nici cretă: oglindește puțin și difuz.
     roughness: 0.58,
     metalness: 0,
-    envMapIntensity: 0.55,
+    envMapIntensity: 0.35,
   });
   const lemnPerete = lemn.clone();
   lemnPerete.roughness = 0.5;
@@ -313,9 +326,9 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
       // Lacul de deasupra: plasticul dur are un strat lucios peste culoare, iar
       // el e cel care dă sclipirea de pe muchii. Potolit, ca să fie sclipire,
       // nu bec.
-      clearcoat: 0.55,
+      clearcoat: 0.40,
       clearcoatRoughness: 0.20,
-      envMapIntensity: 0.50,
+      envMapIntensity: 0.28,
     });
   });
 
