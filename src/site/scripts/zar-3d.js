@@ -277,6 +277,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      De-aia, cât o legeni, lucirea se plimbă pe lemn și pe zar. Ăsta e semnul
      că lucrul are volum, și tocmai el lipsea. */
   const INCLINARE_MAX = THREE.MathUtils.degToRad(18);
+  const TRAGERE = 9;        // cât se urnește tăvița din loc, trasă de bandă
   const tinta = { x: 0, z: 0 };
   const acum = { x: 0, z: 0 };
   let aluneca = false;
@@ -312,6 +313,42 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   const uc = cheie.shadow.camera;
   uc.left = -170; uc.right = 170; uc.top = 170; uc.bottom = -170; uc.near = 40; uc.far = 620;
   scena.add(cheie);
+
+  /* CÂT DE DEPARTE VEDE LUMINA.
+
+     O lumină îndreptată nu-și face umbra peste toată lumea, ci numai într-o
+     cutie. Cutia asta e de ±170 în jurul tăviței și e întoarsă după lumină, nu
+     după lume, fiindcă e privită DIN lumină. De-aia, când zarul iese din ea,
+     umbra lui nu se stinge lin, ci se taie pe muchia unui pătrat strâmb care nu
+     se vede nicăieri în scenă. E chiar „panelul invizibil, pătrățos dar rotit
+     cumva". Nu era un panou: era hotarul de unde lumina nu mai știe să facă
+     umbră.
+
+     Rețin aici cum arată acasă, ca s-o pot lărgi cât ține zarul afară din
+     tăviță și s-o aduc înapoi întocmai pe urmă. Direcția o rețin ca direcție,
+     nu ca punct: mutând lumina mai departe pe aceeași rază, LUMINA rămâne
+     aceeași (una îndreptată n-are loc, are doar direcție), dar cutia umbrei
+     apucă să cuprindă tot ecranul. */
+  const DIRECTIA_LUMINII = cheie.position.clone().normalize();
+  const UMBRA_DE_ACASA = {
+    loc: cheie.position.clone(),
+    raza: 170, near: 40, far: 620, moale: 3,
+  };
+
+  /* PAGINA CA MASĂ.
+     Cât zarul e afară din tăviță, umbra lui trebuie să cadă pe ceva, altfel
+     zarul plutește peste pagină ca un desen lipit. Suprafața asta e a PAGINII,
+     nu a tăviței: stă dreaptă și nu se înclină cu ea. Se aprinde numai atunci,
+     iar `masaUmbrei` se stinge, ca umbrele să nu se adune de două ori. */
+  const pagina = new THREE.Mesh(
+    new THREE.PlaneGeometry(8000, 8000),
+    new THREE.ShadowMaterial({ opacity: 0.22 })
+  );
+  pagina.rotation.x = -Math.PI / 2;
+  pagina.position.y = -6.05;
+  pagina.receiveShadow = true;
+  pagina.visible = false;
+  scena.add(pagina);
 
   const umplutura = new THREE.DirectionalLight(0xdfe8ff, 0.16);
   umplutura.position.set(140, 90, 60);
@@ -585,6 +622,12 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
        ca o apăsare, nu ca o fugă. */
     masa.rotation.z = -acum.x * INCLINARE_MAX;
     masa.rotation.x = acum.z * INCLINARE_MAX;
+    /* Și e TRASĂ puțin într-acolo, nu doar aplecată. Când banda trage de zar
+       spre tăviță, trage și de tăviță spre zar: tăvița e ușoară și se lasă
+       urnită. Nouă unități din o sută optzeci: cât să se vadă că cedează, nu
+       cât să pară că se plimbă. */
+    masa.position.x = acum.x * TRAGERE;
+    masa.position.z = acum.z * TRAGERE;
   }
 
   function porneșteAlunecarea() {
@@ -631,6 +674,24 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     randor.setSize(W, H, false);
     panza.classList.add("e-larg");
     document.body.appendChild(panza);          // scos de sub orice `transform`
+
+    /* CUTIA UMBREI, cât tot ecranul. Raza o socotesc din colțul cel mai
+       depărtat de tăviță: atât și nici un pic mai mult, fiindcă fiecare unitate
+       în plus subțiază umbra (harta are 2048 de puncte, oricât ar cuprinde).
+       Umbra iese mai moale decât acasă, și e bine că iese: zarul ținut sus,
+       departe de masă, CHIAR are umbra mai mare și mai ștearsă. */
+    const mx = c.left + c.width / 2, my = c.top + c.height / 2;
+    const raza = Math.max(Math.hypot(mx, my), Math.hypot(W - mx, my),
+                          Math.hypot(mx, H - my), Math.hypot(W - mx, H - my)) + 80;
+    const departare = raza * 1.4 + 400;
+    cheie.position.copy(DIRECTIA_LUMINII).multiplyScalar(departare);
+    uc.left = -raza * 1.1; uc.right = raza * 1.1;
+    uc.top = raza * 1.5; uc.bottom = -raza * 1.5;
+    uc.near = 1; uc.far = departare * 2 + raza;
+    uc.updateProjectionMatrix();
+    cheie.shadow.radius = 9;
+    pagina.visible = true;
+    masaUmbrei.visible = false;
     deseneaza();
   }
   function stramt() {
@@ -642,6 +703,15 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     randor.setSize(p, p, false);
     panza.classList.remove("e-larg");
     tavita.insertBefore(panza, tavita.firstChild);
+
+    cheie.position.copy(UMBRA_DE_ACASA.loc);
+    uc.left = -UMBRA_DE_ACASA.raza; uc.right = UMBRA_DE_ACASA.raza;
+    uc.top = UMBRA_DE_ACASA.raza; uc.bottom = -UMBRA_DE_ACASA.raza;
+    uc.near = UMBRA_DE_ACASA.near; uc.far = UMBRA_DE_ACASA.far;
+    uc.updateProjectionMatrix();
+    cheie.shadow.radius = UMBRA_DE_ACASA.moale;
+    pagina.visible = false;
+    masaUmbrei.visible = true;
     deseneaza();
   }
 

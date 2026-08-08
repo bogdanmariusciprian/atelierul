@@ -553,7 +553,16 @@ export function fataDeSus(q) {
  */
 export function arunca(cutie, optiuni = {}) {
   const st = optiuni.stare || pornire(cutie, optiuni);
-  const pasul = optiuni.pasul || 1 / 240;
+  /* PASUL SE IA DUPĂ CÂT DE IUTE PLEACĂ ZARUL, nu e același mereu.
+     La 240 de pași pe secundă, un zar aruncat cu mâna se mișcă vreo patru
+     unități între doi pași: nicio ciocnire nu poate fi sărită. Praștia însă
+     poate să-l trimită de zece ori mai iute, iar atunci ar face cincizeci de
+     unități dintr-odată, adică mai mult decât toată lățimea lui: ar trece prin
+     perete fără să-l atingă, ca o fantomă. De-aia pasul se strânge cât să nu
+     facă niciodată mai mult de o optime de zar între două socoteli. */
+  const iuteala = Math.hypot(st.v.x, st.v.y, st.v.z);
+  const pasul = optiuni.pasul ||
+    Math.min(1 / 240, iuteala > 1 ? st.corp.a / (8 * iuteala) : 1 / 240);
   const celMult = optiuni.celMult || 4;
   const cadre = [];
   let t = 0;

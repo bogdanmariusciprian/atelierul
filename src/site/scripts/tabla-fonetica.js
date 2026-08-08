@@ -2382,9 +2382,10 @@ function leagana() {
           fiindcă la capăt viteza unui arc e zero, și intră în tăviță cu
           `ω·√(A²−R²)`, adică plătește exact cât a fost întins. De asta contează
           de unde dai drumul, fără să fi scris nicăieri „de departe, mai tare". */
-  const ELASTIC = 260;      // pixeli de întindere după care banda aproape nu mai dă
+  const ELASTIC = 190;      // pixeli de întindere după care banda e simțită din plin
   const PULS = 6.9;         // ω, în radiani pe secundă: cât de iute se descarcă
-  const SUS_INTINS = 0.10;  // cât se mai ridică zarul când banda e întinsă la maximum
+  const IUTEALA_MAX = 6000; // cât poate da banda, oricât ai întinde-o
+  const SUS_INTINS = 0.17;  // cât se mai ridică zarul când banda e întinsă la maximum
   /* CÂT SE DĂ PESTE CAP ÎN ZBOR, față de cât s-ar da rostogolindu-se pe masă.
      Un lucru care se rostogolește pe o suprafață se învârte cu `v/r`, fiindcă
      nu alunecă. Unul zvârlit prin aer nu e ținut de nimic, deci se dă peste cap
@@ -2416,9 +2417,19 @@ function leagana() {
     const d = Math.hypot(px, py);
     if (d <= m || !zar3d) return { nx: px / m, ny: py / m, intins: 0 };
     const R = zar3d.razaDrumului;
-    const E = ELASTIC * Math.tanh((d - m) / ELASTIC);
-    const n = (R + (zar3d.latimeaScenei / L) * E) / R;
-    return { nx: (px / d) * n, ny: (py / d) * n, intins: E / ELASTIC };
+    /* AFARĂ ZARUL MERGE UNDE MERGE DEGETUL, oriunde pe pagină.
+       Îl țineam mai devreme într-un cerc, ca „să se simtă banda". Era o
+       socoteală greșită: banda nu-ți ține MÂNA pe loc, îți ține doar mâna sub
+       putere, iar putere n-are un cursor. Un lucru pe care-l apuci merge unde-l
+       duci; ce se schimbă e cât te costă și cât îți dă înapoi. Așa că banda se
+       simte prin ce trage de ea, nu prin ce nu te lasă:
+         · tăvița se apleacă și se urnește din loc după zar (legea a treia),
+         · zarul se ridică tot mai sus de pe pagină,
+         · iar la eliberare pleacă cu atât mai tare cu cât ai tras mai departe.
+       `intins` e cât de întinsă e banda, de la 0 la 1, și dă toate trei
+       deodată, ca să spună același lucru. */
+    const n = (R + (zar3d.latimeaScenei / L) * (d - m)) / R;
+    return { nx: (px / d) * n, ny: (py / d) * n, intins: Math.tanh((d - m) / ELASTIC) };
   }
 
   /** Îl desenează acolo unde-l ține degetul acum, cu tot cu bandă. */
@@ -2514,8 +2525,15 @@ function leagana() {
     const n = Math.hypot(u.nx, u.ny) || 1;
     const ux = u.nx / n, uy = u.ny / n;
     const A = Math.max(R * 1.02, n * R);
-    const pana = Math.acos(Math.min(1, R / A)) / PULS;
-    const vIntrare = PULS * Math.sqrt(Math.max(0, A * A - R * R));
+    /* Viteza pe care o dă arcul, `ω·√(A²−R²)`, cu o singură mărginire: nicio
+       bandă nu poate da oricât. Peste `IUTEALA_MAX` nu mai crește, dar creșterea
+       până acolo rămâne netedă, deci nu se simte nicăieri un zid. Pulsul se ia
+       apoi ÎNAPOI din viteză, ca mișcarea să rămână chiar oscilația arcului:
+       trasă de departe, ea se descarcă mai lent, fiindcă are mai mult de mers. */
+    const vBrut = PULS * Math.sqrt(Math.max(0, A * A - R * R));
+    const vIntrare = IUTEALA_MAX * Math.tanh(vBrut / IUTEALA_MAX);
+    const puls = vIntrare / Math.max(1, Math.sqrt(Math.max(1, A * A - R * R)));
+    const pana = Math.acos(Math.min(1, R / A)) / puls;
     const h0 = inaltimea + u.intins * SUS_INTINS;
 
     seRostogoleste = true;                    // nimeni nu aruncă peste praștie
@@ -2524,7 +2542,7 @@ function leagana() {
     (function cadru(acum) {
       const t = ((acum - pornit) / 1000) / INCETINIRE;
       const gata = t >= pana;
-      const s = gata ? R : Math.max(R, A * Math.cos(PULS * t));
+      const s = gata ? R : Math.max(R, A * Math.cos(puls * t));
       const catA = s / R;
       zar3d.plimba(catA * ux, catA * uy, h0 * (s / A),
                    (s - sAnt) * ux * TUMBA, (s - sAnt) * uy * TUMBA, s > R);
