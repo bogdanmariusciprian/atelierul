@@ -2422,14 +2422,36 @@ function leagana() {
      pagină acolo, doar că nu mai e a ta acum. */
   const CEATA_MAX = 5;      // cât se topește pagina din spate, în pixeli de blur
 
-  /* ADÂNCIMEA DE CÂMP: până unde rămâne pagina limpede.
-     Jumătatea dintâi a drumului n-o clatină deloc, fiindcă atât ține adâncimea
-     de câmp: un obiectiv ține limpede tot ce e între două praguri, iar înăuntrul
-     lor nu se schimbă nimic, oricât te-ai mișca. Abia după ce fundalul a ieșit
-     din ea începe să se topească, și de-atunci repede. Așa toată schimbarea care
-     se vede se petrece în ultimul sfert de ecran, acolo unde chiar duci zarul
-     „departe de tot", și nu pe drum, unde n-ai cerut nimic. */
-  const CEATA_PRAG = 0.5;
+  /* CUM CREȘTE CEAȚA: DUPĂ CE SE VEDE, NU DUPĂ CE IESE DINTR-O FORMULĂ.
+
+     Am încercat rând pe rând o creștere dreaptă, una la pătrat, și un prag sub
+     care nu se întâmplă nimic. Fiecare avea temeiul ei, și fiecare a fost
+     greșită: una pornea prea tare, alta se sătura la jumătate, a treia nu
+     pornea deloc. Toate erau formule frumoase potrivite pe ochiul meu, care
+     n-are ochi.
+
+     Așa că am cerut curba de la cine se uită la ea, măsurată pe zece pași, de
+     la peretele tăviței până în colțul cel mai depărtat al ferestrei. Asta e:
+
+         un pas   5%        șase pași   48%
+         doi     15%        șapte       60%
+         trei    20%        opt         80%
+         patru   30%        nouă        95%
+         cinci   40%        zece       100%
+
+     Se citește dintr-o privire: pornește molcom, ține aproape drept prin
+     mijloc, și se repede în ultimii doi pași. Trec liniar printre puncte, că
+     pașii sunt destul de deși cât să nu se simtă niciun colț.
+
+     Dacă vreodată nu mai place cum arată, se schimbă un număr din șirul de mai
+     jos și gata. De-aia stă ca un șir, și nu ascuns într-un exponent. */
+  const CEATA_CURBA = [0, .05, .15, .20, .30, .40, .48, .60, .80, .95, 1];
+
+  function catDeCeata(cat) {
+    const t = Math.max(0, Math.min(1, cat)) * (CEATA_CURBA.length - 1);
+    const i = Math.min(CEATA_CURBA.length - 2, Math.floor(t));
+    return CEATA_CURBA[i] + (CEATA_CURBA[i + 1] - CEATA_CURBA[i]) * (t - i);
+  }
   /* CÂT SE DĂ PESTE CAP ÎN ZBOR, față de cât s-ar da rostogolindu-se pe masă.
      Un lucru care se rostogolește pe o suprafață se învârte cu `v/r`, fiindcă
      nu alunecă. Unul zvârlit prin aer nu e ținut de nimic, deci se dă peste cap
@@ -2462,11 +2484,7 @@ function leagana() {
       ceata.className = 'zar-ceata';
       document.body.appendChild(ceata);
     }
-    /* Cât e fundalul în adâncimea de câmp, nu se clatină nimic; ieșit din ea,
-       se topește, și cu atât mai iute cu cât s-a depărtat mai mult. De-aia
-       întâi scad pragul, și abia ce rămâne îl ridic la pătrat. */
-    const iesit = Math.max(0, (cat - CEATA_PRAG) / (1 - CEATA_PRAG));
-    const gros = iesit * iesit;
+    const gros = catDeCeata(cat);
     ceata.style.transition = lin ? 'backdrop-filter .42s ease, background-color .42s ease' : 'none';
     ceata.style.backdropFilter =
       gros <= 0.001 ? 'none' : 'blur(' + (gros * CEATA_MAX).toFixed(2) + 'px)';
