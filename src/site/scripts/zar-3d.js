@@ -267,17 +267,25 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      nu mint, nu spuneam nimic. Acum înclin 18 grade și las zarul SĂ LUNECE de-a
      binelea, ceea ce e și mai adevărat, și mult mai de văzut.
 
-     Pragul se simte cu degetul, fiindcă e adevărat: pe la mijlocul drumului
-     zarul încă se ține, iar de pe la trei sferturi se urnește și se duce în
-     colț. Iar fiindcă frecarea de mers e mai mică decât cea de agățare, odată
-     pornit nu se mai oprește decât mai jos decât unghiul la care a plecat.
-     Nimic din toate astea nu e scris nicăieri: iese din `inclina` + `pas`.
+     Pragul se simte cu degetul, fiindcă e adevărat: aproape de mijloc zarul
+     încă se ține, iar mai încolo se urnește și se duce în colț. Iar fiindcă
+     frecarea de mers e mai mică decât cea de agățare, odată pornit nu se mai
+     oprește decât mai jos decât unghiul la care a plecat. Nimic din toate astea
+     nu e scris nicăieri: iese din `inclina` + `pas`.
+
+     28 DE GRADE, ȘI CÂT MAI ÎNCAPE. Plafonul de sus nu-l dă gustul, ci chenarul:
+     colțul cel mai depărtat al tăviței, ridicat și umflat de apropierea de
+     cameră, ajunge la 84 de unități din 90 cu tăvița dreaptă, la 99 la
+     optsprezece grade și la 103 la douăzeci și opt. Trecerea peste 90 se
+     petrece deci demult, și n-a supărat pe nimeni: colțul e o muchie rotunjită
+     de lemn, iar cele câteva unități se pierd. Peste vreo patruzeci de grade
+     însă tăvița nu mai pare legănată, ci răsturnată.
 
      Lumina NU se înclină odată cu tăvița, fiindcă lumina e a odăii, nu a mesei.
      De-aia, cât o legeni, lucirea se plimbă pe lemn și pe zar. Ăsta e semnul
      că lucrul are volum, și tocmai el lipsea. */
-  const INCLINARE_MAX = THREE.MathUtils.degToRad(18);
-  const TRAGERE = 9;        // cât se urnește tăvița din loc, trasă de bandă
+  const INCLINARE_MAX = THREE.MathUtils.degToRad(28);
+  const TRAGERE = 14;       // cât se urnește tăvița din loc, trasă de bandă
   const tinta = { x: 0, z: 0 };
   const acum = { x: 0, z: 0 };
   let aluneca = false;
