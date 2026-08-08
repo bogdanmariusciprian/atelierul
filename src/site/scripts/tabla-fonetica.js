@@ -2271,6 +2271,8 @@ async function aruncaZarul() {
    deschide: altfel s-ar acoperi una pe alta și ar spune același lucru de două
    ori. */
 function gataAruncarea(fata) {
+  aPicatOData = true;
+  trezesteTavita();
   try {
     adaugaExercitiu({ sursa: 'zar', fata });
   } catch (e) {
@@ -2310,6 +2312,36 @@ function gataAruncarea(fata) {
    degeaba; o repornește orice mișcare de deget, fiindcă orice mișcare de deget
    schimbă panta.
    ============================================================ */
+
+/* ---------- TĂVIȚA CARE ADOARME ----------
+
+   După ce zarul a picat o dată, tăvița și-a spus ce avea de spus. De-aici
+   încolo elevul se uită la exercițiul lui, nu la ea, iar un lucru care rămâne
+   aprins după ce și-a făcut treaba nu mai e o unealtă, e o distragere. Se
+   retrage deci la patru zecimi, și se trezește la orice atingere.
+
+   Rămâne trează câteva secunde DUPĂ ce degetul a plecat, nu se stinge pe loc:
+   altfel s-ar întuneca exact sub mâna care se întoarce spre ea, iar asta se
+   citește ca o unealtă care fuge, nu ca una care se odihnește. */
+const SOMNUL_TAVITEI = 3500;      // milisecunde de veghe după ultima atingere
+let aPicatOData = false;          // până atunci tăvița stă trează, că n-a lucrat
+
+function seCulcaTavita(da) {
+  if (!elTavita) return;
+  /* Semnul se pune ori pe pânză, ori pe tăviță, niciodată pe amândouă: cât e
+     scenă, pânza pleacă din tăviță în `body`, iar două opacități una într-alta
+     s-ar înmulți. */
+  const unde = zar3d ? zar3d.panza : elTavita;
+  unde.classList.toggle('e-somn', da);
+  if (zar3d) elTavita.classList.remove('e-somn');
+}
+
+function trezesteTavita() {
+  if (!aPicatOData) return;
+  seCulcaTavita(false);
+  clearTimeout(trezesteTavita._t);
+  trezesteTavita._t = setTimeout(() => seCulcaTavita(true), SOMNUL_TAVITEI);
+}
 
 /** Starea fizică a zarului care stă în tăviță. `null` = trebuie luată din scenă. */
 let zarulOprit = null;
@@ -2650,6 +2682,7 @@ function leagana() {
               plecat: false, intins: 0, departe: 0,
               urme: [{ t: performance.now(), x: p.x, y: p.y }] };
     zarInMana = true;
+    trezesteTavita();
     zarulOprit = null;                  // îl mută mâna: starea veche nu mai e bună
     elZar.setPointerCapture(e.pointerId);
     elTavita.classList.add('e-prins');
@@ -2719,6 +2752,10 @@ function leagana() {
     const stins = 1 - lin(departe, jum * RAZA_TINE, jum * RAZA_STINSA);
     const putere = catre * stins;
     zar3d.priveste((p.x / departe) * putere, (p.y / departe) * putere);
+    /* Trezită numai când degetul e CHIAR pe ea. Înclinarea se simte de departe,
+       dar aprinsul e altceva: dacă s-ar trezi de la un metru, n-ar mai adormi
+       niciodată. */
+    if (departe < jum * 1.4) trezesteTavita();
     leagana();
   }, { passive: true });
 

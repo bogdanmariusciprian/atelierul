@@ -817,7 +817,27 @@
   width: 150px; height: 150px;
   perspective: 700px;
   user-select: none;
+  transition: opacity .55s ease;
 }
+
+/* TĂVIȚA CARE ADOARME.
+
+   După ce zarul a picat o dată, tăvița și-a spus ce avea de spus: numărul e în
+   cerință, generatorul s-a deschis, iar de aici încolo elevul se uită la
+   exercițiul lui, nu la ea. Un lucru care rămâne aprins după ce și-a făcut
+   treaba nu mai e o unealtă, e o distragere. Așa că se retrage la patru zecimi:
+   se vede că e acolo, dar nu mai trage ochiul.
+
+   Se trezește la orice atingere și rămâne trează câteva secunde după, ca să nu
+   se stingă chiar sub degetul care se apropie.
+
+   Semnul se pune ori pe PÂNZĂ, ori pe TĂVIȚĂ, niciodată pe amândouă: cât e
+   scenă, pânza pleacă din tăviță în `body` (vezi `larg`), iar dacă ar fi
+   însemnate amândouă, cât timp stau una într-alta cele două opacități s-ar
+   înmulți și tăvița ar ajunge la o șaisprezecime. */
+.zar-tavita.e-somn { opacity: .4; }
+.zar-tavita.e-3d .zar-panza.e-somn,
+.zar-panza.e-larg.e-somn { opacity: .4; }
 /* FUNDUL TĂVIȚEI: SCÂNDURĂ DE STEJAR.
 
    Fibra e făcută din gradienți suprapuși, nu dintr-o poză: nu costă niciun
@@ -927,7 +947,9 @@
   position: fixed;
   inset: auto;
   opacity: 1;
-  transition: none;
+  /* Numai opacitatea se schimbă lin: locul și mărimea trebuie să sară dintr-o
+     dată, altfel s-ar vedea pânza lățindu-se. */
+  transition: opacity .55s ease;
   z-index: 60;              /* peste pagină, sub ferestre și sub bara de sus */
 }
 
