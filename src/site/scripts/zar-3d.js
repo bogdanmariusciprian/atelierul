@@ -646,6 +646,64 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   const strangeUnu = (v) => Math.max(-1, Math.min(1, v));
 
+  /* ---------- ZARUL RIDICAT STĂ ÎN PLANUL DE DEASUPRA ----------
+
+     Aici era o greșeală de fond, nu de reglaj. Îl plimbam pe zar în planul
+     TĂVIȚEI, adică pe masă. Numai că masa e privită dintr-o parte, de la 68 de
+     grade, așa că orice drum pe ea se duce spre fundal: zarul se micșora, se
+     apropia de linia orizontului și, undeva pe la jumătatea paginii, nu mai
+     avea unde să meargă. Nu era o mărginire pe care s-o fi pus eu; era
+     perspectiva, care face din orice masă un lucru care se sfârșește în zare.
+
+     Dar un lucru pe care-l APUCI nu mai e pe masă. E în mână, deasupra ei. De
+     aceea, cât îl ții, zarul stă într-un plan PARALEL CU ECRANUL, care trece
+     prin locul în care l-ai ridicat. Într-un asemenea plan nimic nu se duce în
+     zare: zarul își păstrează mărimea, rămâne mereu chiar sub deget și ajunge
+     oriunde e degetul, fiindcă planul acoperă tot ecranul.
+
+     Socoteala e o rază trasă din cameră prin dreptul degetului, tăiată cu
+     planul acela. E chiar întrebarea „prin ce loc din lume trece privirea mea
+     către pixelul ăsta", pusă invers.
+
+     Locul îl întorc în sistemul TĂVIȚEI, fiindcă acolo lucrează și fizica, și
+     desenul: așa n-avem două socoteli care trebuie să se potrivească. */
+  const planulDeSus = new THREE.Plane();
+  const razaPrivirii = new THREE.Raycaster();
+  const undeva = new THREE.Vector2();
+  const acolo = new THREE.Vector3();
+  const incotro = new THREE.Vector3();
+
+  const inaltimeaDinMana = (nh) => marime / 2 + Math.max(0, nh) * latura;
+
+  function laDeget(clientX, clientY, nh, dx = 0, dz = 0) {
+    const c = panza.getBoundingClientRect();
+    if (!c.width || !c.height) return null;
+    camera.getWorldDirection(incotro);
+    planulDeSus.setFromNormalAndCoplanarPoint(
+      incotro.clone().negate(),
+      new THREE.Vector3(0, inaltimeaDinMana(nh), 0)
+    );
+    undeva.set(((clientX - c.left) / c.width) * 2 - 1,
+               -((clientY - c.top) / c.height) * 2 + 1);
+    razaPrivirii.setFromCamera(undeva, camera);
+    if (!razaPrivirii.ray.intersectPlane(planulDeSus, acolo)) return null;
+    masa.worldToLocal(acolo);
+    puneLa(acolo, dx, dz);
+    return { x: acolo.x, y: acolo.y, z: acolo.z };
+  }
+
+  /** Îl pune la un loc anume din tăviță și îl rostogolește cât a mers. */
+  function puneLa(p, dx = 0, dz = 0) {
+    inAsezare = 0;
+    zar.position.set(p.x, p.y, p.z);
+    const lung = Math.hypot(dx, dz);
+    if (lung > 1e-4) {
+      qRoata.setFromAxisAngle(axaRostogolirii(dx, dz), lung / (marime / 2));
+      zar.quaternion.premultiply(qRoata);
+    }
+    deseneaza();
+  }
+
   /* ---------- PÂNZA CÂT FEREASTRA, FĂRĂ CA TĂVIȚA SĂ TRESARĂ ----------
 
      Ca zarul să se vadă tras AFARĂ din tăviță, pânza trebuie să fie mai mare
@@ -726,6 +784,10 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
       r: { x: zar.position.x, y: zar.position.y, z: zar.position.z },
       q: { x: zar.quaternion.x, y: zar.quaternion.y, z: zar.quaternion.z, w: zar.quaternion.w },
     }),
+    laDeget,
+    puneLa,
+    /** La ce înălțime stă zarul ținut în mână, în unități de scenă. */
+    inaltimeaDinMana,
     /** Cât de departe de mijloc poate ajunge zarul plimbat, în unități de scenă. */
     razaDrumului: RAZA_DRUMULUI,
     /** Cât cuprinde camera, în unități de scenă. Cu ea se trec pixelii în scenă. */

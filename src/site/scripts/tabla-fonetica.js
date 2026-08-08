@@ -2402,44 +2402,34 @@ function leagana() {
   };
 
   /**
-   * Unde ajunge ZARUL când degetul e într-un anume loc.
+   * CÂT DE ÎNTINSĂ E BANDA, de la 0 la 1, după cât de departe de tăviță e degetul.
    *
-   * Înăuntru merge cum a mers dintotdeauna. Afară intră banda: acolo zarul
-   * urmează degetul unu la unu în pixeli de ecran, fiindcă tocmai asta se vede,
-   * că-l tragi după tine, dar cu rămânerea în urmă de mai sus.
+   * Un singur număr, din care ies toate semnele benzii: aplecarea tăviței,
+   * urnirea ei din loc, ridicarea zarului și puterea praștiei. Dacă ar fi mai
+   * multe, s-ar putea contrazice între ele.
    *
-   * `intins` e cât e întinsă banda, de la 0 la 1. Din el se scot și aplecarea
-   * tăviței, și ridicarea zarului, și puterea praștiei: un singur număr, ca
-   * toate trei să spună același lucru.
+   * Banda NU ține zarul într-un cerc. Îl țineam așa la început, „ca să se simtă
+   * banda", și era o socoteală greșită: o bandă nu-ți ține MÂNA pe loc, îți ține
+   * mâna sub putere, iar putere n-are un cursor. Un lucru pe care-l apuci merge
+   * unde-l duci; ce se schimbă e cât te costă și cât îți dă înapoi.
    */
-  function undeStaZarul(px, py, L) {
-    const m = margineaDrumului(L);
+  function catDeIntinsa(px, py, L) {
+    /* Hotarul e chiar acolo unde zarul ar da de peretele tăviței, nu unde ar
+       ieși din casetă. Le încurcasem: banda se simțea abia după ce zarul
+       trecuse demult peste perete, iar la eliberare trebuia adus înapoi cu
+       treizeci de unități dintr-odată, adică o săritură. */
+    const m = zar3d ? zar3d.razaDrumului * (L / zar3d.latimeaScenei) : margineaDrumului(L);
     const d = Math.hypot(px, py);
-    if (d <= m || !zar3d) return { nx: px / m, ny: py / m, intins: 0 };
-    const R = zar3d.razaDrumului;
-    /* AFARĂ ZARUL MERGE UNDE MERGE DEGETUL, oriunde pe pagină.
-       Îl țineam mai devreme într-un cerc, ca „să se simtă banda". Era o
-       socoteală greșită: banda nu-ți ține MÂNA pe loc, îți ține doar mâna sub
-       putere, iar putere n-are un cursor. Un lucru pe care-l apuci merge unde-l
-       duci; ce se schimbă e cât te costă și cât îți dă înapoi. Așa că banda se
-       simte prin ce trage de ea, nu prin ce nu te lasă:
-         · tăvița se apleacă și se urnește din loc după zar (legea a treia),
-         · zarul se ridică tot mai sus de pe pagină,
-         · iar la eliberare pleacă cu atât mai tare cu cât ai tras mai departe.
-       `intins` e cât de întinsă e banda, de la 0 la 1, și dă toate trei
-       deodată, ca să spună același lucru. */
-    const n = (R + (zar3d.latimeaScenei / L) * (d - m)) / R;
-    return { nx: (px / d) * n, ny: (py / d) * n, intins: Math.tanh((d - m) / ELASTIC) };
+    return d <= m ? 0 : Math.tanh((d - m) / ELASTIC);
   }
 
-  /** Îl desenează acolo unde-l ține degetul acum, cu tot cu bandă. */
+  /** Îl desenează acolo unde-l ține degetul acum, în planul de deasupra. */
   function aseazaInMana(dx = 0, dy = 0) {
+    if (!prins) { zar3d.plimba(0, 0, inaltimea, dx, dy); return 0; }
     const c = elTavita.getBoundingClientRect();
-    const u = prins
-      ? undeStaZarul(prins.x, prins.y, c.width)
-      : { nx: 0, ny: 0, intins: 0 };
-    zar3d.plimba(u.nx, u.ny, inaltimea + u.intins * SUS_INTINS, dx, dy, u.intins > 0);
-    return u;
+    const intins = catDeIntinsa(prins.x, prins.y, c.width);
+    zar3d.laDeget(prins.cx, prins.cy, inaltimea + intins * SUS_INTINS, dx, dy);
+    return intins;
   }
 
   /* RIDICATUL DIN TĂVIȚĂ.
@@ -2462,7 +2452,10 @@ function leagana() {
   elZar.addEventListener('pointerdown', (e) => {
     if (!zar3d || seRostogoleste) return;
     const p = inTavita(e);
-    prins = { id: e.pointerId, x: p.x, y: p.y, plecat: false, unde: null,
+    /* `x, y` = față de mijlocul tăviței, pentru cât de întinsă e banda.
+       `cx, cy` = locul din fereastră, pentru raza care taie planul de sus. */
+    prins = { id: e.pointerId, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY,
+              plecat: false, intins: 0,
               urme: [{ t: performance.now(), x: p.x, y: p.y }] };
     zarInMana = true;
     zarulOprit = null;                  // îl mută mâna: starea veche nu mai e bună
@@ -2488,14 +2481,14 @@ function leagana() {
     if (!prins.plecat && Math.hypot(dx, dy) < APASARE) return;
     prins.plecat = true;
     prins.x = p.x; prins.y = p.y;
+    prins.cx = e.clientX; prins.cy = e.clientY;
     // Ținem numai ultima șesime de secundă: avântul se ia din cât ai mișcat
     // ACUM, nu din tot drumul degetului.
     const acum = performance.now();
     prins.urme.push({ t: acum, x: p.x, y: p.y });
     while (prins.urme.length > 2 && acum - prins.urme[0].t > 160) prins.urme.shift();
 
-    const u = aseazaInMana(dx, dy);
-    prins.unde = u;
+    prins.intins = aseazaInMana(dx, dy);
 
     /* PÂNZA se lărgește când zarul chiar a ieșit din tăviță, și se strânge cu o
        idee mai devreme decât s-a lărgit. Fără pragul ăsta dublu, un deget care
@@ -2506,60 +2499,71 @@ function leagana() {
 
     // Legea a treia: banda trage și de tăviță, nu doar de zar.
     const l = d || 1;
-    zar3d.priveste((p.x / l) * u.intins, (p.y / l) * u.intins);
+    zar3d.priveste((p.x / l) * prins.intins, (p.y / l) * prins.intins);
   });
 
   /* PRAȘTIA: jumătatea de oscilație a unui arc întins.
 
-     `s(t) = A·cos(ωt)` e chiar mișcarea unei mase legate de un arc, lăsată din
-     repaus de la depărtarea A. O iau de la capătul întins și o las până ajunge
-     la marginea tăviței, unde predau fizicii poziția și viteza de-atunci. De
-     acolo încolo nu mai e nimic de la mine: sunt aceiași pereți, aceeași
-     frecare, aceeași aruncare ca oricare alta.
+     Zarul se întoarce din planul de deasupra, unde l-ai ținut, în tăviță, de
+     unde încolo nu mai e nimic de la mine: aceiași pereți, aceeași frecare,
+     aceeași aruncare ca oricare alta. Drumul îl face după `s(t) = L·cos(ωt)`,
+     chiar mișcarea unei mase legate de un arc, lăsată din repaus de la
+     depărtarea L. Pornește moale, fiindcă la capătul întins viteza unui arc
+     chiar e zero, și ajunge la tăviță cu `ω·L`: plătește exact cât a fost
+     întins. De asta contează de unde dai drumul, fără să fi scris nicăieri
+     „de departe, mai tare".
 
-     Viteza de intrare, `ω·√(A²−R²)`, iese din legea de mai sus, nu dintr-o
-     scară scrisă de mână. De-aia „contează de la ce distanță dai drumul" e o
-     urmare, nu o regulă. */
-  function prastia(u) {
+     Sfertul de perioadă nu ține de cât de tare ai tras: un arc întins puțin și
+     unul întins mult se descarcă în același timp. E izocronismul, aceeași lege
+     care ține ceasurile cu pendul. Aici iese de la sine, fiindcă ω se ia din
+     viteză, iar viteza crește odată cu drumul. */
+  function prastia(avant) {
     const R = zar3d.razaDrumului;
-    const n = Math.hypot(u.nx, u.ny) || 1;
-    const ux = u.nx / n, uy = u.ny / n;
-    const A = Math.max(R * 1.02, n * R);
-    /* Viteza pe care o dă arcul, `ω·√(A²−R²)`, cu o singură mărginire: nicio
-       bandă nu poate da oricât. Peste `IUTEALA_MAX` nu mai crește, dar creșterea
-       până acolo rămâne netedă, deci nu se simte nicăieri un zid. Pulsul se ia
-       apoi ÎNAPOI din viteză, ca mișcarea să rămână chiar oscilația arcului:
-       trasă de departe, ea se descarcă mai lent, fiindcă are mai mult de mers. */
-    const vBrut = PULS * Math.sqrt(Math.max(0, A * A - R * R));
-    const vIntrare = IUTEALA_MAX * Math.tanh(vBrut / IUTEALA_MAX);
-    const puls = vIntrare / Math.max(1, Math.sqrt(Math.max(1, A * A - R * R)));
-    const pana = Math.acos(Math.min(1, R / A)) / puls;
-    const h0 = inaltimea + u.intins * SUS_INTINS;
+    const p0 = zar3d.locul().r;                 // unde stă acum, ținut în mână
+    const jos = zar3d.marimeaZarului * 0.62;    // pe unde intră înapoi în tăviță
+
+    /* Locul de predare: chiar sub el, dar adus înăuntrul pereților. Dacă e deja
+       deasupra tăviței, nu are de făcut decât drumul în jos. */
+    const dxz = Math.hypot(p0.x, p0.z);
+    const strans = dxz > R ? R / dxz : 1;
+    const p1 = { x: p0.x * strans, y: jos, z: p0.z * strans };
+
+    const L = Math.max(1e-3, Math.hypot(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z));
+    const dir = { x: (p1.x - p0.x) / L, y: (p1.y - p0.y) / L, z: (p1.z - p0.z) / L };
+
+    /* Viteza pe care o dă arcul, cu o singură mărginire: nicio bandă nu poate
+       da oricât. Peste `IUTEALA_MAX` nu mai crește, dar creșterea până acolo
+       rămâne netedă, deci nu se simte nicăieri un zid. */
+    const vIntrare = IUTEALA_MAX * Math.tanh((PULS * L) / IUTEALA_MAX);
+    const puls = vIntrare / L;
+    const pana = (Math.PI / 2) / puls;
 
     seRostogoleste = true;                    // nimeni nu aruncă peste praștie
     const pornit = performance.now();
-    let sAnt = A;
+    let facutAnt = 0;
     (function cadru(acum) {
       const t = ((acum - pornit) / 1000) / INCETINIRE;
       const gata = t >= pana;
-      const s = gata ? R : Math.max(R, A * Math.cos(puls * t));
-      const catA = s / R;
-      zar3d.plimba(catA * ux, catA * uy, h0 * (s / A),
-                   (s - sAnt) * ux * TUMBA, (s - sAnt) * uy * TUMBA, s > R);
-      sAnt = s;
+      const facut = gata ? L : L - L * Math.cos(puls * t);
+      zar3d.puneLa(
+        { x: p0.x + dir.x * facut, y: p0.y + dir.y * facut, z: p0.z + dir.z * facut },
+        (facut - facutAnt) * dir.x * TUMBA, (facut - facutAnt) * dir.z * TUMBA
+      );
+      facutAnt = facut;
       if (!gata) { requestAnimationFrame(cadru); return; }
 
       zar3d.stramt();
-      /* Predarea către fizică. Rotirea i-o dăm noi, altfel și-ar socoti-o din
-         viteză, ca la un zar care se rostogolește pe masă; ăsta însă vine prin
-         aer. Axa e `sus × mers`, aceeași ca la orice aruncare. */
+      /* Rotirea i-o dăm noi, altfel și-ar socoti-o din viteză, ca la un zar
+         rostogolit pe masă; ăsta însă vine prin aer. Axa e `sus × mers`,
+         aceeași ca la orice aruncare. */
+      const orizontal = Math.hypot(dir.x, dir.z) || 1;
       const rotire = (TUMBA * vIntrare) / (zar3d.marimeaZarului / 2);
       aruncatCuMana = {
-        x: ux * R, z: uy * R,
-        vx: -ux * vIntrare, vz: -uy * vIntrare,
-        h: Math.max(zar3d.marimeaZarului * 0.55, h0 * (R / A) * zar3d.latimeaScenei),
-        vy: -140,
-        wx: -uy * rotire, wy: 0, wz: ux * rotire,
+        x: p1.x, z: p1.z, h: p1.y,
+        vx: dir.x * vIntrare + avant.x,
+        vy: dir.y * vIntrare,
+        vz: dir.z * vIntrare + avant.y,
+        wx: (dir.z / orizontal) * rotire, wy: 0, wz: (-dir.x / orizontal) * rotire,
       };
       inaltimea = 0;
       seRostogoleste = false;
@@ -2576,9 +2580,6 @@ function leagana() {
     if (elZar.hasPointerCapture(e.pointerId)) elZar.releasePointerCapture(e.pointerId);
     zar3d.priveste(0, 0);               // tăvița se îndreaptă la loc, odată cu banda
 
-    const c = elTavita.getBoundingClientRect();
-    const m = margineaDrumului(c.width);
-
     if (!luat.plecat) {
       // N-a plimbat: e o apăsare. Zarul e deja ridicat în palmă, deci aruncarea
       // pornește de sus, nu de pe fund.
@@ -2589,28 +2590,20 @@ function leagana() {
       return;
     }
 
-    const u = luat.unde || undeStaZarul(luat.x, luat.y, c.width);
-    if (u.intins > 0) { prastia(u); return; }
-
-    /* Avântul, din ultimele urme. Poziția de plecare se ia de unde CHIAR se
-       vede zarul, nu de unde e degetul: zarul plimbat rămâne în urma degetului,
-       iar dacă i-am da fizicii degetul, ar sări în clipa eliberării. */
+    /* AVÂNTUL MÂINII, din ultimele urme, adunat peste cel al benzii. Sunt două
+       lucruri deosebite și amândouă adevărate: banda îl trage spre tăviță, mâna
+       îl zvârle încotro mergea ea. Un zar aruncat cu praștia în fugă chiar
+       pleacă altfel decât unul lăsat din loc. */
     const a = luat.urme[0], b = luat.urme[luat.urme.length - 1];
     const dt = Math.max(0.016, (b.t - a.t) / 1000);
     const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
     const putere = Math.hypot(vx, vy);
-    const R = zar3d.razaDrumului;
-    zar3d.stramt();
-    aruncatCuMana = {
-      x: (b.x / m) * R, z: (b.y / m) * R,
-      // Sub o anumită putere zarul abia s-ar clinti: îi dăm un minim, ca
-      // aruncarea să arate a aruncare oricât de moale ar fi fost degetul.
-      vx: putere < 120 ? vx * (120 / Math.max(1, putere)) : Math.min(vx, 900),
-      vz: putere < 120 ? vy * (120 / Math.max(1, putere)) : Math.min(vy, 900),
-      h: Math.max(30, inaltimea * zar3d.latimeaScenei), vy: 30,
-    };
-    inaltimea = 0;
-    aruncaZarul();
+    const catreScena = zar3d.latimeaScenei / (elTavita.clientWidth || 150);
+    const avant = putere < 1
+      ? { x: 0, y: 0 }
+      : { x: Math.max(-900, Math.min(900, vx)) * catreScena,
+          y: Math.max(-900, Math.min(900, vy)) * catreScena };
+    prastia(avant);
   };
   elZar.addEventListener('pointerup', dat);
   /* Degetul a plecat: tăvița se îndreaptă lin la loc. Zarul rămâne unde a
