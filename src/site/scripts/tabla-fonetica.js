@@ -2393,7 +2393,21 @@ function leagana() {
   const ELASTIC = 190;      // pixeli de întindere după care banda e simțită din plin
   const PULS = 6.9;         // ω, în radiani pe secundă: cât de iute se descarcă
   const IUTEALA_MAX = 6000; // cât poate da banda, oricât ai întinde-o
-  const SUS_INTINS = 0.17;  // cât se mai ridică zarul când banda e întinsă la maximum
+
+  /* DOUĂ MĂSURI, FIINDCĂ SUNT DOUĂ LUCRURI DEOSEBITE.
+
+     `intins` spune cât e de întinsă BANDA, și se satură repede: o bandă se
+     întinde puțin, apoi stă. De el ține tot ce e mecanic, adică aplecarea și
+     urnirea tăviței.
+
+     `departe` spune cât de departe ai DUS zarul, și crește mult mai încet,
+     fiindcă mâna poate merge oricât. De el ține tot ce e de adâncime: cât de
+     sus ții zarul și cât de tare se topește pagina din spate. Astea două chiar
+     trebuie să meargă împreună, și nu cu banda: zarul dus în celălalt colț al
+     ecranului n-a mai întins banda mai mult, dar l-ai ridicat mai sus. */
+  const DEPARTE = 520;      // pixeli de dus după care zarul e cu totul „la tine"
+  const SUS_INTINS = 0.40;  // cât se mai ridică zarul când l-ai dus cât se poate
+  const CEATA_MAX = 10;     // cât se topește pagina din spate, în pixeli de blur
   /* CÂT SE DĂ PESTE CAP ÎN ZBOR, față de cât s-ar da rostogolindu-se pe masă.
      Un lucru care se rostogolește pe o suprafață se învârte cu `v/r`, fiindcă
      nu alunecă. Unul zvârlit prin aer nu e ținut de nimic, deci se dă peste cap
@@ -2406,16 +2420,17 @@ function leagana() {
 
   /* CEAȚA DIN SPATE.
 
-     Cât tragi de zar, pagina din spate se împăienjenește. Nu e o podoabă: e
-     felul cel mai vechi prin care ochiul citește ADÂNCIMEA. Un aparat de
-     fotografiat nu poate ține clar și ce e la un lat de palmă, și ce e la trei
-     metri; ce e în afara adâncimii de câmp se topește. Așa că, dacă pagina se
-     topește, ochiul înțelege singur că zarul a ieșit din ea și a venit înainte,
-     spre tine. Fără asta, zarul mare de deasupra putea fi citit și ca un zar
-     uriaș lipit de pagină.
+     Cât duci zarul mai departe, pagina din spate se împăienjenește. Nu e o
+     podoabă: e felul cel mai vechi prin care ochiul citește ADÂNCIMEA. Un
+     aparat de fotografiat nu poate ține clar și ce e la un lat de palmă, și ce
+     e la trei metri; ce iese din adâncimea de câmp se topește. Așa că, dacă
+     pagina se topește, ochiul înțelege singur că zarul a ieșit din ea și a
+     venit înainte, spre tine. Fără asta, zarul mare de deasupra putea fi citit
+     și ca un zar uriaș lipit de pagină.
 
-     Merge tot din `intins`, ca toate celelalte semne ale benzii, deci nu poate
-     spune altceva decât ele. Cine a cerut mai puțină mișcare n-o vede deloc. */
+     Merge din `departe`, nu din `intins`, și merge împreună cu ridicarea
+     zarului: pe amândouă le crește aceeași mână care se depărtează, deci nu pot
+     spune lucruri deosebite. Cine a cerut mai puțină mișcare n-o vede deloc. */
   let ceata = null;
   function pacleste(cat, lin = false) {
     if (faraMiscare()) return;
@@ -2426,7 +2441,8 @@ function leagana() {
       document.body.appendChild(ceata);
     }
     ceata.style.transition = lin ? 'backdrop-filter .42s ease, background-color .42s ease' : 'none';
-    ceata.style.backdropFilter = cat <= 0.001 ? 'none' : 'blur(' + (cat * 8).toFixed(2) + 'px)';
+    ceata.style.backdropFilter =
+      cat <= 0.001 ? 'none' : 'blur(' + (cat * CEATA_MAX).toFixed(2) + 'px)';
     ceata.style.backgroundColor = 'rgba(247, 248, 252, ' + (cat * 0.22).toFixed(3) + ')';
   }
 
@@ -2454,16 +2470,19 @@ function leagana() {
        treizeci de unități dintr-odată, adică o săritură. */
     const m = zar3d ? zar3d.razaDrumului * (L / zar3d.latimeaScenei) : margineaDrumului(L);
     const d = Math.hypot(px, py);
-    return d <= m ? 0 : Math.tanh((d - m) / ELASTIC);
+    if (d <= m) return { intins: 0, departe: 0 };
+    return { intins: Math.tanh((d - m) / ELASTIC),
+             departe: Math.tanh((d - m) / DEPARTE) };
   }
 
   /** Îl desenează acolo unde-l ține degetul acum, în planul de deasupra. */
   function aseazaInMana(dx = 0, dy = 0) {
-    if (!prins) { zar3d.plimba(0, 0, inaltimea, dx, dy); return 0; }
+    const gol = { intins: 0, departe: 0 };
+    if (!prins) { zar3d.plimba(0, 0, inaltimea, dx, dy); return gol; }
     const c = elTavita.getBoundingClientRect();
-    const intins = catDeIntinsa(prins.x, prins.y, c.width);
-    zar3d.laDeget(prins.cx, prins.cy, inaltimea + intins * SUS_INTINS, dx, dy);
-    return intins;
+    const cat = catDeIntinsa(prins.x, prins.y, c.width);
+    zar3d.laDeget(prins.cx, prins.cy, inaltimea + cat.departe * SUS_INTINS, dx, dy);
+    return cat;
   }
 
   /* RIDICATUL DIN TĂVIȚĂ.
@@ -2489,12 +2508,19 @@ function leagana() {
     /* `x, y` = față de mijlocul tăviței, pentru cât de întinsă e banda.
        `cx, cy` = locul din fereastră, pentru raza care taie planul de sus. */
     prins = { id: e.pointerId, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY,
-              plecat: false, intins: 0,
+              plecat: false, intins: 0, departe: 0,
               urme: [{ t: performance.now(), x: p.x, y: p.y }] };
     zarInMana = true;
     zarulOprit = null;                  // îl mută mâna: starea veche nu mai e bună
     elZar.setPointerCapture(e.pointerId);
     elTavita.classList.add('e-prins');
+    /* PÂNZA SE LĂRGEȘTE DE CUM PUI DEGETUL, nu abia când zarul trece de perete.
+       O aveam legată de un hotar, cu prag dublu ca să nu clipească, dar hotarul
+       acela nu păzea nimic: zarul ridicat în mână iese peste marginea casetei
+       cu mult înainte să treacă de peretele tăviței, iar acolo se tăia. O
+       apăsare simplă tot strânge pânza la loc înainte de aruncare, deci
+       rostogolirea obișnuită rămâne la desimea ei deplină. */
+    zar3d.larg();
     urca(INALT);
   });
 
@@ -2522,19 +2548,14 @@ function leagana() {
     prins.urme.push({ t: acum, x: p.x, y: p.y });
     while (prins.urme.length > 2 && acum - prins.urme[0].t > 160) prins.urme.shift();
 
-    prins.intins = aseazaInMana(dx, dy);
-
-    /* PÂNZA se lărgește când zarul chiar a ieșit din tăviță, și se strânge cu o
-       idee mai devreme decât s-a lărgit. Fără pragul ăsta dublu, un deget care
-       tremură exact pe margine ar muta pânza de zeci de ori pe secundă. */
-    const m = margineaDrumului(p.L);
-    const d = Math.hypot(p.x, p.y);
-    if (d > m) zar3d.larg(); else if (d < m - 10) zar3d.stramt();
+    const cat = aseazaInMana(dx, dy);
+    prins.intins = cat.intins;
+    prins.departe = cat.departe;
 
     // Legea a treia: banda trage și de tăviță, nu doar de zar.
-    const l = d || 1;
+    const l = Math.hypot(p.x, p.y) || 1;
     zar3d.priveste((p.x / l) * prins.intins, (p.y / l) * prins.intins);
-    pacleste(prins.intins);
+    pacleste(prins.departe);
   });
 
   /* PRAȘTIA: jumătatea de oscilație a unui arc întins.
@@ -2570,7 +2591,7 @@ function leagana() {
     const puls = vIntrare / drumSc;
     const pana = (Math.PI / 2) / puls;
 
-    const h0 = inaltimea + luat.intins * SUS_INTINS;
+    const h0 = inaltimea + luat.departe * SUS_INTINS;
     const jos = zar3d.marimeaZarului * 0.62;      // pe unde intră înapoi în tăviță
     const hJos = (jos - zar3d.marimeaZarului / 2) / zar3d.latimeaLemnului;
 

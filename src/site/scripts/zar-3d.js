@@ -516,6 +516,16 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   const locLumii = new THREE.Vector3();
 
+  /* S-A ÎNTORS ÎN TĂVIȚĂ: pătratul din mână se stinge.
+     Aici era buba de după prima ricoșare. Praștia îl desena pe zar în pătratul
+     ei, apoi îl preda fizicii, dar nu spunea nimănui că zarul nu mai e în mână.
+     Pătratul rămânea agățat unde fusese degetul, iar zarul, care se rostogolea
+     acum în tăviță, era desenat tot acolo: din el nu se mai vedea decât fâșia
+     care nimerea din întâmplare înăuntru. De-aia se pune aici, în TOATE
+     așezările din tăviță, nu într-una anume: cine îl pune pe zar la locul lui
+     spune prin chiar asta că nu-l mai ține nimeni de el. */
+  function inTavita() { zarLaDeget = null; }
+
   function deseneaza() {
     const { W, H } = inPixeliDePanza();
 
@@ -544,27 +554,35 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     zar.visible = true;
     fund.visible = false; peretii.visible = false; masaUmbrei.visible = false;
     pagina.visible = true;                  // ca umbra lui să cadă pe pagină
-    if (decupaj) camera.clearViewOffset();
+    /* PĂTRATUL E MAI LARG DECÂT CASETA, DAR LA ACEEAȘI SCARĂ.
+       Zarul ridicat sus și umbra lui căzută jos-dreapta nu mai încap într-un
+       pătrat cât caseta: unul dintre ele iese afară și se taie. Un pătrat mai
+       mare l-ar mări însă și pe zar, fiindcă trunchiul camerei se întinde pe
+       tot ce i se dă. De-aia îi cer camerei, prin `setViewOffset`, un chenar
+       de aceeași mărime ca înainte, desenat pe o bucată mai lată: fiecare
+       unitate de lume rămâne tot atâția pixeli, doar că în jur e mai mult loc
+       gol. Zarul stă la mijloc, unde nimic nu se strâmbă. */
     const L = tavita.clientWidth || panzaPx;
+    const L2 = Math.round(L * 2.2);
+    camera.setViewOffset(L, L, -(L2 - L) / 2, -(L2 - L) / 2, L2, L2);
 
     /* UNDE SE AȘAZĂ PĂTRATUL. Nu-l pun cu mijlocul pe deget, fiindcă zarul nu e
        la mijlocul lui: fiind ridicat deasupra tăviței, se desenează mai sus, cu
        atât cât e de înalt. Îl întreb deci pe el unde cade în pătrat, și mut
-       pătratul cât trebuie ca ZARUL să ajungă fix pe deget. Așa rămâne loc și
-       pentru umbra lui, care cade mai jos și la dreapta. */
+       pătratul cât trebuie ca ZARUL să ajungă fix pe deget. */
     zar.updateWorldMatrix(true, false);
     locLumii.setFromMatrixPosition(zar.matrixWorld).project(camera);
-    const stanga = zarLaDeget.cx - (locLumii.x * 0.5 + 0.5) * L;
-    const sus = zarLaDeget.cy - (1 - (locLumii.y * 0.5 + 0.5)) * L;
+    const stanga = zarLaDeget.cx - (locLumii.x * 0.5 + 0.5) * L2;
+    const sus = zarLaDeget.cy - (1 - (locLumii.y * 0.5 + 0.5)) * L2;
 
     randor.clearDepth();                    // zarul nu se ascunde după tăviță
-    randor.setViewport(stanga, H - sus - L, L, L);
-    randor.setScissor(stanga, H - sus - L, L, L);
+    randor.setViewport(stanga, H - sus - L2, L2, L2);
+    randor.setScissor(stanga, H - sus - L2, L2, L2);
     randor.render(scena, camera);
 
     fund.visible = true; peretii.visible = true; masaUmbrei.visible = true;
     pagina.visible = false;
-    if (decupaj) camera.setViewOffset(...decupaj);
+    if (decupaj) camera.setViewOffset(...decupaj); else camera.clearViewOffset();
     randor.setScissorTest(false);
     randor.autoClear = true;
   }
@@ -591,6 +609,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   }
 
   function aseaza(nx, ny, nh, rx, ry) {
+    inTavita();
     zar.position.set(
       strange(nx * RAZA_DRUMULUI),
       marime / 2 + Math.max(0, nh) * latura,
@@ -620,6 +639,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      și dovada că modelul și desenul vorbesc aceeași limbă. */
   function aseazaBrut(r, q) {
     inAsezare = 0;
+    inTavita();
     zar.position.set(r.x, Math.max(marime * 0.4, r.y), r.z);
     zar.quaternion.set(q.x, q.y, q.z, q.w);
     deseneaza();
@@ -627,6 +647,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   function aseazaRostogolit(nx, ny, nh, fata, ramas, tot) {
     inAsezare = 0;
+    inTavita();
     zar.position.set(
       strange(nx * RAZA_DRUMULUI),
       marime / 2 + Math.max(0, nh) * latura,
@@ -647,6 +668,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
    */
   function plimba(nx, ny, nh, dx, dz, peste = false) {
     inAsezare = 0;
+    inTavita();
     const tine = peste ? ((v) => v) : strange;
     zar.position.set(
       tine(nx * RAZA_DRUMULUI),
@@ -666,6 +688,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      A rămas pentru drumurile care NU sunt planificate (zarul din CSS, ori
      aruncarea celui care a cerut mai puțină mișcare). */
   function asazaFata(fata, ms = 420) {
+    inTavita();
     const r = SPRE_SUS[fata] || SPRE_SUS[1];
     qTinta.setFromEuler(new THREE.Euler(r.x, r.y, r.z, "XYZ"));
     q.copy(zar.quaternion);
@@ -684,6 +707,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   function ridicaPentruAmestec(inaltime) {
     inAsezare = 0;
+    inTavita();
     zar.position.y = marime / 2 + inaltime;
   }
 
