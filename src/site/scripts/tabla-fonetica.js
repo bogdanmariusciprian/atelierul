@@ -2027,7 +2027,7 @@ let zar3d = null;
 
   try {
     const { pornesteZar3D } = await import('./zar-3d.js');
-    zar3d = await pornesteZar3D(elTavita, { marime: 46, latura: 150 });
+    zar3d = await pornesteZar3D(elTavita, { marime: 38, latura: 150 });
   } catch (e) {
     zar3d = null;
   }
@@ -2151,36 +2151,17 @@ const margineaDrumului = (latime) => Math.max(1, latime / 2 - razaZarului(latime
    `aruncatCuMana` e locul unde așteaptă pornirea până o ia aruncarea. */
 let aruncatCuMana = null;
 
-/* AMESTECUL DIN PALMĂ.
+/* AMESTECUL A FOST SCOS, ȘI E BINE CĂ A FOST SCOS.
 
-   Un zar nu pleacă din nemișcare: întâi îl frămânți în pumn, apoi îl scapi.
-   Aici, „pumnul" e o clipă în care zarul se zbate pe loc, cu pași mărunți și
-   fără noimă, ridicându-se totodată spre tine. Ridicarea nu e o podoabă: cu cât
-   e mai aproape, cu atât se vede mai mare, iar ochiul citește din asta că
-   lucrul are adâncime. La sfârșit e lăsat, și de acolo încolo îl duce fizica.
+   Aveam aici o „frământare în palmă": la fiecare aruncare, zarul se zbătea pe
+   loc o jumătate de secundă, învârtindu-se de vreo patru ori pe secundă. Era
+   invenția mea, nu mișcarea nimănui. De-aia se vedea fals: îl luai blând, îl
+   lăsai blând, iar el pornea ca un titirez, fiindcă rotirea nu venea de la
+   degetul tău, ci de la mine.
 
-   Se face numai când e scenă. Cu zarul din CSS n-ar avea de unde veni
-   apropierea, fiindcă acolo nu există „mai aproape". */
-function amestecaZarul(ms = 460) {
-  return new Promise((gata) => {
-    if (!zar3d) { gata(); return; }
-    const L = elTavita.clientWidth || 150;
-    const pornit = performance.now();
-    let rx = Math.random() * 360, ry = Math.random() * 360;
-    (function pas(acum) {
-      const t = Math.min(1, (acum - pornit) / ms);
-      // Zbaterea crește și se stinge; ridicarea merge tot mai sus, cu avânt.
-      const putere = Math.sin(Math.PI * t);
-      rx += 13 + putere * 16;
-      ry += 17 + putere * 14;
-      const m = margineaDrumului(L);
-      const jx = (Math.random() - 0.5) * 0.5 * putere * m;
-      const jy = (Math.random() - 0.5) * 0.5 * putere * m;
-      asazaZarul(jx, jy, (0.05 + 0.30 * t * t) * L, rx, ry);
-      if (t < 1) requestAnimationFrame(pas); else gata();
-    })(pornit);
-  });
-}
+   Acum rotirea vine de unde vine și în lume: din mâna care merge în clipa
+   lăsării. Îl lași din loc, abia se clatină; îl azvârli, se rostogolește de
+   câteva ori. Nimic între tine și zar. */
 
 async function aruncaZarul() {
   if (seRostogoleste || !elZar || !elTavita) return;
@@ -2196,7 +2177,6 @@ async function aruncaZarul() {
   }
 
   seRostogoleste = true;
-  await amestecaZarul();
 
   /* CUTIA ÎN CARE SE PETRECE TOTUL.
      Când desenează scena, fizica lucrează chiar în unitățile ei: pereții sunt

@@ -33,17 +33,30 @@
 
 /* ---------- Cât de mari sunt lucrurile ---------- */
 
-/** Greutatea, în unități de tăviță pe secundă la pătrat. Vezi „despre scară". */
-export const GRAVITATIE = 4200;
+/* NUMERELE ASTEA NU SUNT ALESE DIN OCHI.
 
-/** Frecarea uscată dintre plastic și lemn lăcuit. Măsurată în lume: 0,3 – 0,5. */
-export const FRECARE = 0.42;
+   Le-a găsit o căutare: 96 de potriveli de greutate, frecare, restituire și
+   mărime de zar, fiecare cu 120 de aruncări măsurate, iar din ele s-a păstrat
+   cea care se apropie cel mai mult de ce face un zar pe masă (vezi
+   `sandbox-zar.js`). Ce se măsura: câte ture face, de câte ori i se schimbă
+   fața de sus, cât ține și cât umblă, pe trei feluri de aruncare, de la lăsat
+   blând până la azvârlit.
 
-/** Cât se agață înainte să alunece: frecarea statică e mai mare decât cea de mers. */
-export const FRECARE_STATICA = 0.52;
+   Greutatea e mai mică decât cea de-acasă fiindcă și tăvița e mică: la scara
+   asta, `g` adevărat ar face totul să se sfârșească în trei zecimi de secundă,
+   prea repede ca să se vadă. Restul rămân în domeniile măsurate în lume. */
+
+/** Greutatea, în unități de tăviță pe secundă la pătrat. */
+export const GRAVITATIE = 2800;
+
+/** Frecarea uscată. Plastic pe lemn lăcuit, în lume: 0,2 – 0,5. */
+export const FRECARE = 0.24;
+
+/** Cât se agață înainte să alunece: statica e mai mare decât cea de mers. */
+export const FRECARE_STATICA = 0.30;
 
 /** Restituirea la viteză mică. Scade cu viteza, vezi `restituirea`. */
-export const RESTITUIRE = 0.42;
+export const RESTITUIRE = 0.55;
 
 /** Rezistența aerului, ∝ v². Neînsemnată la mărimea asta, dar există. */
 export const AER = 3e-6;
@@ -213,38 +226,86 @@ function inerțiaInLume(corp, q) {
 
 /* ---------- Aruncarea ---------- */
 
-/** Starea de pornire a unei aruncări. */
+/**
+ * Starea de pornire a unei aruncări.
+ *
+ * ROTIREA NU MAI E LA ÎNTÂMPLARE, ȘI ASTA E PARTEA CARE CONTEAZĂ.
+ *
+ * Aveam aici o rotire aruncată din zaruri, mare, aceeași oricum ai fi lăsat
+ * zarul din mână. Urmarea se vedea: îl luai blând, îl lăsai blând, iar el se
+ * învârtea ca un titirez. Nicio lege nu era încălcată, dar purtarea era falsă,
+ * fiindcă rotirea nu venea de nicăieri.
+ *
+ * În lume, rotirea unui zar lăsat din mână vine din DOUĂ locuri, și din nimic
+ * altceva:
+ *
+ *   1. MÂNA CARE MERGE. Dacă o dai înainte în clipa lăsării, zarul pleacă
+ *      rostogolindu-se în jurul axei perpendiculare pe mers. Cât de repede? La
+ *      o rostogolire curată, ω = v/r: un corp de rază r care înaintează cu v se
+ *      rotește cu v/r. Mâna dă de obicei ceva mai mult decât rostogolirea
+ *      curată, fiindcă degetele îl și împing pe muchie la plecare.
+ *
+ *   2. NEÎNDEMÂNAREA. Nicio mână nu lasă un lucru perfect drept. Rămâne o
+ *      zvâcnire mică, de câteva zecimi de radian pe secundă, care crește puțin
+ *      cu cât arunci mai tare.
+ *
+ * Deci: lăsat din loc, zarul aproape nu se rotește. Aruncat cu putere, se
+ * rostogolește de câteva ori. Exact ce face unul adevărat.
+ */
 export function pornire(cutie, { aleator = Math.random, deLa = null } = {}) {
-  const unghi = aleator() * Math.PI * 2;
-  /* Aruncarea e mai mult ROTIRE decât împinsă. Un zar aruncat cu multă viteză
-     și puțină rotire patinează și se oprește într-o clipă; unul aruncat cu
-     multă rotire se dă peste cap din muchie în muchie, iar asta ține mult mai
-     mult, fiindcă rostogolirea pierde mult mai puțină energie decât alunecarea.
-     De-aici vine și clac-clac-clacul. */
-  const putere = 150 + aleator() * 140;
-  // Zarul își are mărimea lui, tăvița pe a ei. (Le încurcasem, și ieșea un cub
-  // cât toată cutia, care se freca de pereți din prima clipă.)
   const corp = corpulZarului(cutie.zar || 46);
-  const st = {
+  const raza = corp.a / 2;
+
+  /* Fără nicio poruncă de la mână (o apăsare simplă), zarul e ridicat și lăsat
+     de deasupra mijlocului, cu o împingere ușoară într-o parte: nimeni nu ține
+     mâna perfect nemișcată. */
+  const unghi = aleator() * Math.PI * 2;
+  const implicit = {
+    x: 0, z: 0,
+    h: cutie.latura * 0.22,
+    vx: Math.cos(unghi) * (40 + aleator() * 70),
+    vz: Math.sin(unghi) * (40 + aleator() * 70),
+    vy: 0,
+  };
+  const p = { ...implicit, ...(deLa || {}) };
+
+  const v = v3(p.vx, p.vy, p.vz);
+  const putere = Math.hypot(v.x, v.z);
+
+  /* ROSTOGOLIREA DE LA MÂNĂ: în jurul axei culcate, perpendiculare pe mers.
+     `sus × mers` dă chiar axa aceea. Mărimea, `v/r`, e rostogolirea curată. */
+  let w;
+  if (putere > 1) {
+    const axa = normeaza(produsVectorial(v3(0, 1, 0), v3(v.x, 0, v.z)));
+    w = inmulteste(axa, (putere / raza) * (0.9 + aleator() * 0.7));
+  } else {
+    w = v3();
+  }
+
+  /* NEÎNDEMÂNAREA: o zvâcnire mică pe toate axele, care crește cu puterea, dar
+     rămâne mereu mult sub rostogolire. */
+  const stangacie = 0.6 + putere / 160;
+  w = aduna(w, v3((aleator() - 0.5) * stangacie,
+                  (aleator() - 0.5) * stangacie * 1.6,
+                  (aleator() - 0.5) * stangacie));
+
+  /* Dacă mâna a spus ea însăși cât să se rotească (plimbatul cu degetul îl
+     rostogolește sub el), o ascultăm pe ea. */
+  if (deLa && (deLa.wx != null || deLa.wy != null || deLa.wz != null)) {
+    w = v3(deLa.wx || 0, deLa.wy || 0, deLa.wz || 0);
+  }
+
+  return {
     corp,
     cutie,
-    r: v3(0, cutie.latura * 0.44, 0),
-    v: v3(Math.cos(unghi) * putere, 30 + aleator() * 40, Math.sin(unghi) * putere),
+    r: v3(p.x, Math.max(raza * 1.05, p.h), p.z),
+    v,
     q: normeazaQ({ x: aleator() - 0.5, y: aleator() - 0.5, z: aleator() - 0.5, w: aleator() - 0.5 }),
-    w: v3((aleator() - 0.5) * 52, (aleator() - 0.5) * 34, (aleator() - 0.5) * 52),
+    w,
     liniste: 0,
     doarme: false,
     tarie: 0,          // cât de tare a fost ultima lovitură, pentru „clac"
   };
-  if (deLa) {
-    if (deLa.x != null) st.r.x = deLa.x;
-    if (deLa.z != null) st.r.z = deLa.z;
-    if (deLa.h != null) st.r.y = Math.max(corp.a * 0.5, deLa.h);
-    if (deLa.vx != null) st.v.x = deLa.vx;
-    if (deLa.vz != null) st.v.z = deLa.vz;
-    if (deLa.vy != null) st.v.y = deLa.vy;
-  }
-  return st;
 }
 
 /**
@@ -356,8 +417,8 @@ export function pas(st, dt) {
         /* Îl scoatem din perete, dar blând și cu o îngăduință de o zecime:
            împins afară cu totul, la fiecare tur, l-am ridica mereu mai sus și
            i-am da energie potențială din nimic. */
-        const adanc = -distanta - 0.1;
-        if (adanc > 0) st.r = aduna(st.r, inmulteste(perete.n, adanc * 0.35));
+        const adanc = -distanta - 0.25;
+        if (adanc > 0) st.r = aduna(st.r, inmulteste(perete.n, adanc * 0.2));
       }
     }
   }
