@@ -2682,14 +2682,22 @@ function leagana() {
      ieșeai dintr-un cerc, iar acolo se îndrepta dintr-odată. Se vedea limpede
      hotarul, adică tocmai lucrul care n-ar trebui să se vadă niciodată.
 
-     Acum sunt două: una unde înclinarea ajunge deplină, alta, mult mai
-     departe, unde se stinge cu totul. Între ele tăvița se îndreaptă LIN pe
-     măsură ce te depărtezi, cu o trecere netedă la amândouă capetele, așa că
-     nu mai există niciun loc de unde să se vadă că a început sau s-a sfârșit
-     ceva. Te apropii, se lasă spre tine; pleci, se așază la loc singură,
-     încet, cum se așază un lucru pe care l-ai lăsat în pace. */
-  const RAZA_DEPLINA = 1.9;         // în jumătăți de casetă: unde se lasă cu totul
-  const RAZA_STINSA = 4.2;          // și unde nu mai simte deloc degetul
+     Acum sunt trei, și fac trei lucruri deosebite:
+
+       · până la cea dintâi, tăvița se lasă tot mai mult, cum te apropii;
+       · între cea dintâi și a doua ȚINE ÎNCLINAREA DEPLINĂ, oriunde ai fi în
+         inelul ăla lat. Aici era greșeala: aveam o singură rază, deci
+         înclinarea deplină se atingea într-un singur punct și de-acolo încolo
+         numai scădea. Se lăsa deplin doar la marginea tăviței, iar la două
+         degete pe lângă ea era deja pe jumătate îndreptată;
+       · de la a doua până la a treia se stinge lin, pe un drum lung.
+
+     Așa, tot ocolul tăviței, până la vreo două lățimi și jumătate de casetă în
+     jurul ei, e loc unde tăvița se lasă cu totul spre tine; și abia mult mai
+     departe se așază la loc, atât de încet încât nu se vede de unde începe. */
+  const RAZA_DEPLINA = 1.25;        // în jumătăți de casetă: unde se lasă cu totul
+  const RAZA_TINE = 2.7;            // până unde ține înclinarea deplină
+  const RAZA_STINSA = 5.5;          // și unde nu mai simte deloc degetul
 
   /* Trecere netedă între două praguri: pornește din zero, ajunge la unu, și la
      amândouă capetele are panta zero, deci nu se simte nicio smucitură. */
@@ -2708,7 +2716,7 @@ function leagana() {
        capăt ajunge cu panta zero, deci se împreunează neted cu stingerea și
        nicăieri, nici măcar chiar în vârf, nu se simte vreun colț. */
     const catre = Math.sin(Math.min(1, departe / (jum * RAZA_DEPLINA)) * (Math.PI / 2));
-    const stins = 1 - lin(departe, jum * RAZA_DEPLINA, jum * RAZA_STINSA);
+    const stins = 1 - lin(departe, jum * RAZA_TINE, jum * RAZA_STINSA);
     const putere = catre * stins;
     zar3d.priveste((p.x / departe) * putere, (p.y / departe) * putere);
     leagana();
