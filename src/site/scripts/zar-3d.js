@@ -197,7 +197,21 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      La un pătrat de 150 de pixeli asta nu costă nimic. */
   const DESIME = 2.5;
   randor.setPixelRatio(Math.min((window.devicePixelRatio || 1) * DESIME, 4));
-  randor.setSize(latura, latura, false);
+
+  /* PÂNZA E MAI MARE DECÂT TĂVIȚA, ȘI DE-AIA.
+
+     Pânza cât tăvița era o capcană: tăvița desenată, privită dintr-o parte, nu
+     umple un pătrat, iar restul pânzei rămâne gol. Cu colțuri rotunde și umbră
+     pe pânză, golul acela se citea ca un panou alb din care tăvița pare
+     decupată. Nu era niciun panou, era chiar rama pânzei.
+
+     Acum pânza e cu jumătate mai lată de fiecare parte și n-are nici colțuri,
+     nici umbră: se vede numai ce desenăm în ea, iar în jur trece pagina.
+     Marginea în plus mai are un rost: acolo încape umbra tăviței și tot acolo
+     are loc înclinarea, fără să fie tăiată. */
+  const MARGINE = 1.5;
+  const panzaLatura = Math.round(latura * MARGINE);
+  randor.setSize(panzaLatura, panzaLatura, false);
   randor.shadowMap.enabled = true;
   randor.shadowMap.type = THREE.PCFSoftShadowMap;
   randor.toneMapping = THREE.ACESFilmicToneMapping;
@@ -222,8 +236,12 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
      Unghiul de deschidere e mic (26°) dinadins: un obiectiv larg ar umfla zarul
      la mijloc și ar strâmba pereții, ca într-o poză făcută de prea aproape. */
-  const camera = new THREE.PerspectiveCamera(26, 1, 100, 700);
-  camera.position.set(0, 339, 72);
+  /* Camera cuprinde acum toată pânza, nu doar tăvița: 225 de unități în loc de
+     150. Iar înclinarea se poate întoarce, fiindcă nu mai taie nimic marginile:
+     la 68 de grade tăvița se vede a tăviță, cu pereții ei, dar rămâne destul de
+     dreaptă cât să nu pară masa strâmbă. */
+  const camera = new THREE.PerspectiveCamera(26, 1, 200, 900);
+  camera.position.set(0, 452, 182);
   camera.lookAt(0, 0, 0);
 
   /* ---------- lumina ----------
@@ -249,7 +267,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   cheie.shadow.radius = 3;
   cheie.shadow.bias = -0.0012;
   const uc = cheie.shadow.camera;
-  uc.left = -110; uc.right = 110; uc.top = 110; uc.bottom = -110; uc.near = 40; uc.far = 460;
+  uc.left = -170; uc.right = 170; uc.top = 170; uc.bottom = -170; uc.near = 40; uc.far = 620;
   scena.add(cheie);
 
   const umplutura = new THREE.DirectionalLight(0xdfe8ff, 0.16);
@@ -283,7 +301,21 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   );
   fund.position.y = -3;
   fund.receiveShadow = true;
+  fund.castShadow = true;
   scena.add(fund);
+
+  /* MASA DE DEDESUBT, care nu se vede.
+     Fără ea, tăvița ar pluti: n-ar avea pe ce să-și lase umbra, iar un lucru
+     fără umbră nu stă nicăieri. E o suprafață care primește doar umbre și
+     altceva nimic, așa că în jurul tăviței rămâne pagina, cu umbra peste ea. */
+  const masa = new THREE.Mesh(
+    new THREE.PlaneGeometry(900, 900),
+    new THREE.ShadowMaterial({ opacity: 0.26 })
+  );
+  masa.rotation.x = -Math.PI / 2;
+  masa.position.y = -6.05;
+  masa.receiveShadow = true;
+  scena.add(masa);
 
   /* Pereții: patru, ridicați pe margine. Nu-s de podoabă. Zarul se oprește la
      ei, umbra lui urcă pe ei, iar cel din față îi acoperă marginea de jos când
@@ -416,7 +448,8 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     deseneaza,
     /** Tăvița își schimbă mărimea pe telefon: pânza o urmează. */
     potriveste(nouaLatura) {
-      randor.setSize(nouaLatura, nouaLatura, false);
+      const p = Math.round(nouaLatura * MARGINE);
+      randor.setSize(p, p, false);
       deseneaza();
     },
   };

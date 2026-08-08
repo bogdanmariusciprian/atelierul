@@ -866,12 +866,21 @@
    pagina arată zarul din CSS, gata de apăsat: nimeni nu stă în fața unui gol
    așteptând să vină o bibliotecă. Dacă scena nu vine, clasa nu se pune și
    rămâne totul cum era. */
+/* PÂNZA IESE DIN CHENARUL TĂVIȚEI, ȘI N-ARE NICI RAMĂ, NICI UMBRĂ.
+
+   Avea și una, și alta, iar asta era greșeala: tăvița desenată nu umple un
+   pătrat, fiindcă e privită dintr-o parte, așa că restul pânzei rămânea gol.
+   Cu colțuri rotunde și umbră pe pânză, golul se citea ca un panou alb din care
+   tăvița pare decupată. Nu era niciun panou: era chiar rama pânzei.
+
+   Acum pânza n-are nici rază, nici umbră (umbra o aruncă tăvița, în scenă), și
+   se întinde cu un sfert dincolo de tăviță de fiecare parte, ca înclinarea și
+   umbra să aibă loc fără să fie tăiate. Nu prinde apăsările, deci butonul de
+   dedesubt rămâne al ei. */
 .zar-panza {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  border-radius: 18px; pointer-events: none;
-  /* Umbra tăviței rămâne a foii de stil: pânza desenează lemnul și zarul, dar
-     nu poate desena în afara ei. */
-  box-shadow: 0 12px 30px rgba(31, 36, 48, .22);
+  position: absolute;
+  left: -25%; top: -25%; width: 150%; height: 150%;
+  pointer-events: none;
   opacity: 0;
   transition: opacity .28s ease;
 }
