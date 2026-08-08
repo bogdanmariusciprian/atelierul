@@ -2391,8 +2391,32 @@ function leagana() {
           `ω·√(A²−R²)`, adică plătește exact cât a fost întins. De asta contează
           de unde dai drumul, fără să fi scris nicăieri „de departe, mai tare". */
   const ELASTIC = 190;      // pixeli de întindere după care banda e simțită din plin
-  const PULS = 6.9;         // ω, în radiani pe secundă: cât de iute se descarcă
-  const IUTEALA_MAX = 6000; // cât poate da banda, oricât ai întinde-o
+  /* CÂTĂ PUTERE DĂ BANDA, DUPĂ CÂT AI TRAS.
+
+     Aveam aici o lege care se sătura: la un sfert din drum zarul pleca deja
+     tare, iar de la jumătate încolo, dublând drumul, mai câștigai 29%. Adică
+     tocmai tragerea de departe, cea care cere osteneală, nu se plătea.
+
+     Acum e o curbă măsurată cu ochiul, ca și ceața, pe aceiași zece pași și pe
+     aceeași măsură: părți din cât se poate, de la peretele tăviței până în
+     colțul cel mai depărtat al ferestrei. E molcomă la început și se repede în
+     ultimii doi pași, ca truda să se vadă:
+
+         un pas    3%       șase pași   36%
+         doi       7%       șapte       48%
+         trei     12%       opt         64%
+         patru    18%       nouă        82%
+         cinci    26%       zece       100%
+
+     Capetele nu-s alese din gust, ci măsurate în fizică, pe 60 de aruncări de
+     fiecare treaptă: la 500 zarul se lasă blând, se răstoarnă o dată și se
+     oprește într-o secundă; la 9000 se rostogolește trei secunde, se răstoarnă
+     de nouăsprezece ori și umblă unsprezece lățimi de-ale lui. Mai sus n-are
+     rost: la 12000 se învârte de șaptezeci de ori și nu se mai vede decât o
+     pată care nu spune nimic. */
+  const PUTERE_CURBA = [0, .03, .07, .12, .18, .26, .36, .48, .64, .82, 1];
+  const PUTERE_MIN = 500;    // cât dă lăsat din marginea tăviței
+  const PUTERE_MAX = 9000;   // cât dă tras din colțul cel mai depărtat
 
   /* DOUĂ MĂSURI, FIINDCĂ SUNT DOUĂ LUCRURI DEOSEBITE.
 
@@ -2447,10 +2471,17 @@ function leagana() {
      jos și gata. De-aia stă ca un șir, și nu ascuns într-un exponent. */
   const CEATA_CURBA = [0, .05, .15, .20, .30, .40, .48, .60, .80, .95, 1];
 
-  function catDeCeata(cat) {
-    const t = Math.max(0, Math.min(1, cat)) * (CEATA_CURBA.length - 1);
-    const i = Math.min(CEATA_CURBA.length - 2, Math.floor(t));
-    return CEATA_CURBA[i] + (CEATA_CURBA[i + 1] - CEATA_CURBA[i]) * (t - i);
+  /**
+   * Citește o curbă măsurată cu ochiul, la o parte oarecare din drum.
+   *
+   * Curbele astea sunt șiruri de zece pași, scrise cum se văd. Trec liniar
+   * printre puncte: pașii sunt destul de deși cât să nu se simtă niciun colț,
+   * iar între două puncte n-are ce se ascunde.
+   */
+  function pePasi(curba, cat) {
+    const t = Math.max(0, Math.min(1, cat)) * (curba.length - 1);
+    const i = Math.min(curba.length - 2, Math.floor(t));
+    return curba[i] + (curba[i + 1] - curba[i]) * (t - i);
   }
   /* CÂT SE DĂ PESTE CAP ÎN ZBOR, față de cât s-ar da rostogolindu-se pe masă.
      Un lucru care se rostogolește pe o suprafață se învârte cu `v/r`, fiindcă
@@ -2484,7 +2515,7 @@ function leagana() {
       ceata.className = 'zar-ceata';
       document.body.appendChild(ceata);
     }
-    const gros = catDeCeata(cat);
+    const gros = pePasi(CEATA_CURBA, cat);
     ceata.style.transition = lin ? 'backdrop-filter .42s ease, background-color .42s ease' : 'none';
     ceata.style.backdropFilter =
       gros <= 0.001 ? 'none' : 'blur(' + (gros * CEATA_MAX).toFixed(2) + 'px)';
@@ -2642,8 +2673,12 @@ function leagana() {
     const ux = dx / d, uy = dy / d;
 
     const drum = d - hotar;                       // cât are de mers, în pixeli
-    const drumSc = drum * catreScena;             // același drum, în unități
-    const vIntrare = IUTEALA_MAX * Math.tanh((PULS * drumSc) / IUTEALA_MAX);
+    const drumSc = Math.max(1, drum * catreScena);  // același drum, în unități
+
+    /* Puterea vine din CÂT AI TRAS, măsurat în părți din cât se poate, iar
+       pulsul se ia apoi înapoi din ea, ca mișcarea să rămână chiar oscilația
+       arcului: un arc care dă mai mult se și descarcă mai iute. */
+    const vIntrare = PUTERE_MIN + (PUTERE_MAX - PUTERE_MIN) * pePasi(PUTERE_CURBA, luat.departe);
     const puls = vIntrare / drumSc;
     const pana = (Math.PI / 2) / puls;
 
