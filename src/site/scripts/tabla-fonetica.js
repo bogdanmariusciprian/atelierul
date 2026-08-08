@@ -2425,6 +2425,33 @@ function leagana() {
   const PUTERE_MIN = 900;    // cât dă lăsat din marginea tăviței
   const PUTERE_MAX = 9000;   // cât dă tras din colțul cel mai depărtat
 
+  /* CÂT DUCE TĂVIȚA, ȘI DE CE NU E TOT CE DĂ BANDA.
+
+     Zborul înapoi și rostogolirea din tăviță sunt două lucruri deosebite, și
+     abia acum am înțeles cât de deosebite. În zbor nu e nimic de lovit, deci
+     zarul poate veni oricât de iute: acolo stă tot avântul praștiei, și acolo
+     se și vede. În tăviță însă e altă socoteală: tăvița are 128 de unități, iar
+     zarul 38, adică o tăviță cât trei zaruri. Măsurat pe 1200 de aruncări de
+     fiecare treaptă, un zar intrat cu 9000 e zvârlit de prima izbitură până la
+     o mie de unități înălțime: de șase ori cât tot desenul, pe lângă cameră,
+     adică nicăieri. De-aia „se trunchia": nu se tăia desenul, zbura zarul din
+     el. Peste 3200 nu mai încape în chip: la 3600 ajunge deja lipit de marginea
+     ferestrei, iar tăvița stă la 18 pixeli de ea.
+
+     Ce se întâmplă cu prisosul e ce se întâmplă și pe masă: îl mănâncă rama de
+     lemn a tăviței, în care zarul intră izbind. Un lucru azvârlit tare într-o
+     ramă de lemn nu ricoșează cu tot avântul, se oprește în ea și cade
+     înăuntru. Așa că praștia rămâne întreagă la vedere, iar tăvița primește cât
+     poate ține fără să scape zarul din tablou.
+
+     Prisosul NU se retează, se așază pe scara tăviței: aceeași curbă, aceiași
+     zece pași, doar între alte capete. Retezat, sfertul de sus al drumului
+     ajungea tot la 3200 și rostogolirea nu mai creștea deloc după jumătate,
+     adică boala de care tocmai scăpasem, mutată în tăviță. Așa, și zborul, și
+     rostogolirea cresc tot drumul; doar că una se măsoară în ce vede ochiul,
+     cealaltă în ce încape în tablou. */
+  const CAT_DUCE_TAVA = 3200;
+
   /* DOUĂ MĂSURI, FIINDCĂ SUNT DOUĂ LUCRURI DEOSEBITE.
 
      `intins` spune cât e de întinsă BANDA, și se satură repede: o bandă se
@@ -2682,8 +2709,11 @@ function leagana() {
     const drum = d - hotar;                       // cât are de mers, în pixeli
     const drumSc = Math.max(1, drum * catreScena);  // același drum, în unități
 
-    /* Puterea vine din CÂT AI TRAS, măsurat în părți din cât se poate. */
-    const vIntrare = PUTERE_MIN + (PUTERE_MAX - PUTERE_MIN) * pePasi(PUTERE_CURBA, luat.departe);
+    /* Puterea vine din CÂT AI TRAS, măsurat în părți din cât se poate. Un
+       singur număr, `parte`, din care ies amândouă vitezele: cea a zborului,
+       care se vede, și cea cu care intră în tăviță, care încape. */
+    const parte = pePasi(PUTERE_CURBA, luat.departe);
+    const vIntrare = PUTERE_MIN + (PUTERE_MAX - PUTERE_MIN) * parte;
 
     /* CAUCIUCUL NU E ARC, ȘI DE-AIA SE ÎNTORCEA MEREU LA FEL.
 
@@ -2732,11 +2762,12 @@ function leagana() {
          `sus × mers`, aceeași ca la orice aruncare. Pânza rămâne largă: zarul
          intrat cu putere sare peste marginea casetei, iar dacă am strânge-o
          acum, s-ar vedea cum i se taie săritura într-un chenar. */
-      const rotire = (TUMBA * vIntrare) / (zar3d.marimeaZarului / 2);
+      const vTava = PUTERE_MIN + (CAT_DUCE_TAVA - PUTERE_MIN) * parte;
+      const rotire = (TUMBA * vTava) / (zar3d.marimeaZarului / 2);
       aruncatCuMana = {
         x: ux * R, z: uy * R, h: jos,
-        vx: -ux * vIntrare + avant.x,
-        vz: -uy * vIntrare + avant.y,
+        vx: -ux * vTava + avant.x,
+        vz: -uy * vTava + avant.y,
         vy: -140,
         wx: -uy * rotire, wy: 0, wz: ux * rotire,
       };

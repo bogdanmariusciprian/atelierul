@@ -85,6 +85,24 @@ const MARGINEA_ATINGERII = 0.9;
 /** Sub viteza asta, lovitura nu mai sare deloc. Vezi `restituirea`. */
 const PRAG_SALT = 55;
 
+/* FRECAREA SLĂBEȘTE CÂND LUNECAREA E IUTE (LEGEA 27).
+
+   Frecarea uscată nu e un număr, e o funcție: coeficientul scade cu viteza de
+   lunecare. Se vede la orice frână care se încinge și „scapă", și e măsurată de
+   o sută de ani în tribologie. La vitezele de zi cu zi ale zarului scăderea e
+   neînsemnată, dar la o izbitură iute contează mult.
+
+   Aici n-am pus-o din dragoste de legi, ci fiindcă am măsurat o purtare
+   nefirească. Un zar aruncat cu putere în peretele tăviței era zvârlit în sus
+   de frecarea din contact, care preschimba goana orizontală în săritură. La
+   izbituri tari asta îl trimitea la o mie de unități înălțime, de șase ori mai
+   sus decât tot desenul, pe lângă cameră, adică nicăieri. Cu frecarea slăbită,
+   contactul iute nu mai are cu ce să-l azvârle: îl freacă și-l lasă să
+   sfârâie mai departe, cum face și un lucru izbit tare de-o scândură.
+
+   `PRAG_SLABIRE` e viteza de lunecare la care coeficientul se înjumătățește. */
+const PRAG_SLABIRE = 600;
+
 /** Câte puncte are fiecare față, pe axele +X, -X, +Y, -Y, +Z, -Z. */
 const PUNCTE_PE_AXE = [2, 5, 3, 4, 1, 6];
 
@@ -412,8 +430,10 @@ export function pas(st, dt) {
           const t = inmulteste(vt, -1 / marimeVt);
           const kt = masaEfectiva(corp, Iinv, rc, t);
           const jtDorit = marimeVt / kt;
-          // LEGEA 8: sub pragul static, contactul nu alunecă deloc.
-          const capac = (marimeVt < corp.a * PRAG_VITEZA_RELATIV ? FRECARE_STATICA : FRECARE) * jn;
+          /* LEGEA 8: sub pragul static, contactul nu alunecă deloc.
+             LEGEA 27: cât lunecă, și cu cât mai iute, cu atât se agață mai puțin. */
+          const slabita = FRECARE / (1 + marimeVt / PRAG_SLABIRE);
+          const capac = (marimeVt < corp.a * PRAG_VITEZA_RELATIV ? FRECARE_STATICA : slabita) * jn;
           const jt = Math.min(jtDorit, capac);
           J = aduna(J, inmulteste(t, jt));
         }
