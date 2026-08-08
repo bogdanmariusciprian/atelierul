@@ -2192,7 +2192,7 @@ async function aruncaZarul() {
   if (faraMiscare()) {
     const t = INTOARCERI[fata];
     asazaZarul(0, 0, 0, t.rx, t.ry);
-    if (zar3d) zar3d.asazaFata(fata, 1);
+    if (zar3d) { zar3d.stramt(); zar3d.asazaFata(fata, 1); }
     zarulOprit = null;                    // s-a mutat altcineva: o luăm din scenă
     gataAruncarea(fata);
     return;
@@ -2240,6 +2240,10 @@ async function aruncaZarul() {
       return;
     }
     seRostogoleste = false;
+    /* Abia acum se strânge pânza la loc, nu la plecare: cât se rostogolește,
+       zarul sare peste marginea casetei, iar o pânză strânsă i-ar tăia
+       sărituta într-un chenar. */
+    zar3d.stramt();
     /* Zarul oprit rămâne un CORP, nu o poză: de-aici încolo poate să lunece
        dacă tăvița se lasă sub el. */
     zarulOprit = drumul.sfarsit;
@@ -2504,66 +2508,67 @@ function leagana() {
 
   /* PRAȘTIA: jumătatea de oscilație a unui arc întins.
 
-     Zarul se întoarce din planul de deasupra, unde l-ai ținut, în tăviță, de
-     unde încolo nu mai e nimic de la mine: aceiași pereți, aceeași frecare,
-     aceeași aruncare ca oricare alta. Drumul îl face după `s(t) = L·cos(ωt)`,
-     chiar mișcarea unei mase legate de un arc, lăsată din repaus de la
-     depărtarea L. Pornește moale, fiindcă la capătul întins viteza unui arc
-     chiar e zero, și ajunge la tăviță cu `ω·L`: plătește exact cât a fost
-     întins. De asta contează de unde dai drumul, fără să fi scris nicăieri
-     „de departe, mai tare".
+     Zarul se întoarce din mână în tăviță, de unde încolo nu mai e nimic de la
+     mine: aceiași pereți, aceeași frecare, aceeași aruncare ca oricare alta.
+     Drumul îl face după `s(t) = L·cos(ωt)`, chiar mișcarea unei mase legate de
+     un arc, lăsată din repaus de la depărtarea L. Pornește moale, fiindcă la
+     capătul întins viteza unui arc chiar e zero, și ajunge la tăviță cu `ω·L`:
+     plătește exact cât a fost întins. De asta contează de unde dai drumul, fără
+     să fi scris nicăieri „de departe, mai tare".
 
      Sfertul de perioadă nu ține de cât de tare ai tras: un arc întins puțin și
      unul întins mult se descarcă în același timp. E izocronismul, aceeași lege
      care ține ceasurile cu pendul. Aici iese de la sine, fiindcă ω se ia din
-     viteză, iar viteza crește odată cu drumul. */
-  function prastia(avant) {
+     viteză, iar viteza crește odată cu drumul.
+
+     Drumul se face în PIXELI DE ECRAN, fiindcă acolo a fost ținut zarul: în
+     mână, nu pe masă. Abia la marginea tăviței trece în unitățile fizicii. */
+  function prastia(luat, avant) {
+    const c = elTavita.getBoundingClientRect();
+    const mx = c.left + c.width / 2, my = c.top + c.height / 2;
     const R = zar3d.razaDrumului;
-    const p0 = zar3d.locul().r;                 // unde stă acum, ținut în mână
-    const jos = zar3d.marimeaZarului * 0.62;    // pe unde intră înapoi în tăviță
+    const catreScena = zar3d.latimeaScenei / c.width;
+    const hotar = R / catreScena;                 // peretele tăviței, în pixeli
+    const dx = luat.cx - mx, dy = luat.cy - my;
+    const d = Math.max(hotar + 1, Math.hypot(dx, dy));
+    const ux = dx / d, uy = dy / d;
 
-    /* Locul de predare: chiar sub el, dar adus înăuntrul pereților. Dacă e deja
-       deasupra tăviței, nu are de făcut decât drumul în jos. */
-    const dxz = Math.hypot(p0.x, p0.z);
-    const strans = dxz > R ? R / dxz : 1;
-    const p1 = { x: p0.x * strans, y: jos, z: p0.z * strans };
-
-    const L = Math.max(1e-3, Math.hypot(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z));
-    const dir = { x: (p1.x - p0.x) / L, y: (p1.y - p0.y) / L, z: (p1.z - p0.z) / L };
-
-    /* Viteza pe care o dă arcul, cu o singură mărginire: nicio bandă nu poate
-       da oricât. Peste `IUTEALA_MAX` nu mai crește, dar creșterea până acolo
-       rămâne netedă, deci nu se simte nicăieri un zid. */
-    const vIntrare = IUTEALA_MAX * Math.tanh((PULS * L) / IUTEALA_MAX);
-    const puls = vIntrare / L;
+    const drum = d - hotar;                       // cât are de mers, în pixeli
+    const drumSc = drum * catreScena;             // același drum, în unități
+    const vIntrare = IUTEALA_MAX * Math.tanh((PULS * drumSc) / IUTEALA_MAX);
+    const puls = vIntrare / drumSc;
     const pana = (Math.PI / 2) / puls;
 
-    seRostogoleste = true;                    // nimeni nu aruncă peste praștie
+    const h0 = inaltimea + luat.intins * SUS_INTINS;
+    const jos = zar3d.marimeaZarului * 0.62;      // pe unde intră înapoi în tăviță
+    const hJos = (jos - zar3d.marimeaZarului / 2) / zar3d.latimeaLemnului;
+
+    seRostogoleste = true;                        // nimeni nu aruncă peste praștie
     const pornit = performance.now();
     let facutAnt = 0;
     (function cadru(acum) {
       const t = ((acum - pornit) / 1000) / INCETINIRE;
       const gata = t >= pana;
-      const facut = gata ? L : L - L * Math.cos(puls * t);
-      zar3d.puneLa(
-        { x: p0.x + dir.x * facut, y: p0.y + dir.y * facut, z: p0.z + dir.z * facut },
-        (facut - facutAnt) * dir.x * TUMBA, (facut - facutAnt) * dir.z * TUMBA
-      );
+      const facut = gata ? drum : drum * (1 - Math.cos(puls * t));
+      const ramas = d - facut;
+      const parte = facut / drum;
+      zar3d.laDeget(mx + ux * ramas, my + uy * ramas, h0 + (hJos - h0) * parte,
+                    (facut - facutAnt) * ux * TUMBA, (facut - facutAnt) * uy * TUMBA);
       facutAnt = facut;
       if (!gata) { requestAnimationFrame(cadru); return; }
 
-      zar3d.stramt();
-      /* Rotirea i-o dăm noi, altfel și-ar socoti-o din viteză, ca la un zar
-         rostogolit pe masă; ăsta însă vine prin aer. Axa e `sus × mers`,
-         aceeași ca la orice aruncare. */
-      const orizontal = Math.hypot(dir.x, dir.z) || 1;
+      /* Predarea către fizică. Rotirea i-o dăm noi, altfel și-ar socoti-o din
+         viteză, ca la un zar rostogolit pe masă; ăsta însă vine prin aer. Axa e
+         `sus × mers`, aceeași ca la orice aruncare. Pânza rămâne largă: zarul
+         intrat cu putere sare peste marginea casetei, iar dacă am strânge-o
+         acum, s-ar vedea cum i se taie săritura într-un chenar. */
       const rotire = (TUMBA * vIntrare) / (zar3d.marimeaZarului / 2);
       aruncatCuMana = {
-        x: p1.x, z: p1.z, h: p1.y,
-        vx: dir.x * vIntrare + avant.x,
-        vy: dir.y * vIntrare,
-        vz: dir.z * vIntrare + avant.y,
-        wx: (dir.z / orizontal) * rotire, wy: 0, wz: (-dir.x / orizontal) * rotire,
+        x: ux * R, z: uy * R, h: jos,
+        vx: -ux * vIntrare + avant.x,
+        vz: -uy * vIntrare + avant.y,
+        vy: -140,
+        wx: -uy * rotire, wy: 0, wz: ux * rotire,
       };
       inaltimea = 0;
       seRostogoleste = false;
@@ -2597,13 +2602,10 @@ function leagana() {
     const a = luat.urme[0], b = luat.urme[luat.urme.length - 1];
     const dt = Math.max(0.016, (b.t - a.t) / 1000);
     const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
-    const putere = Math.hypot(vx, vy);
     const catreScena = zar3d.latimeaScenei / (elTavita.clientWidth || 150);
-    const avant = putere < 1
-      ? { x: 0, y: 0 }
-      : { x: Math.max(-900, Math.min(900, vx)) * catreScena,
-          y: Math.max(-900, Math.min(900, vy)) * catreScena };
-    prastia(avant);
+    const avant = { x: Math.max(-900, Math.min(900, vx)) * catreScena,
+                    y: Math.max(-900, Math.min(900, vy)) * catreScena };
+    prastia(luat, avant);
   };
   elZar.addEventListener('pointerup', dat);
   /* Degetul a plecat: tăvița se îndreaptă lin la loc. Zarul rămâne unde a

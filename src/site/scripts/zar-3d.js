@@ -329,11 +329,11 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      nu ca punct: mutând lumina mai departe pe aceeași rază, LUMINA rămâne
      aceeași (una îndreptată n-are loc, are doar direcție), dar cutia umbrei
      apucă să cuprindă tot ecranul. */
-  const DIRECTIA_LUMINII = cheie.position.clone().normalize();
-  const UMBRA_DE_ACASA = {
-    loc: cheie.position.clone(),
-    raza: 170, near: 40, far: 620, moale: 3,
-  };
+  /* CUTIA UMBREI RĂMÂNE CEA DE ACASĂ, ±170, și n-are nevoie să crească: în
+     amândouă trecerile de desen totul se petrece lângă mijloc. Tăvița e la
+     mijloc prin firea ei, iar zarul din mână e mutat CHIAR pe axă și desenat
+     într-un pătrat purtat după deget. Așa umbra rămâne deasă și nu mai are pe
+     ce hotar să se taie. */
 
   /* PAGINA CA MASĂ.
      Cât zarul e afară din tăviță, umbra lui trebuie să cadă pe ceva, altfel
@@ -487,7 +487,65 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   const euler = new THREE.Euler();
   let inAsezare = 0;                    // 0 = nu, altfel clipa de pornire
 
-  function deseneaza() { randor.render(scena, camera); }
+  /* ---------- ZARUL DIN MÂNĂ SE DESENEAZĂ APARTE, ȘI IATĂ DE CE ----------
+
+     Ca pânza să acopere fereastra, trunchiul de piramidă al camerei se lățește
+     de zece ori: din 26 de grade ajunge la vreo 130. Atât înseamnă un fișeu, iar
+     un fișeu întinde tot ce nu e la mijloc. De-aia zarul dus în colțul paginii
+     se lungea ca o placă: nu se strica zarul, se strica privirea.
+
+     Nu se poate face un singur desen și pentru tăviță, și pentru zarul din
+     mână: tăvița vrea camera ei, așezată pe ea, iar zarul vrea să fie privit
+     drept, oriunde ar fi. Sunt două priviri deosebite, deci sunt două treceri:
+
+       1. TĂVIȚA, cu camera de acasă, decupată ca să cadă pe aceiași pixeli.
+       2. ZARUL, așezat CHIAR PE AXA privirii, adică deasupra mijlocului
+          tăviței, unde nimic nu se strâmbă, și desenat într-un pătrat mutat
+          acolo unde e degetul. Nu e o păcăleală: e chiar zarul, chiar la
+          mărimea lui, doar că privit cum se cade.
+
+     Trecerea a doua se așază PESTE cea dintâi, fără s-o șteargă, ca cele două
+     să se poată suprapune când degetul se apropie de tăviță. */
+  let zarLaDeget = null;         // {cx, cy} cât e ținut afară; altfel null
+  let decupaj = null;            // ce i-am cerut camerei, ca să pot pune la loc
+
+  const inPixeliDePanza = () => {
+    const r = randor.getPixelRatio();
+    return { W: randor.domElement.width / r, H: randor.domElement.height / r };
+  };
+
+  function deseneaza() {
+    if (!zarLaDeget) { randor.setScissorTest(false); randor.render(scena, camera); return; }
+
+    const { W, H } = inPixeliDePanza();
+    randor.autoClear = false;
+    randor.setScissorTest(false);
+    randor.clear();
+
+    // 1) tăvița, fără zarul care nu mai e în ea
+    randor.setScissorTest(true);
+    zar.visible = false;
+    randor.setViewport(0, 0, W, H);
+    randor.setScissor(0, 0, W, H);
+    randor.render(scena, camera);
+
+    // 2) zarul, pe axă, în pătratul lui, peste ce s-a desenat deja
+    zar.visible = true;
+    fund.visible = false; peretii.visible = false; masaUmbrei.visible = false;
+    pagina.visible = true;                  // ca umbra lui să cadă pe pagină
+    if (decupaj) camera.clearViewOffset();
+    const L = tavita.clientWidth || panzaPx;
+    randor.clearDepth();                    // zarul nu se ascunde după tăviță
+    randor.setViewport(zarLaDeget.cx - L / 2, H - zarLaDeget.cy - L / 2, L, L);
+    randor.setScissor(zarLaDeget.cx - L / 2, H - zarLaDeget.cy - L / 2, L, L);
+    randor.render(scena, camera);
+
+    fund.visible = true; peretii.visible = true; masaUmbrei.visible = true;
+    pagina.visible = false;
+    if (decupaj) camera.setViewOffset(...decupaj);
+    randor.setScissorTest(false);
+    randor.autoClear = true;
+  }
 
   /** Rotația la care fața cerută stă sus. */
   function catreFata(fata) {
@@ -646,55 +704,40 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   const strangeUnu = (v) => Math.max(-1, Math.min(1, v));
 
-  /* ---------- ZARUL RIDICAT STĂ ÎN PLANUL DE DEASUPRA ----------
+  /* ---------- ZARUL RIDICAT NU MAI E PE MASĂ ----------
 
-     Aici era o greșeală de fond, nu de reglaj. Îl plimbam pe zar în planul
-     TĂVIȚEI, adică pe masă. Numai că masa e privită dintr-o parte, de la 68 de
-     grade, așa că orice drum pe ea se duce spre fundal: zarul se micșora, se
-     apropia de linia orizontului și, undeva pe la jumătatea paginii, nu mai
-     avea unde să meargă. Nu era o mărginire pe care s-o fi pus eu; era
-     perspectiva, care face din orice masă un lucru care se sfârșește în zare.
+     Îl plimbam pe zar în planul TĂVIȚEI, adică pe masă. Numai că masa e privită
+     dintr-o parte, de la 68 de grade, așa că orice drum pe ea se duce spre
+     fundal: zarul se micșora, se apropia de linia orizontului și, pe la
+     jumătatea paginii, nu mai avea unde să meargă. Nu era o mărginire pusă de
+     mine, era perspectiva, care face din orice masă un lucru ce se sfârșește în
+     zare.
 
-     Dar un lucru pe care-l APUCI nu mai e pe masă. E în mână, deasupra ei. De
-     aceea, cât îl ții, zarul stă într-un plan PARALEL CU ECRANUL, care trece
-     prin locul în care l-ai ridicat. Într-un asemenea plan nimic nu se duce în
-     zare: zarul își păstrează mărimea, rămâne mereu chiar sub deget și ajunge
-     oriunde e degetul, fiindcă planul acoperă tot ecranul.
-
-     Socoteala e o rază trasă din cameră prin dreptul degetului, tăiată cu
-     planul acela. E chiar întrebarea „prin ce loc din lume trece privirea mea
-     către pixelul ăsta", pusă invers.
-
-     Locul îl întorc în sistemul TĂVIȚEI, fiindcă acolo lucrează și fizica, și
-     desenul: așa n-avem două socoteli care trebuie să se potrivească. */
-  const planulDeSus = new THREE.Plane();
-  const razaPrivirii = new THREE.Raycaster();
-  const undeva = new THREE.Vector2();
+     Dar un lucru pe care-l APUCI nu mai e pe masă, e în mână, deasupra ei. Așa
+     că zarul ținut de deget nu se mai mută nicăieri în lume: rămâne acolo unde
+     nimic nu se strâmbă, pe axa privirii, deasupra mijlocului tăviței. Ce se
+     mută e PĂTRATUL în care e desenat (vezi `deseneaza`). De-aia își ține și
+     mărimea, și forma, oriunde pe pagină. */
   const acolo = new THREE.Vector3();
-  const incotro = new THREE.Vector3();
 
   const inaltimeaDinMana = (nh) => marime / 2 + Math.max(0, nh) * latura;
 
   function laDeget(clientX, clientY, nh, dx = 0, dz = 0) {
-    const c = panza.getBoundingClientRect();
-    if (!c.width || !c.height) return null;
-    camera.getWorldDirection(incotro);
-    planulDeSus.setFromNormalAndCoplanarPoint(
-      incotro.clone().negate(),
-      new THREE.Vector3(0, inaltimeaDinMana(nh), 0)
-    );
-    undeva.set(((clientX - c.left) / c.width) * 2 - 1,
-               -((clientY - c.top) / c.height) * 2 + 1);
-    razaPrivirii.setFromCamera(undeva, camera);
-    if (!razaPrivirii.ray.intersectPlane(planulDeSus, acolo)) return null;
+    /* Zarul stă pe axa privirii, deasupra mijlocului tăviței, unde nimic nu se
+       strâmbă. Unde se VEDE e treaba pătratului în care-l desenăm, nu a locului
+       lui din lume. Așa își ține mărimea și forma oriunde pe pagină, fiindcă
+       priveala e mereu aceeași: drept. */
+    acolo.set(0, inaltimeaDinMana(nh), 0);
     masa.worldToLocal(acolo);
-    puneLa(acolo, dx, dz);
+    zarLaDeget = { cx: clientX, cy: clientY };
+    puneLa(acolo, dx, dz, true);
     return { x: acolo.x, y: acolo.y, z: acolo.z };
   }
 
   /** Îl pune la un loc anume din tăviță și îl rostogolește cât a mers. */
-  function puneLa(p, dx = 0, dz = 0) {
+  function puneLa(p, dx = 0, dz = 0, dinMana = false) {
     inAsezare = 0;
+    if (!dinMana) zarLaDeget = null;        // s-a întors în tăviță, se vede acolo
     zar.position.set(p.x, p.y, p.z);
     const lung = Math.hypot(dx, dz);
     if (lung > 1e-4) {
@@ -727,49 +770,27 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     elarg = true;
     const c = tavita.getBoundingClientRect();
     const W = Math.round(window.innerWidth), H = Math.round(window.innerHeight);
-    camera.setViewOffset(c.width, c.width, -c.left, -c.top, W, H);
+    decupaj = [c.width, c.width, -c.left, -c.top, W, H];
+    camera.setViewOffset(...decupaj);
     randor.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     randor.setSize(W, H, false);
     panza.classList.add("e-larg");
     document.body.appendChild(panza);          // scos de sub orice `transform`
 
-    /* CUTIA UMBREI, cât tot ecranul. Raza o socotesc din colțul cel mai
-       depărtat de tăviță: atât și nici un pic mai mult, fiindcă fiecare unitate
-       în plus subțiază umbra (harta are 2048 de puncte, oricât ar cuprinde).
-       Umbra iese mai moale decât acasă, și e bine că iese: zarul ținut sus,
-       departe de masă, CHIAR are umbra mai mare și mai ștearsă. */
-    const mx = c.left + c.width / 2, my = c.top + c.height / 2;
-    const raza = Math.max(Math.hypot(mx, my), Math.hypot(W - mx, my),
-                          Math.hypot(mx, H - my), Math.hypot(W - mx, H - my)) + 80;
-    const departare = raza * 1.4 + 400;
-    cheie.position.copy(DIRECTIA_LUMINII).multiplyScalar(departare);
-    uc.left = -raza * 1.1; uc.right = raza * 1.1;
-    uc.top = raza * 1.5; uc.bottom = -raza * 1.5;
-    uc.near = 1; uc.far = departare * 2 + raza;
-    uc.updateProjectionMatrix();
-    cheie.shadow.radius = 9;
-    pagina.visible = true;
-    masaUmbrei.visible = false;
     deseneaza();
   }
   function stramt() {
     if (!elarg) return;
     elarg = false;
     camera.clearViewOffset();
+    decupaj = null;
+    zarLaDeget = null;
     randor.setPixelRatio(Math.min((window.devicePixelRatio || 1) * DESIME, 4));
     const p = Math.round(tavita.clientWidth || panzaPx);
     randor.setSize(p, p, false);
     panza.classList.remove("e-larg");
     tavita.insertBefore(panza, tavita.firstChild);
 
-    cheie.position.copy(UMBRA_DE_ACASA.loc);
-    uc.left = -UMBRA_DE_ACASA.raza; uc.right = UMBRA_DE_ACASA.raza;
-    uc.top = UMBRA_DE_ACASA.raza; uc.bottom = -UMBRA_DE_ACASA.raza;
-    uc.near = UMBRA_DE_ACASA.near; uc.far = UMBRA_DE_ACASA.far;
-    uc.updateProjectionMatrix();
-    cheie.shadow.radius = UMBRA_DE_ACASA.moale;
-    pagina.visible = false;
-    masaUmbrei.visible = true;
     deseneaza();
   }
 
@@ -792,6 +813,8 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     razaDrumului: RAZA_DRUMULUI,
     /** Cât cuprinde camera, în unități de scenă. Cu ea se trec pixelii în scenă. */
     latimeaScenei: latura * MARGINE,
+    /** Cât ține lemnul, în unități de scenă. Înălțimile din mână se măsoară în el. */
+    latimeaLemnului: latura,
     /**
      * Întoarce privirea spre deget. `nx` și `ny` sunt între -1 și 1, măsurate
      * din mijlocul tăviței. Cheamă-l cu (0, 0) când degetul pleacă.
