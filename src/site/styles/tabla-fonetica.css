@@ -903,6 +903,14 @@
 
    Fiindcă e mutată, nu mai poate fi aprinsă de `.zar-tavita.e-3d .zar-panza`:
    de-aia își aprinde singură lumina aici. */
+.zar-ceata {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 59;              /* sub zar, peste pagină */
+  will-change: backdrop-filter;
+}
+
 .zar-panza.e-larg {
   position: fixed;
   inset: 0;

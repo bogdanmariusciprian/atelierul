@@ -1872,8 +1872,12 @@ function verificatorulNumelui(luate, afaraDe = null) {
   };
 }
 
-/* Clic pe fundal = renunțare, ca la orice fereastră modernă. */
-dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close('nu'); });
+/* Clic pe fundal = renunțare. Îl face `inchideLaClicInAfara`, pus mai jos pe
+   toate ferestrele tablei deodată. Aici era o pereche de-a lui care se uita la
+   `e.target`: acela însă spune „fereastra" și pentru clicul din afară, și
+   pentru cel de pe marginea dinăuntru, deci închidea uneori și când n-ar fi
+   trebuit. Renunțarea rămâne: `returnValue` e pus pe „nu" înainte de fiecare
+   deschidere, așa că orice închidere fără apăsare pe „Da" e o renunțare. */
 
 /* ---------- panoul „Tablele mele" ---------- */
 const boardsPanel = document.getElementById('boardsPanel');
@@ -2397,8 +2401,34 @@ function leagana() {
      ar însemna șaisprezece ture pe secundă, adică o pată. */
   const TUMBA = 0.35;
 
-  let prins = null;         // {id, x, y, urme: [{t, x, y}], unde}
+  let prins = null;         // {id, x, y, cx, cy, urme, intins}
   let inaltimea = 0;        // unde e acum, între fund și palmă
+
+  /* CEAȚA DIN SPATE.
+
+     Cât tragi de zar, pagina din spate se împăienjenește. Nu e o podoabă: e
+     felul cel mai vechi prin care ochiul citește ADÂNCIMEA. Un aparat de
+     fotografiat nu poate ține clar și ce e la un lat de palmă, și ce e la trei
+     metri; ce e în afara adâncimii de câmp se topește. Așa că, dacă pagina se
+     topește, ochiul înțelege singur că zarul a ieșit din ea și a venit înainte,
+     spre tine. Fără asta, zarul mare de deasupra putea fi citit și ca un zar
+     uriaș lipit de pagină.
+
+     Merge tot din `intins`, ca toate celelalte semne ale benzii, deci nu poate
+     spune altceva decât ele. Cine a cerut mai puțină mișcare n-o vede deloc. */
+  let ceata = null;
+  function pacleste(cat, lin = false) {
+    if (faraMiscare()) return;
+    if (!ceata) {
+      if (cat <= 0.001) return;
+      ceata = document.createElement('div');
+      ceata.className = 'zar-ceata';
+      document.body.appendChild(ceata);
+    }
+    ceata.style.transition = lin ? 'backdrop-filter .42s ease, background-color .42s ease' : 'none';
+    ceata.style.backdropFilter = cat <= 0.001 ? 'none' : 'blur(' + (cat * 8).toFixed(2) + 'px)';
+    ceata.style.backgroundColor = 'rgba(247, 248, 252, ' + (cat * 0.22).toFixed(3) + ')';
+  }
 
   const inTavita = (e) => {
     const c = elTavita.getBoundingClientRect();
@@ -2504,6 +2534,7 @@ function leagana() {
     // Legea a treia: banda trage și de tăviță, nu doar de zar.
     const l = d || 1;
     zar3d.priveste((p.x / l) * prins.intins, (p.y / l) * prins.intins);
+    pacleste(prins.intins);
   });
 
   /* PRAȘTIA: jumătatea de oscilație a unui arc întins.
@@ -2584,6 +2615,7 @@ function leagana() {
     elTavita.classList.remove('e-prins');
     if (elZar.hasPointerCapture(e.pointerId)) elZar.releasePointerCapture(e.pointerId);
     zar3d.priveste(0, 0);               // tăvița se îndreaptă la loc, odată cu banda
+    pacleste(0, true);                  // ceața se ridică odată cu banda
 
     if (!luat.plecat) {
       // N-a plimbat: e o apăsare. Zarul e deja ridicat în palmă, deci aruncarea
@@ -2621,6 +2653,7 @@ function leagana() {
     elTavita.classList.remove('e-prins');
     zar3d.stramt();
     zar3d.priveste(0, 0);
+    pacleste(0, true);
     urca(0);                       // s-a răzgândit: zarul se lasă la loc
   });
 })();
@@ -2711,6 +2744,36 @@ function deschideFereastra(d) {
   return !!d.open;
 }
 function inchideFereastra(d) { if (!d) return; if (d.close) d.close(); else d.removeAttribute('open'); }
+
+/* CLICUL ÎN AFARĂ ÎNCHIDE FEREASTRA, ȘI ÎNSEAMNĂ „RENUNȚĂ".
+
+   Nu e o scurtătură în plus, e aceeași ieșire pe care o are deja tasta Escape,
+   pusă și acolo unde o caută mâna. Iar „renunță" iese de la sine: nimic nu se
+   face la închidere, ci numai la apăsarea butonului dinăuntru. Închizi, nu se
+   întâmplă nimic.
+
+   DE CE NU MĂ UIT LA `e.target`. Un <dialog> deschis ca modal își desenează
+   singur fundalul, iar clicul pe fundal ajunge tot la el, deci `e.target` ar
+   spune „fereastra" și pentru afară, și pentru marginea dinăuntru. Mă uit la
+   locul clicului față de dreptunghiul ferestrei: e singurul răspuns care nu se
+   poate încurca.
+
+   Și mă uit unde a ÎNCEPUT apăsarea, nu unde s-a sfârșit: cine trage cu mouse-ul
+   ca să aleagă un text și scapă butonul afară nu a cerut să închidă nimic. */
+function inchideLaClicInAfara(d) {
+  if (!d) return;
+  let pornitInauntru = false;
+  const inauntru = (e) => {
+    const r = d.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX <= r.right &&
+           e.clientY >= r.top && e.clientY <= r.bottom;
+  };
+  d.addEventListener('pointerdown', (e) => { pornitInauntru = inauntru(e); });
+  d.addEventListener('click', (e) => {
+    if (pornitInauntru || inauntru(e)) return;
+    inchideFereastra(d);
+  });
+}
 
 /* ---------- Ce fel de exercițiu ----------
    O singură listă, folosită și de fereastra de la „+ cerință", și de întrebarea
@@ -2887,6 +2950,11 @@ function deschideGeneratorul({ dinZar = null } = {}) {
 
 document.getElementById('genBtn')?.addEventListener('click', () => deschideGeneratorul());
 dlgGen && dlgGen.addEventListener('close', () => { felAles = null; banca.clear(); });
+
+/* Toate ferestrele tablei se închid și la un clic în afară, nu doar din Escape
+   sau de pe buton. Se pune într-un singur loc, pe toate deodată, ca să nu ajungă
+   una să se poarte altfel decât surorile ei. */
+document.querySelectorAll('dialog.dlg').forEach(inchideLaClicInAfara);
 
 elGenNou && elGenNou.addEventListener('change', potrivesteFereastraGen);
 elGenNoi && elGenNoi.addEventListener('change', improspatatePlafonul);

@@ -514,10 +514,21 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     return { W: randor.domElement.width / r, H: randor.domElement.height / r };
   };
 
-  function deseneaza() {
-    if (!zarLaDeget) { randor.setScissorTest(false); randor.render(scena, camera); return; }
+  const locLumii = new THREE.Vector3();
 
+  function deseneaza() {
     const { W, H } = inPixeliDePanza();
+
+    /* PÂNZA ÎNTREAGĂ, DE FIECARE DATĂ. `setViewport` rămâne pus până îl schimbi
+       tu, iar `setSize` e singurul care-l pune singur la loc. Fără rândul ăsta,
+       primul desen de după o trecere în două ar fi înghesuit în pătratul în care
+       fusese desenat zarul, adică toată scena trunchiată într-un chenar mic. */
+    if (!zarLaDeget) {
+      randor.setScissorTest(false);
+      randor.setViewport(0, 0, W, H);
+      randor.render(scena, camera);
+      return;
+    }
     randor.autoClear = false;
     randor.setScissorTest(false);
     randor.clear();
@@ -535,9 +546,20 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     pagina.visible = true;                  // ca umbra lui să cadă pe pagină
     if (decupaj) camera.clearViewOffset();
     const L = tavita.clientWidth || panzaPx;
+
+    /* UNDE SE AȘAZĂ PĂTRATUL. Nu-l pun cu mijlocul pe deget, fiindcă zarul nu e
+       la mijlocul lui: fiind ridicat deasupra tăviței, se desenează mai sus, cu
+       atât cât e de înalt. Îl întreb deci pe el unde cade în pătrat, și mut
+       pătratul cât trebuie ca ZARUL să ajungă fix pe deget. Așa rămâne loc și
+       pentru umbra lui, care cade mai jos și la dreapta. */
+    zar.updateWorldMatrix(true, false);
+    locLumii.setFromMatrixPosition(zar.matrixWorld).project(camera);
+    const stanga = zarLaDeget.cx - (locLumii.x * 0.5 + 0.5) * L;
+    const sus = zarLaDeget.cy - (1 - (locLumii.y * 0.5 + 0.5)) * L;
+
     randor.clearDepth();                    // zarul nu se ascunde după tăviță
-    randor.setViewport(zarLaDeget.cx - L / 2, H - zarLaDeget.cy - L / 2, L, L);
-    randor.setScissor(zarLaDeget.cx - L / 2, H - zarLaDeget.cy - L / 2, L, L);
+    randor.setViewport(stanga, H - sus - L, L, L);
+    randor.setScissor(stanga, H - sus - L, L, L);
     randor.render(scena, camera);
 
     fund.visible = true; peretii.visible = true; masaUmbrei.visible = true;
