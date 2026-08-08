@@ -454,6 +454,17 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      `unghiul = ramas / raza` e chiar rostogolirea adevărată: un cerc de rază r
      care se duce cu r înainte s-a rotit cu un radian. Turele în plus se sting
      și ele odată cu drumul, ca la început să pară aruncat cu putere. */
+  /* AȘEZAREA DUPĂ FIZICĂ, FĂRĂ NICIO PRELUCRARE.
+     Fizica lucrează chiar în unitățile scenei: tăvița are `interior`, zarul are
+     `marime`. Deci nu mai e nimic de socotit între ele, doar de copiat. Asta e
+     și dovada că modelul și desenul vorbesc aceeași limbă. */
+  function aseazaBrut(r, q) {
+    inAsezare = 0;
+    zar.position.set(r.x, Math.max(marime * 0.4, r.y), r.z);
+    zar.quaternion.set(q.x, q.y, q.z, q.w);
+    deseneaza();
+  }
+
   function aseazaRostogolit(nx, ny, nh, fata, ramas, tot) {
     inAsezare = 0;
     zar.position.set(
@@ -517,6 +528,10 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   return {
     panza,
+    /** Cât loc are zarul între pereți, în unitățile scenei. Fizica lucrează în ele. */
+    interior: INTERIOR,
+    marimeaZarului: marime,
+    aseazaBrut,
     /** Se pregătește pentru o aruncare: axa se ia din direcția de plecare. */
     pregateste(vx, vy) { axaRostogolirii(vx, vy); },
     aseazaRostogolit,

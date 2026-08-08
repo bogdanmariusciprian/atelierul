@@ -1988,8 +1988,8 @@ if (firstField) placeCaret(firstField, true);
    Trei lucruri legate între ele: zarul spune CE fel de exercițiu, banca ține
    materialul, generatorul le pune la un loc și umple tabla.
    ============================================================ */
-import { aruncare, pas, stat, fataUrmatoare, asezare, INTOARCERI,
-         simuleaza, laClipa } from './zar-fizica.js';
+import { fataUrmatoare, INTOARCERI, aruncaSpre, laClipa, unghiuriDinQ }
+  from './zar-fizica.js';
 import { listItems } from '../../shared/scripts/bank-repo.js';
 import { fataZarului, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
   from '../../shared/scripts/board-material.js';
@@ -2198,47 +2198,50 @@ async function aruncaZarul() {
   seRostogoleste = true;
   await amestecaZarul();
 
-  const latime = elTavita.clientWidth, inaltime = elTavita.clientHeight;
-  const raza = razaZarului(latime);
-  const margine = margineaDrumului(latime);
+  /* CUTIA ÎN CARE SE PETRECE TOTUL.
+     Când desenează scena, fizica lucrează chiar în unitățile ei: pereții sunt
+     acolo unde se văd, zarul are mărimea pe care o vezi. Nu mai e nicio
+     socoteală de trecut între model și desen, deci nici loc de nepotriviri.
+     Fără scenă, tăvița din CSS are aceleași proporții, doar în pixeli de-ai ei. */
+  const L = elTavita.clientWidth || 150;
+  const cutie = zar3d
+    ? { latura: zar3d.interior, zar: zar3d.marimeaZarului }
+    : { latura: L * 0.85, zar: L * 0.31 };
 
-  /* ARUNCAREA SE SOCOTEȘTE ÎNTÂI, SE ARATĂ PE URMĂ.
-
-     Cât timp o desenam pas cu pas, nu știam nici cât ține, nici pe unde trece,
-     deci la sfârșit trebuia s-o corectez spre fața care a picat. Corectura aia
-     se vedea. Acum toată aruncarea e socotită dinainte, până la ultima clipă:
-     știu durata și drumul, deci pot potrivi rostogolirea încât să se stingă
-     chiar la oprire. Nimic de corectat, fiindcă nimic n-a fost greșit.
-
-     Cu zarul din CSS drumul nu se poate planifica la fel (acolo rotirea e pe
-     două unghiuri de ecran, nu pe o axă), așa că el merge mai departe pe drumul
-     lui vechi. */
-  const drumul = simuleaza({ latime, inaltime, raza }, { pornire: aruncatCuMana });
+  /* Fața o alegem noi (ca să nu iasă de două ori la rând aceeași), dar NU
+     îndreptăm nimic pe drum: `aruncaSpre` aruncă cinstit și alege doar CUM a
+     fost ținut zarul în palmă înainte de aruncare. */
+  const drumul = aruncaSpre(cutie, fata, { deLa: aruncatCuMana });
   aruncatCuMana = null;
-  if (zar3d) zar3d.pregateste(drumul.plecare.vx, drumul.plecare.vy);
+
+  /* ÎNCETINIREA e o hotărâre de PRIVIRE, nu de fizică.
+     Un zar de mărimea asta într-o tăviță de mărimea asta chiar se oprește în
+     jumătate de secundă; așa e drept, fiindcă zarul e mare față de cutie. Dar
+     pe ecran o jumătate de secundă trece prea repede ca să se vadă ce s-a
+     întâmplat. Îl privim deci ca la reluarea unui meci, cu aceeași mișcare
+     adevărată, doar desfășurată mai încet. Nicio lege nu e atinsă. */
+  const INCETINIRE = 1.8;
 
   const porni = performance.now();
-  const st = aruncare({ latime, inaltime, raza });   // doar pentru unghiurile CSS
+  const jumatateaScenei = zar3d ? 0 : L / 2;
 
   function cadru(acum) {
-    const secunde = (acum - porni) / 1000;
+    const secunde = ((acum - porni) / 1000) / INCETINIRE;
     const unde = laClipa(drumul, secunde);
-    const x = unde.x - latime / 2, y = unde.y - inaltime / 2;
 
     if (zar3d) {
-      zar3d.aseazaRostogolit(x / margine, y / margine, unde.h / latime,
-                             fata, unde.ramas, drumul.drum);
+      zar3d.aseazaBrut(unde.r, unde.q);
     } else {
-      pas(st, 1 / 60);
-      asazaZarul(x, y, unde.h, st.rx, st.ry);
+      const u = unghiuriDinQ(unde.q);
+      asazaZarul(unde.r.x, unde.r.z, Math.max(0, unde.r.y - cutie.zar / 2), u.rx, u.ry);
     }
 
     if (!unde.gata) { requestAnimationFrame(cadru); return; }
 
     if (!zar3d) {
-      const fin = asezare(st, fata, 1);
+      const fin = INTOARCERI[fata];
       elZar.style.transition = 'transform .42s cubic-bezier(.22,.9,.3,1)';
-      asazaZarul(x, y, 0, fin.rx, fin.ry);
+      asazaZarul(unde.r.x, unde.r.z, 0, fin.rx, fin.ry);
       setTimeout(() => {
         elZar.style.transition = 'none'; seRostogoleste = false; gataAruncarea(fata);
       }, 430);
@@ -2348,7 +2351,7 @@ function gataAruncarea(fata) {
       // N-a plimbat: e o apăsare. Zarul e deja ridicat în palmă, deci aruncarea
       // pornește de sus, nu de pe fund.
       const c0 = elTavita.getBoundingClientRect();
-      aruncatCuMana = { x: c0.width / 2, y: c0.height / 2, h: inaltimea * c0.width, vh: 0 };
+      aruncatCuMana = { x: 0, z: 0, h: Math.max(30, inaltimea * c0.width), vy: 0 };
       inaltimea = 0;
       aruncaZarul();
       return;
@@ -2362,12 +2365,12 @@ function gataAruncarea(fata) {
     const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
     const putere = Math.hypot(vx, vy);
     aruncatCuMana = {
-      x: b.x + c.width / 2, y: b.y + c.height / 2,
+      x: b.x, z: b.y,
       // Sub o anumită putere zarul abia s-ar clinti: îi dăm un minim, ca
       // aruncarea să arate a aruncare oricât de moale ar fi fost degetul.
       vx: putere < 120 ? vx * (120 / Math.max(1, putere)) : Math.min(vx, 900),
-      vy: putere < 120 ? vy * (120 / Math.max(1, putere)) : Math.min(vy, 900),
-      h: Math.max(14, inaltimea * c.width), vh: 30,
+      vz: putere < 120 ? vy * (120 / Math.max(1, putere)) : Math.min(vy, 900),
+      h: Math.max(30, inaltimea * c.width), vy: 30,
     };
     inaltimea = 0;
     aruncaZarul();
