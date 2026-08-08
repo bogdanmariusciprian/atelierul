@@ -936,6 +936,22 @@ sheet.addEventListener('keydown', (e) => {
   }
 });
 
+/* ÎNCĂ UN CUVÂNT PENTRU ACEEAȘI STRUCTURĂ.
+   Căsuța nouă se naște CHIAR ÎNAINTEA butonului, deci intră la coada șirului;
+   iar fiindcă mănunchiul se rupe singur pe rânduri, când nu mai încape trece
+   dedesubt, sub cel dinainte, fără nicio socoteală de așezare din partea mea. */
+sheet.addEventListener('click', (e) => {
+  const plus = e.target.closest && e.target.closest('.cuv-plus');
+  if (!plus) return;
+  const cuvinte = plus.closest('.cuvinte');
+  const model = cuvinte.querySelector('.cuv');
+  const nou = model.cloneNode(false);
+  nou.innerHTML = '';
+  cuvinte.insertBefore(nou, plus);
+  placeCaret(nou, true);
+  murdareste(); scheduleSave();
+});
+
 /* rupe ciclul ă/î/â și starea c->k dacă utilizatorul dă click aiurea */
 sheet.addEventListener('mousedown', () => { resetACycle(); resetCK(); });
 
@@ -970,22 +986,44 @@ function placeCaret(el, atStart) {
    transcriere → c/v/s) și cel de propoziție (propoziția, iar sub ea
    transcrierea ei, cu parantezele montate). */
 const rowTemplateFraza = document.getElementById('rowTemplateFraza');
+const rowTemplateStructura = document.getElementById('rowTemplateStructura');
 
-function createRow(deFraza) {
-  const sablon = deFraza && rowTemplateFraza ? rowTemplateFraza : rowTemplate;
+/* TREI FELURI DE RÂND, ȘI FIECARE ȘTIE SINGUR CE E.
+   Felul nu se ține minte pe alături, ci se citește din chiar rândul din pagină:
+   așa nu se poate întâmpla ca datele să spună una și desenul alta. */
+const SABLOANE = { fraza: rowTemplateFraza, structura: rowTemplateStructura };
+
+function createRow(fel) {
+  const sablon = SABLOANE[fel] || rowTemplate;
   return sablon.content.firstElementChild.cloneNode(true);
 }
 
-/** Rândul ăsta e de propoziție? Îl întrebăm pe el, nu ținem minte pe alături. */
-const eRandDeFraza = (row) => !!row && row.classList.contains('row--fraza');
-
-/** Fața asta de zar cere propoziții? */
-function fataCereFraza(fata) {
-  return !!fata && fataZarului(LECTIE, Number(fata))?.kind === 'propozitie';
+function felRand(row) {
+  if (!row) return 'obisnuit';
+  if (row.classList.contains('row--fraza')) return 'fraza';
+  if (row.classList.contains('row--structura')) return 'structura';
+  return 'obisnuit';
 }
+const eRandDeFraza = (row) => felRand(row) === 'fraza';
+
+/** Ce fel de rând cere fața asta de zar? */
+function felDupaFata(fata) {
+  const kind = fata ? fataZarului(LECTIE, Number(fata))?.kind : null;
+  if (kind === 'propozitie') return 'fraza';
+  if (kind === 'structura') return 'structura';
+  return 'obisnuit';
+}
+const fataCereFraza = (fata) => felDupaFata(fata) === 'fraza';
+
+/* CIORNA NU E UN RÂND CA CELELALTE, deci nu intră la socoteală nicăieri:
+   nu se numără, nu se salvează printre ele, nu se naște una nouă lângă ea.
+   Ca să nu trebuiască ținută minte pe alături, poartă un semn al ei, iar toate
+   locurile care umblă cu rândurile întreabă `randurile()`, nu foaia. */
+const randurile = () => Array.from(sheet.querySelectorAll('.row:not(.row--ciorna)'));
+const eCiorna = (row) => !!row && row.classList.contains('row--ciorna');
 
 function renumber() {
-  sheet.querySelectorAll('.row').forEach((row, idx) => {
+  randurile().forEach((row, idx) => {
     row.querySelector('.rownum').textContent = (idx + 1) + '.';
   });
 }
@@ -993,9 +1031,12 @@ function renumber() {
 function addRowAfter(row) {
   // Rândul nou seamănă cu cel de lângă care se naște: într-un exercițiu de
   // propoziții adaugi tot o propoziție, nu un cuvânt.
-  const newRow = createRow(eRandDeFraza(row) ||
-    (!row && fataCereFraza(exercitiulDeschis()?.fata)));
+  if (eCiorna(row)) return row;               // în ciornă nu se adaugă rânduri
+  const newRow = createRow(row ? felRand(row)
+                               : felDupaFata(exercitiulDeschis()?.fata));
+  const ciorna = sheet.querySelector('.ciorna');
   if (row && row.nextSibling) sheet.insertBefore(newRow, row.nextSibling);
+  else if (ciorna) sheet.insertBefore(newRow, ciorna);
   else sheet.appendChild(newRow);
   renumber();
   placeCaret(newRow.querySelector('.field'), true);
@@ -1035,7 +1076,7 @@ toolbar.addEventListener('click', (e) => {
 });
 
 document.getElementById('addRowBtn').addEventListener('click', () => {
-  const rows = sheet.querySelectorAll('.row');
+  const rows = randurile();
   addRowAfter(rows[rows.length - 1]);
 });
 
@@ -1059,12 +1100,15 @@ sheet.addEventListener('focusin', (e) => {
 
 function currentRow() {
   if (lastFocusedField && sheet.contains(lastFocusedField)) return lastFocusedField.closest('.row');
-  const rows = sheet.querySelectorAll('.row');
+  const rows = randurile();
   return rows[rows.length - 1] || null;
 }
 
 function addStageToRow(row) {
-  if (!row || eRandDeFraza(row)) return null;
+  /* Rândurile cu formă proprie n-au etape de adăugat: propoziția are două
+     câmpuri hotărâte, iar structura are un „+" al ei, care adaugă un cuvânt,
+     nu o etapă. */
+  if (!row || felRand(row) !== 'obisnuit') return null;
   const arrow = document.createElement('span');
   arrow.className = 'arrow';
   arrow.textContent = '→';
@@ -1369,13 +1413,51 @@ function textulCerintei(ex) {
   return c ? c + ' ' + cuv : cuv;
 }
 
+/**
+ * Cerința scrisă pe ecran, cu cele două straturi ale ei deosebite la vedere.
+ *
+ * În date sunt deja două lucruri deosebite: CE SE CERE, care e al profesorului
+ * și e același pe toată tabla, și CU CE, adică materialul adus de generator,
+ * care se schimbă la fiecare generare. Până acum se citeau ca un singur șir
+ * cenușiu, deși ochiul are nevoie de ele despărțite: porunca se caută o dată,
+ * materialul se caută la fiecare cuvânt rezolvat.
+ *
+ * Deci: porunca îngroșată, materialul cursiv. Nu e o podoabă, e chiar deosebirea
+ * din date, arătată. Iar dacă vreodată se schimbă felul în care sunt ținute,
+ * desenul se schimbă odată cu ele, fiindcă se ia din aceleași două locuri.
+ *
+ * Textul intră prin `escapaText` ÎNAINTE de a fi îmbrăcat în etichete: un cuvânt
+ * generat n-are voie să aducă alte etichete cu el.
+ */
+function cerintaInHtml(ex) {
+  if (!ex) return '';
+  const cere = escapaText(bazaCerintei(ex));
+  const cu = escapaText((ex.cuvinte || []).join(', '));
+  const a = cere ? '<b class="cer__cere">' + cere + '</b>' : '';
+  const b = cu ? '<i class="cer__material">' + cu + '</i>' : '';
+  return a && b ? a + ' ' + b : a + b;
+}
+
 /** Se poate scrie în cerința asta? Numai cele scrise de mână. */
 const eDeScris = (ex) => !!ex && ex.sursa === 'mana';
 const exercitiulDeschis = () => exercitii[deschis] || null;
 
 /** Rândurile din pagină, în formă de date. */
 function culegeRanduri() {
-  return Array.from(sheet.querySelectorAll('.row')).map((row) => {
+  return randurile().map((row) => {
+    if (felRand(row) === 'structura') {
+      const st = row.querySelector('.structura');
+      return {
+        structura: st ? st.innerHTML : '',
+        syll: (row.querySelector('.syll') || {}).innerHTML || '',
+        /* Cuvintele goale nu se salvează: sunt căsuțe deschise din greșeală cu
+           „+", nu răspunsuri. Se pierd la salvare și nu se mai întorc. */
+        raspuns: Array.from(row.querySelectorAll('.cuv'))
+          .map((c) => c.innerHTML)
+          .filter((t) => String(t).replace(/<br\s*\/?>|&nbsp;|\s/g, '') !== ''),
+        blocata: !!st && st.getAttribute('contenteditable') === 'false',
+      };
+    }
     if (eRandDeFraza(row)) {
       const fr = row.querySelector('.fraza');
       return {
@@ -1396,19 +1478,44 @@ function culegeRanduri() {
 
 /** Datele înapoi în pagină. Un rând gol dacă exercițiul n-are niciunul: o
  *  tablă fără nicio căsuță de scris n-ar spune elevului ce să facă. */
-function aseazaRanduri(randuri, deFraza) {
+function aseazaRanduri(randuri, felCerut) {
   sheet.innerHTML = '';
   const lista = (randuri && randuri.length) ? randuri : [null];
-  // Un exercițiu gol de propoziții tot un rând de propoziție primește: felul îl
-  // spune exercițiul, nu rândurile care încă nu există.
-  const frazaImplicit = deFraza !== undefined ? deFraza
-    : fataCereFraza(exercitiulDeschis()?.fata);
+  // Un exercițiu gol tot rândul felului lui îl primește: felul îl spune
+  // exercițiul, nu rândurile care încă nu există.
+  const felImplicit = felCerut !== undefined ? felCerut
+    : felDupaFata(exercitiulDeschis()?.fata);
   lista.forEach((r) => {
-    const eFraza = r ? r.fraza !== undefined : frazaImplicit;
-    const row = createRow(eFraza);
+    /* Felul unui rând se citește din chiar datele lui: are `fraza`, e de
+       propoziție; are `structura`, e de structură. Nu-l ținem minte pe alături,
+       ca să nu se poată ca datele să spună una și desenul alta. */
+    const fel = r ? (r.fraza !== undefined ? 'fraza'
+                   : r.structura !== undefined ? 'structura' : 'obisnuit')
+                  : felImplicit;
+    const row = createRow(fel);
     sheet.appendChild(row);
     if (!r) return;
-    if (eFraza) {
+    if (fel === 'structura') {
+      const st = row.querySelector('.structura');
+      st.innerHTML = r.structura || '';
+      // Structura venită de la generator nu se schimbă: e materialul, nu lucrul
+      // elevului. Cea adăugată de mână se scrie.
+      if (r.blocata) st.setAttribute('contenteditable', 'false');
+      row.querySelector('.syll').innerHTML = r.syll || '';
+      const cuvinte = row.querySelector('.cuvinte');
+      const plus = cuvinte.querySelector('.cuv-plus');
+      const lista2 = (r.raspuns && r.raspuns.length) ? r.raspuns : [''];
+      cuvinte.querySelectorAll('.cuv').forEach((c, i) => { if (i) c.remove(); });
+      const dintai = cuvinte.querySelector('.cuv');
+      dintai.innerHTML = lista2[0] || '';
+      for (let i = 1; i < lista2.length; i++) {
+        const c = dintai.cloneNode(false);
+        c.innerHTML = lista2[i];
+        cuvinte.insertBefore(c, plus);
+      }
+      return;
+    }
+    if (fel === 'fraza') {
       const fr = row.querySelector('.fraza');
       fr.innerHTML = r.fraza || '';
       // Propoziția venită de la generator nu se schimbă: e materialul, nu lucrul
@@ -1432,13 +1539,71 @@ function aseazaRanduri(randuri, deFraza) {
       row.appendChild(arrow); row.appendChild(f);
     });
   });
+  aseazaCiorna();
   renumber();
+}
+
+/* ---------- CIORNA ----------
+
+   La exercițiul cu structuri fonetice, elevul dă cuvinte care se potrivesc unei
+   structuri. Ca să fie sigur că un cuvânt chiar se potrivește, are nevoie să-l
+   analizeze fonetic, adică taman lucrul pe care-l face rândul obișnuit. De-aia
+   jos de tot stă un rând clasic, unul singur: e hârtia de pe margine, nu o
+   cerință. Nu se numără, nu se poate adăuga altul, iar când vrea să încerce alt
+   cuvânt, elevul șterge ce a scris.
+
+   Se salvează totuși odată cu exercițiul. O ciornă care se pierde la închiderea
+   filei ar fi o pedeapsă pentru cine s-a oprit din lucru, iar ce a scris acolo
+   e tot al lui. */
+function aseazaCiorna(date) {
+  const ex = exercitiulDeschis();
+  const trebuie = felDupaFata(ex?.fata) === 'structura';
+  const veche = sheet.querySelector('.ciorna');
+  if (veche) veche.remove();
+  if (!trebuie) return;
+
+  const cutie = document.createElement('div');
+  cutie.className = 'ciorna';
+  const et = document.createElement('span');
+  et.className = 'ciorna__et';
+  et.textContent = 'ciornă';
+  cutie.appendChild(et);
+
+  const row = createRow('obisnuit');
+  row.classList.add('row--ciorna');
+  const c = date !== undefined ? date : (ex && ex.ciorna) || null;
+  if (c) {
+    row.querySelector('.word').innerHTML = c.word || '';
+    row.querySelector('.syll').innerHTML = c.syll || '';
+    row.querySelector('.trans').innerHTML = c.trans || '';
+    imbracaSimboluri(row.querySelector('.trans'));
+    row.querySelector('.types').textContent = c.types || '';
+  }
+  cutie.appendChild(row);
+  sheet.appendChild(cutie);
+}
+
+/** Ce s-a scris în ciornă. `null` dacă n-are ciornă sau dacă e goală. */
+function culegeCiorna() {
+  const row = sheet.querySelector('.row--ciorna');
+  if (!row) return null;
+  const c = {
+    word:  (row.querySelector('.word')  || {}).innerHTML || '',
+    syll:  (row.querySelector('.syll')  || {}).innerHTML || '',
+    trans: (row.querySelector('.trans') || {}).innerHTML || '',
+    types: (row.querySelector('.types') || {}).textContent || '',
+  };
+  const gol = (t) => String(t).replace(/<br\s*\/?>|&nbsp;|\u200b|\s|\[|\]/g, '') === '';
+  return (gol(c.word) && gol(c.syll) && gol(c.trans) && gol(c.types)) ? null : c;
 }
 
 /** Pune deoparte ce e pe ecran, în exercițiul de care ține. */
 function salveazaDeschisul() {
   const ex = exercitiulDeschis();
-  if (ex) ex.randuri = culegeRanduri();
+  if (!ex) return;
+  ex.randuri = culegeRanduri();
+  const c = culegeCiorna();
+  if (c) ex.ciorna = c; else delete ex.ciorna;
 }
 
 /** Deschide alt exercițiu. */
@@ -1462,7 +1627,7 @@ function deseneazaTeancul() {
       (ex.tema ? '<span class="cer__semn cer__tema">temă</span>' : '');
     if (i !== deschis) {
       return '<div class="cer e-stransa" data-ex="' + i + '" role="button" tabindex="0">' +
-        nr + '<span class="cer__text">' + (escapaText(textulCerintei(ex)) || 'fără cerință') + '</span>' +
+        nr + '<span class="cer__text">' + (cerintaInHtml(ex) || 'fără cerință') + '</span>' +
         semne + '</div>';
     }
     /* Cea de la zar nu se scrie: e ce ți-a picat, nu ce vrei tu. Nici cea a unui
@@ -1473,7 +1638,7 @@ function deseneazaTeancul() {
         escapaText(ex.cerinta) + '</textarea>' +
         (ex.cuvinte && ex.cuvinte.length
           ? '<div class="cer__cuvinte">' + escapaText(ex.cuvinte.join(', ')) + '</div>' : '')
-      : '<div class="cer__data">' + escapaText(textulCerintei(ex)) + '</div>';
+      : '<div class="cer__data">' + cerintaInHtml(ex) + '</div>';
     return '<div class="cer e-deschisa" data-ex="' + i + '">' +
       '<span class="cer__eticheta">Cerință</span>' + nr +
       '<div class="cer__text">' + corp + '</div>' + semne +
@@ -3296,22 +3461,22 @@ elGenFa && elGenFa.addEventListener('click', async () => {
   ex.cuvinte = cfg.kind === 'propozitie' ? [] : texte;
   ex.tema = !!(elGenTema && elGenTema.checked);
 
-  // RÂNDURILE, după felul materialului:
-  //  · cuvinte     → un rând pe cuvânt, cu cuvântul pus la locul lui;
-  //  · structuri   → rânduri GOALE: structura e cerința, cuvintele le dă elevul;
-  //  · propoziții  → un rând, cu propoziția în prima căsuță, de transcris.
-  //  · cuvinte     → un rând pe cuvânt, cu cuvântul pus la locul lui;
-  //  · structuri   → rânduri GOALE: structura e cerința, cuvintele le dă elevul;
-  //  · propoziții  → rând de propoziție: enunțul sus, blocat, transcrierea jos.
+  /* RÂNDURILE, după felul materialului. Fiecare fel are alt drum de străbătut,
+     deci alt rând:
+       · cuvinte    → un rând pe cuvânt, cu cuvântul pus la locul lui, iar
+                      elevul merge înainte: silabe, transcriere, tipul sunetelor;
+       · structuri  → un rând pe structură, cu ea pusă în capul lui și blocată;
+                      elevul merge ÎNAPOI, de la structură spre cuvinte, oricâte;
+       · propoziții → rând de propoziție: enunțul sus, blocat, transcrierea jos. */
   if (cfg.kind === 'propozitie') {
     ex.randuri = texte.map((t) => ({ fraza: escapaText(t), trans: '', blocata: true }));
   } else if (cfg.kind === 'structura') {
-    ex.randuri = texte.map(() => ({}));
+    ex.randuri = texte.map((t) => ({ structura: escapaText(t), syll: '', raspuns: [], blocata: true }));
   } else {
     ex.randuri = texte.map((t) => ({ word: escapaText(t) }));
   }
 
-  aseazaRanduri(ex.randuri, cfg.kind === 'propozitie');
+  aseazaRanduri(ex.randuri, felDupaFata(fata));
   deseneazaTeancul();
   murdareste(); scheduleSave();
   inchideFereastra(dlgGen);

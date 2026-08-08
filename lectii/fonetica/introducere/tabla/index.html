@@ -293,6 +293,34 @@
   </div>
 </template>
 
+<!-- RÂNDUL DE STRUCTURĂ FONETICĂ (zarul 5).
+     Aici exercițiul merge invers decât la celelalte: nu pleci de la cuvânt ca
+     să afli structura, ci de la structură ca să găsești cuvinte. De-aia în
+     locul cuvântului stă structura, adusă de generator și nescrisă de elev,
+     iar la capăt stau cuvintele LUI, oricâte.
+
+     Structura se poate despărți în silabe, ca orice înșiruire de sunete, deci
+     etapa a doua rămâne cea știută.
+
+     Cuvintele stau într-un mănunchi care se rupe singur pe rânduri: butonul „+"
+     merge la coada lor, așa că atunci când nu mai încap, și el, și cuvântul nou
+     trec dedesubt, fără să se socotească nimic. -->
+<template id="rowTemplateStructura">
+  <div class="row row--structura">
+    <div class="rownum"></div>
+    <div class="field structura" contenteditable="true" data-ph="structură fonetică"></div>
+    <span class="arrow">→</span>
+    <div class="field syll" contenteditable="true" data-ph="si-la-be"></div>
+    <span class="arrow">→</span>
+    <div class="cuvinte">
+      <div class="field cuv" contenteditable="true" data-ph="cuvânt"></div>
+      <button class="cuv-plus" type="button"
+              title="Încă un cuvânt pentru aceeași structură"
+              aria-label="Încă un cuvânt pentru aceeași structură">+</button>
+    </div>
+  </div>
+</template>
+
 <!-- Șablon pentru un rând de lucru -->
 <template id="rowTemplate">
   <div class="row">

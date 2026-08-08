@@ -591,6 +591,79 @@
   /* Cuvintele aduse de generator la o cerință scrisă de mână: acolo cerința e
      o căsuță de scris, deci n-au unde să intre în continuarea ei. Stau sub ea,
      dar se citesc ca urmarea ei. */
+  /* CE SE CERE ȘI CU CE, deosebite la vedere.
+     Porunca e a profesorului și e aceeași pe toată tabla: se caută o dată, deci
+     stă îngroșată. Materialul îl aduce generatorul și se schimbă la fiecare
+     generare: se caută la fiecare cuvânt rezolvat, deci stă cursiv. Nu-i o
+     podoabă, e chiar deosebirea din date, arătată. */
+  /* ---------- RÂNDUL DE STRUCTURĂ FONETICĂ ----------
+     Structura e materialul, nu lucrul elevului: se vede ca un text așezat, nu
+     ca o căsuță de scris, la fel ca propoziția venită de la generator.
+     Cuvintele, în schimb, sunt ale lui, și-s oricâte: stau într-un mănunchi
+     care se rupe singur pe rânduri. */
+  .row--structura .structura {
+    flex: 0 0 auto;
+    min-width: 9ch;
+    font-family: var(--mono);
+    letter-spacing: .04em;
+  }
+  .row--structura .structura[contenteditable="false"] {
+    background: transparent;
+    border-color: transparent;
+    cursor: default;
+  }
+  .row--structura .cuvinte {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .row--structura .cuv { flex: 0 1 auto; min-width: 7ch; }
+
+  /* Butonul merge la COADA cuvintelor, nu într-un colț: așa, când mănunchiul se
+     rupe pe rândul următor, se duce și el acolo, iar cuvântul nou apare chiar
+     sub cel dinainte, fără nicio socoteală de așezare. */
+  .cuv-plus {
+    flex: none;
+    width: 26px; height: 26px;
+    border: 1px dashed #cdd7ff;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--accent);
+    font-family: var(--ui);
+    font-size: 16px; line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    transition: background .12s, border-color .12s;
+  }
+  .cuv-plus:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+  /* ---------- CIORNA ----------
+     Un singur rând, jos de tot, despărțit de restul printr-o linie subțire.
+     Nu se numără, fiindcă nu e o cerință: e hârtia pe care elevul își verifică
+     un cuvânt prin analiză fonetică, înainte să-l scrie sus. */
+  .ciorna {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+  }
+  .ciorna__et {
+    display: block;
+    margin: 0 0 6px 2px;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    user-select: none;
+  }
+  .row--ciorna .rownum { visibility: hidden; }
+
+  .cer__cere { font-weight: 600; }
+  .cer__material,
+  .cer__cuvinte { font-style: italic; }
+
   .cer__cuvinte { font-size: 15px; line-height: 1.5; padding: 2px 0 4px; }
   .cer__semn {
     flex: none; display: inline-flex; align-items: center; gap: 4px;
