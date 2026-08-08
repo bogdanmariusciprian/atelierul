@@ -1988,7 +1988,8 @@ if (firstField) placeCaret(firstField, true);
    Trei lucruri legate între ele: zarul spune CE fel de exercițiu, banca ține
    materialul, generatorul le pune la un loc și umple tabla.
    ============================================================ */
-import { aruncare, pas, stat, fataUrmatoare, asezare, INTOARCERI } from './zar-fizica.js';
+import { aruncare, pas, stat, fataUrmatoare, asezare, INTOARCERI,
+         simuleaza, laClipa } from './zar-fizica.js';
 import { listItems } from '../../shared/scripts/bank-repo.js';
 import { fataZarului, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
   from '../../shared/scripts/board-material.js';
@@ -2137,6 +2138,19 @@ const razaZarului = (latime) =>
 /** Până unde poate ajunge MIJLOCUL zarului, în pixeli de casetă. */
 const margineaDrumului = (latime) => Math.max(1, latime / 2 - razaZarului(latime));
 
+/* ZARUL LUAT CU DEGETUL.
+
+   Îl apeși, îl plimbi pe tăviță, îi dai drumul, iar el pleacă încotro l-ai
+   împins și cu ce putere l-ai împins. Cât îl ții, se rostogolește sub deget, în
+   jurul mersului tău: asta e ce face un zar plimbat pe masă.
+
+   Cheia e că nu inventăm nimic la sfârșit: la ridicarea degetului socotim
+   avântul din ultimele clipe de mișcare și îl dăm fizicii ca pornire. Dacă
+   n-ai mișcat deloc, e o simplă apăsare, iar zarul pleacă cum pleca și înainte.
+
+   `aruncatCuMana` e locul unde așteaptă pornirea până o ia aruncarea. */
+let aruncatCuMana = null;
+
 /* AMESTECUL DIN PALMĂ.
 
    Un zar nu pleacă din nemișcare: întâi îl frămânți în pumn, apoi îl scapi.
@@ -2183,41 +2197,55 @@ async function aruncaZarul() {
 
   seRostogoleste = true;
   await amestecaZarul();
-  elZar.style.transition = 'none';
+
   const latime = elTavita.clientWidth, inaltime = elTavita.clientHeight;
   const raza = razaZarului(latime);
-  const st = aruncare({ latime, inaltime, raza });
+  const margine = margineaDrumului(latime);
 
-  let trecut = 0;
-  const PAS = 1 / 120;                          // pași mărunți, ca loviturile
-  let ramas = 0;                                // de perete să nu fie sărite
+  /* ARUNCAREA SE SOCOTEȘTE ÎNTÂI, SE ARATĂ PE URMĂ.
+
+     Cât timp o desenam pas cu pas, nu știam nici cât ține, nici pe unde trece,
+     deci la sfârșit trebuia s-o corectez spre fața care a picat. Corectura aia
+     se vedea. Acum toată aruncarea e socotită dinainte, până la ultima clipă:
+     știu durata și drumul, deci pot potrivi rostogolirea încât să se stingă
+     chiar la oprire. Nimic de corectat, fiindcă nimic n-a fost greșit.
+
+     Cu zarul din CSS drumul nu se poate planifica la fel (acolo rotirea e pe
+     două unghiuri de ecran, nu pe o axă), așa că el merge mai departe pe drumul
+     lui vechi. */
+  const drumul = simuleaza({ latime, inaltime, raza }, { pornire: aruncatCuMana });
+  aruncatCuMana = null;
+  if (zar3d) zar3d.pregateste(drumul.plecare.vx, drumul.plecare.vy);
+
   const porni = performance.now();
-  let ultimul = porni;
+  const st = aruncare({ latime, inaltime, raza });   // doar pentru unghiurile CSS
 
   function cadru(acum) {
-    const dt = Math.min(0.05, (acum - ultimul) / 1000);
-    ultimul = acum;
-    ramas += dt;
-    while (ramas >= PAS) { pas(st, PAS); ramas -= PAS; }
-    trecut = acum - porni;
-    asazaZarul(st.x - latime / 2, st.y - inaltime / 2, st.h, st.rx, st.ry);
+    const secunde = (acum - porni) / 1000;
+    const unde = laClipa(drumul, secunde);
+    const x = unde.x - latime / 2, y = unde.y - inaltime / 2;
 
-    // Se oprește singur, dar nu-l lăsăm să se legene la nesfârșit: după trei
-    // secunde îl așezăm oricum, ca elevul să nu aștepte după un zar îndărătnic.
-    if (!stat(st) && trecut < 3000) { requestAnimationFrame(cadru); return; }
-
-    /* Așezarea. În scenă zarul se lasă pe fața care a picat, întorcându-se lin
-       spre ea, ca unul adevărat care se mai clatină o dată și se oprește. În
-       CSS, aceeași treabă se face dintr-o trecere de stil. */
     if (zar3d) {
-      asazaZarul(st.x - latime / 2, st.y - inaltime / 2, 0, st.rx, st.ry);
-      zar3d.asazaFata(fata, 420);
+      zar3d.aseazaRostogolit(x / margine, y / margine, unde.h / latime,
+                             fata, unde.ramas, drumul.drum);
     } else {
+      pas(st, 1 / 60);
+      asazaZarul(x, y, unde.h, st.rx, st.ry);
+    }
+
+    if (!unde.gata) { requestAnimationFrame(cadru); return; }
+
+    if (!zar3d) {
       const fin = asezare(st, fata, 1);
       elZar.style.transition = 'transform .42s cubic-bezier(.22,.9,.3,1)';
-      asazaZarul(st.x - latime / 2, st.y - inaltime / 2, 0, fin.rx, fin.ry);
+      asazaZarul(x, y, 0, fin.rx, fin.ry);
+      setTimeout(() => {
+        elZar.style.transition = 'none'; seRostogoleste = false; gataAruncarea(fata);
+      }, 430);
+      return;
     }
-    setTimeout(() => { elZar.style.transition = 'none'; seRostogoleste = false; gataAruncarea(fata); }, 430);
+    seRostogoleste = false;
+    gataAruncarea(fata);
   }
   requestAnimationFrame(cadru);
 }
@@ -2250,7 +2278,83 @@ function gataAruncarea(fata) {
   cheamaGeneratorul();
 }
 
-elZar && elZar.addEventListener('click', aruncaZarul);
+/* Plimbatul cu degetul. Numai când desenează scena: zarul din CSS n-are cum să
+   se rostogolească după mers, iar o jumătate de unealtă e mai rea decât niciuna. */
+(function plimbatulZarului() {
+  if (!elTavita || !elZar) return;
+
+  const APASARE = 6;        // sub atâția pixeli, e apăsare, nu plimbare
+  let prins = null;         // {id, x, y, urme: [{t, x, y}]}
+
+  const inTavita = (e) => {
+    const c = elTavita.getBoundingClientRect();
+    return { x: e.clientX - c.left - c.width / 2, y: e.clientY - c.top - c.height / 2, L: c.width };
+  };
+
+  elZar.addEventListener('pointerdown', (e) => {
+    if (!zar3d || seRostogoleste) return;
+    const p = inTavita(e);
+    prins = { id: e.pointerId, x: p.x, y: p.y, plecat: false, urme: [{ t: performance.now(), x: p.x, y: p.y }] };
+    elZar.setPointerCapture(e.pointerId);
+    elTavita.classList.add('e-prins');
+  });
+
+  elZar.addEventListener('pointermove', (e) => {
+    if (!prins || e.pointerId !== prins.id) return;
+    const p = inTavita(e);
+    const dx = p.x - prins.x, dy = p.y - prins.y;
+    if (!prins.plecat && Math.hypot(dx, dy) < APASARE) return;
+    prins.plecat = true;
+    prins.x = p.x; prins.y = p.y;
+    // Ținem numai ultima șesime de secundă: avântul se ia din cât ai mișcat
+    // ACUM, nu din tot drumul degetului.
+    const acum = performance.now();
+    prins.urme.push({ t: acum, x: p.x, y: p.y });
+    while (prins.urme.length > 2 && acum - prins.urme[0].t > 160) prins.urme.shift();
+
+    const m = margineaDrumului(p.L);
+    zar3d.plimba(p.x / m, p.y / m, 0.10, dx, dy);
+  });
+
+  const dat = (e) => {
+    if (!prins || e.pointerId !== prins.id) return;
+    const luat = prins;
+    prins = null;
+    elTavita.classList.remove('e-prins');
+    if (elZar.hasPointerCapture(e.pointerId)) elZar.releasePointerCapture(e.pointerId);
+    if (!luat.plecat) { aruncaZarul(); return; }      // n-a plimbat: e apăsare
+
+    /* Avântul, din ultimele urme. Fizica îl vrea în pixeli pe secundă, cu
+       (0,0) în colțul tăviței, nu în mijloc: de-aia adunăm jumătate de lățime. */
+    const c = elTavita.getBoundingClientRect();
+    const a = luat.urme[0], b = luat.urme[luat.urme.length - 1];
+    const dt = Math.max(0.016, (b.t - a.t) / 1000);
+    const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
+    const putere = Math.hypot(vx, vy);
+    aruncatCuMana = {
+      x: b.x + c.width / 2, y: b.y + c.height / 2,
+      // Sub o anumită putere zarul abia s-ar clinti: îi dăm un minim, ca
+      // aruncarea să arate a aruncare oricât de moale ar fi fost degetul.
+      vx: putere < 120 ? vx * (120 / Math.max(1, putere)) : Math.min(vx, 900),
+      vy: putere < 120 ? vy * (120 / Math.max(1, putere)) : Math.min(vy, 900),
+      h: 14, vh: 30,
+    };
+    aruncaZarul();
+  };
+  elZar.addEventListener('pointerup', dat);
+  elZar.addEventListener('pointercancel', () => {
+    if (!prins) return;
+    prins = null;
+    elTavita.classList.remove('e-prins');
+  });
+})();
+
+/* Apăsarea simplă. Cu scena, apăsarea vine din `pointerup` de mai sus, ca să nu
+   pornească aruncarea de două ori; fără ea, clicul e singurul drum. */
+elZar && elZar.addEventListener('click', (e) => {
+  if (zar3d) return;
+  aruncaZarul();
+});
 
 /* Zarul stă înclinat de la bun început, nu abia după prima aruncare: altfel
    te-ar întâmpina un pătrat, și abia pe urmă ai afla că e un zar. */

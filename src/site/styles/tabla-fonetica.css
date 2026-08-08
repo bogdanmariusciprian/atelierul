@@ -939,6 +939,13 @@
    rostogolește un zar nevăzut e mai rea decât una care nu face nimic. */
 .zar-tavita:not(.e-3d):not(.e-css) .zar { pointer-events: none; }
 
+/* Zarul se poate lua cu degetul și plimba pe tăviță. Cursorul o spune: mână
+   deschisă când poate fi luat, mână strânsă cât îl ții.
+   `touch-action: none` nu e un moft: fără el, pe telefon plimbatul ar fi luat
+   drept derulare a paginii și zarul n-ar mai simți degetul. */
+.zar-tavita.e-3d .zar { cursor: grab; touch-action: none; }
+.zar-tavita.e-3d.e-prins .zar { cursor: grabbing; }
+
 /* Butonul se întinde peste toată tăvița: e mai ușor de nimerit decât un cub de
    46 de pixeli, iar cubul desenat stă oricum dedesubt, în pânză. */
 .zar-tavita.e-3d .zar {

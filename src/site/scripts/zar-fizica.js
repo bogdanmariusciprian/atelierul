@@ -146,3 +146,86 @@ export function asezare(st, fata, ture = 1) {
     ry: potrivit(st.ry, t.ry) + (st.vry >= 0 ? 360 : -360) * ture,
   };
 }
+
+/* ============================================================
+   TOATĂ ARUNCAREA, SOCOTITĂ DINAINTE
+
+   DE CE. Până acum zarul se rostogolea la întâmplare, iar la sfârșit îl
+   întorceam eu spre fața care a picat. Se vedea mâna: ultima jumătate de
+   secundă nu mai era rostogolire, era corectură. Un zar adevărat nu se
+   răzgândește; el a mers, de la prima clipă, exact spre locul unde avea să se
+   oprească.
+
+   Leacul e ordinea, nu formula: socotim ÎNTÂI toată aruncarea, până se oprește,
+   și abia pe urmă o arătăm. Așa știm dinainte cât ține și pe unde trece, deci
+   putem potrivi rotirea încât să se stingă chiar în clipa opririi. Nu mai e
+   nimic de corectat, fiindcă nimic n-a fost greșit pe drum.
+
+   `pornire` e pentru zarul luat cu mâna: acolo locul și avântul nu le mai
+   alege norocul, ci degetul care l-a aruncat.
+   ============================================================ */
+export function simuleaza(cutie, { aleator = Math.random, pornire = null,
+                                   pasul = 1 / 120, celMult = 3 } = {}) {
+  const st = aruncare(cutie, aleator);
+  if (pornire) {
+    for (const cheie of ["x", "y", "vx", "vy", "h", "vh"]) {
+      if (pornire[cheie] != null) st[cheie] = pornire[cheie];
+    }
+  }
+
+  const cadre = [];
+  let t = 0;
+  let drum = 0;                    // cât a umblat, în total
+  let xAnt = st.x, yAnt = st.y;
+
+  // Prima clipă intră întotdeauna, ca playbackul să aibă de unde porni.
+  cadre.push({ t: 0, x: st.x, y: st.y, h: st.h, drum: 0 });
+
+  while (t < celMult) {
+    pas(st, pasul);
+    t += pasul;
+    drum += Math.hypot(st.x - xAnt, st.y - yAnt);
+    xAnt = st.x; yAnt = st.y;
+    cadre.push({ t, x: st.x, y: st.y, h: st.h, drum });
+    // Nu-l lăsăm să se oprească în prima clipă, chiar dacă a picat lin: o
+    // aruncare de o zecime de secundă n-ar arăta a aruncare.
+    if (stat(st) && t > 0.35) break;
+  }
+
+  // Ultima clipă, așezat: pe fund, fără avânt.
+  cadre.push({ t, x: st.x, y: st.y, h: 0, drum });
+
+  return {
+    cadre,
+    durata: t,
+    drum,
+    // Încotro a plecat: din asta se află axa în jurul căreia se rostogolește.
+    plecare: { vx: st.vx, vy: st.vy },
+  };
+}
+
+/**
+ * Unde e zarul la clipa cerută, între două cadre socotite.
+ * Întoarce și `ramas`: cât drum mai are de făcut, din care se scoate rotirea.
+ */
+export function laClipa(drumul, secunde) {
+  const c = drumul.cadre;
+  if (!c.length) return { x: 0, y: 0, h: 0, ramas: 0, gata: true };
+  if (secunde >= drumul.durata) {
+    const u = c[c.length - 1];
+    return { x: u.x, y: u.y, h: 0, ramas: 0, gata: true };
+  }
+  // Cadrele sunt la pas egal, deci locul se află împărțind, nu căutând.
+  const i = Math.min(c.length - 2, Math.max(0, Math.floor(secunde / (drumul.durata / (c.length - 1)))));
+  const a = c[i], b = c[i + 1];
+  const intre = b.t === a.t ? 0 : (secunde - a.t) / (b.t - a.t);
+  const k = Math.max(0, Math.min(1, intre));
+  const drumFacut = a.drum + (b.drum - a.drum) * k;
+  return {
+    x: a.x + (b.x - a.x) * k,
+    y: a.y + (b.y - a.y) * k,
+    h: a.h + (b.h - a.h) * k,
+    ramas: Math.max(0, drumul.drum - drumFacut),
+    gata: false,
+  };
+}

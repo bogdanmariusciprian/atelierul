@@ -402,10 +402,33 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   const q = new THREE.Quaternion();
   const qTinta = new THREE.Quaternion();
+  const qRoata = new THREE.Quaternion();
+  const axa = new THREE.Vector3(0, 0, -1);
   const euler = new THREE.Euler();
   let inAsezare = 0;                    // 0 = nu, altfel clipa de pornire
 
   function deseneaza() { randor.render(scena, camera); }
+
+  /** Rotația la care fața cerută stă sus. */
+  function catreFata(fata) {
+    const r = SPRE_SUS[fata] || SPRE_SUS[1];
+    return new THREE.Quaternion().setFromEuler(new THREE.Euler(r.x, r.y, r.z, "XYZ"));
+  }
+
+  /**
+   * Axa în jurul căreia se rostogolește un zar care merge într-o direcție.
+   *
+   * Un zar care se duce spre dreapta se dă peste cap în jurul unei axe culcate,
+   * PERPENDICULARĂ pe mersul lui. Nu e o alegere de frumusețe: dacă axa n-ar fi
+   * perpendiculară, zarul ar aluneca răsucindu-se, nu s-ar rostogoli, iar ochiul
+   * prinde deosebirea imediat.
+   */
+  function axaRostogolirii(dx, dz) {
+    const lung = Math.hypot(dx, dz);
+    if (lung < 1e-6) return axa.set(0, 0, -1);
+    // sus × mers, adică (0,1,0) × (dx,0,dz)
+    return axa.set(dz / lung, 0, -dx / lung);
+  }
 
   function aseaza(nx, ny, nh, rx, ry) {
     zar.position.set(
@@ -422,8 +445,49 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     deseneaza();
   }
 
+  /* ROSTOGOLIREA PLANIFICATĂ.
+     `ramas` e cât drum mai are zarul de făcut. Rotirea se scoate din el, nu din
+     ceas: un zar care mai are de mers se mai dă peste cap, iar când n-a mai
+     rămas nimic de mers, s-a oprit. Unghiul se stinge singur la zero exact
+     odată cu drumul, deci fața cerută iese sus fără nicio corectură.
+
+     `unghiul = ramas / raza` e chiar rostogolirea adevărată: un cerc de rază r
+     care se duce cu r înainte s-a rotit cu un radian. Turele în plus se sting
+     și ele odată cu drumul, ca la început să pară aruncat cu putere. */
+  function aseazaRostogolit(nx, ny, nh, fata, ramas, tot) {
+    inAsezare = 0;
+    zar.position.set(
+      strange(nx * RAZA_DRUMULUI),
+      marime / 2 + Math.max(0, nh) * latura,
+      strange(ny * RAZA_DRUMULUI)
+    );
+    const parte = tot > 0 ? ramas / tot : 0;
+    const unghi = ramas / (marime / 2) + parte * Math.PI * 4;
+    qRoata.setFromAxisAngle(axa, unghi);
+    zar.quaternion.copy(qRoata).multiply(catreFata(fata));
+    deseneaza();
+  }
+
+  /** Plimbatul cu degetul: se rostogolește cât îl duci, în jurul mersului. */
+  function plimba(nx, ny, nh, dx, dz) {
+    inAsezare = 0;
+    zar.position.set(
+      strange(nx * RAZA_DRUMULUI),
+      marime / 2 + Math.max(0, nh) * latura,
+      strange(ny * RAZA_DRUMULUI)
+    );
+    const lung = Math.hypot(dx, dz);
+    if (lung > 1e-4) {
+      qRoata.setFromAxisAngle(axaRostogolirii(dx, dz), lung / (marime / 2));
+      zar.quaternion.premultiply(qRoata);
+    }
+    deseneaza();
+  }
+
   /* Așezarea pe fața care a picat. Nu sărim la ea, ne ducem lin: un zar care
-     se oprește sare ultima dată puțin și se lasă pe față, nu se teleportează. */
+     se oprește sare ultima dată puțin și se lasă pe față, nu se teleportează.
+     A rămas pentru drumurile care NU sunt planificate (zarul din CSS, ori
+     aruncarea celui care a cerut mai puțină mișcare). */
   function asazaFata(fata, ms = 420) {
     const r = SPRE_SUS[fata] || SPRE_SUS[1];
     qTinta.setFromEuler(new THREE.Euler(r.x, r.y, r.z, "XYZ"));
@@ -453,6 +517,10 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
 
   return {
     panza,
+    /** Se pregătește pentru o aruncare: axa se ia din direcția de plecare. */
+    pregateste(vx, vy) { axaRostogolirii(vx, vy); },
+    aseazaRostogolit,
+    plimba,
     /* Cât ține jumătate de zar din caseta întreagă. Caseta e mai mare decât
        lemnul, cu marginea dinăuntru, iar cine socotește drumul zarului trebuie
        să afle asta de la noi, nu s-o ghicească. */
