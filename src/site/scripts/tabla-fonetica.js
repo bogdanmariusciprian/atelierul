@@ -2208,8 +2208,8 @@ async function aruncaZarul() {
      Zarul care ricoșează urcă peste marginea casetei, și acolo se tăia. Îi dau
      un pătrat de două ori și ceva cât caseta, cât ține rostogolirea: e
      destul pentru orice săritură, și e destul de mic cât desimea desenului să
-     rămână întreagă. Tăvița cade pe aceiași pixeli, deci nu se clatină nimic. */
-  if (zar3d) zar3d.larg(2.2);
+     deci nu se clatină nimic. */
+  if (zar3d) zar3d.larg(2.8);
 
   /* CUTIA ÎN CARE SE PETRECE TOTUL.
      Când desenează scena, fizica lucrează chiar în unitățile ei: pereții sunt
@@ -2446,11 +2446,11 @@ function leagana() {
 
      Prisosul NU se retează, se așază pe scara tăviței: aceeași curbă, aceiași
      zece pași, doar între alte capete. Retezat, sfertul de sus al drumului
-     ajungea tot la 3200 și rostogolirea nu mai creștea deloc după jumătate,
+     ajungea tot la plafon și rostogolirea nu mai creștea deloc după jumătate,
      adică boala de care tocmai scăpasem, mutată în tăviță. Așa, și zborul, și
      rostogolirea cresc tot drumul; doar că una se măsoară în ce vede ochiul,
      cealaltă în ce încape în tablou. */
-  const CAT_DUCE_TAVA = 3200;
+  const CAT_DUCE_TAVA = 4200;
 
   /* DOUĂ MĂSURI, FIINDCĂ SUNT DOUĂ LUCRURI DEOSEBITE.
 
