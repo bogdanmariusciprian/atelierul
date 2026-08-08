@@ -880,7 +880,11 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
       W = H = Math.round(c.width * cat);
       X = Math.round(c.left + c.width / 2 - W / 2);
       Y = Math.round(c.top + c.height / 2 - H / 2);
-      desime = Math.min((window.devicePixelRatio || 1) * DESIME, 4);
+      /* Într-un pătrat mic desimea poate rămâne deplină; într-unul de aproape
+         patru ori cât caseta, patru ori desimea ar însemna șapte milioane de
+         puncte pe cadru chiar în clipa rostogolirii. Se strânge deci după cât
+         de lat e, ca socoteala să rămână aceeași oriunde. */
+      desime = Math.min((window.devicePixelRatio || 1) * DESIME, cat > 3 ? 3 : 4);
     } else {
       X = 0; Y = 0;
       W = Math.round(window.innerWidth); H = Math.round(window.innerHeight);

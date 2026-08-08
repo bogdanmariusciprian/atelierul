@@ -772,14 +772,16 @@
    Coordonatele sunt pe MĂNUNCHI, nu pe fiecare în parte: așa se mișcă împreună
    și nu se pot despărți din greșeală la vreo schimbare de așezare. */
 /* AȘEZAREA MĂNUNCHIULUI, ȘI CE ATÂRNĂ DE EA.
-   Ridicat de la 18 la 36 de pixeli și împins de la 18 la 10 spre dreapta. Cei
-   opt pixeli dați dreptei nu-s gratis: spre marginea ferestrei rămân acum 100
-   de pixeli de la mijlocul tăviței, nu 108, iar aceia sunt chiar locul în care
-   încape zarul când ricoșează sus și se umflă apropiindu-se de cameră. Numărul
-   e păzit în `sandbox-zar.js`; dacă mănunchiul se mai mută vreodată, se mută și
-   acolo, altfel proba spune adevărul despre altă tablă decât cea de pe ecran. */
+   Tras de lângă colț: 92 de pixeli de la marginea din dreapta și 70 de la cea
+   de jos. Depărtarea asta nu e numai de așezare, e și de fizică: de la mijlocul
+   tăviței până la marginea ferestrei rămân acum 182 de pixeli, iar aceia sunt
+   chiar locul în care încape zarul când ricoșează sus și se umflă apropiindu-se
+   de cameră. Lipit de colț, cum stătea, avea numai 100, și de-aia săriturile
+   mari se tăiau. Numărul e păzit în `sandbox-zar.js` și legat de foaia asta
+   printr-o probă: dacă mănunchiul se mai mută vreodată și uit să potrivesc
+   sandboxul, cade proba, nu se strică zarul. */
 .unelte-jos {
-  position: fixed; right: 10px; bottom: 36px; z-index: 40;
+  position: fixed; right: 92px; bottom: 70px; z-index: 40;
   display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
   user-select: none;
 }
