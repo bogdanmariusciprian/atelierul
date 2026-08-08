@@ -2663,17 +2663,32 @@ function leagana() {
     urca(INALT);
   });
 
-  /* PRIVIREA URMEAZĂ DEGETUL.
-     Cât timp doar treci pe deasupra, fără să apeși, tăvița se lasă sub deget.
-     Și fiindcă se lasă cu mai mult decât unghiul de la care lucrurile pornesc
-     la vale, zarul chiar lunecă spre colțul coborât: de-aia se cheamă `leagana`
-     imediat după, ca fizica să afle că i s-a schimbat panta. */
+  /* PRIVIREA URMEAZĂ DEGETUL, ȘI DE MULT MAI DEPARTE DECÂT ÎNAINTE.
+
+     Ascultam degetul numai cât stătea CHIAR pe tăviță, fiindcă ascultam butonul.
+     Ieșeai un pixel din ea și tăvița îngheța, iar drumul de la mijloc până la
+     înclinarea deplină avea vreo sută de pixeli: prea strâmt ca să se simtă că
+     tăvița te urmărește. Ascult acum toată fereastra și socotesc depărtarea de
+     mijlocul tăviței, iar înclinarea deplină vine abia la aproape două lățimi
+     de casetă. Așa se poate legăna și de departe, iar mișcarea are unde să se
+     desfășoare.
+
+     Fiindcă tăvița se lasă cu mai mult decât unghiul de la care lucrurile
+     pornesc la vale, zarul chiar lunecă spre colțul coborât: de-aia se cheamă
+     `leagana` imediat după, ca fizica să afle că i s-a schimbat panta. */
+  const RAZA_ASCULTARII = 1.9;      // în jumătăți de casetă, de la mijlocul ei
+
+  window.addEventListener('pointermove', (e) => {
+    if (!zar3d || prins || seRostogoleste || faraMiscare()) return;
+    const p = inTavita(e);
+    const raza = (p.L / 2) * RAZA_ASCULTARII;
+    const departe = Math.hypot(p.x, p.y);
+    if (departe > raza * 1.35) { zar3d.priveste(0, 0); leagana(); return; }
+    zar3d.priveste(p.x / raza, p.y / raza);
+    leagana();
+  }, { passive: true });
+
   elZar.addEventListener('pointermove', (e) => {
-    if (zar3d && !prins && !seRostogoleste && !faraMiscare()) {
-      const p = inTavita(e);
-      zar3d.priveste((p.x / (p.L / 2)) * 0.9, (p.y / (p.L / 2)) * 0.9);
-      leagana();
-    }
     if (!prins || e.pointerId !== prins.id) return;
     const p = inTavita(e);
     const dx = p.x - prins.x, dy = p.y - prins.y;
@@ -2828,10 +2843,11 @@ function leagana() {
     prastia(luat, avant);
   };
   elZar.addEventListener('pointerup', dat);
-  /* Degetul a plecat: tăvița se îndreaptă lin la loc. Zarul rămâne unde a
-     lunecat, cum ar rămâne și pe masă. */
-  elZar.addEventListener('pointerleave', () => {
-    if (zar3d && !prins) { zar3d.priveste(0, 0); leagana(); }
+  /* Degetul a ieșit cu totul din fereastră: tăvița se îndreaptă lin la loc.
+     Cât e în fereastră, de asta are grijă ascultătorul de mai sus, care o
+     îndreaptă singur pe măsură ce te depărtezi. */
+  window.addEventListener('pointerout', (e) => {
+    if (zar3d && !prins && !e.relatedTarget) { zar3d.priveste(0, 0); leagana(); }
   });
 
   elZar.addEventListener('pointercancel', () => {
