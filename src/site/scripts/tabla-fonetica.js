@@ -2676,15 +2676,41 @@ function leagana() {
      Fiindcă tăvița se lasă cu mai mult decât unghiul de la care lucrurile
      pornesc la vale, zarul chiar lunecă spre colțul coborât: de-aia se cheamă
      `leagana` imediat după, ca fizica să afle că i s-a schimbat panta. */
-  const RAZA_ASCULTARII = 1.9;      // în jumătăți de casetă, de la mijlocul ei
+  /* CELE DOUĂ RAZE, ȘI DE CE-S DOUĂ.
+
+     Cu una singură, tăvița se lăsa deplin la marginea ei și rămânea așa până
+     ieșeai dintr-un cerc, iar acolo se îndrepta dintr-odată. Se vedea limpede
+     hotarul, adică tocmai lucrul care n-ar trebui să se vadă niciodată.
+
+     Acum sunt două: una unde înclinarea ajunge deplină, alta, mult mai
+     departe, unde se stinge cu totul. Între ele tăvița se îndreaptă LIN pe
+     măsură ce te depărtezi, cu o trecere netedă la amândouă capetele, așa că
+     nu mai există niciun loc de unde să se vadă că a început sau s-a sfârșit
+     ceva. Te apropii, se lasă spre tine; pleci, se așază la loc singură,
+     încet, cum se așază un lucru pe care l-ai lăsat în pace. */
+  const RAZA_DEPLINA = 1.9;         // în jumătăți de casetă: unde se lasă cu totul
+  const RAZA_STINSA = 4.2;          // și unde nu mai simte deloc degetul
+
+  /* Trecere netedă între două praguri: pornește din zero, ajunge la unu, și la
+     amândouă capetele are panta zero, deci nu se simte nicio smucitură. */
+  const lin = (v, a, b) => {
+    const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
 
   window.addEventListener('pointermove', (e) => {
     if (!zar3d || prins || seRostogoleste || faraMiscare()) return;
     const p = inTavita(e);
-    const raza = (p.L / 2) * RAZA_ASCULTARII;
-    const departe = Math.hypot(p.x, p.y);
-    if (departe > raza * 1.35) { zar3d.priveste(0, 0); leagana(); return; }
-    zar3d.priveste(p.x / raza, p.y / raza);
+    const jum = p.L / 2;
+    const departe = Math.hypot(p.x, p.y) || 1;
+    /* Creșterea e un sfert de sinusoidă, nu o dreaptă. Aproape de mijloc
+       pornește mai iute decât ar porni o dreaptă, deci se simte îndată; iar la
+       capăt ajunge cu panta zero, deci se împreunează neted cu stingerea și
+       nicăieri, nici măcar chiar în vârf, nu se simte vreun colț. */
+    const catre = Math.sin(Math.min(1, departe / (jum * RAZA_DEPLINA)) * (Math.PI / 2));
+    const stins = 1 - lin(departe, jum * RAZA_DEPLINA, jum * RAZA_STINSA);
+    const putere = catre * stins;
+    zar3d.priveste((p.x / departe) * putere, (p.y / departe) * putere);
     leagana();
   }, { passive: true });
 
