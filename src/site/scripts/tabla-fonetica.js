@@ -2006,10 +2006,26 @@ let seRostogoleste = false;
 const faraMiscare = () =>
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/* ÎNCLINAREA DE REPAUS.
+
+   Fizica hotărăște CE FAȚĂ a picat, și o întoarce exact spre tine. Numai că un
+   cub privit drept în față nu se mai vede că e cub: rămâne un pătrat cu puncte,
+   plat ca un buton. De-aia îl privim puțin de sus și din dreapta.
+
+   Înclinarea se pune ÎNAINTEA rotirii feței, nu după: așa ea se socotește față
+   de ecran, nu față de zar, iar unghiul din care privim rămâne același pentru
+   toate cele șase fețe. Pusă după, fiecare față ar fi ieșit întoarsă altfel.
+
+   Fizica nu se atinge deloc: ea spune ce s-a întâmplat, asta spune doar de unde
+   ne uităm. */
+const INCLINARE = { rx: -18, ry: 26 };
+
 function asazaZarul(x, y, h, rx, ry) {
   if (!elZar) return;
   elZar.style.transform =
-    `translate3d(${x}px, ${y}px, ${h}px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+    `translate3d(${x}px, ${y}px, ${h}px)` +
+    ` rotateX(${INCLINARE.rx}deg) rotateY(${INCLINARE.ry}deg)` +
+    ` rotateX(${rx}deg) rotateY(${ry}deg)`;
   if (elUmbra) {
     // Umbra rămâne pe fundul tăviței și se strânge cu cât zarul e mai sus:
     // așa se citește înălțimea săriturii, care altfel nu s-ar vedea deloc.
@@ -2120,6 +2136,10 @@ function gataAruncarea(fata) {
 }
 
 elZar && elZar.addEventListener('click', aruncaZarul);
+
+/* Zarul stă înclinat de la bun început, nu abia după prima aruncare: altfel
+   te-ar întâmpina un pătrat, și abia pe urmă ai afla că e un zar. */
+if (elZar) asazaZarul(0, 0, 0, 0, 0);
 
 /* ============================================================
    GENERATORUL
