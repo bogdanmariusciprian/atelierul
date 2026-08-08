@@ -2304,7 +2304,16 @@ function gataAruncarea(fata) {
     urca(INALT);
   });
 
+  /* PRIVIREA URMEAZĂ DEGETUL.
+     Cât timp doar treci pe deasupra, fără să apeși, tăvița se întoarce ușor
+     spre tine. E singurul semn că lucrul de acolo are volum, înainte să-l
+     atingi. Nu se face cât ții zarul (atunci degetul are altă treabă) și nici
+     cât se rostogolește (atunci mișcarea ar fi două lucruri deodată). */
   elZar.addEventListener('pointermove', (e) => {
+    if (zar3d && !prins && !seRostogoleste && !faraMiscare()) {
+      const p = inTavita(e);
+      zar3d.priveste((p.x / (p.L / 2)) * 0.9, (p.y / (p.L / 2)) * 0.9);
+    }
     if (!prins || e.pointerId !== prins.id) return;
     const p = inTavita(e);
     const dx = p.x - prins.x, dy = p.y - prins.y;
@@ -2356,6 +2365,9 @@ function gataAruncarea(fata) {
     aruncaZarul();
   };
   elZar.addEventListener('pointerup', dat);
+  /* Degetul a plecat: privirea se întoarce lin la locul ei. */
+  elZar.addEventListener('pointerleave', () => { if (zar3d && !prins) zar3d.priveste(0, 0); });
+
   elZar.addEventListener('pointercancel', () => {
     if (!prins) return;
     prins = null;

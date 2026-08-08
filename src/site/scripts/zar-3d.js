@@ -250,8 +250,35 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   const DEPARTARE = CUPRINS / (2 * Math.tan(THREE.MathUtils.degToRad(13)));
   const INCLINARE = THREE.MathUtils.degToRad(68);
   const camera = new THREE.PerspectiveCamera(26, 1, DEPARTARE * 0.4, DEPARTARE * 2.2);
-  camera.position.set(0, DEPARTARE * Math.sin(INCLINARE), DEPARTARE * Math.cos(INCLINARE));
-  camera.lookAt(0, 0, 0);
+
+  /* ---------- PRIVIREA CARE URMEAZĂ DEGETUL ----------
+
+     Când treci cu mausul peste tăviță, ea se întoarce puțin spre tine. Se mișcă
+     însă CAMERA, nu tăvița: e ca și cum te-ai apleca tu deasupra mesei, nu ca
+     și cum ar sălta masa. Deosebirea se vede imediat, fiindcă lumina și umbrele
+     rămân pe loc: mișcându-ți capul, nu muți și lampa din tavan.
+
+     Abaterile sunt mici dinadins. Peste vreo zece grade, un pătrat privit
+     dintr-o parte începe iar să pară trapez, adică exact greșeala pe care am
+     îndreptat-o mai devreme. Iar înclinarea nu coboară sub 63 de grade, ca
+     tăvița să rămână tăviță, nu masă răsturnată. */
+  const ROTIRE_MAX = THREE.MathUtils.degToRad(9);   // stânga-dreapta
+  const APLECARE_MAX = THREE.MathUtils.degToRad(5); // sus-jos
+  const tinta = { az: 0, inc: 0 };                  // unde vrea privirea, -1..1
+  const acum = { az: 0, inc: 0 };                   // unde a ajuns
+  let aluneca = false;
+
+  function asazaCamera() {
+    const az = acum.az * ROTIRE_MAX;
+    const inc = INCLINARE + acum.inc * APLECARE_MAX;
+    camera.position.set(
+      DEPARTARE * Math.cos(inc) * Math.sin(az),
+      DEPARTARE * Math.sin(inc),
+      DEPARTARE * Math.cos(inc) * Math.cos(az)
+    );
+    camera.lookAt(0, 0, 0);
+  }
+  asazaCamera();
 
   /* ---------- lumina ----------
      Trei surse, fiecare cu treaba ei:
@@ -526,8 +553,38 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   asazaFata(1, 1);
   deseneaza();
 
+  /* Privirea nu sare la deget, ci alunecă spre el. O cameră care se mută
+     dintr-odată la fiecare zvâcnire de maus dă amețeală; una care se duce lin
+     se simte ca o greutate adevărată. Alunecarea se oprește singură când a
+     ajuns, ca să nu desenăm de pomană. */
+  function porneșteAlunecarea() {
+    if (aluneca) return;
+    aluneca = true;
+    (function pas() {
+      const dAz = tinta.az - acum.az, dInc = tinta.inc - acum.inc;
+      acum.az += dAz * 0.12;
+      acum.inc += dInc * 0.12;
+      asazaCamera();
+      deseneaza();
+      if (Math.abs(dAz) > 0.002 || Math.abs(dInc) > 0.002) requestAnimationFrame(pas);
+      else { acum.az = tinta.az; acum.inc = tinta.inc; asazaCamera(); deseneaza(); aluneca = false; }
+    })();
+  }
+
+  const strangeUnu = (v) => Math.max(-1, Math.min(1, v));
+
   return {
     panza,
+    /**
+     * Întoarce privirea spre deget. `nx` și `ny` sunt între -1 și 1, măsurate
+     * din mijlocul tăviței. Cheamă-l cu (0, 0) când degetul pleacă.
+     */
+    priveste(nx, ny) {
+      tinta.az = strangeUnu(nx);
+      // Degetul sus înseamnă privire de mai sus, deci semnul se întoarce.
+      tinta.inc = strangeUnu(-ny);
+      porneșteAlunecarea();
+    },
     /** Cât loc are zarul între pereți, în unitățile scenei. Fizica lucrează în ele. */
     interior: INTERIOR,
     marimeaZarului: marime,
