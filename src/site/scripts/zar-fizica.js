@@ -302,6 +302,9 @@ export function pornire(cutie, { aleator = Math.random, deLa = null } = {}) {
     v,
     q: normeazaQ({ x: aleator() - 0.5, y: aleator() - 0.5, z: aleator() - 0.5, w: aleator() - 0.5 }),
     w,
+    /* Încotro trage greutatea, în sistemul tăviței. Cu tăvița dreaptă e chiar
+       „în jos"; se schimbă prin `inclina`. */
+    g: v3(0, -1, 0),
     liniste: 0,
     doarme: false,
     tarie: 0,          // cât de tare a fost ultima lovitură, pentru „clac"
@@ -325,8 +328,16 @@ export function pas(st, dt) {
   /* ÎN AER lucrează doar greutatea și aerul.
      LEGEA 7: momentul cinetic se păstrează, deci rotirea NU scade în aer. Asta
      era o greșeală veche: aveam o frecare a rotirii care lucra și în zbor.
-     LEGEA 15: aerul frânează cu pătratul vitezei, neînsemnat aici, dar pus. */
-  st.v.y -= GRAVITATIE * dt;
+     LEGEA 15: aerul frânează cu pătratul vitezei, neînsemnat aici, dar pus.
+
+     GREUTATEA ARE DIRECȚIE, nu e „minus y".
+     Toată socoteala se face în sistemul TĂVIȚEI: pereții sunt acolo unde sunt,
+     fundul e la y = 0. Când tăvița se înclină, în sistemul ei nu se mișcă nimic
+     din toate astea; se mută doar încotro trage greutatea. Un singur vector
+     schimbat, și panta e o pantă adevărată: zarul lunecă la vale sau se agață,
+     după cum îi îngăduie frecarea. N-am scris nicăieri „lunecă". */
+  const g = st.g || v3(0, -1, 0);
+  st.v = aduna(st.v, inmulteste(g, GRAVITATIE * dt));
   const vit = lungime(st.v);
   if (vit > 1e-6) st.v = scade(st.v, inmulteste(st.v, AER * vit * dt));
 
@@ -449,6 +460,50 @@ export function pas(st, dt) {
 
   return st;
 }
+
+/**
+ * TĂVIȚA S-A LĂSAT ÎNTR-O PARTE.
+ *
+ * `unghiX` și `unghiZ` sunt cât s-a rotit tăvița în lume, în radiani, în jurul
+ * axelor X și Z. Nu mișcăm nici pereții, nici fundul: în sistemul tăviței ele
+ * n-au unde se duce. Întoarcem greutatea, care e singurul lucru din afară:
+ *
+ *     g_tăviță = Rᵀ · (0, −1, 0)
+ *
+ * Din atât iese totul. Cât panta e sub unghiul de frecare statică, `arctg(μs)`,
+ * frecarea din contact ține zarul locului fără nicio poruncă de la noi: chiar
+ * asta face rezolvitorul de atingeri, mărginind frecarea la conul lui Coulomb.
+ * Peste unghiul acela, conul nu mai are cu ce ține și zarul PLEACĂ la vale, tot
+ * singur. Și fiindcă frecarea de mers (0,24) e mai mică decât cea de agățare
+ * (0,30), odată pornit se oprește abia mai jos decât unghiul la care a plecat:
+ * histerezisul acela e adevărat și se vede cu ochiul liber pe orice masă.
+ *
+ * Singurul lucru de făcut cu mâna e trezirea: un zar adormit nu mai socotește
+ * nimic, deci n-ar afla niciodată că masa s-a înclinat sub el.
+ */
+export function inclina(st, unghiX = 0, unghiZ = 0) {
+  const cx = Math.cos(unghiX), sx = Math.sin(unghiX);
+  const cz = Math.cos(unghiZ), sz = Math.sin(unghiZ);
+  st.g = v3(-sz * cx, -cz * cx, sx);
+
+  /* Panta, măsurată ca abatere a greutății de la verticală. `-g.y` e cosinusul
+     ei, deci tangenta iese din ce a rămas. */
+  const cosPanta = Math.max(-1, Math.min(1, -st.g.y));
+  const tgPanta = Math.sqrt(Math.max(0, 1 - cosPanta * cosPanta)) / Math.max(1e-6, cosPanta);
+
+  if (st.doarme && tgPanta > FRECARE_STATICA) {
+    st.doarme = false;
+    st.liniste = 0;
+  }
+  return st;
+}
+
+/** Cât de mare e panta simțită de zar, în radiani. Pentru probe. */
+export const panta = (st) => Math.acos(Math.max(-1, Math.min(1, -(st.g || v3(0, -1, 0)).y)));
+
+/** Unghiul de la care un corp pornește la vale. Ține de frecare, nu de gust. */
+export const UNGHIUL_DE_AGATARE = Math.atan(FRECARE_STATICA);
+export const UNGHIUL_DE_LUNECARE = Math.atan(FRECARE);
 
 /** S-a oprit? */
 export const stat = (st) => !!st.doarme;

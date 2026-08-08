@@ -892,6 +892,26 @@
   transition: opacity .28s ease;
 }
 
+/* CÂT ȚII ZARUL AFARĂ DIN TĂVIȚĂ, pânza se face cât fereastra, ca zarul să aibă
+   pe ce se desena acolo unde l-ai dus. Tăvița rămâne pe aceiași pixeli: de asta
+   are grijă camera, prin `setViewOffset`.
+
+   Pânza e mutată atunci în `body`, nu lăsată pe loc cu `position: fixed`. Un
+   `fixed` se agață de primul strămoș cu `transform`, iar dacă apare vreodată
+   unul deasupra tăviței, pânza s-ar așeza după el, nu după fereastră. Am mai
+   pățit-o o dată în casa asta. Mutată în `body`, n-are cum.
+
+   Fiindcă e mutată, nu mai poate fi aprinsă de `.zar-tavita.e-3d .zar-panza`:
+   de-aia își aprinde singură lumina aici. */
+.zar-panza.e-larg {
+  position: fixed;
+  inset: 0;
+  width: 100vw; height: 100vh;
+  opacity: 1;
+  transition: none;
+  z-index: 60;              /* peste pagină, sub ferestre și sub bara de sus */
+}
+
 /* Caseta crește cu marginea dinăuntru (150 → 180), ca lemnul să rămână la
    mărimea lui. Mănunchiul e prins de colțul din dreapta jos, deci creșterea se
    duce în sus și spre stânga: nici peste buton, nici peste marginea ferestrei. */

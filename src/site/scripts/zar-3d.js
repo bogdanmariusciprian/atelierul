@@ -251,34 +251,41 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   const INCLINARE = THREE.MathUtils.degToRad(68);
   const camera = new THREE.PerspectiveCamera(26, 1, DEPARTARE * 0.4, DEPARTARE * 2.2);
 
-  /* ---------- PRIVIREA CARE URMEAZĂ DEGETUL ----------
+  camera.position.set(0, DEPARTARE * Math.sin(INCLINARE), DEPARTARE * Math.cos(INCLINARE));
+  camera.lookAt(0, 0, 0);
 
-     Când treci cu mausul peste tăviță, ea se întoarce puțin spre tine. Se mișcă
-     însă CAMERA, nu tăvița: e ca și cum te-ai apleca tu deasupra mesei, nu ca
-     și cum ar sălta masa. Deosebirea se vede imediat, fiindcă lumina și umbrele
-     rămân pe loc: mișcându-ți capul, nu muți și lampa din tavan.
+  /* ---------- TĂVIȚA SE ÎNCLINĂ DUPĂ DEGET ----------
 
-     Abaterile sunt mici dinadins. Peste vreo zece grade, un pătrat privit
-     dintr-o parte începe iar să pară trapez, adică exact greșeala pe care am
-     îndreptat-o mai devreme. Iar înclinarea nu coboară sub 63 de grade, ca
-     tăvița să rămână tăviță, nu masă răsturnată. */
-  const ROTIRE_MAX = THREE.MathUtils.degToRad(9);   // stânga-dreapta
-  const APLECARE_MAX = THREE.MathUtils.degToRad(5); // sus-jos
-  const tinta = { az: 0, inc: 0 };                  // unde vrea privirea, -1..1
-  const acum = { az: 0, inc: 0 };                   // unde a ajuns
+     Întâi am mișcat camera, adică am făcut ca și cum te-ai apleca tu deasupra
+     mesei. Era o alegere curată, dar nu se vedea: pe un pătrat de 150 de pixeli,
+     nouă grade de cameră înseamnă doi-trei pixeli. Se mișcă acum chiar tăvița,
+     ca și cum ai ține-o în palme și ai lăsa-o puțin într-o parte.
+
+     ÎNCLINAREA TRECE ACUM PESTE UNGHIUL DE FRECARE, ȘI E BINE CĂ TRECE.
+     Ținusem 10 grade tocmai ca să rămân sub `arctg(μs) = 16,7°`, adică sub
+     unghiul de la care un corp pornește la vale. Era o alegere fricoasă: ca să
+     nu mint, nu spuneam nimic. Acum înclin 18 grade și las zarul SĂ LUNECE de-a
+     binelea, ceea ce e și mai adevărat, și mult mai de văzut.
+
+     Pragul se simte cu degetul, fiindcă e adevărat: pe la mijlocul drumului
+     zarul încă se ține, iar de pe la trei sferturi se urnește și se duce în
+     colț. Iar fiindcă frecarea de mers e mai mică decât cea de agățare, odată
+     pornit nu se mai oprește decât mai jos decât unghiul la care a plecat.
+     Nimic din toate astea nu e scris nicăieri: iese din `inclina` + `pas`.
+
+     Lumina NU se înclină odată cu tăvița, fiindcă lumina e a odăii, nu a mesei.
+     De-aia, cât o legeni, lucirea se plimbă pe lemn și pe zar. Ăsta e semnul
+     că lucrul are volum, și tocmai el lipsea. */
+  const INCLINARE_MAX = THREE.MathUtils.degToRad(18);
+  const tinta = { x: 0, z: 0 };
+  const acum = { x: 0, z: 0 };
   let aluneca = false;
 
-  function asazaCamera() {
-    const az = acum.az * ROTIRE_MAX;
-    const inc = INCLINARE + acum.inc * APLECARE_MAX;
-    camera.position.set(
-      DEPARTARE * Math.cos(inc) * Math.sin(az),
-      DEPARTARE * Math.sin(inc),
-      DEPARTARE * Math.cos(inc) * Math.cos(az)
-    );
-    camera.lookAt(0, 0, 0);
-  }
-  asazaCamera();
+  /* Tot ce ține de masă intră într-un singur grup, ca înclinarea să fie una
+     singură, nu patru potrivite între ele. Zarul intră și el: o tăviță care se
+     lasă într-o parte fără zarul din ea ar fi o nălucă. */
+  const masa = new THREE.Group();
+  scena.add(masa);
 
   /* ---------- lumina ----------
      Trei surse, fiecare cu treaba ei:
@@ -338,20 +345,29 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   fund.position.y = -3;
   fund.receiveShadow = true;
   fund.castShadow = true;
-  scena.add(fund);
+  masa.add(fund);
 
   /* MASA DE DEDESUBT, care nu se vede.
      Fără ea, tăvița ar pluti: n-ar avea pe ce să-și lase umbra, iar un lucru
      fără umbră nu stă nicăieri. E o suprafață care primește doar umbre și
      altceva nimic, așa că în jurul tăviței rămâne pagina, cu umbra peste ea. */
-  const masa = new THREE.Mesh(
+  const masaUmbrei = new THREE.Mesh(
     new THREE.PlaneGeometry(900, 900),
     new THREE.ShadowMaterial({ opacity: 0.26 })
   );
-  masa.rotation.x = -Math.PI / 2;
-  masa.position.y = -6.05;
-  masa.receiveShadow = true;
-  scena.add(masa);
+  masaUmbrei.rotation.x = -Math.PI / 2;
+  masaUmbrei.position.y = -6.05;
+  masaUmbrei.receiveShadow = true;
+  /* MASA CARE PRINDE UMBRA MERGE CU TĂVIȚA, ȘI IATĂ DE CE.
+     Curat ar fi s-o las pe loc: legeni tăvița, masa de sub ea stă. Am ținut-o
+     așa cât înclinarea era de 10 grade. La 18 însă, colțul de jos al tăviței
+     coboară cu 75·sin18 = 23 de unități, adică se afundă în masă; ca să nu se
+     afunde, ar trebui ridicat tot grupul cu tot atât, iar 23 de unități ridicate
+     într-un chenar de 180 scot tăvița din desen. Din două minciuni am ales-o pe
+     cea mică: pânza pe care cade umbra se lasă odată cu tăvița, ceea ce se vede
+     doar pe franjurul de 15 unități rămas pe dinafară, și acela pe jumătate
+     topit. Cealaltă s-ar fi văzut din prima clipă. */
+  masa.add(masaUmbrei);
 
   /* Pereții: patru, ridicați pe margine. Nu-s de podoabă. Zarul se oprește la
      ei, umbra lui urcă pe ei, iar cel din față îi acoperă marginea de jos când
@@ -369,7 +385,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     p.receiveShadow = true;
     peretii.add(p);
   }
-  scena.add(peretii);
+  masa.add(peretii);
 
   /* ---------- zarul ---------- */
   const RAZA_MUCHIEI = marime * 0.16;   // cât de tocite sunt muchiile
@@ -403,7 +419,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   const zar = new THREE.Mesh(geometrie, materiale);
   zar.castShadow = true;
   zar.receiveShadow = false;
-  scena.add(zar);
+  masa.add(zar);
 
   /* ---------- legătura cu fizica ----------
      Fizica ne trimite locul zarului ADUS LA UNU: `nx` și `ny` între -1 și 1,
@@ -506,13 +522,19 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     deseneaza();
   }
 
-  /** Plimbatul cu degetul: se rostogolește cât îl duci, în jurul mersului. */
-  function plimba(nx, ny, nh, dx, dz) {
+  /**
+   * Plimbatul cu degetul: se rostogolește cât îl duci, în jurul mersului.
+   *
+   * `peste` îi ridică zăgazul: cât ține degetul zarul AFARĂ din tăviță, nu mai
+   * are rost să-l ținem între pereți, fiindcă tocmai asta se vede, că a ieșit.
+   */
+  function plimba(nx, ny, nh, dx, dz, peste = false) {
     inAsezare = 0;
+    const tine = peste ? ((v) => v) : strange;
     zar.position.set(
-      strange(nx * RAZA_DRUMULUI),
+      tine(nx * RAZA_DRUMULUI),
       marime / 2 + Math.max(0, nh) * latura,
-      strange(ny * RAZA_DRUMULUI)
+      tine(ny * RAZA_DRUMULUI)
     );
     const lung = Math.hypot(dx, dz);
     if (lung > 1e-4) {
@@ -557,32 +579,94 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      dintr-odată la fiecare zvâcnire de maus dă amețeală; una care se duce lin
      se simte ca o greutate adevărată. Alunecarea se oprește singură când a
      ajuns, ca să nu desenăm de pomană. */
+  function inclinaMasa() {
+    /* Tăvița se lasă SUB deget, nu se ferește de el: degetul la dreapta coboară
+       latura dreaptă, degetul în jos coboară latura dinspre tine. Așa se simte
+       ca o apăsare, nu ca o fugă. */
+    masa.rotation.z = -acum.x * INCLINARE_MAX;
+    masa.rotation.x = acum.z * INCLINARE_MAX;
+  }
+
   function porneșteAlunecarea() {
     if (aluneca) return;
     aluneca = true;
     (function pas() {
-      const dAz = tinta.az - acum.az, dInc = tinta.inc - acum.inc;
-      acum.az += dAz * 0.12;
-      acum.inc += dInc * 0.12;
-      asazaCamera();
+      const dx = tinta.x - acum.x, dz = tinta.z - acum.z;
+      acum.x += dx * 0.14;
+      acum.z += dz * 0.14;
+      inclinaMasa();
       deseneaza();
-      if (Math.abs(dAz) > 0.002 || Math.abs(dInc) > 0.002) requestAnimationFrame(pas);
-      else { acum.az = tinta.az; acum.inc = tinta.inc; asazaCamera(); deseneaza(); aluneca = false; }
+      if (Math.abs(dx) > 0.002 || Math.abs(dz) > 0.002) requestAnimationFrame(pas);
+      else { acum.x = tinta.x; acum.z = tinta.z; inclinaMasa(); deseneaza(); aluneca = false; }
     })();
   }
 
   const strangeUnu = (v) => Math.max(-1, Math.min(1, v));
 
+  /* ---------- PÂNZA CÂT FEREASTRA, FĂRĂ CA TĂVIȚA SĂ TRESARĂ ----------
+
+     Ca zarul să se vadă tras AFARĂ din tăviță, pânza trebuie să fie mai mare
+     decât caseta. Numai că tot ce s-a desenat până acum e potrivit pe o pânză
+     cât caseta, iar dacă schimb camera, tăvița sare în clipa trecerii.
+
+     `setViewOffset` e făcut fix pentru asta: îi spui camerei „chenarul tău
+     întreg are atâta, iar tu desenează BUCATA asta din el". Îi dau ca chenar
+     întreg caseta, și-i cer să deseneze o bucată cât toată fereastra, care
+     începe cu colțul casetei mutat la locul lui. Trunchiul de piramidă se
+     lățește în jurul aceluiași mijloc, deci fiecare punct al tăviței cade exact
+     pe pixelul pe care cădea și înainte. Nu e o potrivire din ochi: e aceeași
+     proiecție, doar tăiată mai larg.
+
+     Desimea scade cât e larg, și trebuie să scadă: 2,5 ori pe o pânză cât
+     ecranul ar însemna douăzeci de milioane de pixeli de desenat la fiecare
+     cadru, adică o smucitură exact când degetul cere lin. */
+  let elarg = false;
+  function larg() {
+    if (elarg) return;
+    elarg = true;
+    const c = tavita.getBoundingClientRect();
+    const W = Math.round(window.innerWidth), H = Math.round(window.innerHeight);
+    camera.setViewOffset(c.width, c.width, -c.left, -c.top, W, H);
+    randor.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    randor.setSize(W, H, false);
+    panza.classList.add("e-larg");
+    document.body.appendChild(panza);          // scos de sub orice `transform`
+    deseneaza();
+  }
+  function stramt() {
+    if (!elarg) return;
+    elarg = false;
+    camera.clearViewOffset();
+    randor.setPixelRatio(Math.min((window.devicePixelRatio || 1) * DESIME, 4));
+    const p = Math.round(tavita.clientWidth || panzaPx);
+    randor.setSize(p, p, false);
+    panza.classList.remove("e-larg");
+    tavita.insertBefore(panza, tavita.firstChild);
+    deseneaza();
+  }
+
   return {
     panza,
+    larg,
+    stramt,
+    /** Cât s-a lăsat tăvița chiar acum, în radiani. Fizica are nevoie de asta. */
+    inclinarea: () => ({ x: masa.rotation.x, z: masa.rotation.z }),
+    /** Unde stă zarul chiar acum. De aici se face starea de repaus a fizicii. */
+    locul: () => ({
+      r: { x: zar.position.x, y: zar.position.y, z: zar.position.z },
+      q: { x: zar.quaternion.x, y: zar.quaternion.y, z: zar.quaternion.z, w: zar.quaternion.w },
+    }),
+    /** Cât de departe de mijloc poate ajunge zarul plimbat, în unități de scenă. */
+    razaDrumului: RAZA_DRUMULUI,
+    /** Cât cuprinde camera, în unități de scenă. Cu ea se trec pixelii în scenă. */
+    latimeaScenei: latura * MARGINE,
     /**
      * Întoarce privirea spre deget. `nx` și `ny` sunt între -1 și 1, măsurate
      * din mijlocul tăviței. Cheamă-l cu (0, 0) când degetul pleacă.
      */
     priveste(nx, ny) {
-      tinta.az = strangeUnu(nx);
-      // Degetul sus înseamnă privire de mai sus, deci semnul se întoarce.
-      tinta.inc = strangeUnu(-ny);
+      tinta.x = strangeUnu(nx);
+      tinta.z = strangeUnu(ny);
       porneșteAlunecarea();
     },
     /** Cât loc are zarul între pereți, în unitățile scenei. Fizica lucrează în ele. */
@@ -605,6 +689,11 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     /* Caseta se schimbă pe telefon; pânza o urmează întocmai, fără să crească
        peste ea. Scena rămâne aceeași: se schimbă doar câți pixeli o desenează. */
     potriveste(pxCaseta) {
+      /* Cât e pânza lată cât fereastra, mărimea ei n-o mai dă caseta, ci
+         fereastra, iar decupajul camerei trebuie luat de la capăt: caseta s-a
+         mutat. O potrivire făcută atunci după casetă ar strânge pânza înapoi
+         chiar cu zarul afară din ea. */
+      if (elarg) { elarg = false; larg(); return; }
       const p = Math.round(pxCaseta || panzaPx);
       randor.setSize(p, p, false);
       deseneaza();
