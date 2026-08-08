@@ -2421,6 +2421,15 @@ function leagana() {
      se topesc, dar rândurile rămân rânduri și tabla rămâne tablă: vezi că e o
      pagină acolo, doar că nu mai e a ta acum. */
   const CEATA_MAX = 5;      // cât se topește pagina din spate, în pixeli de blur
+
+  /* ADÂNCIMEA DE CÂMP: până unde rămâne pagina limpede.
+     Jumătatea dintâi a drumului n-o clatină deloc, fiindcă atât ține adâncimea
+     de câmp: un obiectiv ține limpede tot ce e între două praguri, iar înăuntrul
+     lor nu se schimbă nimic, oricât te-ai mișca. Abia după ce fundalul a ieșit
+     din ea începe să se topească, și de-atunci repede. Așa toată schimbarea care
+     se vede se petrece în ultimul sfert de ecran, acolo unde chiar duci zarul
+     „departe de tot", și nu pe drum, unde n-ai cerut nimic. */
+  const CEATA_PRAG = 0.5;
   /* CÂT SE DĂ PESTE CAP ÎN ZBOR, față de cât s-ar da rostogolindu-se pe masă.
      Un lucru care se rostogolește pe o suprafață se învârte cu `v/r`, fiindcă
      nu alunecă. Unul zvârlit prin aer nu e ținut de nimic, deci se dă peste cap
@@ -2453,13 +2462,11 @@ function leagana() {
       ceata.className = 'zar-ceata';
       document.body.appendChild(ceata);
     }
-    /* PAGINA NU IESE DIN FOCAR DINTR-ODATĂ.
-       Un obiectiv are o adâncime de câmp: cât timp fundalul e înăuntrul ei, nu
-       se schimbă mai nimic, iar topirea se face de-abia după ce a ieșit din ea,
-       și atunci repede. De-aia ceața nu merge după `departe`, ci după pătratul
-       lui: primii pași abia se simt, iar pâcla vine la capăt. Așa zarul purtat
-       prin apropiere lasă pagina în pace, cum și trebuie. */
-    const gros = cat * cat;
+    /* Cât e fundalul în adâncimea de câmp, nu se clatină nimic; ieșit din ea,
+       se topește, și cu atât mai iute cu cât s-a depărtat mai mult. De-aia
+       întâi scad pragul, și abia ce rămâne îl ridic la pătrat. */
+    const iesit = Math.max(0, (cat - CEATA_PRAG) / (1 - CEATA_PRAG));
+    const gros = iesit * iesit;
     ceata.style.transition = lin ? 'backdrop-filter .42s ease, background-color .42s ease' : 'none';
     ceata.style.backdropFilter =
       gros <= 0.001 ? 'none' : 'blur(' + (gros * CEATA_MAX).toFixed(2) + 'px)';
