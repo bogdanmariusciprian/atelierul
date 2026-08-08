@@ -897,22 +897,47 @@
    duce în sus și spre stânga: nici peste buton, nici peste marginea ferestrei. */
 .zar-tavita.e-3d { width: 180px; height: 180px; }
 
-/* SCHIMBUL SE FACE PRIN TOPIRE, NU DINTR-O SĂRITURĂ.
+/* NIMIC NU SE VEDE PÂNĂ NU SE ȘTIE CE SE VEDE.
 
-   Pagina se deschide cu tăvița din CSS, gata de apăsat. Când scena e gata, ea
-   îi ia locul. Făcut dintr-odată, schimbul se vede ca o pâlpâire și pare o
-   scăpare. Topite una într-alta într-o treime de secundă, se citește ca o
-   imagine care se limpezește.
+   Greșeala de dinainte: pagina se deschidea cu tăvița din CSS, iar când sosea
+   scena îi lua locul. Oricât de lin ar fi fost schimbul, tot se apuca ochiul să
+   vadă desenul vechi pentru o clipă. Nu voiam „un schimb frumos", voiam ca
+   desenul vechi să nu apară deloc.
+
+   De-aia starea de PORNIRE nu mai e niciuna dintre cele două, ci așteptarea: o
+   suprafață neutră, fără lemn și fără zar. De acolo pleacă într-o singură
+   direcție, și numai când se știe încotro:
+     · `e-3d`  → scena a pornit, se aprinde pânza;
+     · `e-css` → scena nu se poate, se aprinde tăvița din foaia de stil.
+   Cea care nu s-a ales nu se aprinde niciodată, deci nu se vede niciodată.
 
    `visibility` în loc de `display`, fiindcă un lucru ascuns cu `display` nu se
-   poate stinge treptat: piere pe loc, și tocmai asta voiam să nu se întâmple. */
-.zar-tavita.e-3d .zar-panza { opacity: 1; }
+   poate stinge sau aprinde treptat: apare și piere pe loc. */
 .zar-tavita .zar-tavita__fund,
 .zar-tavita .zar-tavita__umbra,
-.zar-tavita .zar__f { transition: opacity .28s ease; }
-.zar-tavita.e-3d .zar-tavita__fund,
-.zar-tavita.e-3d .zar-tavita__umbra,
-.zar-tavita.e-3d .zar__f { opacity: 0; visibility: hidden; }
+.zar-tavita .zar__f {
+  opacity: 0; visibility: hidden;
+  transition: opacity .28s ease;
+}
+.zar-tavita.e-css .zar-tavita__fund,
+.zar-tavita.e-css .zar-tavita__umbra,
+.zar-tavita.e-css .zar__f { opacity: 1; visibility: visible; }
+.zar-tavita.e-3d .zar-panza { opacity: 1; }
+
+/* Așteptarea: o umbră de casetă, atât. Nu seamănă cu niciunul dintre cele două
+   desene, deci nu poate fi luată drept „vechiul design". */
+.zar-tavita::before {
+  content: ""; position: absolute; inset: 0; border-radius: 18px;
+  background: rgba(31, 36, 48, .055);
+  transition: opacity .28s ease;
+  pointer-events: none;
+}
+.zar-tavita.e-3d::before,
+.zar-tavita.e-css::before { opacity: 0; }
+
+/* Cât nu se știe ce se desenează, butonul nu răspunde: o apăsare care
+   rostogolește un zar nevăzut e mai rea decât una care nu face nimic. */
+.zar-tavita:not(.e-3d):not(.e-css) .zar { pointer-events: none; }
 
 /* Butonul se întinde peste toată tăvița: e mai ușor de nimerit decât un cub de
    46 de pixeli, iar cubul desenat stă oricum dedesubt, în pânză. */

@@ -2011,15 +2011,33 @@ let zar3d = null;
 
 (async () => {
   if (!elTavita || !elZar) return;
+
+  /* Până se știe ce se desenează, tăvița stă în așteptare: nici lemn din foaia
+     de stil, nici scenă. Altfel s-ar vedea desenul vechi pentru o clipă, la
+     fiecare deschidere de pagină.
+
+     Ceasul de mai jos e plasa: dacă biblioteca nu vine într-un timp omenesc
+     (rețea proastă, CDN căzut), pornim zarul simplu. Mai bine unul care merge
+     decât o casetă goală la nesfârșit. */
+  let raspuns = false;
+  const ceas = setTimeout(() => {
+    if (!raspuns) elTavita.classList.add('e-css');
+  }, 6000);
+
   try {
     const { pornesteZar3D } = await import('./zar-3d.js');
     zar3d = await pornesteZar3D(elTavita, { marime: 46, latura: 150 });
   } catch (e) {
     zar3d = null;
   }
-  if (!zar3d) return;
+  raspuns = true;
+  clearTimeout(ceas);
+
+  if (!zar3d) { elTavita.classList.add('e-css'); return; }
+
   // Din clipa asta tăvița e desenată de scenă, nu de foaia de stil, iar toată
   // suprafața ei devine buton: e mai ușor de nimerit decât un cub de 46 de px.
+  elTavita.classList.remove('e-css');
   elTavita.classList.add('e-3d');
   zar3d.potriveste(elTavita.clientWidth || 150);
   asazaZarul(0, 0, 0, 0, 0);
