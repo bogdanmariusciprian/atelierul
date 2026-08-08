@@ -2002,6 +2002,36 @@ const elVestire = document.getElementById('zarVestire');
 let ultimaFata = null;      // ca să nu iasă de două ori la rând aceeași
 let seRostogoleste = false;
 
+/* ZARUL DE STICLĂ, DACĂ SE POATE.
+   Se aduce târziu și pe tăcute: pagina se deschide cu zarul din CSS, gata de
+   apăsat, iar dacă biblioteca ajunge, ea îi ia locul fără să se vadă vreo
+   clipire. Dacă nu ajunge (fără rețea, fără WebGL, calculator vechi), rămâne
+   cel din CSS și nimeni nu vede vreo eroare. */
+let zar3d = null;
+
+(async () => {
+  if (!elTavita || !elZar) return;
+  try {
+    const { pornesteZar3D } = await import('./zar-3d.js');
+    zar3d = await pornesteZar3D(elTavita, { marime: 46, latura: 150 });
+  } catch (e) {
+    zar3d = null;
+  }
+  if (!zar3d) return;
+  // Din clipa asta tăvița e desenată de scenă, nu de foaia de stil, iar toată
+  // suprafața ei devine buton: e mai ușor de nimerit decât un cub de 46 de px.
+  elTavita.classList.add('e-3d');
+  zar3d.potriveste(elTavita.clientWidth || 150);
+  asazaZarul(0, 0, 0, 0, 0);
+})();
+
+/* Tăvița se micșorează pe telefon: pânza o urmează. */
+window.addEventListener('resize', () => {
+  if (!zar3d || !elTavita) return;
+  clearTimeout(window.__zarPotrivire);
+  window.__zarPotrivire = setTimeout(() => zar3d.potriveste(elTavita.clientWidth || 150), 120);
+});
+
 /** Cine a cerut mai puțină mișcare primește numărul, nu rostogolirea. */
 const faraMiscare = () =>
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2022,6 +2052,16 @@ const INCLINARE = { rx: -18, ry: 26 };
 
 function asazaZarul(x, y, h, rx, ry) {
   if (!elZar) return;
+
+  /* Când desenează scena, locul se dă ADUS LA UNU, nu în pixeli: scena are
+     mărimea ei, tăvița pe a ei, iar între ele nu vreau nicio socoteală de
+     pixeli care să se strice la alt ecran. */
+  if (zar3d) {
+    const L = elTavita ? (elTavita.clientWidth || 150) : 150;
+    zar3d.aseaza(x / (L / 2), y / (L / 2), h / L, rx, ry);
+    return;
+  }
+
   elZar.style.transform =
     `translate3d(${x}px, ${y}px, ${h}px)` +
     ` rotateX(${INCLINARE.rx}deg) rotateY(${INCLINARE.ry}deg)` +
@@ -2063,7 +2103,37 @@ function cheamaGeneratorul() {
   cheamaGeneratorul._t = setTimeout(() => b.classList.remove('e-chemat'), 3400);
 }
 
-function aruncaZarul() {
+/* AMESTECUL DIN PALMĂ.
+
+   Un zar nu pleacă din nemișcare: întâi îl frămânți în pumn, apoi îl scapi.
+   Aici, „pumnul" e o clipă în care zarul se zbate pe loc, cu pași mărunți și
+   fără noimă, ridicându-se totodată spre tine. Ridicarea nu e o podoabă: cu cât
+   e mai aproape, cu atât se vede mai mare, iar ochiul citește din asta că
+   lucrul are adâncime. La sfârșit e lăsat, și de acolo încolo îl duce fizica.
+
+   Se face numai când e scenă. Cu zarul din CSS n-ar avea de unde veni
+   apropierea, fiindcă acolo nu există „mai aproape". */
+function amestecaZarul(ms = 460) {
+  return new Promise((gata) => {
+    if (!zar3d) { gata(); return; }
+    const L = elTavita.clientWidth || 150;
+    const pornit = performance.now();
+    let rx = Math.random() * 360, ry = Math.random() * 360;
+    (function pas(acum) {
+      const t = Math.min(1, (acum - pornit) / ms);
+      // Zbaterea crește și se stinge; ridicarea merge tot mai sus, cu avânt.
+      const putere = Math.sin(Math.PI * t);
+      rx += 13 + putere * 16;
+      ry += 17 + putere * 14;
+      const jx = (Math.random() - 0.5) * 0.13 * putere * L;
+      const jy = (Math.random() - 0.5) * 0.13 * putere * L;
+      asazaZarul(jx, jy, (0.05 + 0.30 * t * t) * L, rx, ry);
+      if (t < 1) requestAnimationFrame(pas); else gata();
+    })(pornit);
+  });
+}
+
+async function aruncaZarul() {
   if (seRostogoleste || !elZar || !elTavita) return;
   const fata = fataUrmatoare(ultimaFata);
   ultimaFata = fata;
@@ -2071,14 +2141,19 @@ function aruncaZarul() {
   if (faraMiscare()) {
     const t = INTOARCERI[fata];
     asazaZarul(0, 0, 0, t.rx, t.ry);
+    if (zar3d) zar3d.asazaFata(fata, 1);
     gataAruncarea(fata);
     return;
   }
 
   seRostogoleste = true;
+  await amestecaZarul();
   elZar.style.transition = 'none';
   const latime = elTavita.clientWidth, inaltime = elTavita.clientHeight;
-  const raza = elZar.offsetWidth / 2 + 4;      // 4px de aer față de perete
+  /* Raza zarului. În 3D butonul e cât toată tăvița, deci n-o mai pot lua din
+     mărimea lui: o socotesc din tăviță, în aceeași proporție ca la CSS (46 la
+     150). Așa drumul rămâne același, oricât de mare ar fi tăvița. */
+  const raza = (zar3d ? latime * 0.1533 : elZar.offsetWidth / 2) + 4;
   const st = aruncare({ latime, inaltime, raza });
 
   let trecut = 0;
@@ -2099,9 +2174,17 @@ function aruncaZarul() {
     // secunde îl așezăm oricum, ca elevul să nu aștepte după un zar îndărătnic.
     if (!stat(st) && trecut < 3000) { requestAnimationFrame(cadru); return; }
 
-    const fin = asezare(st, fata, 1);
-    elZar.style.transition = 'transform .42s cubic-bezier(.22,.9,.3,1)';
-    asazaZarul(st.x - latime / 2, st.y - inaltime / 2, 0, fin.rx, fin.ry);
+    /* Așezarea. În scenă zarul se lasă pe fața care a picat, întorcându-se lin
+       spre ea, ca unul adevărat care se mai clatină o dată și se oprește. În
+       CSS, aceeași treabă se face dintr-o trecere de stil. */
+    if (zar3d) {
+      asazaZarul(st.x - latime / 2, st.y - inaltime / 2, 0, st.rx, st.ry);
+      zar3d.asazaFata(fata, 420);
+    } else {
+      const fin = asezare(st, fata, 1);
+      elZar.style.transition = 'transform .42s cubic-bezier(.22,.9,.3,1)';
+      asazaZarul(st.x - latime / 2, st.y - inaltime / 2, 0, fin.rx, fin.ry);
+    }
     setTimeout(() => { elZar.style.transition = 'none'; seRostogoleste = false; gataAruncarea(fata); }, 430);
   }
   requestAnimationFrame(cadru);

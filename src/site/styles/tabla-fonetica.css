@@ -860,6 +860,31 @@
   will-change: transform;
 }
 .zar:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 8px; }
+
+/* ============ Când tăvița e desenată de scenă ============
+   Clasa `e-3d` se pune din cod, DUPĂ ce scena chiar a pornit. Până atunci
+   pagina arată zarul din CSS, gata de apăsat: nimeni nu stă în fața unui gol
+   așteptând să vină o bibliotecă. Dacă scena nu vine, clasa nu se pune și
+   rămâne totul cum era. */
+.zar-panza {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border-radius: 18px; pointer-events: none;
+  /* Umbra tăviței rămâne a foii de stil: pânza desenează lemnul și zarul, dar
+     nu poate desena în afara ei. */
+  box-shadow: 0 12px 30px rgba(31, 36, 48, .22);
+}
+.zar-tavita.e-3d .zar-tavita__fund,
+.zar-tavita.e-3d .zar-tavita__umbra,
+.zar-tavita.e-3d .zar__f { display: none; }
+
+/* Butonul se întinde peste toată tăvița: e mai ușor de nimerit decât un cub de
+   46 de pixeli, iar cubul desenat stă oricum dedesubt, în pânză. */
+.zar-tavita.e-3d .zar {
+  left: 0; top: 0; width: 100%; height: 100%; margin: 0;
+  transform: none !important; transform-style: flat;
+  border-radius: 18px;
+}
+.zar-tavita.e-3d .zar:focus-visible { outline-offset: 3px; border-radius: 18px; }
 /* FEȚELE: PLASTIC ALB, DUR.
 
    Trei lucruri fac plasticul, și niciunul nu e culoarea: muchia strânsă (rază
