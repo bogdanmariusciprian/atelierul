@@ -2284,7 +2284,28 @@ function gataAruncarea(fata) {
   if (!elTavita || !elZar) return;
 
   const APASARE = 6;        // sub atâția pixeli, e apăsare, nu plimbare
+  const INALT = 0.14;       // cât de sus îl ții, din latura tăviței
   let prins = null;         // {id, x, y, urme: [{t, x, y}]}
+  let inaltimea = 0;        // unde e acum, între fund și palmă
+
+  /* RIDICATUL DIN TĂVIȚĂ.
+     Când pui degetul pe zar, el se ridică: nu se apucă nimeni de un lucru fără
+     să-l urnească. Ridicarea nu e liniară, ci frânează la capăt, ca o mână care
+     ia ceva și se oprește; umbra se strânge singură, fiindcă e umbră adevărată
+     și zarul chiar s-a depărtat de fund. */
+  function urca(catre, ms = 150) {
+    const dela = inaltimea;
+    const pornit = performance.now();
+    (function pas(acum) {
+      if (!prins && catre > 0) return;                 // a dat drumul între timp
+      const t = Math.min(1, (acum - pornit) / ms);
+      inaltimea = dela + (catre - dela) * (1 - Math.pow(1 - t, 3));
+      const c = elTavita.getBoundingClientRect();
+      const m = margineaDrumului(c.width);
+      zar3d.plimba((prins ? prins.x : 0) / m, (prins ? prins.y : 0) / m, inaltimea, 0, 0);
+      if (t < 1) requestAnimationFrame(pas);
+    })(pornit);
+  }
 
   const inTavita = (e) => {
     const c = elTavita.getBoundingClientRect();
@@ -2297,6 +2318,7 @@ function gataAruncarea(fata) {
     prins = { id: e.pointerId, x: p.x, y: p.y, plecat: false, urme: [{ t: performance.now(), x: p.x, y: p.y }] };
     elZar.setPointerCapture(e.pointerId);
     elTavita.classList.add('e-prins');
+    urca(INALT);
   });
 
   elZar.addEventListener('pointermove', (e) => {
@@ -2313,7 +2335,7 @@ function gataAruncarea(fata) {
     while (prins.urme.length > 2 && acum - prins.urme[0].t > 160) prins.urme.shift();
 
     const m = margineaDrumului(p.L);
-    zar3d.plimba(p.x / m, p.y / m, 0.10, dx, dy);
+    zar3d.plimba(p.x / m, p.y / m, inaltimea, dx, dy);
   });
 
   const dat = (e) => {
@@ -2322,7 +2344,15 @@ function gataAruncarea(fata) {
     prins = null;
     elTavita.classList.remove('e-prins');
     if (elZar.hasPointerCapture(e.pointerId)) elZar.releasePointerCapture(e.pointerId);
-    if (!luat.plecat) { aruncaZarul(); return; }      // n-a plimbat: e apăsare
+    if (!luat.plecat) {
+      // N-a plimbat: e o apăsare. Zarul e deja ridicat în palmă, deci aruncarea
+      // pornește de sus, nu de pe fund.
+      const c0 = elTavita.getBoundingClientRect();
+      aruncatCuMana = { x: c0.width / 2, y: c0.height / 2, h: inaltimea * c0.width, vh: 0 };
+      inaltimea = 0;
+      aruncaZarul();
+      return;
+    }
 
     /* Avântul, din ultimele urme. Fizica îl vrea în pixeli pe secundă, cu
        (0,0) în colțul tăviței, nu în mijloc: de-aia adunăm jumătate de lățime. */
@@ -2337,8 +2367,9 @@ function gataAruncarea(fata) {
       // aruncarea să arate a aruncare oricât de moale ar fi fost degetul.
       vx: putere < 120 ? vx * (120 / Math.max(1, putere)) : Math.min(vx, 900),
       vy: putere < 120 ? vy * (120 / Math.max(1, putere)) : Math.min(vy, 900),
-      h: 14, vh: 30,
+      h: Math.max(14, inaltimea * c.width), vh: 30,
     };
+    inaltimea = 0;
     aruncaZarul();
   };
   elZar.addEventListener('pointerup', dat);
@@ -2346,6 +2377,7 @@ function gataAruncarea(fata) {
     if (!prins) return;
     prins = null;
     elTavita.classList.remove('e-prins');
+    urca(0);                       // s-a răzgândit: zarul se lasă la loc
   });
 })();
 
