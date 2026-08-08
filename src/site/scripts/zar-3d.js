@@ -75,7 +75,10 @@ function panzaFetei(numar, latura = 256) {
   const c = document.createElement("canvas");
   c.width = c.height = latura;
   const g = c.getContext("2d");
-  g.fillStyle = "#f3f5fa";
+  /* Fondul feței nu e alb curat, ci un alb-albăstrui potolit. Albul curat, sub
+     lumină și cu lac deasupra, se arde: fața iese o pată fără desen, iar
+     punctele par lipite pe hârtie. */
+  g.fillStyle = "#e6eaf2";
   g.fillRect(0, 0, latura, latura);
   const raza = latura * 0.085;
   for (const [x, y] of PUNCTE[numar] || []) {
@@ -188,19 +191,27 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   randor.shadowMap.enabled = true;
   randor.shadowMap.type = THREE.PCFSoftShadowMap;
   randor.toneMapping = THREE.ACESFilmicToneMapping;
-  randor.toneMappingExposure = 1.05;
+  randor.toneMappingExposure = 0.95;
   tavita.insertBefore(panza, tavita.firstChild);
 
   const scena = new THREE.Scene();
 
   /* ---------- camera ----------
-     Priviri de sus, dar nu de-a dreptul: la 62 de grade tăvița se citește tot ca
-     un pătrat, iar pereții din spate se văd pe dinăuntru. Unghiul de deschidere
-     e mic (34°) dinadins: un obiectiv larg ar umfla zarul de la mijloc, ca la
-     pozele făcute de aproape. */
-  const camera = new THREE.PerspectiveCamera(34, 1, 10, 900);
-  camera.position.set(0, 235, 122);
-  camera.lookAt(0, 4, 0);
+     APROAPE DE DEASUPRA, ȘI DE-AIA. Un pătrat privit dintr-o parte iese trapez:
+     latura din spate se strânge, cea din față se lățește, iar ochiul citește de
+     acolo „masa e înclinată". La 62 de grade se vedea limpede. La 78 de grade
+     cele două laturi ajung aproape egale, deci tăvița se citește iar ca un
+     pătrat așezat drept, cum era și cea din CSS.
+
+     Nu merg însă până la 90: de-a dreptul de deasupra n-ai vedea decât fața de
+     sus a zarului, iar cubul ar arăta iar ca un pătrat cu puncte. Cele 12 grade
+     rămase sunt exact cât trebuie ca să se zărească două muchii rotunjite.
+
+     Unghiul de deschidere e mic (26°) dinadins: un obiectiv larg ar umfla zarul
+     la mijloc și ar strâmba pereții, ca într-o poză făcută de prea aproape. */
+  const camera = new THREE.PerspectiveCamera(26, 1, 100, 700);
+  camera.position.set(0, 339, 72);
+  camera.lookAt(0, 0, 0);
 
   /* ---------- lumina ----------
      Trei surse, fiecare cu treaba ei:
@@ -218,7 +229,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
     console.warn("mediul de lumină n-a mers:", e && e.message);
   }
 
-  const cheie = new THREE.DirectionalLight(0xfff6e8, 2.5);
+  const cheie = new THREE.DirectionalLight(0xfff6e8, 1.7);
   cheie.position.set(-120, 210, 95);
   cheie.castShadow = true;
   cheie.shadow.mapSize.set(1024, 1024);
@@ -228,10 +239,10 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
   uc.left = -110; uc.right = 110; uc.top = 110; uc.bottom = -110; uc.near = 40; uc.far = 460;
   scena.add(cheie);
 
-  const umplutura = new THREE.DirectionalLight(0xdfe8ff, 0.35);
+  const umplutura = new THREE.DirectionalLight(0xdfe8ff, 0.22);
   umplutura.position.set(140, 90, 60);
   scena.add(umplutura);
-  scena.add(new THREE.HemisphereLight(0xffffff, 0x6b4a26, 0.25));
+  scena.add(new THREE.HemisphereLight(0xffffff, 0x6b4a26, 0.20));
 
   /* ---------- lemnul ---------- */
   const texturaLemn = new THREE.CanvasTexture(panzaLemnului());
@@ -295,13 +306,16 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
       bumpMap: t,
       bumpScale: 3.2,
       color: 0xffffff,
-      roughness: 0.30,
+      /* Mai aspru decât părea: un zar de joc nu e oglindă, e plastic frecat.
+         Cu rugozitate mică prindea toată camera în el și strălucea ca sticla. */
+      roughness: 0.38,
       metalness: 0,
       // Lacul de deasupra: plasticul dur are un strat lucios peste culoare, iar
-      // el e cel care dă sclipirea ascuțită de pe muchii.
-      clearcoat: 0.85,
-      clearcoatRoughness: 0.10,
-      envMapIntensity: 1.1,
+      // el e cel care dă sclipirea de pe muchii. Potolit, ca să fie sclipire,
+      // nu bec.
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.20,
+      envMapIntensity: 0.50,
     });
   });
 
