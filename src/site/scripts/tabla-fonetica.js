@@ -2204,6 +2204,13 @@ async function aruncaZarul() {
 
   seRostogoleste = true;
 
+  /* LOC PENTRU SĂRITURI.
+     Zarul care ricoșează urcă peste marginea casetei, și acolo se tăia. Îi dau
+     un pătrat de două ori și ceva cât caseta, cât ține rostogolirea: e
+     destul pentru orice săritură, și e destul de mic cât desimea desenului să
+     rămână întreagă. Tăvița cade pe aceiași pixeli, deci nu se clatină nimic. */
+  if (zar3d) zar3d.larg(2.2);
+
   /* CUTIA ÎN CARE SE PETRECE TOTUL.
      Când desenează scena, fizica lucrează chiar în unitățile ei: pereții sunt
      acolo unde se văd, zarul are mărimea pe care o vezi. Nu mai e nicio
@@ -2415,7 +2422,7 @@ function leagana() {
      rost: la 12000 se învârte de șaptezeci de ori și nu se mai vede decât o
      pată care nu spune nimic. */
   const PUTERE_CURBA = [0, .03, .07, .12, .18, .26, .36, .48, .64, .82, 1];
-  const PUTERE_MIN = 500;    // cât dă lăsat din marginea tăviței
+  const PUTERE_MIN = 900;    // cât dă lăsat din marginea tăviței
   const PUTERE_MAX = 9000;   // cât dă tras din colțul cel mai depărtat
 
   /* DOUĂ MĂSURI, FIINDCĂ SUNT DOUĂ LUCRURI DEOSEBITE.
@@ -2675,12 +2682,32 @@ function leagana() {
     const drum = d - hotar;                       // cât are de mers, în pixeli
     const drumSc = Math.max(1, drum * catreScena);  // același drum, în unități
 
-    /* Puterea vine din CÂT AI TRAS, măsurat în părți din cât se poate, iar
-       pulsul se ia apoi înapoi din ea, ca mișcarea să rămână chiar oscilația
-       arcului: un arc care dă mai mult se și descarcă mai iute. */
+    /* Puterea vine din CÂT AI TRAS, măsurat în părți din cât se poate. */
     const vIntrare = PUTERE_MIN + (PUTERE_MAX - PUTERE_MIN) * pePasi(PUTERE_CURBA, luat.departe);
-    const puls = vIntrare / drumSc;
-    const pana = (Math.PI / 2) / puls;
+
+    /* CAUCIUCUL NU E ARC, ȘI DE-AIA SE ÎNTORCEA MEREU LA FEL.
+
+       Un arc adevărat e izocron: întins puțin sau mult, se descarcă în același
+       timp. Frumoasă lege, și chiar ea era boala: oricât ai fi tras, întoarcerea
+       ținea cam o jumătate de secundă, iar ochiul citește întâi CÂT ȚINE, nu cât
+       de iute merge. De-aia „viteza părea la fel", deși nu era.
+
+       Numai că o bandă de cauciuc nu e un arc. Puterea ei nu crește drept cu
+       întinderea, ci se îndârjește spre capăt: întinsă la maximum e de câteva
+       ori mai tare decât la început. Un cauciuc întins tare nu împinge, ci
+       pocnește, iar restul drumului lucrul zboară singur.
+
+       Asta se scrie într-un singur număr, `indarjirea`: cât de repede se
+       îngrămădește mișcarea la început. Doi înseamnă împins egal tot drumul,
+       ca un arc molcom; unu și un pic înseamnă o smucitură scurtă și apoi zbor.
+       Cauciucul abia întins se poartă ca un arc, cel întins de tot pocnește.
+
+       Din el ies amândouă deodată, fără nicio altă socoteală: și cât ține
+       întoarcerea, `t = indarjire · drum / viteză`, și felul mișcării.
+       Iar la capăt viteza iese chiar `viteză`, cum a fost aleasă: nu se rupe
+       nimic la predarea către fizică. */
+    const indarjire = 2 - 0.9 * luat.departe;
+    const pana = (indarjire * drumSc) / vIntrare;
 
     const h0 = inaltimea + luat.departe * SUS_INTINS;
     const jos = zar3d.marimeaZarului * 0.62;      // pe unde intră înapoi în tăviță
@@ -2692,7 +2719,7 @@ function leagana() {
     (function cadru(acum) {
       const t = ((acum - pornit) / 1000) / INCETINIRE;
       const gata = t >= pana;
-      const facut = gata ? drum : drum * (1 - Math.cos(puls * t));
+      const facut = gata ? drum : drum * Math.pow(t / pana, indarjire);
       const ramas = d - facut;
       const parte = facut / drum;
       zar3d.laDeget(mx + ux * ramas, my + uy * ramas, h0 + (hJos - h0) * parte,

@@ -912,9 +912,11 @@
 }
 
 .zar-panza.e-larg {
+  /* Locul și mărimea vin din cod, fiindcă pânza are două mărimi: cât fereastra,
+     când porți zarul cu degetul, și un pătrat mic în jurul tăviței, cât ține
+     rostogolirea. Aici rămâne numai ce e la fel în amândouă. */
   position: fixed;
-  inset: 0;
-  width: 100vw; height: 100vh;
+  inset: auto;
   opacity: 1;
   transition: none;
   z-index: 60;              /* peste pagină, sub ferestre și sub bara de sus */

@@ -810,24 +810,54 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
      Desimea scade cât e larg, și trebuie să scadă: 2,5 ori pe o pânză cât
      ecranul ar însemna douăzeci de milioane de pixeli de desenat la fiecare
      cadru, adică o smucitură exact când degetul cere lin. */
-  let elarg = false;
-  function larg() {
-    if (elarg) return;
-    elarg = true;
+  /**
+   * Pânza se face mai mare decât caseta ei.
+   *
+   * `cat` spune de câte ori cât caseta. Zero înseamnă „cât toată fereastra",
+   * și e pentru zarul purtat cu degetul, care poate ajunge oriunde. Un număr
+   * mic, ca 2,4, e pentru ROSTOGOLIRE: acolo zarul nu pleacă nicăieri, doar
+   * sare peste marginea casetei, și-i ajunge un pic de loc în jur. Deosebirea
+   * nu e de lene, e de desime: o pânză cât fereastra la desimea deplină ar
+   * însemna zece milioane de puncte la fiecare cadru, așa că acolo desimea
+   * scade; într-un pătrat de două ori și ceva cât caseta, ea rămâne întreagă,
+   * iar zarul care se rostogolește se vede tot atât de limpede ca înainte.
+   *
+   * Oricare ar fi mărimea, tăvița cade pe aceiași pixeli: de asta are grijă
+   * `setViewOffset`, căruia îi spun ce chenar are caseta și pe ce bucată să-l
+   * deseneze. */
+  let elarg = 0;                 // 0 = strâmtă; altfel, de câte ori cât caseta
+  function larg(cat = 0) {
+    if (elarg === (cat || -1)) return;
+    elarg = cat || -1;
     const c = tavita.getBoundingClientRect();
-    const W = Math.round(window.innerWidth), H = Math.round(window.innerHeight);
-    decupaj = [c.width, c.width, -c.left, -c.top, W, H];
+    let X, Y, W, H, desime;
+    if (cat > 0) {
+      W = H = Math.round(c.width * cat);
+      X = Math.round(c.left + c.width / 2 - W / 2);
+      Y = Math.round(c.top + c.height / 2 - H / 2);
+      desime = Math.min((window.devicePixelRatio || 1) * DESIME, 4);
+    } else {
+      X = 0; Y = 0;
+      W = Math.round(window.innerWidth); H = Math.round(window.innerHeight);
+      desime = Math.min(window.devicePixelRatio || 1, 1.5);
+    }
+    decupaj = [c.width, c.width, X - c.left, Y - c.top, W, H];
     camera.setViewOffset(...decupaj);
-    randor.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    randor.setPixelRatio(desime);
     randor.setSize(W, H, false);
     panza.classList.add("e-larg");
+    panza.style.left = X + "px";
+    panza.style.top = Y + "px";
+    panza.style.width = W + "px";
+    panza.style.height = H + "px";
     document.body.appendChild(panza);          // scos de sub orice `transform`
 
     deseneaza();
   }
   function stramt() {
     if (!elarg) return;
-    elarg = false;
+    elarg = 0;
+    panza.style.left = panza.style.top = panza.style.width = panza.style.height = "";
     camera.clearViewOffset();
     decupaj = null;
     zarLaDeget = null;
@@ -894,7 +924,7 @@ export async function pornesteZar3D(tavita, { marime = 46, latura = 150 } = {}) 
          fereastra, iar decupajul camerei trebuie luat de la capăt: caseta s-a
          mutat. O potrivire făcută atunci după casetă ar strânge pânza înapoi
          chiar cu zarul afară din ea. */
-      if (elarg) { elarg = false; larg(); return; }
+      if (elarg) { const cat = elarg; elarg = 0; larg(cat > 0 ? cat : 0); return; }
       const p = Math.round(pxCaseta || panzaPx);
       randor.setSize(p, p, false);
       deseneaza();
