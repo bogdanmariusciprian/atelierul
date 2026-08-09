@@ -13,6 +13,10 @@
      cineva care oricum urmează să fie trimis la /in-curand/. -->
 <style>html:not(.gate-ready) body { visibility: hidden; }</style>
 <link rel="stylesheet" href="../../../../src/site/styles/tabla-fonetica.css">
+<!-- Stilurile etichetării vin de-aici, nu de la widgetul comutatorului: pe
+     tablă se folosesc semnele de pe rânduri, care există și fără el (elevul nu
+     vede niciodată comutatorul, dar vede semnele). -->
+<link rel="stylesheet" href="../../../../src/shared/styles/tagging.css">
 </head>
 <body>
 
@@ -388,10 +392,16 @@
   if (await enforceGate()) {
     await import("../../../../src/site/scripts/tabla-fonetica.js");
     revealGate();
-  /* Butonul „TO-DO" al profesorului. Pagina asta nu cheamă bara sitului, deci
-     nu-l primește de la sine; îl chemăm de mână, cu drumul până la rădăcină. */
+  /* Butoanele plutitoare ale profesorului. Pagina asta nu cheamă bara sitului,
+     deci nu le primește de la sine; le chemăm de mână, cu drumul până la
+     rădăcină. Comutatorul de etichetare vine DUPĂ TO-DO, ca să intre în același
+     mănunchi: pornit înainte, ar face un al doilea, iar cele două butoane ar
+     ajunge unul peste altul. */
     import("../../../../src/shared/components/todo-fab.js")
       .then((m) => m.initTodo("../../../../"))
+      .catch(() => {})
+      .then(() => import("../../../../src/shared/components/tagging-fab.js"))
+      .then((m) => m && m.initTagging("../../../../"))
       .catch(() => {});
   }
 </script>

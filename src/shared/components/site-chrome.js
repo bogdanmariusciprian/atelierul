@@ -21,6 +21,7 @@ import { LESSONS } from "../scripts/lessons-index.js";
 import { LESSON_DOMAINS } from "../scripts/domains.js";
 import { initUserMenu } from "../scripts/user-menu.js";
 import { initTodo } from "./todo-fab.js";
+import { initTagging } from "./tagging-fab.js";
 import { fetchOpenModerationCount } from "../scripts/forum-repo.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications, clearAllNotifications } from "../scripts/notif.js";
@@ -88,6 +89,10 @@ export async function renderChrome(basePath = "") {
   safe(() => initAdminQuickPanel(basePath), "adminQuickPanel"); // floating 🛡️ toolbox (admin)
   safe(() => initMessenger(basePath), "messenger"); // floating 💬 Messenger + guest contact
   safe(() => initTodo(basePath), "todo"); // floating „TO-DO" bottom-left (admin only)
+  /* Comutatorul de etichetare stă în același mănunchi cu TO-DO-ul, deci se
+     pornește DUPĂ el: dacă ar veni primul, s-ar face un al doilea mănunchi, iar
+     cele două butoane ar ajunge unul peste altul. */
+  safe(() => initTagging(basePath), "tagging");
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
   safe(addPlannerLink, "plannerLink"); // „Meditații" — added only if allowed

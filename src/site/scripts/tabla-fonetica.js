@@ -1677,6 +1677,7 @@ function culegeRanduri() {
   return randurile().map((row) => {
     if (felRand(row) === 'accent') {
       return {
+        itemId: row.dataset.item || null,
         word: (row.querySelector('.word') || {}).innerHTML || '',
         accentuat: (row.querySelector('.accentuat') || {}).innerHTML || '',
         sens: (row.querySelector('.sens') || {}).innerHTML || '',
@@ -1686,6 +1687,7 @@ function culegeRanduri() {
     if (felRand(row) === 'structura') {
       const st = row.querySelector('.structura');
       return {
+        itemId: row.dataset.item || null,
         structura: st ? st.innerHTML : '',
         syll: (row.querySelector('.syll') || {}).innerHTML || '',
         /* Cuvintele goale nu se salvează: sunt căsuțe deschise din greșeală cu
@@ -1699,12 +1701,14 @@ function culegeRanduri() {
     if (eRandDeFraza(row)) {
       const fr = row.querySelector('.fraza');
       return {
+        itemId: row.dataset.item || null,
         fraza: fr ? fr.innerHTML : '',
         trans: (row.querySelector('.trans') || {}).innerHTML || '',
         blocata: !!fr && fr.getAttribute('contenteditable') === 'false',
       };
     }
     return {
+      itemId: row.dataset.item || null,
       word:  (row.querySelector('.word')  || {}).innerHTML || '',
       syll:  (row.querySelector('.syll')  || {}).innerHTML || '',
       trans: (row.querySelector('.trans') || {}).innerHTML || '',
@@ -1732,6 +1736,11 @@ function aseazaRanduri(randuri, felCerut) {
                    : r.accentuat !== undefined ? 'accent' : 'obisnuit')
                   : felImplicit;
     const row = createRow(fel);
+    /* Numele cuvântului în bancă, purtat de rândul din pagină. Nu se ține pe
+       alături, într-o listă paralelă: o listă paralelă ar trebui ținută în pas
+       cu rândurile la fiecare ștergere și adăugare, iar la prima uitare ar
+       eticheta alt cuvânt decât cel de pe ecran. */
+    if (r && r.itemId) row.dataset.item = r.itemId;
     sheet.appendChild(row);
     if (!r) return;
     if (fel === 'accent') {
@@ -1787,7 +1796,148 @@ function aseazaRanduri(randuri, felCerut) {
   });
   aseazaCiorna();
   renumber();
+  /* Rândurile s-au schimbat, deci semnele de etichetat trebuie puse din nou:
+     ele stau pe rânduri, nu pe pagină. */
+  if (typeof aratăSemneleDeEtichetat === 'function') aratăSemneleDeEtichetat();
 }
+
+/* ============================================================
+   ETICHETAREA CUVINTELOR, DE CĂTRE ELEV
+
+   Banca de material se etichetează cuvânt cu cuvânt, iar treaba e lungă pentru
+   un singur om. Numai că, privind mai atent, nici nu e o corvoadă de dat
+   altcuiva: a hotărî că „ceapă" e bun pentru grupuri de sunete E chiar
+   exercițiul. Deci lucrul nu se pasează, se mută acolo unde se și învață.
+
+   CE SE VEDE AICI E DOAR CURTOAZIE. Cine are voie, când are voie și dacă nu
+   cumva cuvântul a fost etichetat deja se hotărăsc în bază, într-o singură
+   funcție (migrarea 0082). Aici se face numai atât cât elevul să nu vadă un
+   buton care oricum n-ar merge. O regulă ținută în browser se ocolește cu
+   unealta de dezvoltare; una ținută în bază, nu.
+
+   SEMNUL APARE NUMAI PE RÂNDURILE VENITE DIN BANCĂ. Un cuvânt scris de mână de
+   elev nu e în bancă, deci n-are ce eticheta: mărginirea asta nu e o hotărâre,
+   e chiar firea lucrurilor.
+   ============================================================ */
+let potEticheta = false;      // sunt elev la meditații (ori profesor)?
+let etichetareaEDeschisa = false;
+let etichetateDeja = new Set();
+
+/** Ce etichete se pot pune pe felul de material al exercițiului deschis. */
+function eticheteDePus() {
+  const ex = exercitiulDeschis();
+  const cfg = ex && ex.fata ? felulExercitiului(LECTIE, ex.fata) : null;
+  return cfg ? eticheteleFelului(LECTIE, cfg.kind) : [];
+}
+
+/** Pune ori scoate semnele de etichetat de pe rândurile din pagină. */
+function aratăSemneleDeEtichetat() {
+  if (!sheet) return;
+  const seArata = potEticheta && etichetareaEDeschisa && eticheteDePus().length > 0;
+  sheet.querySelectorAll('.et-semn').forEach((b) => b.remove());
+  if (!seArata) return;
+  randurile().forEach((row) => {
+    const id = row.dataset.item;
+    if (!id) return;
+    const gata = etichetateDeja.has(id);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'et-semn' + (gata ? ' e-gata' : '');
+    b.dataset.etichetare = id;
+    b.textContent = gata ? '✓' : '🏷';
+    b.title = gata
+      ? 'Cuvântul ăsta a fost etichetat deja.'
+      : 'Pune etichetele care i se potrivesc.';
+    if (gata) b.disabled = true;
+    /* Semnul stă lângă capul rândului, adică lângă lucrul pe care-l etichetezi:
+       cuvântul, structura ori propoziția. */
+    const cap = row.querySelector('.structura, .fraza, .word');
+    if (cap && cap.parentElement) cap.parentElement.insertBefore(b, cap.nextSibling);
+  });
+}
+
+/** Fereastra de bifat, deschisă lângă semnul apăsat. */
+function deschideEtichetele(semn) {
+  document.querySelectorAll('.et-panou').forEach((p) => p.remove());
+  const id = semn.dataset.etichetare;
+  const lista = eticheteDePus();
+  if (!id || !lista.length) return;
+
+  const panou = document.createElement('div');
+  panou.className = 'et-panou';
+  panou.innerHTML =
+    '<p class="et-panou__cap">Ce i se potrivește</p>' +
+    lista.map((e) =>
+      '<label><input type="checkbox" value="' + escapaText(e.slug) + '">' +
+      '<span>' + escapaText(e.nume) + '</span></label>').join('') +
+    '<div class="et-panou__jos">' +
+      '<button type="button" class="et-panou__nu">Lasă</button>' +
+      '<button type="button" class="et-panou__da" disabled>Pune etichetele</button>' +
+    '</div>';
+  document.body.appendChild(panou);
+
+  const c = semn.getBoundingClientRect();
+  panou.style.left = Math.max(8, Math.min(window.innerWidth - panou.offsetWidth - 8, c.left)) + 'px';
+  panou.style.top = (window.scrollY + c.bottom + 6) + 'px';
+
+  const da = panou.querySelector('.et-panou__da');
+  const bifele = () => Array.from(panou.querySelectorAll('input:checked')).map((i) => i.value);
+  panou.addEventListener('change', () => { da.disabled = bifele().length === 0; });
+  panou.querySelector('.et-panou__nu').addEventListener('click', () => panou.remove());
+
+  da.addEventListener('click', async () => {
+    da.disabled = true;
+    da.textContent = 'Se pun…';
+    const { bine, motiv } = await eticheteaza(id, bifele());
+    if (bine) {
+      etichetateDeja.add(id);
+      panou.remove();
+      aratăSemneleDeEtichetat();
+      return;
+    }
+    da.textContent = 'Pune etichetele';
+    da.disabled = false;
+    let rau = panou.querySelector('.et-panou__rau');
+    if (!rau) {
+      rau = document.createElement('p');
+      rau.className = 'et-panou__rau';
+      panou.appendChild(rau);
+    }
+    rau.textContent = motiv;
+  });
+}
+
+document.addEventListener('click', (e) => {
+  const semn = e.target.closest && e.target.closest('.et-semn');
+  if (semn) { deschideEtichetele(semn); return; }
+  if (!(e.target.closest && e.target.closest('.et-panou'))) {
+    document.querySelectorAll('.et-panou').forEach((p) => p.remove());
+  }
+});
+
+/** Ce cuvinte de pe tabla asta au fost deja etichetate de cineva. */
+async function afluCeSAEtichetat() {
+  const ids = randurile().map((r) => r.dataset.item).filter(Boolean);
+  if (!ids.length) return;
+  etichetateDeja = await celeEtichetate(ids);
+  aratăSemneleDeEtichetat();
+}
+
+(async function porneșteEtichetarea() {
+  potEticheta = await hasPlannerAccess();
+  if (!potEticheta) return;
+  etichetareaEDeschisa = await eDeschis();
+  aratăSemneleDeEtichetat();
+  await afluCeSAEtichetat();
+  /* Profesorul închide comutatorul TOCMAI ca elevul să se oprească acum, nu la
+     următoarea reîncărcare. De-aia semnele pier pe loc, iar fereastra deschisă
+     se închide odată cu ele. */
+  ascultaComutatorul((val) => {
+    etichetareaEDeschisa = val;
+    if (!val) document.querySelectorAll('.et-panou').forEach((p) => p.remove());
+    aratăSemneleDeEtichetat();
+  });
+})();
 
 /* ---------- CIORNA ----------
 
@@ -2458,6 +2608,8 @@ document.getElementById('pdfBtn').addEventListener('click', () => { inchideMeniu
 
 /** Rândul, curățat de tot ce a răspuns elevul; capul lui rămâne. */
 function faraRezolvare(r) {
+  /* `itemId` trece mai departe de la sine, prin `...r`: e legătura cu banca, nu
+     o rezolvare, deci n-are ce căuta printre lucrurile care se șterg. */
   if (!r) return r;
   if (r.accentuat !== undefined) return { ...r, accentuat: '', sens: '', exemplu: '' };
   if (r.structura !== undefined) return { ...r, syll: '', raspuns: [] };
@@ -2585,7 +2737,11 @@ import { fataUrmatoare, INTOARCERI, aruncaSpre, laClipa, unghiuriDinQ,
          pornire, pas, inclina }
   from './zar-fizica.js';
 import { listItems } from '../../shared/scripts/bank-repo.js';
-import { felulExercitiului, altele, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
+import { hasPlannerAccess } from '../../shared/scripts/planner-repo.js';
+import { eDeschis, ascultaComutatorul, eticheteaza, celeEtichetate }
+  from '../../shared/scripts/tagging-repo.js';
+import { felulExercitiului, altele, felulMaterialului, seCuvineEticheta, deCeCereEticheta,
+         eticheteleFelului }
   from '../../shared/scripts/board-material.js';
 
 /* ---------- Zarul ---------- */
@@ -3881,7 +4037,13 @@ elGenFa && elGenFa.addEventListener('click', async () => {
   if (!libere.length) { improspatatePlafonul(); return; }
 
   const cate = Math.max(1, Math.min(libere.length, Number(elGenCate.value) || 1));
-  const texte = alege(libere, cate).map((x) => x.body);
+  /* Se țin ITEMII, nu doar textele. Până acum se lua numai `body`, iar numele
+     cuvântului în bancă se pierdea chiar în clipa în care ajungea pe tablă. Or,
+     ca elevul să-i poată pune etichete, rândul trebuie să știe DESPRE CE cuvânt
+     din bancă e vorba: două cuvinte scrise la fel nu-s același cuvânt. */
+  const alesii = alege(libere, cate);
+  const texte = alesii.map((x) => x.body);
+  const legatura = (i) => (alesii[i] && alesii[i].id) || null;
 
   // UNDE INTRĂ. Un exercițiu nou capătă felul ăsta; cel deschis, dacă n-avea
   // fel (cerință scrisă de mână), îl capătă acum și nu va mai fi întrebat.
@@ -3911,13 +4073,13 @@ elGenFa && elGenFa.addEventListener('click', async () => {
                       elevul merge ÎNAPOI, de la structură spre cuvinte, oricâte;
        · propoziții → rând de propoziție: enunțul sus, blocat, transcrierea jos. */
   if (cfg.kind === 'propozitie') {
-    ex.randuri = texte.map((t) => ({ fraza: escapaText(t), trans: '', blocata: true }));
+    ex.randuri = texte.map((t, i) => ({ fraza: escapaText(t), trans: '', blocata: true, itemId: legatura(i) }));
   } else if (cfg.kind === 'structura') {
-    ex.randuri = texte.map((t) => ({ structura: escapaText(t), syll: '', raspuns: [], blocata: true }));
+    ex.randuri = texte.map((t, i) => ({ structura: escapaText(t), syll: '', raspuns: [], blocata: true, itemId: legatura(i) }));
   } else if (felDupaFata(fata) === 'accent') {
-    ex.randuri = texte.map((t) => ({ word: escapaText(t), accentuat: '', sens: '', exemplu: '' }));
+    ex.randuri = texte.map((t, i) => ({ word: escapaText(t), accentuat: '', sens: '', exemplu: '', itemId: legatura(i) }));
   } else {
-    ex.randuri = texte.map((t) => ({ word: escapaText(t) }));
+    ex.randuri = texte.map((t, i) => ({ word: escapaText(t), itemId: legatura(i) }));
   }
 
   aseazaRanduri(ex.randuri, felDupaFata(fata));

@@ -291,6 +291,11 @@
      nu-l primește de la sine; îl chemăm de mână, cu drumul până la rădăcină. */
     import("../../../../src/shared/components/todo-fab.js")
       .then((m) => m.initTodo("../../../../"))
+      .catch(() => {})
+      /* Comutatorul de etichetare, în același mănunchi cu TO-DO: pornit după
+         el, ca să nu se facă un al doilea și să se acopere unul pe altul. */
+      .then(() => import("../../../../src/shared/components/tagging-fab.js"))
+      .then((m) => m && m.initTagging("../../../../"))
       .catch(() => {});
 
     const LECTIE = "sintaxa-frazei-introducere";
