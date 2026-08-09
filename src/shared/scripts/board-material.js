@@ -48,6 +48,13 @@ export const MATERIAL_PE_LECTIE = {
           { slug: "consoane-speciale", nume: "Consoane speciale" },
           { slug: "silabe", nume: "Despărțire în silabe" },
           {
+            slug: "accent",
+            nume: "Marcarea accentului",
+            // Nu orice cuvânt e bun aici: trebuie unul la care accentul chiar se
+            // pune în discuție („véselă / vesélă", „cópii / copíi"). Alegerea o
+            // face profesorul, bifând eticheta; regula n-o poate scrie codul.
+          },
+          {
             slug: "valoarea-i",
             nume: "Valoarea lui i",
             // Un cuvânt fără „i" n-are ce căuta la exercițiul ăsta: n-are ce
@@ -76,6 +83,15 @@ export const MATERIAL_PE_LECTIE = {
     ],
     // Fețele zarului de pe tabla de fonetică. Numărul care pică hotărăște ce
     // material cere generatorul. Tablele fără zar n-au câmpul ăsta.
+    /* EXERCIȚII CARE NU PICĂ LA ZAR.
+
+       Zarul are șase fețe, și atât. Sunt însă exerciții pe care profesorul le dă
+       când socotește el, nu când cade norocul: acelea stau aici. Se poartă
+       întocmai ca fețele, cu fel și etichetă, doar că se cheamă pe nume, nu pe
+       număr, iar lista de la „+ cerință" le arată după cele șase. */
+    altele: {
+      accent: { kind: "cuvant", eticheta: "accent", nume: "Marcarea accentului" },
+    },
     fete: {
       1: { kind: "cuvant", eticheta: "litere-sunete", nume: "Litere și sunete" },
       2: { kind: "cuvant", eticheta: "grupuri", nume: "Grupuri de sunete" },
@@ -130,6 +146,27 @@ export function eticheteleFelului(lessonSlug, kind) {
 /** Ce cere zarul când pică fața asta. `null` dacă lecția n-are zar. */
 export function fataZarului(lessonSlug, fata) {
   return materialulLectiei(lessonSlug)?.fete?.[fata] || null;
+}
+
+/**
+ * Felul unui exercițiu, chemat pe numărul feței ori pe numele lui.
+ *
+ * Un exercițiu poate veni de la zar (și-atunci are un număr de la 1 la 6) sau
+ * de la profesor (și-atunci are un nume, ca „accent"). Amândouă sunt același
+ * lucru pentru tot restul codului: un fel de material cu o cerință a lui. De
+ * aceea se caută prin aceeași ușă, nu prin două.
+ */
+export function felulExercitiului(lessonSlug, cheie) {
+  if (cheie === null || cheie === undefined || cheie === '') return null;
+  const m = materialulLectiei(lessonSlug);
+  if (!m) return null;
+  return m.fete?.[cheie] || m.altele?.[cheie] || null;
+}
+
+/** Exercițiile care nu pică la zar, în ordinea în care se arată. */
+export function altele(lessonSlug) {
+  const a = materialulLectiei(lessonSlug)?.altele || {};
+  return Object.keys(a).map((cheie) => ({ cheie, ...a[cheie] }));
 }
 
 /**

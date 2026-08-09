@@ -465,12 +465,12 @@
     border-radius: 10px;
   }
   .btn-add:hover { background: #dfe7ff; }
-  /* SUNETUL ACCENTUAT.
-     Roșul e numai pentru „Ă", „Î" și „Â", unde însemnarea din lecție e majuscula
-     lor; celelalte cinci se cunosc după accentul de pe ele și n-au nevoie de
-     culoare. Regula e pusă totuși pe toate, fiindcă semnul e același lucru
-     oriunde: un sunet ales ca purtător al accentului. */
-  b.accent { color: #d93a3a; }
+  /* SUNETUL ACCENTUAT, ÎN DOUĂ CULORI.
+     Culoarea nu e podoabă, e deosebire: „ă", „î" și „â" se scriu cu roșu, cum
+     sunt însemnate și în lecție, iar celelalte cinci cu movul tablei. Tabla
+     trebuie să scrie ca lecția, altfel elevul învață un lucru și scrie altul. */
+  b.accent { color: var(--accent); }
+  b.accent--rosu { color: #d93a3a; }
 
   /* CALEA DE ÎNTORS.
      Stă jos, la mijloc, unde nu acoperă nici tabla, nici mănunchiul din colț.
@@ -652,6 +652,16 @@
      stă îngroșată. Materialul îl aduce generatorul și se schimbă la fiecare
      generare: se caută la fiecare cuvânt rezolvat, deci stă cursiv. Nu-i o
      podoabă, e chiar deosebirea din date, arătată. */
+  /* ---------- RÂNDUL DE ACCENT ----------
+     Patru etape într-un rând: cuvântul, accentuarea lui, sensul și exemplul.
+     Primele trei sunt scurte, dar exemplul e un enunț întreg, deci el ia locul
+     care rămâne. Sensul poate lipsi cu totul, așa că nu-i dăm mai mult decât îi
+     trebuie. */
+  .row--accent .word,
+  .row--accent .accentuat { flex: 0 0 auto; min-width: 9ch; }
+  .row--accent .sens { flex: 1 1 12ch; min-width: 8ch; }
+  .row--accent .exemplu { flex: 3 1 20ch; min-width: 12ch; }
+
   /* ---------- RÂNDUL DE STRUCTURĂ FONETICĂ ----------
      Structura e materialul, nu lucrul elevului: se vede ca un text așezat, nu
      ca o căsuță de scris, la fel ca propoziția venită de la generator.

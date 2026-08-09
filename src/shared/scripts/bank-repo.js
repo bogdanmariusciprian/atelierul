@@ -13,7 +13,7 @@
 // scrie ce i se spune.
 // =========================================================
 import { supabase } from "./supabase-client.js";
-import { fataZarului, cheia } from "./board-material.js";
+import { felulExercitiului, cheia } from "./board-material.js";
 
 // Se dă mai departe, ca cine are deja repo-ul s-o poată folosi de aici.
 export { cheia };
@@ -27,7 +27,9 @@ export { cheia };
  * Băncile de la o lecție sunt de ordinul sutelor, deci nu e nicio pagubă.
  */
 export async function listItems(lessonSlug, fata, { level } = {}) {
-  const cfg = fataZarului(lessonSlug, fata);
+  /* `fata` e ori numărul unei fețe de zar, ori numele unui exercițiu dat de
+     profesor („accent"): amândouă se caută prin aceeași ușă. */
+  const cfg = felulExercitiului(lessonSlug, fata);
   if (!cfg) return [];
   return listByTag(lessonSlug, cfg.kind, cfg.eticheta, { level });
 }

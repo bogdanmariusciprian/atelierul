@@ -651,13 +651,28 @@ function cycleA(field) {
 /* ---------- Regula 7: superscript pe o selecție ----------
    caracterul selectat devine: superscript + bold + subliniat,
    cu un spațiu inserat ÎNAINTEA lui. */
+/* „I"-UL SUPRASCRIS.
+
+   Într-o transcriere, „i"-ul final care nu se aude se scrie mic, deasupra, cu o
+   linie sub el, și cu un spațiu înaintea lui. Butonul face același lucru în
+   amândouă felurile în care poate fi cerut:
+
+     · ai ales un „i" pe care l-ai scris deja → el se preface în cel suprascris;
+     · n-ai ales nimic → se scrie unul acolo unde stă cursorul.
+
+   Erau două lucruri deosebite până acum: fără nicio alegere, butonul doar
+   pornea „scrisul suprascris" al browserului, adică o stare care se ține minte
+   și se uită, nu un semn pus pe tablă. Un buton care uneori pune un lucru și
+   alteori pornește o stare nu se poate ține minte.
+
+   SPAȚIUL DINAINTE face parte din semn, nu e o podoabă: fără el, „i"-ul mic s-ar
+   lipi de litera dinainte și s-ar citi ca parte din ea. */
 function superscriptSelection() {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return false;
   const range = sel.getRangeAt(0);
-  if (range.collapsed) return false;
-  const text = range.toString();
-  range.deleteContents();
+  const text = range.collapsed ? 'i' : range.toString();
+  if (!range.collapsed) range.deleteContents();
 
   const frag = document.createDocumentFragment();
   frag.appendChild(document.createTextNode(' '));   // spațiu înainte
@@ -688,40 +703,37 @@ function superscriptSelection() {
    că nu face: o unealtă care se supune orbește ar lăsa elevul să scrie un lucru
    care nu există, iar tabla e tocmai locul unde se învață ce există.
 
-   DE UNDE VIN SEMNELE, ȘI DE CE-S DE DOUĂ FELURI.
+   DE UNDE VIN LITERELE, ȘI DE CE-S DE DOUĂ CULORI.
 
-   Cele cinci sunete obișnuite au fiecare litera lor accentuată gata făcută:
-   á, é, í, ó, ú. Acolo nu-i nimic de ales.
+   Toate opt capătă litera lor accentuată: á, é, í, ó, ú, iar cele trei ale
+   noastre ắ, ấ și „î" cu semnul de accent pus deasupra. Pe „î" nu se putea
+   altfel: nicio scriere din lume n-a avut nevoie de „i" cu căciulă ȘI cu
+   accent, așa că nu i s-a făcut o literă a lui. Iese la fel la citit, doar că-s
+   două semne, nu unul.
 
-   Pentru „ă", „î" și „â" însă nu se pune accent, ci se scrie MAJUSCULA LOR, cu
-   ROȘU. Nu e o găselniță: e însemnarea din lecție, iar tabla trebuie să scrie
-   ca lecția, altfel elevul învață un lucru și scrie altul. (Ar fi fost și
-   litere accentuate de împrumutat, ắ și ấ din vietnameză, dar „î" n-are niciuna
-   și ar fi trebuit lipit un semn deasupra; două feluri de a scrie același lucru
-   sunt mai rele decât unul singur ales anume.)
+   CULOAREA nu e podoabă, e deosebire: „ă", „î" și „â" se scriu cu ROȘU, cum
+   sunt însemnate și în lecție, iar celelalte cinci cu movul tablei. Tabla
+   trebuie să scrie ca lecția, altfel elevul învață un lucru și scrie altul.
 
    CUM SE ȘTIE CĂ E ACCENTUATĂ. Nu după cum arată litera, ci după semnul pus pe
-   ea: `<b class="accent">`. Trebuie așa, fiindcă un „Ă" roșu și un „Ă" scris
-   pur și simplu de elev arată la fel; deosebirea nu e în literă, e în ce s-a
-   vrut cu ea, iar asta se ține minte, nu se ghicește.
+   ea: `<b class="accent">`. Trebuie așa, fiindcă la scoaterea accentului
+   trebuie să știm și de unde am plecat, iar litera singură n-o mai spune.
 
    Și SE IA ÎNAPOI la a doua apăsare. Orice unealtă care pune ceva trebuie să
    știe și să scoată, altfel singurul drum înapoi e ștergerea, adică pierderea a
    ce era bun împreună cu ce era greșit. */
 const ACCENTE = {
   a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú',
-  'ă': 'Ă', 'â': 'Â', 'î': 'Î',
+  'ă': 'ắ', 'â': 'ấ', 'î': 'î\u0301',
   A: 'Á', E: 'É', I: 'Í', O: 'Ó', U: 'Ú',
-  'Ă': 'Ă', 'Â': 'Â', 'Î': 'Î',
+  'Ă': 'Ắ', 'Â': 'Ấ', 'Î': 'Î\u0301',
 };
-/* Înapoi se merge de la litera accentuată la cea de rând. Majusculele roșii
-   trimit la literele mici, fiindcă de acolo au venit: cine scrie „ă" și apasă
-   accentul vede „Ă", iar apăsând iar trebuie să-și primească „ă"-ul înapoi. */
-const FARA_ACCENT = {
-  'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
-  'Ă': 'ă', 'Â': 'â', 'Î': 'î',
-  'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
-};
+const FARA_ACCENT = Object.fromEntries(
+  Object.entries(ACCENTE).map(([gol, cu]) => [cu, gol]));
+
+/* Cele trei ale noastre se scriu cu roșu, cum sunt însemnate și în lecție;
+   celelalte cinci, cu movul tablei. */
+const ROSII = 'ăâîĂÂÎ';
 
 /** Litera dinaintea cursorului, ori cea aleasă: un domeniu peste ea. */
 function domeniulLiterei() {
@@ -772,7 +784,7 @@ function accentueaza() {
   } else {
     r.deleteContents();
     nod = document.createElement('b');
-    nod.className = 'accent';
+    nod.className = ROSII.includes(text) ? 'accent accent--rosu' : 'accent';
     nod.textContent = pus;
     r.insertNode(nod);
   }
@@ -1143,11 +1155,16 @@ function placeCaret(el, atStart) {
    transcrierea ei, cu parantezele montate). */
 const rowTemplateFraza = document.getElementById('rowTemplateFraza');
 const rowTemplateStructura = document.getElementById('rowTemplateStructura');
+const rowTemplateAccent = document.getElementById('rowTemplateAccent');
 
 /* TREI FELURI DE RÂND, ȘI FIECARE ȘTIE SINGUR CE E.
    Felul nu se ține minte pe alături, ci se citește din chiar rândul din pagină:
    așa nu se poate întâmpla ca datele să spună una și desenul alta. */
-const SABLOANE = { fraza: rowTemplateFraza, structura: rowTemplateStructura };
+const SABLOANE = {
+  fraza: rowTemplateFraza,
+  structura: rowTemplateStructura,
+  accent: rowTemplateAccent,
+};
 
 function createRow(fel) {
   const sablon = SABLOANE[fel] || rowTemplate;
@@ -1158,13 +1175,17 @@ function felRand(row) {
   if (!row) return 'obisnuit';
   if (row.classList.contains('row--fraza')) return 'fraza';
   if (row.classList.contains('row--structura')) return 'structura';
+  if (row.classList.contains('row--accent')) return 'accent';
   return 'obisnuit';
 }
 const eRandDeFraza = (row) => felRand(row) === 'fraza';
 
 /** Ce fel de rând cere fața asta de zar? */
 function felDupaFata(fata) {
-  const kind = fata ? fataZarului(LECTIE, Number(fata))?.kind : null;
+  /* Accentul are rândul lui, deși materialul e tot cuvinte: drumul pe care-l
+     face elevul e altul, iar rândul e drumul făcut văzut. */
+  if (fata === 'accent') return 'accent';
+  const kind = fata ? felulExercitiului(LECTIE, fata)?.kind : null;
   if (kind === 'propozitie') return 'fraza';
   if (kind === 'structura') return 'structura';
   return 'obisnuit';
@@ -1215,8 +1236,11 @@ toolbar.addEventListener('click', (e) => {
   if (btn.dataset.cmd) {
     const cmd = btn.dataset.cmd;
     if (cmd === 'superscript') {
-      // pe selecție -> regula 7; fără selecție -> comută superscript normal
-      if (!superscriptSelection()) document.execCommand('superscript', false, null);
+      /* Un singur lucru, în amândouă felurile: cu literă aleasă o preface, fără
+         literă aleasă scrie un „i". Fără asta, butonul pornea o STARE a
+         browserului, iar o unealtă care uneori pune un semn și alteori pornește
+         o stare nu se poate ține minte. */
+      superscriptSelection();
     } else {
       document.execCommand(cmd, false, null);
     }
@@ -1515,6 +1539,8 @@ const CERINTE = {
   4: 'Stabilește valoarea fonetică a lui [i] în cuvintele date:',
   5: 'Oferă cuvinte pentru structurile fonetice date:',
   6: 'Transcrie fonetic propozițiile de mai jos:',
+  // Nu pică la zar: îl dă profesorul când socotește el.
+  accent: 'Stabilește pronunția corectă a cuvintelor prin marcarea accentului:',
 };
 
 /* CERINȚA UNUI FEL NU SE ȚINE MINTE PE EXERCIȚIU.
@@ -1603,6 +1629,14 @@ const exercitiulDeschis = () => exercitii[deschis] || null;
 /** Rândurile din pagină, în formă de date. */
 function culegeRanduri() {
   return randurile().map((row) => {
+    if (felRand(row) === 'accent') {
+      return {
+        word: (row.querySelector('.word') || {}).innerHTML || '',
+        accentuat: (row.querySelector('.accentuat') || {}).innerHTML || '',
+        sens: (row.querySelector('.sens') || {}).innerHTML || '',
+        exemplu: (row.querySelector('.exemplu') || {}).innerHTML || '',
+      };
+    }
     if (felRand(row) === 'structura') {
       const st = row.querySelector('.structura');
       return {
@@ -1648,11 +1682,19 @@ function aseazaRanduri(randuri, felCerut) {
        propoziție; are `structura`, e de structură. Nu-l ținem minte pe alături,
        ca să nu se poată ca datele să spună una și desenul alta. */
     const fel = r ? (r.fraza !== undefined ? 'fraza'
-                   : r.structura !== undefined ? 'structura' : 'obisnuit')
+                   : r.structura !== undefined ? 'structura'
+                   : r.accentuat !== undefined ? 'accent' : 'obisnuit')
                   : felImplicit;
     const row = createRow(fel);
     sheet.appendChild(row);
     if (!r) return;
+    if (fel === 'accent') {
+      row.querySelector('.word').innerHTML = r.word || '';
+      row.querySelector('.accentuat').innerHTML = r.accentuat || '';
+      row.querySelector('.sens').innerHTML = r.sens || '';
+      row.querySelector('.exemplu').innerHTML = r.exemplu || '';
+      return;
+    }
     if (fel === 'structura') {
       const st = row.querySelector('.structura');
       st.innerHTML = r.structura || '';
@@ -1715,7 +1757,10 @@ function aseazaRanduri(randuri, felCerut) {
    e tot al lui. */
 function aseazaCiorna(date) {
   const ex = exercitiulDeschis();
-  const trebuie = felDupaFata(ex?.fata) === 'structura';
+  /* Ciorna e pentru cine are ce verifica prin analiză fonetică: și structurile,
+     și accentul. La celelalte n-ar avea ce căuta. */
+  const fel = felDupaFata(ex?.fata);
+  const trebuie = fel === 'structura' || fel === 'accent';
   const veche = sheet.querySelector('.ciorna');
   if (veche) veche.remove();
   /* Butonul de șters ciorna se vede numai unde CHIAR e o ciornă: un buton care
@@ -2356,6 +2401,7 @@ document.getElementById('pdfBtn').addEventListener('click', () => { inchideMeniu
 /** Rândul, curățat de tot ce a răspuns elevul; capul lui rămâne. */
 function faraRezolvare(r) {
   if (!r) return r;
+  if (r.accentuat !== undefined) return { ...r, accentuat: '', sens: '', exemplu: '' };
   if (r.structura !== undefined) return { ...r, syll: '', raspuns: [] };
   if (r.fraza !== undefined) return { ...r, trans: '' };
   return { ...r, syll: '', trans: '', types: '', extra: (r.extra || []).map(() => '') };
@@ -2481,7 +2527,7 @@ import { fataUrmatoare, INTOARCERI, aruncaSpre, laClipa, unghiuriDinQ,
          pornire, pas, inclina }
   from './zar-fizica.js';
 import { listItems } from '../../shared/scripts/bank-repo.js';
-import { fataZarului, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
+import { felulExercitiului, altele, felulMaterialului, seCuvineEticheta, deCeCereEticheta }
   from '../../shared/scripts/board-material.js';
 
 /* ---------- Zarul ---------- */
@@ -3538,17 +3584,24 @@ function inchideLaClicInAfara(d) {
 /* ---------- Ce fel de exercițiu ----------
    O singură listă, folosită și de fereastra de la „+ cerință", și de întrebarea
    dinăuntrul generatorului. Se face din `CERINTE` și din registrul lecției:
-   dacă se schimbă o cerință, se schimbă în amândouă locurile deodată. */
+   dacă se schimbă o cerință, se schimbă în amândouă locurile deodată.
+
+   Întâi cele șase ale zarului, cu numărul lor; apoi cele pe care le dă
+   profesorul când socotește el, cu un semn în locul numărului, fiindcă n-au
+   număr și n-ar avea ce să însemne acolo. */
 function feluriHtml(cuLiber) {
   let h = '';
+  const unul = (cheie, semn, cfg) =>
+    '<button class="fel" type="button" data-fata="' + escapaText(cheie) + '">' +
+      '<span class="fel__n">' + semn + '</span>' +
+      '<span class="fel__t"><b>' + escapaText(cfg.nume) + '</b>' +
+      '<i>' + escapaText(CERINTE[cheie] || '') + '</i></span></button>';
   for (const fata of [1, 2, 3, 4, 5, 6]) {
-    const cfg = fataZarului(LECTIE, fata);
+    const cfg = felulExercitiului(LECTIE, fata);
     if (!cfg) continue;
-    h += '<button class="fel" type="button" data-fata="' + fata + '">' +
-           '<span class="fel__n">' + fata + '</span>' +
-           '<span class="fel__t"><b>' + escapaText(cfg.nume) + '</b>' +
-           '<i>' + escapaText(CERINTE[fata]) + '</i></span></button>';
+    h += unul(String(fata), String(fata), cfg);
   }
+  for (const alt of altele(LECTIE)) h += unul(alt.cheie, '✦', alt);
   if (cuLiber) {
     h += '<button class="fel fel--liber" type="button" data-fata="0">' +
            '<span class="fel__n">✎</span>' +
@@ -3574,12 +3627,20 @@ function ceFel(cuLiber, apoi) {
 elFelLista && elFelLista.addEventListener('click', (e) => {
   const b = e.target.closest('.fel');
   if (!b) return;
-  const fata = Number(b.dataset.fata) || 0;
+  /* Cheia rămâne cum e scrisă: numerele fețelor de zar tot numere, numele
+     celorlalte tot nume. Trecută prin `Number`, „accent" ar fi ieșit `NaN`. */
+  const fata = cheiaFelului(b.dataset.fata);
   inchideFereastra(dlgFel);
   const apoi = raspundeLaFel;
   raspundeLaFel = null;
   if (apoi) apoi(fata);
 });
+
+/** Cheia scrisă pe un buton de fel: număr dacă e față de zar, nume altfel. */
+function cheiaFelului(brut) {
+  const t = String(brut || '');
+  return /^\d+$/.test(t) ? (Number(t) || 0) : t;
+}
 
 /* ---------- Ținta și felul în lucru ---------- */
 
@@ -3587,7 +3648,10 @@ elFelLista && elFelLista.addEventListener('click', (e) => {
 function fataInLucru() {
   if (felAles) return felAles;
   const ex = exercitii[deschis];
-  return ex && ex.fata ? Number(ex.fata) : null;
+  /* Cheia unui exercițiu e ori numărul feței de zar, ori numele unuia dat de
+     profesor. NU se mai trece prin `Number`: „accent" ar fi ieșit `NaN`, iar
+     de-acolo încolo tabla ar fi crezut că exercițiul n-are fel. */
+  return ex && ex.fata ? ex.fata : null;
 }
 
 const nivelAles = () => {
@@ -3605,7 +3669,7 @@ const nivelAles = () => {
    zece cuvinte și ți-ar fi dat patru. */
 async function bancaPentru(fata) {
   if (!banca.has(fata)) {
-    const cfg = fataZarului(LECTIE, fata);
+    const cfg = felulExercitiului(LECTIE, fata);
     const tot = await listItems(LECTIE, fata, {});
     banca.set(fata, tot.filter((x) => seCuvineEticheta(LECTIE, cfg.eticheta, x.body)));
   }
@@ -3638,7 +3702,7 @@ function potrivesteFereastraGen() {
     return;
   }
 
-  const cfg = fataZarului(LECTIE, fata);
+  const cfg = felulExercitiului(LECTIE, fata);
   const ex = exercitii[deschis];
   const nou = elGenNou && elGenNou.checked;
 
@@ -3663,7 +3727,7 @@ function potrivesteFereastraGen() {
 async function improspatatePlafonul() {
   const fata = fataInLucru();
   if (!fata || !elGenCate) return;
-  const cfg = fataZarului(LECTIE, fata);
+  const cfg = felulExercitiului(LECTIE, fata);
   if (elGenDin) elGenDin.textContent = 'caut în bancă…';
   const tot = await bancaPentru(fata);
   // Între timp poți fi schimbat felul; atunci răspunsul ăsta e vechi.
@@ -3727,7 +3791,7 @@ elGenNivel && elGenNivel.addEventListener('click', (e) => {
 elGenFelLista && elGenFelLista.addEventListener('click', (e) => {
   const b = e.target.closest('.fel');
   if (!b) return;
-  felAles = Number(b.dataset.fata) || null;
+  felAles = cheiaFelului(b.dataset.fata) || null;
   potrivesteFereastraGen();
 });
 
@@ -3752,7 +3816,7 @@ function alege(lista, cate) {
 elGenFa && elGenFa.addEventListener('click', async () => {
   const fata = fataInLucru();
   if (!fata) return;                       // fereastra e la întrebarea de fel
-  const cfg = fataZarului(LECTIE, fata);
+  const cfg = felulExercitiului(LECTIE, fata);
 
   const tot = await bancaPentru(fata);
   const libere = libereDin(tot, nivelAles(), !!(elGenNoi && elGenNoi.checked));
@@ -3792,6 +3856,8 @@ elGenFa && elGenFa.addEventListener('click', async () => {
     ex.randuri = texte.map((t) => ({ fraza: escapaText(t), trans: '', blocata: true }));
   } else if (cfg.kind === 'structura') {
     ex.randuri = texte.map((t) => ({ structura: escapaText(t), syll: '', raspuns: [], blocata: true }));
+  } else if (felDupaFata(fata) === 'accent') {
+    ex.randuri = texte.map((t) => ({ word: escapaText(t), accentuat: '', sens: '', exemplu: '' }));
   } else {
     ex.randuri = texte.map((t) => ({ word: escapaText(t) }));
   }

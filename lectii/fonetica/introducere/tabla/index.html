@@ -341,6 +341,27 @@
   </div>
 </template>
 
+<!-- RÂNDUL DE ACCENT.
+     Patru etape, fiindcă drumul are patru pași: pleci de la cuvântul scris,
+     îi marchezi accentul, spui ce înseamnă așa accentuat, și îl pui într-un
+     enunț care să arate că l-ai înțeles.
+
+     „Sensul" poate rămâne gol: la unele cuvinte accentul schimbă înțelesul și
+     atunci merită scris, la altele doar arată pronunția. Enter trece mai
+     departe prin el ca prin oricare altul, deci nu stă în drum. -->
+<template id="rowTemplateAccent">
+  <div class="row row--accent">
+    <div class="rownum"></div>
+    <div class="field word" contenteditable="true" data-ph="cuvânt"></div>
+    <span class="arrow">→</span>
+    <div class="field accentuat" contenteditable="true" data-ph="accentuare"></div>
+    <span class="arrow">→</span>
+    <div class="field sens" contenteditable="true" data-ph="sens (dacă e cazul)"></div>
+    <span class="arrow">→</span>
+    <div class="field exemplu" contenteditable="true" data-ph="exemplu"></div>
+  </div>
+</template>
+
 <!-- Șablon pentru un rând de lucru -->
 <template id="rowTemplate">
   <div class="row">
