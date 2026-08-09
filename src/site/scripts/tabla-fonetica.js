@@ -972,12 +972,30 @@ sheet.addEventListener('mousedown', () => { resetACycle(); resetCK(); });
    scrie, iar rândul nou se naște abia când nu mai e niciunul. */
 const sePoateScrie = (f) => !!f && f.getAttribute('contenteditable') !== 'false';
 
+/* CUVINTELE UNEI STRUCTURI SUNT O SINGURĂ ETAPĂ, REPETATĂ.
+
+   Un rând de structură are trei etape: structura, despărțirea ei, cuvântul.
+   Butonul „+" nu adaugă o etapă a patra, ci încă un cuvânt la aceeași etapă,
+   fiindcă unei structuri i se potrivesc oricâte cuvinte.
+
+   Or, Tab și Enter umblă prin ETAPE. Dacă ar intra și în cuvintele adăugate, ar
+   însemna că fiecare „+" apăsat lungește drumul până la structura următoare, și
+   de-atunci nu mai poți merge înainte fără să treci prin niște căsuțe pe care
+   poate nici nu le-ai vrut. Așa că din oricare cuvânt se trece drept la
+   structura următoare, iar cuvintele dintre ele se aleg cu degetul, cum au și
+   fost cerute cu degetul. */
+const acelasiSirDeCuvinte = (a, b) =>
+  !!a && !!b && a.classList.contains('cuv') && b.classList.contains('cuv') &&
+  a.closest('.cuvinte') === b.closest('.cuvinte');
+
 function navigate(current, back) {
   const fields = Array.from(sheet.querySelectorAll('.field'));
   const i = fields.indexOf(current);
   let target = null;
   for (let k = i + (back ? -1 : 1); k >= 0 && k < fields.length; k += (back ? -1 : 1)) {
-    if (sePoateScrie(fields[k])) { target = fields[k]; break; }
+    if (!sePoateScrie(fields[k])) continue;
+    if (acelasiSirDeCuvinte(current, fields[k])) continue;
+    target = fields[k]; break;
   }
   if (!target && !back) {
     /* Ciorna e ultima și rămâne ultima: după ea nu se naște nimic, fiindcă nu
