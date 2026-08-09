@@ -8,6 +8,8 @@
 // Content is Romanian; identifiers stay English. Replace with Supabase later.
 // =========================================================
 import { userById, initials, avatarColor } from "./community-data.js";
+/* Plasa din browser e a CONTULUI, nu a calculatorului: vezi `session.js`. */
+import { iaLocal, punLocal } from "./session.js";
 import { relTime, nextId, makeComment } from "./forum-data.js";
 import { localDayStr, localDayNumber } from "./format.js";
 import { WORDS_OF_DAY } from "./news-data.js";
@@ -82,19 +84,13 @@ const CHALLENGE_SEEDS = [
 
 // Teacher-added challenges (mock persistence; Supabase table later).
 const CUSTOM_KEY = "atelier_custom_challenges";
+/* Per ACCOUNT, not per browser. See `session.js`. */
 function loadCustom() {
-  try {
-    return JSON.parse(localStorage.getItem(CUSTOM_KEY) || "[]");
-  } catch {
-    return [];
-  }
+  const l = iaLocal(CUSTOM_KEY, []);
+  return Array.isArray(l) ? l : [];
 }
 function saveCustom(list) {
-  try {
-    localStorage.setItem(CUSTOM_KEY, JSON.stringify(list));
-  } catch {
-    /* private mode */
-  }
+  punLocal(CUSTOM_KEY, list);
 }
 
 /** Everything, seeds + the teacher's own (customs first, they win ties). */

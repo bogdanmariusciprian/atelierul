@@ -124,6 +124,92 @@ function syncCurrentUser() {
 }
 syncCurrentUser();
 
+// =========================================================
+// PLASA DIN BROWSER E A CONTULUI, NU A CALCULATORULUI.
+//
+// Aici a fost o scurgere adevărată, și una din cele urâte: lucrul ținut în
+// `localStorage` e al BROWSERULUI, nu al omului. Profesorul lucra pe tablă din
+// contul lui, se deconecta, intra un elev pe același calculator — și găsea
+// tabla profesorului, cu tot ce scrisese el. Nimeni nu spărsese nimic: baza își
+// făcuse treaba fără cusur, fiindcă acolo fiecare rând poartă `user_id` și e
+// păzit de politici. Scurgerea era în plasa de siguranță din browser, care nu
+// întrebase niciodată AL CUI e ce ține.
+//
+// LEACUL, ÎNTR-UN SINGUR LOC. Orice cheie de-a noastră capătă la coadă numele
+// contului. Așa două conturi de pe același calculator nu se mai pot vedea
+// niciodată, fiindcă nici măcar nu se uită în același sertar. Iar când contul
+// se schimbă, ce era al celuilalt se șterge de-a binelea: o plasă care ține
+// minte lucrul altcuiva nu mai e plasă, e o gaură.
+//
+// Stă în `session.js` fiindcă e o întrebare de identitate („al cui e?"), și
+// fiindcă ăsta e singurul modul pe care-l cheamă absolut toate paginile,
+// inclusiv cele două table, care nu încarcă bara sitului.
+// =========================================================
+
+/** Cine e acum, ca nume de sertar. Nedeconectat ori nelogat: „invitat". */
+export function cineSunt() {
+  return CURRENT_USER.authId || "invitat";
+}
+
+/** Cheia mea pentru o cheie de-a noastră. */
+export const cheiaMea = (cheie) => `${cheie}::${cineSunt()}`;
+
+export function iaLocal(cheie, altfel = null) {
+  try {
+    const brut = localStorage.getItem(cheiaMea(cheie));
+    return brut === null ? altfel : JSON.parse(brut);
+  } catch { return altfel; }
+}
+
+export function punLocal(cheie, valoare) {
+  try { localStorage.setItem(cheiaMea(cheie), JSON.stringify(valoare)); }
+  catch { /* plin ori oprit */ }
+}
+
+export function stergLocal(cheie) {
+  try { localStorage.removeItem(cheiaMea(cheie)); } catch { /* ignoră */ }
+}
+
+/* Cheile scrise înainte de regula asta, fără nume de cont la coadă. Se șterg la
+   prima schimbare de cont: erau ale cuiva, iar acum nu se mai știe ale cui. */
+const CHEI_VECHI = [
+  "fonetica_state", "fonetica_symbols", "atelier:todo", "atelier:tagging",
+  "atelier_notes", "atelier_saved_posts", "atelier_lessons_done", "atelier_streak",
+  "atelier_kudos", "atelier_daily_challenge", "atelier_challenges_solved",
+  "atelier_activity_read", "atelier_custom_challenges", "atelier_messages",
+  "atelier_notif_seen", "atelier_admin_log", "atelier_group_seen",
+  "tests_fx", "tests_pace",
+];
+
+const CHEIA_CINE = "atelier:cine";
+
+/**
+ * S-a schimbat contul? Atunci ce era al celuilalt piere din browserul ăsta.
+ *
+ * NU se șterge tot `localStorage`: acolo stă și sesiunea Supabase, iar ștergerea
+ * ei ne-ar deconecta chiar pe noi. Se șterg numai sertarele altor conturi (cele
+ * cu `::altcineva` la coadă) și cheile vechi, fără nume de cont, despre care nu
+ * se mai poate ști ale cui erau.
+ */
+function curataAlteConturi() {
+  const acum = cineSunt();
+  let inainte = null;
+  try { inainte = localStorage.getItem(CHEIA_CINE); } catch { return; }
+  if (inainte === acum) return;
+  try {
+    const deSters = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.includes("::") && !k.endsWith(`::${acum}`)) deSters.push(k);
+      else if (CHEI_VECHI.includes(k)) deSters.push(k);
+    }
+    deSters.forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem(CHEIA_CINE, acum);
+  } catch { /* plin ori oprit */ }
+}
+curataAlteConturi();
+
 export function getRole() {
   return _user ? roleForEmail(_user.email) : "guest";
 }
@@ -157,6 +243,11 @@ export async function signOut() {
 supabase.auth.onAuthStateChange((_event, session) => {
   _user = session?.user ?? null;
   syncCurrentUser();
+  /* S-a schimbat contul CHIAR ACUM: la deconectare, la conectare, la trecerea
+     de la un cont la altul. Curățenia se face aici, nu doar la pornirea paginii,
+     fiindcă între deconectare și conectare pagina de multe ori nici nu se
+     reîncarcă. */
+  curataAlteConturi();
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent("atelier:role", { detail: { role: getRole() } })

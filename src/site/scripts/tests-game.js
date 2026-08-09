@@ -33,7 +33,7 @@ import { initBonus, maybeSpawn, clearBonus } from "./bonus.js";
 import { createPost } from "../../shared/scripts/forum-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
-import { isLoggedIn } from "../../shared/scripts/session.js";
+import { isLoggedIn, iaLocal, punLocal } from "../../shared/scripts/session.js";
 
 const OPTS = ["A", "B", "C", "D"];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -95,11 +95,14 @@ const BOOSTERS = {
 const FX_KEY = "tgame:fx";
 const PACE_KEY = "tgame:pace";
 let audioCtx = null;
+/* Per ACCOUNT, not per browser: sound/vibration and pace are personal, and on
+   a shared computer they would otherwise be inherited from whoever sat there
+   before. See `session.js`. */
 function loadFx() {
-  try { Object.assign(G.fx, JSON.parse(localStorage.getItem(FX_KEY) || "{}")); } catch { /* keep defaults */ }
+  Object.assign(G.fx, iaLocal(FX_KEY, {}) || {});
 }
 function saveFx() {
-  try { localStorage.setItem(FX_KEY, JSON.stringify(G.fx)); } catch { /* private mode */ }
+  punLocal(FX_KEY, G.fx);
 }
 function beep(kind) {
   if (!G.fx.sound) return;
@@ -127,14 +130,14 @@ function buzz(pattern) {
 // The pupil's own pace, remembered between sittings, so „≈ N minute" means
 // something instead of being a guess.
 function avgMsPerItem() {
-  const v = Number(localStorage.getItem(PACE_KEY)) || 0;
+  const v = Number(iaLocal(PACE_KEY, 0)) || 0;
   return v > 2000 ? v : 30000;
 }
 function rememberPace() {
   if (!G.history.length) return;
   const avg = G.history.reduce((a, e) => a + e.ms, 0) / G.history.length;
-  const prev = Number(localStorage.getItem(PACE_KEY)) || avg;
-  try { localStorage.setItem(PACE_KEY, String(Math.round(prev * 0.6 + avg * 0.4))); } catch { /* ignore */ }
+  const prev = Number(iaLocal(PACE_KEY, 0)) || avg;
+  punLocal(PACE_KEY, Math.round(prev * 0.6 + avg * 0.4));
 }
 const fmtMins = (ms) => {
   const m = Math.round(ms / 60000);

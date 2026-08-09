@@ -11,7 +11,7 @@
 // .streak stays the single value everything else reads (badges, rings).
 // =========================================================
 import { MY_PROFILE } from "./community-data.js";
-import { isLoggedIn, isAdmin } from "./session.js";
+import { isLoggedIn, isAdmin, iaLocal, punLocal } from "./session.js";
 import { showToast } from "./toast.js";
 import { localDayStr } from "./format.js";
 
@@ -20,12 +20,11 @@ const KEY = "atelier_streak"; // { lastDay: "2026-07-04", count: n }
 // LOCAL calendar day (not UTC) — the streak flips at the pupil's local midnight.
 const dayStr = (d = new Date()) => localDayStr(d);
 
+/* Per ACCOUNT, not per browser: on a shared computer the streak of whoever
+   sat there first would otherwise be handed to the next person. See
+   `session.js` for the whole story. */
 function load() {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || "null");
-  } catch {
-    return null;
-  }
+  return iaLocal(KEY, null);
 }
 
 /** Sync MY_PROFILE.streak from storage at module load, so rings/badges
@@ -60,7 +59,7 @@ export function touchStreak() {
   const continues = s && (s.lastDay === yesterday || s.lastDay === twoDaysAgo);
   const count = continues ? s.count + 1 : 1;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ lastDay: today, count }));
+    punLocal(KEY, { lastDay: today, count });
   } catch {
     /* private mode — in-memory only */
   }

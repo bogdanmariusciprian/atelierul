@@ -20,7 +20,7 @@
 // sitului (cele două table, atelierul de redactare), deci nu se poate sprijini
 // pe ea. Vezi `todo.css`. Content Romanian, identifiers English.
 // =========================================================
-import { isAdmin } from "../scripts/session.js";
+import { isAdmin, iaLocal, punLocal } from "../scripts/session.js";
 import {
   cheiaPaginii, numelePaginii, listTodos, addTodo,
   setTodoDone, setTodoBody, removeTodo, pePagini,
@@ -38,15 +38,14 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
    vine tot, imediat ce sosește, și îl întrece pe ăsta. */
 const CHEIE_MEMORIE = "atelier:todo";
 
+/* Ținute pe CONT, nu pe browser: altfel, pe un calculator împărțit, numărul de
+   pe buton ar fi al altcuiva. Vezi `session.js`. */
 function dinMemorie() {
-  try {
-    const brut = localStorage.getItem(CHEIE_MEMORIE);
-    const note = brut ? JSON.parse(brut) : [];
-    return Array.isArray(note) ? note : [];
-  } catch { return []; }
+  const note = iaLocal(CHEIE_MEMORIE, []);
+  return Array.isArray(note) ? note : [];
 }
 function inMemorie(note) {
-  try { localStorage.setItem(CHEIE_MEMORIE, JSON.stringify(note)); } catch { /* plin ori oprit */ }
+  punLocal(CHEIE_MEMORIE, note);
 }
 
 let radacina = null;

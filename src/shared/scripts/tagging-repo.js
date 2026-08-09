@@ -17,6 +17,7 @@
 // citire pentru toți în afară de profesor.
 // =========================================================
 import { supabase } from "./supabase-client.js";
+import { iaLocal, punLocal } from "./session.js";
 
 const CHEIA = "pupil_tagging";
 
@@ -25,13 +26,14 @@ const CHEIA = "pupil_tagging";
    răspunsului. O clipire care spune „nu se poate" și apoi „ba se poate" e mai
    rea decât o așteptare tăcută. */
 const CHEIE_MEMORIE = "atelier:tagging";
-let deschisAcum = (() => {
-  try { return localStorage.getItem(CHEIE_MEMORIE) === "1"; } catch { return false; }
-})();
+/* Ținut pe CONT, nu pe browser. Aici e doar o amintire, nu o pază, dar regula
+   e aceeași peste tot: nimic din ce știe un cont nu se moștenește de altul pe
+   același calculator. Vezi `session.js`. */
+let deschisAcum = iaLocal(CHEIE_MEMORIE, false) === true;
 
 function tineMinte(val) {
   deschisAcum = !!val;
-  try { localStorage.setItem(CHEIE_MEMORIE, val ? "1" : "0"); } catch { /* plin ori oprit */ }
+  punLocal(CHEIE_MEMORIE, !!val);
 }
 
 /** Ce știam despre comutator, fără să întrebăm serverul. */

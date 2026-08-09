@@ -45,9 +45,8 @@ const VERSIUNEA_SIMBOLURILOR = 2;
 
 function loadSymbols() {
   try {
-    const raw = localStorage.getItem('fonetica_symbols');
-    if (raw) {
-      const o = JSON.parse(raw);
+    const o = iaLocal('fonetica_symbols', null);
+    if (o) {
       if (o && o['1'] && o['2'] && o['3'] && o['4']) {
         const taste = { '1': o['1'], '2': o['2'], '3': o['3'], '4': o['4'] };
         if (Number(o.v) !== VERSIUNEA_SIMBOLURILOR) {
@@ -66,8 +65,7 @@ function loadSymbols() {
 }
 function saveSymbols() {
   try {
-    localStorage.setItem('fonetica_symbols',
-      JSON.stringify({ v: VERSIUNEA_SIMBOLURILOR, ...symbols }));
+    punLocal('fonetica_symbols', { v: VERSIUNEA_SIMBOLURILOR, ...symbols });
   } catch (e) {}
 }
 let symbols = loadSymbols();
@@ -2252,6 +2250,8 @@ function deslusesteExercitiile(state) {
       nicăieri și nu înseamnă „salvat": e doar ce aveai în mână.
    ============================================ */
 import { listSheets, loadSheet, saveSheet, renameSheet, deleteSheet } from '../../shared/scripts/board-repo.js';
+/* Plasa din browser e a CONTULUI, nu a calculatorului: vezi `session.js`. */
+import { iaLocal, punLocal } from '../../shared/scripts/session.js';
 
 const LECTIE = 'fonetica-introducere';
 
@@ -2293,12 +2293,22 @@ function scheduleSave() {
   try { clearTimeout(saveTimer); } catch (e) {}
   saveTimer = setTimeout(saveStateLocal, 400);
 }
+/* PLASA E A CONTULUI, NU A CALCULATORULUI.
+
+   Aici a fost o scurgere adevărată: lucrul ținut în browser e al BROWSERULUI,
+   nu al omului. Profesorul lucra pe tablă din contul lui, se deconecta, intra un
+   elev pe același calculator, și găsea tabla profesorului cu tot ce scrisese el.
+   Nimeni nu spărsese nimic: baza își făcuse treaba fără cusur, fiindcă acolo
+   fiecare tablă poartă `user_id` și e păzită de politici. Scurgerea era în plasa
+   de siguranță, care nu întrebase niciodată AL CUI e ce ține.
+
+   `punLocal` și `iaLocal` pun numele contului la coada cheii, deci două conturi
+   de pe același calculator nici măcar nu se uită în același sertar. */
 function saveStateLocal() {
-  try { localStorage.setItem('fonetica_state', JSON.stringify(collectState())); } catch (e) {}
+  punLocal('fonetica_state', collectState());
 }
 function loadStateLocal() {
-  try { const raw = localStorage.getItem('fonetica_state'); if (raw) return JSON.parse(raw); } catch (e) {}
-  return null;
+  return iaLocal('fonetica_state', null);
 }
 
 /* orice tastare -> plasa din browser + semnul „nesalvat" */

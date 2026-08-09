@@ -221,7 +221,7 @@ export function renderCommunity(basePath = "") {
   // Lifetime count of solved daily challenges (drives a badge — still local
   // until badges are derived from real data in a later batch).
   const SOLVED_KEY = "atelier_challenges_solved";
-  const challengesSolved = () => Number(localStorage.getItem(SOLVED_KEY) || 0);
+  const challengesSolved = () => Number(store.get(SOLVED_KEY, 0)) || 0;
 
   const state = {
     section: location.hash.slice(1) || "forum",
