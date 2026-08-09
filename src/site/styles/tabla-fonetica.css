@@ -823,141 +823,139 @@
    (`learn_lessons_boards`), iar „table" ar fi însemnat două lucruri deodată,
    tabla de scris și tabelul din bază. */
 .sertar {
-  /* Pe ecrane mici, sertarul nu se întinde peste toată tabla: lasă o palmă în
+  /* Pe ecrane mici, panoul nu se întinde peste toată tabla: lasă o palmă în
      dreapta, ca să se vadă că e ceva dedesubt și să ai unde apăsa ca să-l
      închizi. */
   --lat: min(300px, calc(100vw - 64px));
 
   position: fixed;
   left: 0;
+  /* Cutia e cât PANGLICA, 260 pe 92, iar mijlocul ei cade la jumătatea
+     ferestrei: de-aia se dă în sus cu 46, adică jumătate din 92. Panoul atârnă
+     dedesubt, din chiar capul panglicii, deci nu mai trebuie măsurat niciodată
+     cât e de înalt. Măsurătoarea aceea ar fi trebuit refăcută la fiecare tablă
+     salvată și la fiecare schimbare de fereastră. */
   top: 50%;
-  /* Cutia e cât fila; corpul iese din ea, absolut. */
-  transform: translateY(-50%);
+  transform: translateY(-46px);
+  width: 260px;
+  height: 92px;
   z-index: 40;
+  /* Cutia e nevăzută și pentru mouse: altfel un dreptunghi de 260 pe 92 ar fi
+     înghițit clicurile de pe tablă, chiar și cu sertarul închis. Își iau
+     dreptul înapoi doar lucrurile care chiar se apasă. */
+  pointer-events: none;
 }
 
 .sertar__corp {
   position: absolute;
   left: 0;
-  top: 50%;
+  /* Începe de sub capul panglicii și crește în jos. */
+  top: 6px;
+  z-index: 1;
   width: var(--lat);
-  /* ÎNĂLȚIMEA E SOCOTITĂ, NU GHICITĂ, fiindcă în colțul din stânga-jos stau doi
-     vecini: comutatorul de etichetare (jos 26, înalt 56, deci până la 82) și
-     butonul TO-DO (jos 92, înalt 42, deci până la 134). Sertarul e așezat la
-     mijloc, deci marginea lui de jos cade la (100vh − H) / 2 de podea. Ca să
-     rămână deasupra lor, cu o palmă de aer: (100vh − H) / 2 ≥ 146, adică
-     H ≤ 100vh − 292. Rotunjesc la 300.
-
-     `max(...)` e podeaua podelei: pe un ecran foarte scund, mai bine un sertar
-     de 220 care se suprapune o idee decât unul de 40, în care nu încape nimic.
-     Vecinii sunt oricum numai ai profesorului; elevul n-are niciunul. */
-  max-height: max(220px, calc(100vh - 300px));
+  /* De la jumătatea ferestrei în jos, oprindu-se la 150 de podea: acolo încep
+     butonul TO-DO (până la 134) și comutatorul de etichetare (până la 82), care
+     sunt amândouă ale profesorului. `max` e podeaua podelei: pe un ecran foarte
+     scund, mai bine un sertar de 220 care se suprapune o idee decât unul de 40,
+     în care nu încape nimic. */
+  max-height: max(220px, calc(50vh - 150px));
   display: flex;
   flex-direction: column;
+  /* Loc pentru panglica ce stă peste el. */
+  padding-top: 44px;
   overflow: hidden;
   background: var(--card);
   border: 1px solid var(--line);
   border-left: none;
   border-radius: 0 14px 14px 0;
   box-shadow: var(--shadow);
+  pointer-events: auto;
   /* Închis, stă cu totul în afara ecranului, la stânga. */
-  transform: translate(-100%, -50%);
-  transition: transform .22s cubic-bezier(.22, .7, .3, 1);
+  transform: translateX(-100%);
+  transition: transform .28s cubic-bezier(.22, .7, .3, 1);
 }
-.sertar.open .sertar__corp { transform: translate(0, -50%); }
+.sertar.open .sertar__corp { transform: translateX(0); }
 
-/* MÂNERUL: singurul lucru care se vede când sertarul e închis, și el ÎNSUȘI e
-   săgeata. Se ascute spre dreapta, adică arată încotro trage.
-
-   De-aia n-are și un semn „›" desenat pe el: ar fi spus a doua oară același
-   lucru. Forma singură e mai tăcută și se citește mai repede decât un semn.
-
-   DOUĂ STRATURI, fiindcă un chenar obișnuit nu urmează o formă tăiată: `border`
-   se desenează pe muchiile dreptunghiului, iar tăietura l-ar reteza tocmai pe
-   laturile piezișe. Deci stratul de dedesubt e chenarul, iar fața, retrasă cu un
-   pixel, lasă din el exact o linie subțire de jur împrejur. Umbra o pune
-   `drop-shadow`, care umblă după silueta tăiată, nu după dreptunghi.
-
-   LĂȚIMEA E SOCOTITĂ, nu aleasă din ochi: la fereastra cea mai strâmtă (sub
-   1080, unde nu mai rămâne margine liberă) primul caracter de pe rând începe la
-   38 de pixeli: 20 din marginea paginii + 10 din cea a foii + 8 din a rândului.
-   Mânerul are exact 38, deci vârful lui ajunge fix acolo unde începe scrisul, și
-   numai la jumătatea înălțimii, unde e ascuțit. Corpul lui, cel lat de 26, stă
-   cu totul peste marginea albă a foii, ca o etichetă lipită pe muchia ei. */
+/* PANGLICA. Cutia butonului nu se schimbă niciodată: 260 pe 92, la același loc.
+   Se schimbă numai CONTURUL dinăuntru, iar el se topește dintr-o întruchipare
+   într-alta. Așa nu se mișcă nimic care ar putea împinge altceva. */
 .sertar__fila {
-  --varf: 12px;               /* cât iese vârful din trupul mânerului */
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
   z-index: 2;
-  display: block;
-  width: 38px;
-  min-height: 82px;
+  width: 260px;
+  height: 92px;
+  margin: 0;
   padding: 0;
   border: none;
-  background: var(--line);    /* stratul de dedesubt: chenarul */
-  clip-path: polygon(0 0, calc(100% - var(--varf)) 0, 100% 50%,
-                     calc(100% - var(--varf)) 100%, 0 100%);
-  filter: drop-shadow(2px 2px 7px rgba(31, 36, 48, .26));
-  cursor: pointer;
-  user-select: none;
-  transition: transform .22s cubic-bezier(.22, .7, .3, 1);
-}
-.sertar__fata {
-  position: absolute;
-  inset: 1px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding-left: 5px;
-  background: var(--card);
-  color: var(--muted);
+  background: none;
   font-family: var(--ui);
-  /* Aceeași tăietură, pe o cutie cu doi pixeli mai mică: așa rămâne o linie
-     subțire, deopotrivă pe laturile drepte și pe cele piezișe. */
-  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 50%,
-                     calc(100% - 11px) 100%, 0 100%);
-  transition: background .15s ease, color .15s ease;
+  /* Butonul e nevăzut pentru mouse; se apasă chiar conturul, nu dreptunghiul din
+     jurul lui. Altfel s-ar fi apăsat și aerul dintre panglică și tablă. */
+  pointer-events: none;
 }
-/* La hover se COLOREAZĂ, nu se lățește. Se lățea, și era o idee proastă: aerul
-   de la vârf s-ar fi dus taman când mâna e pe mâner. */
-.sertar__fila:hover .sertar__fata,
-.sertar__fila:focus-visible .sertar__fata {
-  background: var(--accent-soft);
-  color: var(--accent);
+.sertar__panglica { display: block; overflow: visible; }
+.sertar__panglica path {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: fill .15s ease;
 }
-.sertar__fila:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.sertar__fila:hover .sertar__panglica path,
+.sertar__fila:focus-visible .sertar__panglica path { fill: #dbe3ff; }
+.sertar__fila:focus-visible { outline: none; }
+.sertar__fila:focus-visible .sertar__panglica path { stroke-width: 2; }
 
-/* Deschis, mânerul se dă la o parte exact cât ține corpul, ca și cum ar fi tras
-   de el, ȘI SE ÎNTOARCE: vârful arată acum înapoi, adică „împinge-mă la loc".
-   Oglindirea ar fi întors și pastila cu numărul, deci ea se întoarce încă o dată
-   la loc, ca cifra să rămână citibilă. */
-.sertar.open .sertar__fila { transform: translateX(var(--lat)) scaleX(-1); }
-.sertar.open .sertar__cat { transform: scaleX(-1); }
-
-/* Câte table sunt salvate, într-o pastilă, în trupul mânerului. Pastila o scoate
-   din rândul semnelor mărunte și o face un NUMĂR, adică ceva de citit.
-
-   Lipsește când nu e nimic, fiindcă un zero nu spune decât „gol", iar asta o
-   spune mai bine tăcerea. Atunci rămâne mânerul singur, o săgeată curată. */
+/* Titlul și numărul stau PESTE contur, nu în el: conturul se topește, iar un
+   text care s-ar topi odată cu el ar ieși strâmb. Ele doar se mută. */
+.sertar__titlu,
 .sertar__cat {
+  position: absolute;
+  pointer-events: none;
+  transition: left .28s cubic-bezier(.22, .7, .3, 1),
+              top .28s cubic-bezier(.22, .7, .3, 1),
+              opacity .18s ease;
+}
+/* Închisă, panglica e prea îngustă pentru un titlu: rămâne doar numărul.
+   Cine ascultă pagina aude oricum numele, din `.sertar__citit`. */
+.sertar__titlu {
+  left: 26px;
+  top: 18px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  opacity: 0;
+}
+.sertar.open .sertar__titlu { left: 14px; top: 18px; opacity: 1; }
+
+.sertar__cat {
+  left: 6px;
+  top: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: none;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
+  border: 1px solid var(--accent);
   border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--card);
+  color: var(--accent);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: .01em;
 }
+.sertar.open .sertar__cat { left: 196px; top: 18px; }
+/* Fără table, numărul piere cu totul: un zero nu spune decât „gol", iar asta o
+   spune mai bine tăcerea. */
 .sertar__cat:empty { display: none; }
 
-/* Numele, pentru cititoarele de ecran: pe fila de 22 de pixeli n-ar încăpea,
-   dar cine ascultă pagina trebuie să audă ce e butonul ăsta. */
+/* Numele, pentru cititoarele de ecran: pe panglica închisă n-ar încăpea, dar
+   cine ascultă pagina trebuie să audă ce e butonul ăsta. */
 .sertar__citit {
   position: absolute;
   width: 1px; height: 1px;
@@ -968,7 +966,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sertar__corp, .sertar__fila, .sertar__fata { transition: none; }
+  .sertar__corp, .sertar__titlu, .sertar__cat { transition: none; }
+}
 }
 .boards-body { padding: 10px 12px 14px; overflow-y: auto; }
 .boards-empty { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 4px 2px; }

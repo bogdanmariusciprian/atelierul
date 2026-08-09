@@ -199,21 +199,23 @@
      Fila stă în afara corpului care lunecă, altfel ar pleca odată cu el. -->
 <aside class="sertar" id="boardsPanel" aria-hidden="true">
   <div class="sertar__corp">
-    <div class="notes-head">
-      <strong>Tablele mele</strong>
-      <button class="notes-close" id="boardsClose" title="Închide">×</button>
-    </div>
     <div class="boards-body" id="boardsBody"></div>
   </div>
-  <!-- Mânerul e el însuși săgeata: se ascute spre dreapta. De-aia nu mai are și
-       un semn „›" desenat pe el, care ar fi spus a doua oară același lucru.
-       Două straturi, ca forma ascuțită să capete și un chenar subțire: cel de
-       dedesubt e chenarul, cel de deasupra, retras cu un pixel, e fața. -->
+  <!-- PANGLICA. Un singur lucru care se preface în altul: închisă, atârnă din
+       marginea ecranului cu vârful spre dreapta („trage de mine"); deschisă, se
+       întinde peste capul panoului și capătă crestătura de fundă la celălalt
+       capăt („împinge-mă la loc"). Duce cu ea titlul și numărul, deci butonul
+       „×" din antet n-are ce mai căuta: erau două uși spre aceeași cameră.
+
+       Desenul e un singur contur, cu aceleași patru curbe în amândouă
+       întruchipările. Numai așa se poate topi una într-alta. -->
   <button class="sertar__fila" id="boardsFila" type="button"
           aria-expanded="false" aria-controls="boardsPanel" title="Tablele mele">
-    <span class="sertar__fata" aria-hidden="true">
-      <span class="sertar__cat" id="boardsCat"></span>
-    </span>
+    <svg class="sertar__panglica" width="260" height="92" aria-hidden="true">
+      <path id="boardsForma" d="M 0 4 C 14 6 20 14 26 34 C 31 40 33 44 33 46 C 33 48 31 52 26 58 C 20 78 14 86 0 88 Z"/>
+    </svg>
+    <span class="sertar__titlu" aria-hidden="true">Tablele mele</span>
+    <span class="sertar__cat" id="boardsCat" aria-hidden="true"></span>
     <span class="sertar__citit">Tablele mele</span>
   </button>
 </aside>

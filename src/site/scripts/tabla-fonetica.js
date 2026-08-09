@@ -2636,6 +2636,69 @@ const boardsPanel = document.getElementById('boardsPanel');
 const boardsBody  = document.getElementById('boardsBody');
 const boardsFila  = document.getElementById('boardsFila');
 const boardsCat   = document.getElementById('boardsCat');
+const boardsForma = document.getElementById('boardsForma');
+
+/* ---------- Panglica: două întruchipări ale aceluiași contur ----------
+
+   ÎNCHISĂ atârnă din marginea ecranului, cu vârful spre dreapta: „trage de
+   mine". DESCHISĂ se întinde peste capul panoului, iar celălalt capăt i se
+   scobește în crestătura de fundă, care arată înapoi: „împinge-mă la loc".
+
+   AMÂNDOUĂ AU ACELEAȘI PATRU CURBE, în aceeași ordine, și tocmai de-aia se pot
+   topi una într-alta: se trec numerele dintr-un desen într-altul, pe rând. Dacă
+   unul dintre ele ar avea o curbă în plus, topirea s-ar preface într-o săritură,
+   fără să dea vreo eroare nicăieri. Deci conturul se scrie o dată, iar al doilea
+   se face după chipul lui.
+
+   Numerele se plimbă cu mâna, dintr-un cadru în altul, nu cu `transition` pe
+   `d`. Aceea merge doar prin unele browsere, iar acolo unde nu merge n-ar da
+   greș zgomotos, ci ar lăsa panglica înțepenită în forma închisă peste un panou
+   deschis: greșeala care se vede cel mai greu. */
+const FORMA_INCHISA = 'M 0 4 C 14 6 20 14 26 34 C 31 40 33 44 33 46 C 33 48 31 52 26 58 C 20 78 14 86 0 88 Z';
+const FORMA_DESCHISA = 'M 0 6 C 60 3 120 7 178 9 C 200 11 216 12 230 8 C 200 20 200 34 230 46 C 170 48 60 50 0 46 Z';
+
+const NUMERELE = /-?\d+(?:\.\d+)?/g;
+const cifrele = (d) => (d.match(NUMERELE) || []).map(Number);
+/* Bucățile de literă dintre numere: din ele și din numerele plimbate se
+   recompune conturul, fără să mai fie nevoie să știm ce înseamnă fiecare. */
+const CUVINTELE = FORMA_INCHISA.split(NUMERELE);
+const DE_LA = cifrele(FORMA_INCHISA);
+const PANA_LA = cifrele(FORMA_DESCHISA);
+
+function conturLa(t) {
+  let d = CUVINTELE[0];
+  for (let i = 0; i < DE_LA.length; i++) {
+    d += (DE_LA[i] + (PANA_LA[i] - DE_LA[i]) * t).toFixed(1) + CUVINTELE[i + 1];
+  }
+  return d;
+}
+
+const TOPIRE = 280;                                   // cât ține topirea
+const lin = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+let topireaDeAcum = 0;                                // unde a rămas conturul
+let firulTopirii = 0;
+
+function topesteContur(catre) {
+  if (!boardsForma) return;
+  cancelAnimationFrame(firulTopirii);
+  const dela = topireaDeAcum;
+  const scurt = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (scurt || dela === catre) {
+    topireaDeAcum = catre;
+    boardsForma.setAttribute('d', conturLa(catre));
+    return;
+  }
+  const pornit = performance.now();
+  /* Se pleacă DE UNDE E ACUM, nu de la capăt: cine apasă de două ori repede nu
+     vede panglica sărind înapoi ca s-o ia de la început. */
+  const drum = Math.abs(catre - dela);
+  (function cadru(acum) {
+    const t = Math.min(1, (acum - pornit) / (TOPIRE * drum || 1));
+    topireaDeAcum = dela + (catre - dela) * lin(t);
+    boardsForma.setAttribute('d', conturLa(topireaDeAcum));
+    if (t < 1) firulTopirii = requestAnimationFrame(cadru);
+  })(pornit);
+}
 
 function sertarulEDeschis() { return !!(boardsPanel && boardsPanel.classList.contains('open')); }
 
@@ -2644,6 +2707,7 @@ function inchideSertarul() {
   boardsPanel.classList.remove('open');
   boardsPanel.setAttribute('aria-hidden', 'true');
   if (boardsFila) boardsFila.setAttribute('aria-expanded', 'false');
+  topesteContur(0);
 }
 
 function deschideSertarul() {
@@ -2651,6 +2715,7 @@ function deschideSertarul() {
   boardsPanel.classList.add('open');
   boardsPanel.setAttribute('aria-hidden', 'false');
   if (boardsFila) boardsFila.setAttribute('aria-expanded', 'true');
+  topesteContur(1);
   aratăTablele();
 }
 
