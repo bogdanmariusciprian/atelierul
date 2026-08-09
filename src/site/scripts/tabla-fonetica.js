@@ -3126,11 +3126,21 @@ async function aruncaZarul() {
 function gataAruncarea(fata) {
   aPicatOData = true;
   trezesteTavita();
-  try {
-    adaugaExercitiu({ sursa: 'zar', fata });
-  } catch (e) {
-    console.error('exercițiul de la zar nu s-a putut face:', e);
-  }
+
+  /* EXERCIȚIUL NU SE MAI FACE AICI, ȘI ĂSTA E MIEZUL.
+
+     Se făcea, iar dacă omul apăsa „Renunță" ori dădea clic în afară, pe tablă
+     rămânea un exercițiu gol, cu cerință și fără nimic în el. Greșeala nu era în
+     fereastră, ci în ordine: aruncarea zarului nu e o HOTĂRÂRE, e o ÎNTREBARE.
+     „Ți-a picat 3, faci exercițiul ăsta?" Iar dintr-o întrebare nu se naște
+     nimic până nu i se răspunde.
+
+     Deci fața trăiește deocamdată doar aici, într-o singură variabilă, iar
+     exercițiul se naște abia la „Generează". Renunțarea nu mai are ce curăța,
+     fiindcă nu s-a făcut nimic de curățat: e mai bine decât o curățenie, care
+     s-ar fi putut și uita. */
+  fataDinZar = fata;
+
   /* Deschiderea e păzită anume. Dacă vreodată crapă ceva înăuntru, elevul
      rămânea cu tabla mută: nici fereastră, nici vestire, nici semn. Așa,
      orice s-ar întâmpla, tot capătă numărul picat și butonul arătat cu
@@ -3142,6 +3152,17 @@ function gataAruncarea(fata) {
     console.error('generatorul nu s-a deschis singur:', e);
   }
   if (sADeschis) return;
+
+  /* Aici, în plasă, exercițiul CHIAR se face: fereastra n-a putut întreba, deci
+     n-are cine răspunde, iar fața s-ar pierde cu totul. E singurul loc în care
+     zarul mai hotărăște singur, și numai fiindcă altfel aruncarea ar fi fost
+     degeaba. */
+  try {
+    adaugaExercitiu({ sursa: 'zar', fata });
+    fataDinZar = null;
+  } catch (e) {
+    console.error('exercițiul de la zar nu s-a putut face:', e);
+  }
   vesteste(fata);
   cheamaGeneratorul();
 }
@@ -3841,6 +3862,14 @@ const datAzi = new Set();
    până se închide fereastra; de acolo încolo îl ține exercițiul. */
 let felAles = null;
 
+/* Fața pe care a scos-o zarul și care ÎNCĂ N-A DEVENIT EXERCIȚIU.
+
+   Aruncarea e o întrebare, nu o hotărâre, deci între „a picat 3" și „Generează"
+   nu există niciun exercițiu pe tablă: fața stă aici. Dacă omul renunță, se
+   golește și nu rămâne nimic în urmă. Dacă generează, atunci se face exercițiul,
+   cu fața asta pe el. */
+let fataDinZar = null;
+
 /* Banca, cerută o dată pe fereastră deschisă. O ținem ca să putem socoti
    plafonul din mers, când schimbi dificultatea ori bifa: altfel ar fi o cerere
    la server la fiecare apăsare. Se golește la închidere, ca fereastra
@@ -3969,6 +3998,9 @@ function cheiaFelului(brut) {
 /** Felul cu care lucrăm acum: cel ales adineauri ori cel al exercițiului. */
 function fataInLucru() {
   if (felAles) return felAles;
+  /* Zarul a spus felul, dar exercițiul nu s-a făcut încă: se face abia la
+     „Generează". Până atunci fața trăiește în `fataDinZar`, nu pe tablă. */
+  if (fataDinZar) return fataDinZar;
   const ex = exercitii[deschis];
   /* Cheia unui exercițiu e ori numărul feței de zar, ori numele unuia dat de
      profesor. NU se mai trece prin `Number`: „accent" ar fi ieșit `NaN`, iar
@@ -4026,7 +4058,13 @@ function potrivesteFereastraGen() {
 
   const cfg = felulExercitiului(LECTIE, fata);
   const ex = exercitii[deschis];
-  const nou = elGenNou && elGenNou.checked;
+  /* Când fața vine de la zar, exercițiul e ÎNTOTDEAUNA nou, deci bifa „într-un
+     exercițiu nou" n-ar mai avea ce alege. Se ascunde: o bifă care nu schimbă
+     nimic e mai rea decât una care lipsește, fiindcă te lasă să crezi că ai
+     hotărât ceva. */
+  const dinZar = !!fataDinZar;
+  const nou = dinZar || !!(elGenNou && elGenNou.checked);
+  if (elGenNou && elGenNou.parentElement) elGenNou.parentElement.hidden = dinZar;
 
   if (elGenTintaK) {
     elGenTintaK.textContent = numeFelArticulat(cfg.kind) + ' intră ' +
@@ -4095,7 +4133,16 @@ function deschideGeneratorul({ dinZar = null } = {}) {
 }
 
 document.getElementById('genBtn')?.addEventListener('click', () => deschideGeneratorul());
-dlgGen && dlgGen.addEventListener('close', () => { felAles = null; banca.clear(); });
+
+/* ÎNCHIDEREA CURĂȚĂ TOT, ORICUM S-AR FACE: de pe „Renunță", cu Escape, cu un
+   clic în afară, ori după o generare izbutită. Toate trec pe aici, fiindcă toate
+   sfârșesc cu `close`, iar asta e chiar ce voiam: o singură curățenie, nu una
+   pentru fiecare fel de a pleca. Așa fața zarului nu poate rămâne agățată. */
+dlgGen && dlgGen.addEventListener('close', () => {
+  felAles = null;
+  fataDinZar = null;
+  banca.clear();
+});
 
 /* Toate ferestrele tablei se închid și la un clic în afară, nu doar din Escape
    sau de pe buton. Se pune într-un singur loc, pe toate deodată, ca să nu ajungă
@@ -4156,7 +4203,12 @@ elGenFa && elGenFa.addEventListener('click', async () => {
   // UNDE INTRĂ. Un exercițiu nou capătă felul ăsta; cel deschis, dacă n-avea
   // fel (cerință scrisă de mână), îl capătă acum și nu va mai fi întrebat.
   let ex;
-  if ((elGenNou && elGenNou.checked) || !exercitii[deschis]) {
+  if (fataDinZar) {
+    /* AICI SE NAȘTE exercițiul venit de la zar, nu la aruncare. Aruncarea doar
+       întreabă; abia răspunsul face ceva. Iar el e întotdeauna NOU: „mi-a picat
+       altceva" înseamnă altă cerință, nu alte cuvinte la cea de față. */
+    ex = adaugaExercitiu({ sursa: 'zar', fata });
+  } else if ((elGenNou && elGenNou.checked) || !exercitii[deschis]) {
     ex = adaugaExercitiu({ sursa: 'tip', fata });
   } else {
     ex = exercitii[deschis];
