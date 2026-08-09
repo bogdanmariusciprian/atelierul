@@ -1654,6 +1654,51 @@ function deseneazaTeancul() {
       '<button class="cer__x" data-sterge="' + i + '" title="Șterge exercițiul" aria-label="Șterge exercițiul"></button>' +
       '</div>';
   }).join('');
+  potrivesteTeancul();
+}
+
+/* ---------- CÂT SE VEDE DIN TEANC, ȘI UNDE E DUS ----------
+
+   Se văd patru cerințe strânse, plus cea deschisă. Mai multe ar mânca locul de
+   scris, care e treaba tablei; mai puține și n-ai mai ști ce-ai făcut adineauri.
+
+   Mărginirea era în procente din ecran, 42%, ceea ce însemna cu totul altceva pe
+   un ecran lat decât pe unul de laptop: patru rânduri într-un loc, unsprezece în
+   altul. Se socotește acum din înălțimea MĂSURATĂ a unui rând strâns, deci peste
+   tot se văd tot patru, oricare ar fi ecranul, mărimea literei sau lungimea
+   cerinței. Plafonul din foaia de stil rămâne pentru ecranele scunde, unde nici
+   patru n-ar încăpea: acolo câștigă cel mai mic dintre cele două.
+
+   Iar teancul se duce singur la cerința deschisă. La douăzeci de exerciții, cea
+   la care lucrezi e tocmai jos, iar dacă teancul rămâne unde a fost, te uiți la
+   ce ai făcut acum o oră. */
+const CATE_STRANSE_SE_VAD = 4;
+
+function potrivesteTeancul() {
+  if (!elTeanc) return;
+  const strans = elTeanc.querySelector('.cer.e-stransa');
+  const desch = elTeanc.querySelector('.cer.e-deschisa');
+  if (!strans) { elTeanc.style.maxHeight = ''; return; }
+
+  const gol = parseFloat(getComputedStyle(elTeanc).rowGap) || 0;
+  const inalt = strans.getBoundingClientRect().height;
+  const inaltD = desch ? desch.getBoundingClientRect().height : 0;
+  const cate = CATE_STRANSE_SE_VAD;
+  elTeanc.style.maxHeight =
+    Math.round(inaltD + (desch ? gol : 0) + cate * inalt + (cate - 1) * gol) + 'px';
+
+  if (!desch) return;
+  /* Măsurat din dreptunghiurile de pe ecran, nu din `offsetTop`: acela se ia
+     după primul strămoș așezat, iar dacă vreodată se schimbă așezarea teancului,
+     socoteala ar ieși greșită fără să se vadă de ce. */
+  const t = elTeanc.getBoundingClientRect(), d = desch.getBoundingClientRect();
+  const sus = d.top - t.top + elTeanc.scrollTop;
+  const jos = sus + d.height;
+  if (jos > elTeanc.scrollTop + elTeanc.clientHeight) {
+    elTeanc.scrollTop = jos - elTeanc.clientHeight;
+  } else if (sus < elTeanc.scrollTop) {
+    elTeanc.scrollTop = sus;
+  }
 }
 
 function escapaText(t) {

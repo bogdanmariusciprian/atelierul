@@ -545,12 +545,23 @@
      spoilerele de pe forumuri: le vezi pe toate, dar nu-ți fură locul.
 
      Teancul e mărginit în înălțime și derulează pe dinăuntru: la zece exerciții
-     ar fi crescut peste jumătate de ecran și n-ar mai fi rămas loc de scris. */
+     ar fi crescut peste jumătate de ecran și n-ar mai fi rămas loc de scris.
+
+     MĂRGINIREA E ÎN RÂNDURI, NU ÎN PROCENTE DE ECRAN. Avea 42% din înălțime,
+     ceea ce însemna cu totul altceva pe un ecran lat decât pe unul de laptop:
+     patru rânduri într-un loc, unsprezece în altul. Acum se socotește în cod,
+     din înălțimea măsurată a unui rând strâns și a celei deschise (vezi
+     `potrivesteTeancul`), deci peste tot se văd tot patru. Aici rămâne doar
+     plafonul de siguranță, pentru clipa dinaintea măsurării și pentru ecranele
+     scunde, unde nici patru n-ar încăpea. */
   .teanc {
     max-width: 1080px; margin: 0 auto;
     max-height: 42vh; overflow: auto;
     display: flex; flex-direction: column; gap: 4px;
+    /* Derularea se duce lin la exercițiul curent, nu sare la el. */
+    scroll-behavior: smooth;
   }
+  @media (prefers-reduced-motion: reduce) { .teanc { scroll-behavior: auto; } }
   .cer {
     background: var(--card); border: 1px solid var(--line); border-radius: 14px;
     box-shadow: var(--shadow);
