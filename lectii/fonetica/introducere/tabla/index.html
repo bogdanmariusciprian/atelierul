@@ -105,7 +105,16 @@
     <div class="add-row">
       <button class="btn-add" id="addStageBtn" title="Adaugă o etapă (câmp) pe rândul curent">+ etapă</button>
       <button class="btn-add" id="addRowBtn">+ rând nou</button>
-      <button class="btn-add btn-danger" id="clearBtn" title="Șterge cerința și toate rândurile">🗑 Șterge tot</button>
+      <!-- TREI ȘTERGERI, AȘEZATE DUPĂ CÂT DOR.
+           Cea mică stă întâi și arată ca o unealtă obișnuită; cea mare stă la
+           urmă, singură, roșie și cu semn de primejdie. Fiecare spune pe ea
+           CE anume duce, ca nimeni să nu afle abia după. -->
+      <button class="btn-add" id="clearCiornaBtn" hidden
+              title="Golește ciorna. Exercițiul nu se atinge.">Șterge ciorna</button>
+      <button class="btn-add" id="clearSolvedBtn"
+              title="Șterge doar ce ai rezolvat la exercițiul ăsta. Cerințele rămân.">Șterge rezolvările</button>
+      <button class="btn-add btn-danger" id="clearBtn"
+              title="Șterge TOATĂ tabla: toate exercițiile, cu cerințe și rezolvări.">⚠️ Șterge tabla</button>
     </div>
   </div>
 </main>

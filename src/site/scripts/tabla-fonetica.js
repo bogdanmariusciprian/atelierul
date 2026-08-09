@@ -1601,6 +1601,10 @@ function aseazaCiorna(date) {
   const trebuie = felDupaFata(ex?.fata) === 'structura';
   const veche = sheet.querySelector('.ciorna');
   if (veche) veche.remove();
+  /* Butonul de șters ciorna se vede numai unde CHIAR e o ciornă: un buton care
+     stă mereu pe ecran și uneori n-are ce șterge se învață ca zgomot. */
+  const btnCiorna = document.getElementById('clearCiornaBtn');
+  if (btnCiorna) btnCiorna.hidden = !trebuie;
   if (!trebuie) return;
 
   const cutie = document.createElement('div');
@@ -2061,7 +2065,11 @@ const dlgEroare = document.getElementById('dlgEroare');
 
 /* Deschide fereastra și așteaptă răspunsul. Cu `camp: true` întoarce textul
    scris (sau null la renunțare); fără el, întoarce true/false. */
-function intreaba({ titlu, text = '', camp = null, buton = 'Salvează', verifica = null }) {
+function intreaba({ titlu, text = '', camp = null, buton = 'Salvează', verifica = null,
+                    primejdie = false }) {
+  /* Numai ștergerea tablei tresare. O întrebare care se deschide lin se citește
+     ca o formalitate, iar mâna apasă „da" înainte s-o citească. */
+  dlg.classList.toggle('e-primejdie', !!primejdie);
   dlgTitlu.textContent = titlu;
   dlgText.textContent = text;
   dlgText.hidden = !text;
@@ -2205,11 +2213,120 @@ boardsBody.addEventListener('click', async (e) => {
 document.getElementById('pdfBtn').addEventListener('click', () => { inchideMeniu(); window.print(); });
 
 /* Șterge tot: cerința + toate rândurile (notițele și simbolurile rămân) */
+/* ============================================================
+   TREI ȘTERGERI, DUPĂ CÂT DOR
+
+   Sunt trei lucruri deosebite, iar dacă ar avea un singur buton, elevul ar
+   trebui să aleagă de fiecare dată cu grijă ce n-ar trebui să-l coste nicio
+   grijă. Așa că fiecare are butonul lui, iar paza e pe măsura pagubei:
+
+     · CIORNA e o hârtie de pe margine. Se șterge fără nicio vorbă, cu putință
+       de întors, fiindcă tocmai de-aia o șterge: ca să încerce alt cuvânt.
+     · REZOLVĂRILE sunt munca lui de acum. Nici aici nu întrebăm, dar are cinci
+       secunde să se răzgândească: o întrebare pusă înaintea fiecărei ștergeri
+       ajunge să fie apăsată fără să fie citită, pe când o cale de întors e
+       citită abia atunci când chiar e nevoie de ea.
+     · TABLA ÎNTREAGĂ e altceva: acolo se duce și ce a adus profesorul, și tot
+       ce a lucrat el, la toate exercițiile. Aceea întreabă, iar fereastra
+       tresare.
+
+   CE ÎNSEAMNĂ „REZOLVARE". Fiecare rând are un cap și o urmare: capul e ce se
+   cere (cuvântul de analizat, structura, propoziția), urmarea e ce răspunde
+   elevul. Ștergerea rezolvărilor golește urmarea și lasă capul, la toate cele
+   trei feluri de rând, fie că a venit de la generator, fie că l-a scris el.
+   ============================================================ */
+
+/** Rândul, curățat de tot ce a răspuns elevul; capul lui rămâne. */
+function faraRezolvare(r) {
+  if (!r) return r;
+  if (r.structura !== undefined) return { ...r, syll: '', raspuns: [] };
+  if (r.fraza !== undefined) return { ...r, trans: '' };
+  return { ...r, syll: '', trans: '', types: '', extra: (r.extra || []).map(() => '') };
+}
+
+/* ---------- Calea de întors ----------
+   Cinci secunde. Nu e o politețe, e ce ține locul întrebării pe care n-o mai
+   punem: o întrebare pusă înaintea fiecărei ștergeri ajunge apăsată fără să fie
+   citită, pe când o cale de întors e citită abia atunci când chiar e nevoie. */
+const SECUNDE_DE_INTORS = 5;
+let elIntors = null;
+
+function potIntoarce(text, inapoi) {
+  if (!elIntors) {
+    elIntors = document.createElement('div');
+    elIntors.className = 'intors';
+    elIntors.setAttribute('role', 'status');
+    document.body.appendChild(elIntors);
+  }
+  elIntors.innerHTML = '';
+  const spus = document.createElement('span');
+  spus.textContent = text;
+  const buton = document.createElement('button');
+  buton.type = 'button';
+  buton.className = 'intors__buton';
+  buton.textContent = 'Adu înapoi';
+  elIntors.appendChild(spus);
+  elIntors.appendChild(buton);
+  elIntors.hidden = false;
+  requestAnimationFrame(() => elIntors.classList.add('e-vazut'));
+
+  const stinge = () => {
+    clearTimeout(potIntoarce._t);
+    elIntors.classList.remove('e-vazut');
+    setTimeout(() => { if (elIntors) elIntors.hidden = true; }, 220);
+  };
+  buton.addEventListener('click', () => { inapoi(); stinge(); }, { once: true });
+  clearTimeout(potIntoarce._t);
+  potIntoarce._t = setTimeout(stinge, SECUNDE_DE_INTORS * 1000);
+}
+
+/* ---------- 1. Ciorna ---------- */
+document.getElementById('clearCiornaBtn').addEventListener('click', () => {
+  const ex = exercitiulDeschis();
+  const vechi = culegeCiorna();
+  if (!ex || !vechi) return;
+  delete ex.ciorna;
+  aseazaCiorna(null);
+  murdareste(); scheduleSave();
+  potIntoarce('Ciorna a fost ștearsă.', () => {
+    const acum = exercitiulDeschis();
+    if (!acum) return;
+    acum.ciorna = vechi;
+    aseazaCiorna(vechi);
+    murdareste(); scheduleSave();
+  });
+});
+
+/* ---------- 2. Rezolvările exercițiului deschis ---------- */
+document.getElementById('clearSolvedBtn').addEventListener('click', () => {
+  const ex = exercitiulDeschis();
+  if (!ex) return;
+  salveazaDeschisul();
+  const vechi = { randuri: JSON.parse(JSON.stringify(ex.randuri || [])),
+                  ciorna: ex.ciorna ? { ...ex.ciorna } : null };
+  ex.randuri = (ex.randuri || []).map(faraRezolvare);
+  aseazaRanduri(ex.randuri);
+  deseneazaTeancul();
+  murdareste(); scheduleSave();
+  potIntoarce('Rezolvările au fost șterse.', () => {
+    const acum = exercitiulDeschis();
+    if (!acum) return;
+    acum.randuri = vechi.randuri;
+    if (vechi.ciorna) acum.ciorna = vechi.ciorna; else delete acum.ciorna;
+    aseazaRanduri(acum.randuri);
+    deseneazaTeancul();
+    murdareste(); scheduleSave();
+  });
+});
+
+/* ---------- 3. Toată tabla ---------- */
 document.getElementById('clearBtn').addEventListener('click', async () => {
   if (!await intreaba({
-        titlu: 'Ștergi tot?',
-        text: 'Se duc toate exercițiile, cu cerințele și rândurile lor. Notițele și simbolurile rămân.',
-        buton: 'Șterge tot',
+        titlu: 'Ștergi toată tabla?',
+        text: 'Se duc TOATE exercițiile, cu cerințele și cu tot ce ai rezolvat la ele. ' +
+              'Notițele și simbolurile rămân. Ștergerea asta nu se mai poate întoarce.',
+        buton: 'Șterge tabla',
+        primejdie: true,
       })) return;
   exercitii = [exercitiuNou()];
   deschis = 0;

@@ -465,8 +465,46 @@
     border-radius: 10px;
   }
   .btn-add:hover { background: #dfe7ff; }
-  .btn-danger { background: #fff2f2; border: 1px dashed #ffb0b0; color: #d13636; }
-  .btn-danger:hover { background: #ffe4e4; border-color: #ff9b9b; }
+  /* CALEA DE ÎNTORS.
+     Stă jos, la mijloc, unde nu acoperă nici tabla, nici mănunchiul din colț.
+     Nu întrerupe nimic și nu cere nimic: dacă n-o bagi în seamă, se stinge
+     singură după cinci secunde, iar ștergerea rămâne făcută. */
+  .intors {
+    position: fixed;
+    left: 50%; bottom: 22px;
+    transform: translate(-50%, 12px);
+    z-index: 70;
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 12px 10px 16px;
+    border-radius: 12px;
+    background: #1f2430; color: #fff;
+    font-family: var(--ui); font-size: 13px;
+    box-shadow: 0 12px 30px rgba(31, 36, 48, .3);
+    opacity: 0;
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .intors.e-vazut { opacity: 1; transform: translate(-50%, 0); }
+  .intors[hidden] { display: none; }
+  .intors__buton {
+    border: none; border-radius: 8px;
+    padding: 6px 12px;
+    background: #3d4457; color: #fff;
+    font-family: var(--ui); font-size: 13px; font-weight: 600;
+    cursor: pointer;
+  }
+  .intors__buton:hover { background: #4d5568; }
+  @media (prefers-reduced-motion: reduce) {
+    .intors { transition: none; transform: translate(-50%, 0); }
+  }
+
+  /* ȘTERGEREA MARE ARATĂ ALTFEL DECÂT CELELALTE DOUĂ.
+     Era un buton palid, cu chenar punctat, adică exact cum arată o unealtă
+     nevinovată. Or, el duce toată tabla. Roșu plin și semn de primejdie: ochiul
+     îl citește ca „stai" înainte să apuce să citească scrisul de pe el. */
+  .btn-danger {
+    background: #d93a3a; border: 1px solid #c22e2e; color: #fff; font-weight: 600;
+  }
+  .btn-danger:hover { background: #c22e2e; }
 
   /* ============ Panoul de notițe ============ */
   .notes {
@@ -809,6 +847,36 @@
   box-shadow: 0 18px 48px rgba(31, 36, 48, .22);
 }
 .dlg::backdrop { background: rgba(31, 36, 48, .35); }
+
+/* FEREASTRA CARE TREMURĂ.
+
+   Numai cea de la ștergerea tablei. O întrebare care se deschide lin se citește
+   ca o formalitate, iar mâna apasă „da" înainte s-o citească; una care tresare
+   când apare oprește degetul pentru o clipă, și clipa aceea e tot ce trebuie.
+
+   Tremurul e scurt și se face O SINGURĂ DATĂ: unul care ar ține s-ar citi ca o
+   defecțiune, nu ca o avertizare, iar ochiul se obișnuiește cu orice mișcare
+   care se repetă. Cine a cerut mai puțină mișcare primește în loc un chenar
+   roșu: paza rămâne, doar felul ei se schimbă. */
+@keyframes dlg-tresare {
+  0%   { transform: translateX(0); }
+  12%  { transform: translateX(-9px); }
+  26%  { transform: translateX(8px); }
+  40%  { transform: translateX(-6px); }
+  54%  { transform: translateX(5px); }
+  68%  { transform: translateX(-3px); }
+  82%  { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+.dlg.e-primejdie[open] {
+  animation: dlg-tresare .42s cubic-bezier(.36, .07, .19, .97) both;
+  box-shadow: 0 18px 48px rgba(180, 40, 40, .34);
+}
+.dlg.e-primejdie .dlg__titlu { color: #c22e2e; }
+@media (prefers-reduced-motion: reduce) {
+  .dlg.e-primejdie[open] { animation: none; outline: 2px solid #d93a3a; }
+}
+
 .dlg__form { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
 .dlg__titlu { margin: 0; font-family: var(--ui); font-size: 16px; font-weight: 600; }
 .dlg__text { margin: 0; font-family: var(--ui); font-size: 13px; color: var(--muted); line-height: 1.55; }
