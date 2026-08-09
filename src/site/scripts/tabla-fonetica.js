@@ -960,11 +960,25 @@ sheet.addEventListener('click', (e) => {
 /* rupe ciclul ă/î/â și starea c->k dacă utilizatorul dă click aiurea */
 sheet.addEventListener('mousedown', () => { resetACycle(); resetCK(); });
 
-/* ---------- Navigare între câmpuri (Tab) ---------- */
+/* ---------- Navigare între câmpuri (Tab și Enter) ----------
+
+   SE SARE PESTE CE NU SE POATE SCRIE. Structura fonetică și propoziția venite
+   de la generator sunt materialul, nu lucrul elevului, deci stau blocate. Erau
+   totuși în șirul prin care umblă Tab, iar `focus()` pe un câmp blocat nu face
+   nimic: apăsai Enter și rămâneai pe loc, fără nicio veste de ce. O tastă care
+   uneori nu face nimic e mai rea decât una care nu există.
+
+   Se caută deci înainte (sau înapoi) până la primul câmp în care CHIAR se poate
+   scrie, iar rândul nou se naște abia când nu mai e niciunul. */
+const sePoateScrie = (f) => !!f && f.getAttribute('contenteditable') !== 'false';
+
 function navigate(current, back) {
   const fields = Array.from(sheet.querySelectorAll('.field'));
   const i = fields.indexOf(current);
-  let target = back ? fields[i - 1] : fields[i + 1];
+  let target = null;
+  for (let k = i + (back ? -1 : 1); k >= 0 && k < fields.length; k += (back ? -1 : 1)) {
+    if (sePoateScrie(fields[k])) { target = fields[k]; break; }
+  }
   if (!target && !back) {
     /* Ciorna e ultima și rămâne ultima: după ea nu se naște nimic, fiindcă nu
        e o cerință, e hârtia de pe margine. */
