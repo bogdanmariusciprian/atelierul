@@ -41,7 +41,12 @@
         <button class="btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
         <button class="btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
         <button class="btn" data-cmd="underline" title="Subliniat (Ctrl+U)"><u>U</u></button>
-        <button class="btn" data-cmd="superscript" title="Superscript (pe selecție: bold + subliniat + spațiu înainte)">x<sup>2</sup></button>
+        <!-- Butonul arată CHIAR ce face: un „i" suprascris și subliniat, adică
+             semnul cu care se însemnează „i"-ul final care nu se aude. „x la
+             puterea a doua" era semnul matematicii, împrumutat fiindcă tot
+             suprascriere se cheamă, dar aici nu se ridică nicio putere. -->
+        <button class="btn" data-cmd="superscript"
+                title="„i" suprascris (pe selecție: suprascris + îngroșat + subliniat, cu spațiu înainte)"><sup><b><u>i</u></b></sup></button>
       </div>
       <div class="tgroup">
         <button class="btn mono sym-btn" data-symkey="1"></button>
@@ -52,6 +57,12 @@
       <div class="tgroup">
         <button class="btn mono" data-pair="()" title="Inserează (  )">(&nbsp;)</button>
         <button class="btn mono" data-pair="[]" title="Inserează [  ]">[&nbsp;]</button>
+        <!-- ACCENTUL. Alege sunetul vocalic și apasă: litera se îngroașă și se
+             schimbă cu cea accentuată ascuțit. Apăsat a doua oară pe aceeași
+             literă, îl ia înapoi: orice unealtă care pune ceva trebuie să știe
+             și să scoată, altfel greșeala se repară numai ștergând. -->
+        <button class="btn" data-actiune="accent"
+                title="Accent ascuțit pe sunetul vocalic ales (se și îngroașă). Apasă din nou ca să-l iei înapoi.">Accent</button>
       </div>
     </div>
 

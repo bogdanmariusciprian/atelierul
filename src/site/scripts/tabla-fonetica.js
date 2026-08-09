@@ -677,6 +677,90 @@ function superscriptSelection() {
   return true;
 }
 
+/* ---------- ACCENTUL ASCUȚIT PE SUNETUL VOCALIC ----------
+
+   Într-o transcriere fonetică se însemnează silaba accentuată, iar semnul cade
+   pe sunetul vocalic al ei. Elevul alege sunetul și apasă: litera se îngroașă
+   și se schimbă cu cea accentuată.
+
+   NUMAI SUNETE VOCALICE, fiindcă numai ele pot purta accentul: a, e, i, o, u,
+   ă, â, î, cu majusculele lor. Pe o consoană butonul nu face nimic, și e bine
+   că nu face: o unealtă care se supune orbește ar lăsa elevul să scrie un lucru
+   care nu există, iar tabla e tocmai locul unde se învață ce există.
+
+   DE UNDE VIN LITERELE. Cele cinci obișnuite au fiecare litera ei gata făcută
+   (á, é, í, ó, ú), la fel „ă" și „â" (ắ, ấ). Numai „î" n-are: nicio scriere din
+   lume n-a avut nevoie de „i" cu căciulă ȘI cu accent, așa că nu i s-a făcut o
+   literă a lui. Acolo se pune semnul de accent aparte, care se desenează peste
+   litera dinainte. Iese la fel la citit, doar că-s două semne, nu unul.
+
+   Și SE IA ÎNAPOI la a doua apăsare. Orice unealtă care pune ceva trebuie să
+   știe și să scoată, altfel singurul drum înapoi e ștergerea, adică pierderea a
+   ce era bun împreună cu ce era greșit. */
+const ACCENTE = {
+  a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú',
+  'ă': 'ắ', 'â': 'ấ', 'î': 'î\u0301',
+  A: 'Á', E: 'É', I: 'Í', O: 'Ó', U: 'Ú',
+  'Ă': 'Ắ', 'Â': 'Ấ', 'Î': 'Î\u0301',
+};
+const FARA_ACCENT = Object.fromEntries(
+  Object.entries(ACCENTE).map(([gol, cu]) => [cu, gol]));
+
+/** Litera dinaintea cursorului, ori cea aleasă: un domeniu peste ea. */
+function domeniulLiterei() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  const r = sel.getRangeAt(0);
+  if (!r.collapsed) return r;
+  /* Fără nicio alegere, luăm litera dinaintea cursorului: e cea pe care tocmai
+     ai scris-o, deci cea la care te gândești. */
+  const nod = r.startContainer, unde = r.startOffset;
+  if (nod.nodeType !== 3 || unde === 0) return null;
+  let de = unde - 1;
+  // un semn de accent merge întotdeauna cu litera lui, niciodată singur
+  if (/[\u0300-\u036f]/.test(nod.data[de]) && de > 0) de--;
+  const nou = document.createRange();
+  nou.setStart(nod, de);
+  nou.setEnd(nod, unde);
+  return nou;
+}
+
+function accentueaza() {
+  const camp = activeField();
+  if (!camp) return false;
+  const r = domeniulLiterei();
+  if (!r) return false;
+  const text = r.toString();
+  // O singură literă, cu semnul ei cu tot. Un cuvânt întreg n-are un singur
+  // accent de pus: accentul cade pe UN sunet, iar care anume alege elevul.
+  if (text.replace(/[\u0300-\u036f]/g, '').length !== 1) return false;
+
+  const scos = FARA_ACCENT[text];
+  const pus = ACCENTE[text];
+  if (!scos && !pus) return false;
+
+  r.deleteContents();
+  let nod;
+  if (scos) {
+    nod = document.createTextNode(scos);
+  } else {
+    nod = document.createElement('b');
+    nod.textContent = pus;
+  }
+  r.insertNode(nod);
+  r.setStartAfter(nod);
+  r.setEndAfter(nod);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+
+  /* Îngroșarea rămasă goală după scoaterea accentului n-are ce căuta: ar
+     îngroșa pe furiș litera următoare pe care o scrii acolo. */
+  camp.querySelectorAll('b').forEach((b) => { if (!b.textContent) b.remove(); });
+  murdareste(); scheduleSave();
+  return true;
+}
+
 /* ---------- Butoane paranteze: „(  )” / „[  ]” cu cursorul la mijloc ---------- */
 function insertPair(pair) {
   const sel = window.getSelection();
@@ -1114,6 +1198,8 @@ toolbar.addEventListener('click', (e) => {
   if (btn.dataset.symkey)      { insertSymbol(btn.dataset.symkey, activeField()); return; }
   // perechi de paranteze
   if (btn.dataset.pair)        { insertPair(btn.dataset.pair); return; }
+  // accentul ascuțit pe sunetul vocalic ales
+  if (btn.dataset.actiune === 'accent') { accentueaza(); return; }
 });
 
 document.getElementById('addRowBtn').addEventListener('click', () => {
