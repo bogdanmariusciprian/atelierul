@@ -1794,9 +1794,13 @@ function aseazaRanduri(randuri, felCerut) {
   });
   aseazaCiorna();
   renumber();
-  /* Rândurile s-au schimbat, deci semnele de etichetat trebuie puse din nou:
-     ele stau pe rânduri, nu pe pagină. */
-  if (typeof aratăSemneleDeEtichetat === 'function') aratăSemneleDeEtichetat();
+  /* Rândurile s-au schimbat, deci semnele trebuie puse din nou: ele stau pe
+     rânduri, nu pe pagină. Iar dacă s-au schimbat și CUVINTELE, nu doar
+     așezarea lor, întrebăm din nou care sunt lucrate: altfel bifele verzi ar
+     rămâne cele ale cuvintelor de dinainte. `afluCeSAEtichetat` întreabă numai
+     când chiar s-a schimbat lista, și desenează oricum. */
+  if (typeof afluCeSAEtichetat === 'function') afluCeSAEtichetat();
+  else if (typeof aratăSemneleDeEtichetat === 'function') aratăSemneleDeEtichetat();
 }
 
 /* ============================================================
@@ -1816,8 +1820,23 @@ function aseazaRanduri(randuri, felCerut) {
    SEMNUL APARE NUMAI PE RÂNDURILE VENITE DIN BANCĂ. Un cuvânt scris de mână de
    elev nu e în bancă, deci n-are ce eticheta: mărginirea asta nu e o hotărâre,
    e chiar firea lucrurilor.
+
+   DOUĂ SEMNE, NU UNUL. Arătau la fel fiindcă erau același lucru, și era greșit:
+
+     · BIFA VERDE spune „cuvântul ăsta a fost lucrat la meditație". E o veste,
+       nu o unealtă, deci se vede la TOȚI: vizitator, elev oarecare, elev la
+       meditații, profesor. Nu ține de comutator: ce s-a lucrat s-a lucrat.
+       Numai la profesor e și buton, iar apăsată deschide schimbarea etichetelor.
+     · SEMNUL PUNCTAT e unealta de etichetat, și rămâne strâmt: numai elevii de
+       la meditații, numai cu comutatorul deschis, numai pe cuvintele
+       neetichetate încă.
+
+   O ETICHETĂ NU SE MAI POATE SCOATE DECÂT DE PROFESOR. Elevul, prin ușa lui,
+   doar adaugă (0083). Aici se vede aceeași regulă: fereastra lui n-are bifele
+   dinainte puse, fiindcă n-are ce dezbifa.
    ============================================================ */
-let potEticheta = false;      // sunt elev la meditații (ori profesor)?
+let potEticheta = false;          // sunt elev la meditații (ori profesor)?
+let potSchimbaEtichete = false;   // sunt profesor?
 let etichetareaEDeschisa = false;
 let etichetateDeja = new Set();
 
@@ -1831,22 +1850,32 @@ function eticheteDePus() {
 /** Pune ori scoate semnele de etichetat de pe rândurile din pagină. */
 function aratăSemneleDeEtichetat() {
   if (!sheet) return;
-  const seArata = potEticheta && etichetareaEDeschisa && eticheteDePus().length > 0;
   sheet.querySelectorAll('.et-semn').forEach((b) => b.remove());
-  if (!seArata) return;
+  /* Unealta de etichetat, strâmtă: numai la meditații, numai cu comutatorul
+     deschis, numai unde lecția are ce etichete să dea. Bifa verde nu ține de
+     niciuna dintre astea, de-aia se socotește pe rând mai jos, nu aici. */
+  const potPune = potEticheta && etichetareaEDeschisa && eticheteDePus().length > 0;
   randurile().forEach((row) => {
     const id = row.dataset.item;
     if (!id) return;
     const gata = etichetateDeja.has(id);
+    if (!gata && !potPune) return;
+
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'et-semn' + (gata ? ' e-gata' : '');
     b.dataset.etichetare = id;
     b.textContent = gata ? '✓' : '🏷';
-    b.title = gata
-      ? 'Cuvântul ăsta a fost etichetat deja.'
-      : 'Pune etichetele care i se potrivesc.';
-    if (gata) b.disabled = true;
+    if (gata) {
+      /* Bifa e buton numai la profesor. La ceilalți rămâne un însemn, și e
+         scris pe ea de ce: altfel ar părea un buton stricat. */
+      b.disabled = !potSchimbaEtichete;
+      b.title = potSchimbaEtichete
+        ? 'Lucrat la meditație. Apasă ca să schimbi etichetele.'
+        : 'Cuvântul ăsta a fost lucrat la meditație.';
+    } else {
+      b.title = 'Pune etichetele care i se potrivesc.';
+    }
     /* Semnul stă lângă capul rândului, adică lângă lucrul pe care-l etichetezi:
        cuvântul, structura ori propoziția. */
     const cap = row.querySelector('.structura, .fraza, .word');
@@ -1854,23 +1883,55 @@ function aratăSemneleDeEtichetat() {
   });
 }
 
-/** Fereastra de bifat, deschisă lângă semnul apăsat. */
-function deschideEtichetele(semn) {
+/**
+ * Fereastra de bifat, deschisă lângă semnul apăsat.
+ *
+ * Aceeași fereastră slujește la două lucruri, fiindcă e aceeași întrebare pusă
+ * de doi oameni: „ce i se potrivește cuvântului ăstuia?". Se deosebesc doar prin
+ * ce se poate face cu răspunsul.
+ *
+ *   · ELEVUL o deschide de pe semnul punctat, cu bifele goale, și poate doar
+ *     ADĂUGA. N-are ce dezbifa, fiindcă n-are dreptul să scoată.
+ *   · PROFESORUL o deschide de pe bifa verde, cu etichetele de acum deja puse,
+ *     și poate și scoate.
+ */
+async function deschideEtichetele(semn) {
   document.querySelectorAll('.et-panou').forEach((p) => p.remove());
   const id = semn.dataset.etichetare;
+  if (!id) return;
+
+  const eSchimbare = semn.classList.contains('e-gata');
+  if (eSchimbare && !potSchimbaEtichete) return;   // la ceilalți bifa e însemn, nu buton
+
   const lista = eticheteDePus();
-  if (!id || !lista.length) return;
+  /* La schimbare cerem etichetele PROASPETE, nu ce avea pagina: o tablă lăsată
+     deschisă de ieri arată etichetele de ieri, iar între timp poate să fi
+     etichetat un elev. Cine se apucă să schimbe trebuie să vadă ce e. */
+  const puse = eSchimbare ? await etichetelePuse(id) : [];
+
+  /* Iar în listă intră ȘI etichetele venite de la alte feluri de exercițiu.
+     Altfel profesorul le-ar șterge fără să le fi văzut vreodată: ar bifa ce
+     vede, ar apăsa, și s-ar duce ce nu vedea. Ce nu are nume frumos în lecție se
+     arată cu numele lui scurt: mai bine urât și văzut decât frumos și pierdut. */
+  const toate = lista.slice();
+  puse.forEach((slug) => {
+    if (!toate.some((e) => e.slug === slug)) toate.push({ slug, nume: slug });
+  });
+  if (!toate.length) return;
 
   const panou = document.createElement('div');
   panou.className = 'et-panou';
   panou.innerHTML =
-    '<p class="et-panou__cap">Ce i se potrivește</p>' +
-    lista.map((e) =>
-      '<label><input type="checkbox" value="' + escapaText(e.slug) + '">' +
+    '<p class="et-panou__cap">' + (eSchimbare ? 'Etichetele cuvântului' : 'Ce i se potrivește') + '</p>' +
+    toate.map((e) =>
+      '<label><input type="checkbox" value="' + escapaText(e.slug) + '"' +
+      (puse.includes(e.slug) ? ' checked' : '') + '>' +
       '<span>' + escapaText(e.nume) + '</span></label>').join('') +
     '<div class="et-panou__jos">' +
       '<button type="button" class="et-panou__nu">Lasă</button>' +
-      '<button type="button" class="et-panou__da" disabled>Pune etichetele</button>' +
+      '<button type="button" class="et-panou__da"' + (eSchimbare ? '' : ' disabled') + '>' +
+        (eSchimbare ? 'Schimbă etichetele' : 'Pune etichetele') +
+      '</button>' +
     '</div>';
   document.body.appendChild(panou);
 
@@ -1880,20 +1941,42 @@ function deschideEtichetele(semn) {
 
   const da = panou.querySelector('.et-panou__da');
   const bifele = () => Array.from(panou.querySelectorAll('input:checked')).map((i) => i.value);
-  panou.addEventListener('change', () => { da.disabled = bifele().length === 0; });
+
+  /* Un cuvânt fără nicio etichetă nu mai apare în niciun exercițiu, deci ar pieri
+     din bancă fără să fie șters. Profesorul are dreptul s-o facă, dar nu pe
+     nevăzute: i se spune ce urmează, acolo unde apasă. */
+  const vestea = document.createElement('p');
+  vestea.className = 'et-panou__rau';
+  function cantareste() {
+    const câte = bifele().length;
+    if (!eSchimbare) { da.disabled = câte === 0; return; }
+    if (câte === 0) {
+      vestea.textContent = 'Fără nicio etichetă, cuvântul nu mai apare în niciun exercițiu.';
+      if (!vestea.parentElement) panou.appendChild(vestea);
+    } else if (vestea.parentElement) {
+      vestea.remove();
+    }
+  }
+  panou.addEventListener('change', cantareste);
+  cantareste();
   panou.querySelector('.et-panou__nu').addEventListener('click', () => panou.remove());
 
   da.addEventListener('click', async () => {
+    const scria = da.textContent;
     da.disabled = true;
-    da.textContent = 'Se pun…';
-    const { bine, motiv } = await eticheteaza(id, bifele());
-    if (bine) {
-      etichetateDeja.add(id);
+    da.textContent = eSchimbare ? 'Se schimbă…' : 'Se pun…';
+
+    const raspuns = eSchimbare
+      ? await schimbaEtichetele(id, bifele())
+      : await eticheteaza(id, bifele());
+
+    if (raspuns.bine) {
+      if (!eSchimbare) etichetateDeja.add(id);
       panou.remove();
       aratăSemneleDeEtichetat();
       return;
     }
-    da.textContent = 'Pune etichetele';
+    da.textContent = scria;
     da.disabled = false;
     let rau = panou.querySelector('.et-panou__rau');
     if (!rau) {
@@ -1901,7 +1984,7 @@ function deschideEtichetele(semn) {
       rau.className = 'et-panou__rau';
       panou.appendChild(rau);
     }
-    rau.textContent = motiv;
+    rau.textContent = raspuns.motiv;
   });
 }
 
@@ -1913,23 +1996,38 @@ document.addEventListener('click', (e) => {
   }
 });
 
-/** Ce cuvinte de pe tabla asta au fost deja etichetate de cineva. */
-async function afluCeSAEtichetat() {
+/* Ce cuvinte de pe tabla asta au fost etichetate de cineva.
+   Ținem minte ce am întrebat ultima dată: rândurile se reașază la fiecare
+   apăsare de tastă, iar o întrebare la server pentru fiecare literă scrisă ar fi
+   o risipă și, mai rău, ar face bifele să pâlpâie. */
+let ultimeleCerute = '';
+async function afluCeSAEtichetat({ dinNou = false } = {}) {
   const ids = randurile().map((r) => r.dataset.item).filter(Boolean);
-  if (!ids.length) return;
-  etichetateDeja = await celeEtichetate(ids);
+  const cheia = ids.slice().sort().join(',');
+  /* Desenatul se face de fiecare dată, întrebatul numai când s-a schimbat ceva:
+     rândurile se reașază des, dar cuvintele de pe ele, rar. */
+  if (ids.length && (dinNou || cheia !== ultimeleCerute)) {
+    ultimeleCerute = cheia;
+    etichetateDeja = await celeEtichetate(ids);
+  }
+  if (!ids.length) ultimeleCerute = '';
   aratăSemneleDeEtichetat();
 }
 
 (async function porneșteEtichetarea() {
+  /* BIFA VERDE SE VEDE LA TOȚI, deci lista cuvintelor lucrate se cere ÎNTOTDEAUNA,
+     chiar și pentru un vizitator nelogat. Aici era mai devreme o ieșire devreme,
+     din vremea când semnul era unul singur și numai al elevului de la meditații. */
+  potSchimbaEtichete = isAdmin();
+  await afluCeSAEtichetat();
+
   potEticheta = await hasPlannerAccess();
   if (!potEticheta) return;
   etichetareaEDeschisa = await eDeschis();
   aratăSemneleDeEtichetat();
-  await afluCeSAEtichetat();
   /* Profesorul închide comutatorul TOCMAI ca elevul să se oprească acum, nu la
      următoarea reîncărcare. De-aia semnele pier pe loc, iar fereastra deschisă
-     se închide odată cu ele. */
+     se închide odată cu ele. Bifele verzi rămân: ele nu ascultă de comutator. */
   ascultaComutatorul((val) => {
     etichetareaEDeschisa = val;
     if (!val) document.querySelectorAll('.et-panou').forEach((p) => p.remove());
@@ -2251,7 +2349,7 @@ function deslusesteExercitiile(state) {
    ============================================ */
 import { listSheets, loadSheet, saveSheet, renameSheet, deleteSheet } from '../../shared/scripts/board-repo.js';
 /* Plasa din browser e a CONTULUI, nu a calculatorului: vezi `session.js`. */
-import { iaLocal, punLocal } from '../../shared/scripts/session.js';
+import { iaLocal, punLocal, isAdmin } from '../../shared/scripts/session.js';
 
 const LECTIE = 'fonetica-introducere';
 
@@ -2746,7 +2844,7 @@ if (firstField) placeCaret(firstField, true);
 import { fataUrmatoare, INTOARCERI, aruncaSpre, laClipa, unghiuriDinQ,
          pornire, pas, inclina }
   from './zar-fizica.js';
-import { listItems } from '../../shared/scripts/bank-repo.js';
+import { listItems, etichetelePuse, schimbaEtichetele } from '../../shared/scripts/bank-repo.js';
 import { hasPlannerAccess } from '../../shared/scripts/planner-repo.js';
 import { eDeschis, ascultaComutatorul, eticheteaza, celeEtichetate }
   from '../../shared/scripts/tagging-repo.js';

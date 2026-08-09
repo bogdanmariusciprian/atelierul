@@ -119,11 +119,25 @@ export async function eticheteaza(itemId, etichete) {
   return { bine: false, motiv: MOTIVE[raspuns] || "N-a mers acum. Mai încearcă o dată." };
 }
 
-/** Cuvintele deja etichetate, dintre cele date. Ca să nu le mai arătăm cu bifă. */
+/**
+ * Cuvintele deja etichetate, dintre cele date.
+ *
+ * TRECE PRINTR-O FUNCȚIE, NU PRIN TABEL, și nu din grabă. Bifa verde înseamnă
+ * „lucrat la meditație" și se cuvine să se vadă la toți, până și la un vizitator
+ * nelogat. Tabelul însă ține și NUMELE celui care a etichetat, iar acela rămâne
+ * numai al profesorului. Citit de-a dreptul, tabelul ar fi trebuit deschis
+ * tuturor cu tot cu nume, ori ținut închis și atunci bifa s-ar fi văzut doar la
+ * cel care a pus-o.
+ *
+ * Funcția din 0083 taie nodul: întoarce numai cuvintele, niciodată cine. Lucrul
+ * se vede, omul nu.
+ */
 export async function celeEtichetate(ids) {
   if (!ids || !ids.length) return new Set();
-  const { data, error } = await supabase
-    .from("learn_lessons_items_tagged").select("item_id").in("item_id", ids);
+  const { data, error } = await supabase.rpc("cuvintele_etichetate", { p_ids: ids });
   if (error) { console.warn("celeEtichetate:", error.message); return new Set(); }
-  return new Set((data || []).map((r) => r.item_id));
+  /* Funcția întoarce o coloană de identificatori: pe unele drumuri sosesc ca
+     șiruri simple, pe altele ca obiecte cu un singur câmp. Le primim pe amândouă
+     în loc să ne bizuim pe una. */
+  return new Set((data || []).map((r) => (typeof r === "string" ? r : r && r.cuvintele_etichetate)));
 }

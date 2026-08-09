@@ -131,6 +131,39 @@ export async function updateItem(id, schimbari) {
   return true;
 }
 
+/**
+ * Etichetele de ACUM ale unui cuvânt, cerute la sursă.
+ *
+ * Se cer proaspete, nu se iau din ce avea pagina, fiindcă pagina poate fi
+ * veche: o tablă lăsată deschisă de ieri arată etichetele de ieri, iar între
+ * timp poate să fi etichetat un elev. Cine se apucă să schimbe trebuie să vadă
+ * ce e, nu ce era. Din același motiv adunarea etichetelor elevului se face în
+ * bază, nu aici (0083).
+ */
+export async function etichetelePuse(id) {
+  const { data, error } = await supabase
+    .from("learn_lessons_items").select("tags").eq("id", id).maybeSingle();
+  if (error) { console.warn("etichetelePuse:", error.message); return []; }
+  return (data && data.tags) || [];
+}
+
+/**
+ * Schimbă etichetele unui cuvânt. NUMAI profesorul, și baza e cea care o spune:
+ * politica de pe tabel cere `is_admin_user()`, deci un elev care ar chema asta
+ * primește zero rânduri schimbate, oricât de bine ar fi scris codul.
+ *
+ * E singurul drum pe care o etichetă poate fi și SCOASĂ. Elevul, prin ușa lui
+ * din 0083, poate doar adăuga.
+ */
+export async function schimbaEtichetele(id, etichete) {
+  const curate = Array.from(new Set((etichete || []).map((t) => String(t).trim()).filter(Boolean)));
+  const { data, error } = await supabase
+    .from("learn_lessons_items").update({ tags: curate }).eq("id", id).select("id");
+  if (error) { console.warn("schimbaEtichetele:", error.message); return { bine: false, motiv: motivul(error) }; }
+  if (!data || !data.length) return { bine: false, motiv: "numai profesorul poate schimba etichetele" };
+  return { bine: true, motiv: null, etichete: curate };
+}
+
 export async function deleteItem(id) {
   const { error } = await supabase.from("learn_lessons_items").delete().eq("id", id);
   if (error) { console.warn("deleteItem:", error.message); return false; }

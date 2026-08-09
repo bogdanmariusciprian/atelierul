@@ -104,14 +104,26 @@
   transition: background 0.12s, border-color 0.12s;
 }
 .et-semn:hover { background: #eaefff; border-color: #4f6ef2; }
-/* Cuvântul etichetat deja nu mai poate fi etichetat de nimeni, niciodată: semnul
-   rămâne, dar ca însemn, nu ca buton. */
+
+/* BIFA VERDE spune „lucrat la meditație", și se vede la toți: vizitator, elev,
+   profesor. Nu ține de comutator, fiindcă ce s-a lucrat s-a lucrat.
+
+   La cei mai mulți e un ÎNSEMN, nu un buton: stă acolo, nu se apasă, iar `disabled`
+   o spune și mâinilor, și cititorului de ecran. */
 .et-semn.e-gata {
   border-style: solid;
   border-color: #a7dcbd;
   background: #e9f7ef;
   color: #1a7a45;
   cursor: default;
+  opacity: 1;   /* butoanele oprite se șterg din obișnuință; ăsta e o veste, nu un buton stins */
+}
+/* Numai la profesor e și buton: apăsat, deschide schimbarea etichetelor. Se și
+   vede că e apăsabil, altfel ar fi un buton ascuns într-un însemn. */
+.et-semn.e-gata:not(:disabled) { cursor: pointer; }
+.et-semn.e-gata:not(:disabled):hover {
+  background: #d6f0e2;
+  border-color: #1a7a45;
 }
 
 /* Fereastra de bifat. Nu e un meniu care se închide la prima atingere: bifezi
