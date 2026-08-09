@@ -2638,32 +2638,33 @@ const boardsFila  = document.getElementById('boardsFila');
 const boardsCat   = document.getElementById('boardsCat');
 const boardsForma = document.getElementById('boardsForma');
 
-/* ---------- Panglica: două întruchipări ale aceluiași contur ----------
+/* ---------- Mânerul: săgeată închis, stea deschis ----------
 
-   ÎNCHISĂ atârnă din marginea ecranului, cu vârful spre dreapta: „trage de
-   mine". DESCHISĂ se întinde peste capul panoului, iar celălalt capăt i se
-   scobește în crestătura de fundă, care arată înapoi: „împinge-mă la loc".
+   ÎNCHIS e o săgeată care atârnă din marginea ecranului: arată încotro, adică
+   „trage de mine". DESCHIS se rotește și se strânge în stea: nu mai are ce
+   arăta, fiindcă ai ajuns. Apăsată, steaua se topește la loc în săgeată.
 
-   AMÂNDOUĂ AU ACELEAȘI PATRU CURBE, în aceeași ordine, și tocmai de-aia se pot
-   topi una într-alta: se trec numerele dintr-un desen într-altul, pe rând. Dacă
-   unul dintre ele ar avea o curbă în plus, topirea s-ar preface într-o săritură,
-   fără să dea vreo eroare nicăieri. Deci conturul se scrie o dată, iar al doilea
-   se face după chipul lui.
+   AMÂNDOUĂ DESENELE AU ACELEAȘI ZECE CURBE, în aceeași ordine, și tocmai de-aia
+   se pot topi una într-alta: se trec numerele dintr-un desen într-altul, pe
+   rând. Steaua are zece colțuri de la natura ei (cinci vârfuri și cinci
+   adâncituri), deci săgeata a fost desenată tot din zece puncte, ca să se
+   potrivească. Dacă unul dintre ele ar avea o curbă în plus, topirea s-ar
+   preface într-o săritură, fără să dea vreo eroare nicăieri.
 
    Numerele se plimbă cu mâna, dintr-un cadru în altul, nu cu `transition` pe
    `d`. Aceea merge doar prin unele browsere, iar acolo unde nu merge n-ar da
-   greș zgomotos, ci ar lăsa panglica înțepenită în forma închisă peste un panou
-   deschis: greșeala care se vede cel mai greu. */
-const FORMA_INCHISA = 'M 0 4 C 14 6 20 14 26 34 C 31 40 33 44 33 46 C 33 48 31 52 26 58 C 20 78 14 86 0 88 Z';
-const FORMA_DESCHISA = 'M 0 6 C 60 3 120 7 178 9 C 200 11 216 12 230 8 C 200 20 200 34 230 46 C 170 48 60 50 0 46 Z';
+   greș zgomotos, ci ar lăsa mânerul înțepenit într-o formă: greșeala care se
+   vede cel mai greu. */
+const FORMA_SAGEATA = 'M 2.0 6.0 C 6.7 7.3 11.3 8.7 16.0 10.0 C 19.3 14.0 22.7 18.0 26.0 22.0 C 28.0 26.7 30.0 31.3 32.0 36.0 C 33.3 39.3 34.7 42.7 36.0 46.0 C 34.7 49.3 33.3 52.7 32.0 56.0 C 30.0 60.7 28.0 65.3 26.0 70.0 C 22.7 74.0 19.3 78.0 16.0 82.0 C 11.3 83.3 6.7 84.7 2.0 86.0 C 1.3 72.7 0.7 59.3 0.0 46.0 C 0.7 32.7 1.3 19.3 2.0 6.0 Z';
+const FORMA_STEA = 'M 26.0 20.0 C 28.2 25.7 30.3 31.4 32.5 37.1 C 38.6 37.4 44.6 37.7 50.7 38.0 C 46.0 41.8 41.2 45.6 36.5 49.4 C 38.1 55.3 39.7 61.2 41.3 67.0 C 36.2 63.7 31.1 60.3 26.0 57.0 C 20.9 60.3 15.8 63.7 10.7 67.0 C 12.3 61.2 13.9 55.3 15.5 49.4 C 10.8 45.6 6.0 41.8 1.3 38.0 C 7.4 37.7 13.4 37.4 19.5 37.1 C 21.7 31.4 23.8 25.7 26.0 20.0 Z';
 
 const NUMERELE = /-?\d+(?:\.\d+)?/g;
 const cifrele = (d) => (d.match(NUMERELE) || []).map(Number);
 /* Bucățile de literă dintre numere: din ele și din numerele plimbate se
    recompune conturul, fără să mai fie nevoie să știm ce înseamnă fiecare. */
-const CUVINTELE = FORMA_INCHISA.split(NUMERELE);
-const DE_LA = cifrele(FORMA_INCHISA);
-const PANA_LA = cifrele(FORMA_DESCHISA);
+const CUVINTELE = FORMA_SAGEATA.split(NUMERELE);
+const DE_LA = cifrele(FORMA_SAGEATA);
+const PANA_LA = cifrele(FORMA_STEA);
 
 function conturLa(t) {
   let d = CUVINTELE[0];
@@ -2690,7 +2691,7 @@ function topesteContur(catre) {
   }
   const pornit = performance.now();
   /* Se pleacă DE UNDE E ACUM, nu de la capăt: cine apasă de două ori repede nu
-     vede panglica sărind înapoi ca s-o ia de la început. */
+     vede mânerul sărind înapoi ca s-o ia de la început. */
   const drum = Math.abs(catre - dela);
   (function cadru(acum) {
     const t = Math.min(1, (acum - pornit) / (TOPIRE * drum || 1));
