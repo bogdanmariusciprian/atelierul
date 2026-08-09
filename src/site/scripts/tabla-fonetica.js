@@ -688,23 +688,40 @@ function superscriptSelection() {
    că nu face: o unealtă care se supune orbește ar lăsa elevul să scrie un lucru
    care nu există, iar tabla e tocmai locul unde se învață ce există.
 
-   DE UNDE VIN LITERELE. Cele cinci obișnuite au fiecare litera ei gata făcută
-   (á, é, í, ó, ú), la fel „ă" și „â" (ắ, ấ). Numai „î" n-are: nicio scriere din
-   lume n-a avut nevoie de „i" cu căciulă ȘI cu accent, așa că nu i s-a făcut o
-   literă a lui. Acolo se pune semnul de accent aparte, care se desenează peste
-   litera dinainte. Iese la fel la citit, doar că-s două semne, nu unul.
+   DE UNDE VIN SEMNELE, ȘI DE CE-S DE DOUĂ FELURI.
+
+   Cele cinci sunete obișnuite au fiecare litera lor accentuată gata făcută:
+   á, é, í, ó, ú. Acolo nu-i nimic de ales.
+
+   Pentru „ă", „î" și „â" însă nu se pune accent, ci se scrie MAJUSCULA LOR, cu
+   ROȘU. Nu e o găselniță: e însemnarea din lecție, iar tabla trebuie să scrie
+   ca lecția, altfel elevul învață un lucru și scrie altul. (Ar fi fost și
+   litere accentuate de împrumutat, ắ și ấ din vietnameză, dar „î" n-are niciuna
+   și ar fi trebuit lipit un semn deasupra; două feluri de a scrie același lucru
+   sunt mai rele decât unul singur ales anume.)
+
+   CUM SE ȘTIE CĂ E ACCENTUATĂ. Nu după cum arată litera, ci după semnul pus pe
+   ea: `<b class="accent">`. Trebuie așa, fiindcă un „Ă" roșu și un „Ă" scris
+   pur și simplu de elev arată la fel; deosebirea nu e în literă, e în ce s-a
+   vrut cu ea, iar asta se ține minte, nu se ghicește.
 
    Și SE IA ÎNAPOI la a doua apăsare. Orice unealtă care pune ceva trebuie să
    știe și să scoată, altfel singurul drum înapoi e ștergerea, adică pierderea a
    ce era bun împreună cu ce era greșit. */
 const ACCENTE = {
   a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú',
-  'ă': 'ắ', 'â': 'ấ', 'î': 'î\u0301',
+  'ă': 'Ă', 'â': 'Â', 'î': 'Î',
   A: 'Á', E: 'É', I: 'Í', O: 'Ó', U: 'Ú',
-  'Ă': 'Ắ', 'Â': 'Ấ', 'Î': 'Î\u0301',
+  'Ă': 'Ă', 'Â': 'Â', 'Î': 'Î',
 };
-const FARA_ACCENT = Object.fromEntries(
-  Object.entries(ACCENTE).map(([gol, cu]) => [cu, gol]));
+/* Înapoi se merge de la litera accentuată la cea de rând. Majusculele roșii
+   trimit la literele mici, fiindcă de acolo au venit: cine scrie „ă" și apasă
+   accentul vede „Ă", iar apăsând iar trebuie să-și primească „ă"-ul înapoi. */
+const FARA_ACCENT = {
+  'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+  'Ă': 'ă', 'Â': 'â', 'Î': 'î',
+  'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+};
 
 /** Litera dinaintea cursorului, ori cea aleasă: un domeniu peste ea. */
 function domeniulLiterei() {
@@ -735,19 +752,30 @@ function accentueaza() {
   // accent de pus: accentul cade pe UN sunet, iar care anume alege elevul.
   if (text.replace(/[\u0300-\u036f]/g, '').length !== 1) return false;
 
-  const scos = FARA_ACCENT[text];
-  const pus = ACCENTE[text];
+  /* E accentuată? Nu întrebăm litera, întrebăm semnul de pe ea: „Ă" roșu și
+     „Ă" scris de elev arată la fel, iar deosebirea nu e în literă. */
+  const purtat = r.commonAncestorContainer;
+  const semnul = purtat && purtat.parentElement
+    ? (purtat.nodeType === 3 ? purtat.parentElement : purtat).closest('b.accent')
+    : null;
+  const eraAccentuata = !!semnul && semnul.textContent === text;
+
+  const scos = eraAccentuata ? (FARA_ACCENT[text] || text) : null;
+  const pus = eraAccentuata ? null : ACCENTE[text];
   if (!scos && !pus) return false;
 
-  r.deleteContents();
   let nod;
   if (scos) {
     nod = document.createTextNode(scos);
+    semnul.replaceWith(nod);
+    r.selectNode(nod);
   } else {
+    r.deleteContents();
     nod = document.createElement('b');
+    nod.className = 'accent';
     nod.textContent = pus;
+    r.insertNode(nod);
   }
-  r.insertNode(nod);
   r.setStartAfter(nod);
   r.setEndAfter(nod);
   const sel = window.getSelection();
@@ -997,6 +1025,9 @@ sheet.addEventListener('keydown', (e) => {
   if (e.code === 'Digit2') { e.preventDefault(); insertSymbol('2', field); return; }
   if (e.code === 'Digit3') { e.preventDefault(); insertSymbol('3', field); return; }
   if (e.code === 'Digit4') { e.preventDefault(); insertSymbol('4', field); return; }
+  /* Tasta 5, în urma celor patru simboluri: accentul e tot un semn pus pe un
+     sunet, deci stă în același rând de taste, nu într-un colț al minții. */
+  if (e.code === 'Digit5') { e.preventDefault(); accentueaza(); return; }
 
   // Virgulă -> „, ”   (virgulă + spațiu)
   if (e.key === ',') { e.preventDefault(); insertText(', '); return; }

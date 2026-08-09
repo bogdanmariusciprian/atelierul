@@ -465,6 +465,13 @@
     border-radius: 10px;
   }
   .btn-add:hover { background: #dfe7ff; }
+  /* SUNETUL ACCENTUAT.
+     Roșul e numai pentru „Ă", „Î" și „Â", unde însemnarea din lecție e majuscula
+     lor; celelalte cinci se cunosc după accentul de pe ele și n-au nevoie de
+     culoare. Regula e pusă totuși pe toate, fiindcă semnul e același lucru
+     oriunde: un sunet ales ca purtător al accentului. */
+  b.accent { color: #d93a3a; }
+
   /* CALEA DE ÎNTORS.
      Stă jos, la mijloc, unde nu acoperă nici tabla, nici mănunchiul din colț.
      Nu întrerupe nimic și nu cere nimic: dacă n-o bagi în seamă, se stinge
