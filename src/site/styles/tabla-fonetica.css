@@ -765,7 +765,7 @@
 
   /* la printare / „Salvează ca PDF": arătăm doar cerința + foaia de lucru */
   @media print {
-    header, .add-row, .notes, #settingsPanel, .types-label, #openFile { display: none !important; }
+    header, .add-row, .notes, .sertar, #settingsPanel, .types-label, #openFile { display: none !important; }
     body { height: auto; overflow: visible; display: block; background: #fff; }
     main { overflow: visible; }
     .main-inner { max-width: none; padding: 0; }
@@ -801,14 +801,140 @@
 }
 
 
-/* ============ Panoul „Tablele mele" ============
-   Aceeași casetă din dreapta ca notițele și simbolurile, deci elevul o
-   recunoaște fără s-o învețe.
+/* ============ Sertarul „Tablele mele" ============
+
+   ERA O CASETĂ ÎN DREAPTA, CHEMATĂ DIN MENIUL „⋯", și acolo era greșeala: un
+   lucru ascuns într-un meniu e un lucru pe care jumătate dintre elevi nu-l află
+   niciodată. Acum e un sertar lipit de marginea din stânga, la jumătatea
+   înălțimii, din care iese mereu o filă îngustă cu o săgeată. Nu-ți spune ce e,
+   dar îți spune CĂ E, iar de-aici încolo curiozitatea face restul.
+
+   ALCĂTUIREA, și de ce așa. Sertarul e o cutie fixă cât fila, iar corpul care
+   lunecă stă ABSOLUT lângă ea, scos din flux. Dacă ar fi stat amândouă în flux,
+   corpul tras afară din ecran ar fi împins fila cu 300 de pixeli spre dreapta,
+   în mijlocul tablei, chiar când sertarul e închis: adică taman ce nu voiam.
+
+   Lățimea trăiește într-o singură variabilă, `--lat`, fiindcă o știu două
+   lucruri deodată: cât se lățește corpul și cât se dă fila la o parte. Scrisă de
+   două ori, s-ar fi despărțit la prima schimbare.
 
    Clasele poartă numele englezesc „board", nu „tablă": pe ecran scrie
    „tablă", dar în cod numele se potrivește cu tabelul din bază
    (`learn_lessons_boards`), iar „table" ar fi însemnat două lucruri deodată,
    tabla de scris și tabelul din bază. */
+.sertar {
+  /* Pe ecrane mici, sertarul nu se întinde peste toată tabla: lasă o palmă în
+     dreapta, ca să se vadă că e ceva dedesubt și să ai unde apăsa ca să-l
+     închizi. */
+  --lat: min(300px, calc(100vw - 64px));
+
+  position: fixed;
+  left: 0;
+  top: 50%;
+  /* Cutia e cât fila; corpul iese din ea, absolut. */
+  transform: translateY(-50%);
+  z-index: 40;
+}
+
+.sertar__corp {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--lat);
+  /* ÎNĂLȚIMEA E SOCOTITĂ, NU GHICITĂ, fiindcă în colțul din stânga-jos stau doi
+     vecini: comutatorul de etichetare (jos 26, înalt 56, deci până la 82) și
+     butonul TO-DO (jos 92, înalt 42, deci până la 134). Sertarul e așezat la
+     mijloc, deci marginea lui de jos cade la (100vh − H) / 2 de podea. Ca să
+     rămână deasupra lor, cu o palmă de aer: (100vh − H) / 2 ≥ 146, adică
+     H ≤ 100vh − 292. Rotunjesc la 300.
+
+     `max(...)` e podeaua podelei: pe un ecran foarte scund, mai bine un sertar
+     de 220 care se suprapune o idee decât unul de 40, în care nu încape nimic.
+     Vecinii sunt oricum numai ai profesorului; elevul n-are niciunul. */
+  max-height: max(220px, calc(100vh - 300px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: none;
+  border-radius: 0 14px 14px 0;
+  box-shadow: var(--shadow);
+  /* Închis, stă cu totul în afara ecranului, la stânga. */
+  transform: translate(-100%, -50%);
+  transition: transform .22s cubic-bezier(.22, .7, .3, 1);
+}
+.sertar.open .sertar__corp { transform: translate(0, -50%); }
+
+/* FILA: singurul lucru care se vede când sertarul e închis. Rotunjită doar în
+   dreapta, ca o filă ieșită dintr-un dosar, cu umbra căzând în aceeași parte. */
+.sertar__fila {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 22px;
+  min-height: 78px;
+  padding: 12px 0;
+  border: 1px solid var(--line);
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  background: var(--card);
+  color: var(--muted);
+  font-family: var(--ui);
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 3px 3px 12px -5px rgba(31, 36, 48, .35);
+  transition: width .15s ease, background .15s ease, color .15s ease,
+              transform .22s cubic-bezier(.22, .7, .3, 1);
+}
+/* Se lățește spre DREAPTA, în gol: la marginea ecranului n-are pe cine
+   îmbrânci, iar fiind fixă nu mișcă nimic din pagină. */
+.sertar__fila:hover,
+.sertar__fila:focus-visible {
+  width: 28px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sertar__fila:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Deschis, fila se dă la o parte exact cât ține corpul, ca și cum ar fi trasă
+   de el. De-aia lățimea e o singură variabilă. */
+.sertar.open .sertar__fila { transform: translateX(var(--lat)); }
+
+.sertar__sageata {
+  font-size: 16px;
+  line-height: 1;
+  transition: transform .22s cubic-bezier(.22, .7, .3, 1);
+}
+.sertar.open .sertar__sageata { transform: rotate(180deg); }
+
+/* Câte table sunt salvate. Scris mărunt sub săgeată: nu e o veste importantă,
+   e doar un semn că înăuntru chiar e ceva. Lipsește când nu e nimic, fiindcă un
+   zero nu spune decât „gol", iar asta o spune mai bine tăcerea. */
+.sertar__cat {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.sertar__cat:empty { display: none; }
+
+/* Numele, pentru cititoarele de ecran: pe fila de 22 de pixeli n-ar încăpea,
+   dar cine ascultă pagina trebuie să audă ce e butonul ăsta. */
+.sertar__citit {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sertar__corp, .sertar__fila, .sertar__sageata { transition: none; }
+}
 .boards-body { padding: 10px 12px 14px; overflow-y: auto; }
 .boards-empty { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 4px 2px; }
 .board {
@@ -846,7 +972,7 @@
 /* La tipărire rămâne doar foaia: capul de pagină și panourile n-au ce căuta
    pe hârtie. */
 @media print {
-  header, .add-row, .notes, .tb-inapoi { display: none !important; }
+  header, .add-row, .notes, .sertar, .tb-inapoi { display: none !important; }
   body { height: auto; overflow: visible; }
 }
 

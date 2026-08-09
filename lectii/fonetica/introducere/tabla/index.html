@@ -80,8 +80,9 @@
       </button>
       <button class="btn btn--ico" id="altBtn" title="Altele" aria-label="Altele" aria-expanded="false">⋯</button>
 
+      <!-- „Tablele mele…" a plecat de aici: s-a mutat pe sertarul din stânga.
+           Un lucru, un loc. În două locuri, unul dintre ele rămâne în urmă. -->
       <div class="meniu" id="altMeniu" hidden>
-        <button class="meniu__it" id="boardsBtn">Tablele mele…</button>
         <button class="meniu__it" id="saveAsBtn">Salvează ca tablă nouă…</button>
         <button class="meniu__it" id="renameBtn">Redenumește tabla…</button>
         <hr class="meniu__linie">
@@ -187,13 +188,29 @@
   <div class="settings-hint">Tastele 1-4 și butoanele din bară inserează aceste simboluri. Bifează „bold" dacă vrei simbolul îngroșat. Setările se salvează pe acest calculator.</div>
 </aside>
 
-<!-- Panoul „Tablele mele": tablele salvate în cont pentru lecția asta. -->
-<aside class="notes boards" id="boardsPanel" aria-hidden="true">
-  <div class="notes-head">
-    <strong>Tablele mele</strong>
-    <button class="notes-close" id="boardsClose" title="Închide">×</button>
+<!-- Sertarul „Tablele mele": tablele salvate în cont pentru lecția asta.
+
+     NU MAI E O CASETĂ CARE APARE DE NICĂIERI, ci un sertar lipit de marginea
+     din stânga, la jumătatea înălțimii. Închis, din el iese o filă îngustă cu o
+     săgeată: așa unealta se VEDE că există, fără să fi fost nevoie s-o caute
+     cineva prin meniu. Un lucru ascuns într-un meniu e un lucru pe care
+     jumătate dintre elevi nu-l află niciodată.
+
+     Fila stă în afara corpului care lunecă, altfel ar pleca odată cu el. -->
+<aside class="sertar" id="boardsPanel" aria-hidden="true">
+  <div class="sertar__corp">
+    <div class="notes-head">
+      <strong>Tablele mele</strong>
+      <button class="notes-close" id="boardsClose" title="Închide">×</button>
+    </div>
+    <div class="boards-body" id="boardsBody"></div>
   </div>
-  <div class="boards-body" id="boardsBody"></div>
+  <button class="sertar__fila" id="boardsFila" type="button"
+          aria-expanded="false" aria-controls="boardsPanel" title="Tablele mele">
+    <span class="sertar__sageata" aria-hidden="true">›</span>
+    <span class="sertar__cat" id="boardsCat" aria-hidden="true"></span>
+    <span class="sertar__citit">Tablele mele</span>
+  </button>
 </aside>
 
 <!-- Fereastra de întrebat (nume de tablă, confirmări).

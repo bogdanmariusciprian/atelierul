@@ -1364,12 +1364,16 @@ sheet.addEventListener('input', (e) => {
   }
 });
 
-/* ---------- Panourile din dreapta (Notițe / Simboluri / Tablele mele) ----------
-   Se deschid DOAR la click și numai unul odată: se așază toate în același colț,
-   iar două deschise s-ar acoperi unul pe altul. */
+/* ---------- Panourile din dreapta (Notițe / Simboluri) ----------
+   Se deschid DOAR la click și numai unul odată: se așază amândouă în același
+   colț, iar două deschise s-ar acoperi unul pe altul.
+
+   „Tablele mele" NU MAI E AICI. S-a mutat într-un sertar pe marginea din
+   stânga, deci nu se mai bate cu astea pe colț și n-are de ce se închide când
+   se deschid ele. */
 const notesPanel    = document.getElementById('notesPanel');
 const settingsPanel = document.getElementById('settingsPanel');
-const panouri = [notesPanel, settingsPanel, document.getElementById('boardsPanel')].filter(Boolean);
+const panouri = [notesPanel, settingsPanel].filter(Boolean);
 
 function inchidePanou(p) {
   p.classList.remove('open');
@@ -1387,12 +1391,6 @@ document.getElementById('notesBtn').addEventListener('click', () => togglePanel(
 document.getElementById('notesClose').addEventListener('click', () => inchidePanou(notesPanel));
 document.getElementById('settingsBtn').addEventListener('click', () => { inchideMeniu(); togglePanel(settingsPanel); });
 document.getElementById('settingsClose').addEventListener('click', () => inchidePanou(settingsPanel));
-document.getElementById('boardsClose').addEventListener('click', () => inchidePanou(boardsPanel));
-document.getElementById('boardsBtn').addEventListener('click', () => {
-  inchideMeniu();
-  togglePanel(boardsPanel);
-  aratăTablele();
-});
 
 /* ---------- Scurtăturile: ascunse până le ceri ----------
    Erau șase rânduri de text mărunt, citite o dată și apoi niciodată, dar care
@@ -2469,6 +2467,11 @@ async function salveaza(caTablaNoua = false) {
   tabla = { id: row.id, titlu: row.title, curat: true };
   aratăStarea();
   spune('salvat', true);
+  /* Sertarul din stânga poartă numărul tablelor salvate. Dacă tocmai s-a făcut
+     una nouă, numărul trebuie să se schimbe pe loc: altfel fila ar minți până
+     la următoarea deschidere a paginii, iar o cifră care minte e mai rea decât
+     niciuna. */
+  aratăTablele();
 }
 
 elSaveBtn && elSaveBtn.addEventListener('click', () => salveaza(false));
@@ -2616,9 +2619,65 @@ function verificatorulNumelui(luate, afaraDe = null) {
    trebuit. Renunțarea rămâne: `returnValue` e pus pe „nu" înainte de fiecare
    deschidere, așa că orice închidere fără apăsare pe „Da" e o renunțare. */
 
-/* ---------- panoul „Tablele mele" ---------- */
+/* ---------- sertarul „Tablele mele" ----------
+
+   Stă pe marginea din stânga, la jumătatea înălțimii, și se vede MEREU: din el
+   iese o filă îngustă cu o săgeată. Era mai devreme o casetă chemată din meniul
+   „⋯", iar acolo era greșeala. Un lucru ascuns într-un meniu e un lucru pe care
+   jumătate dintre elevi nu-l află niciodată; o filă care iese din marginea
+   ecranului nu-ți spune ce e, dar îți spune CĂ E, iar de-aici încolo se
+   descurcă singură curiozitatea.
+
+   Se deschide la CLIC, nu la trecerea mouse-ului. La hover s-ar fi deschis
+   singură ori de câte ori mâna trecea spre stânga, adică taman când elevul
+   scrie, iar un panou care apare nechemat peste tablă e mai supărător decât
+   unul care se lasă apăsat. */
 const boardsPanel = document.getElementById('boardsPanel');
 const boardsBody  = document.getElementById('boardsBody');
+const boardsFila  = document.getElementById('boardsFila');
+const boardsCat   = document.getElementById('boardsCat');
+
+function sertarulEDeschis() { return !!(boardsPanel && boardsPanel.classList.contains('open')); }
+
+function inchideSertarul() {
+  if (!boardsPanel) return;
+  boardsPanel.classList.remove('open');
+  boardsPanel.setAttribute('aria-hidden', 'true');
+  if (boardsFila) boardsFila.setAttribute('aria-expanded', 'false');
+}
+
+function deschideSertarul() {
+  if (!boardsPanel) return;
+  boardsPanel.classList.add('open');
+  boardsPanel.setAttribute('aria-hidden', 'false');
+  if (boardsFila) boardsFila.setAttribute('aria-expanded', 'true');
+  aratăTablele();
+}
+
+boardsFila && boardsFila.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (sertarulEDeschis()) inchideSertarul(); else deschideSertarul();
+});
+
+/* Trei feluri de a-l închide, fiindcă un sertar deschis peste tablă trebuie să
+   plece ușor: butonul lui, Escape, ori un clic oriunde în afară. Clicul pe filă
+   nu se numără „în afară", altfel s-ar închide și s-ar redeschide într-o
+   singură apăsare. */
+document.addEventListener('click', (e) => {
+  if (!sertarulEDeschis()) return;
+  if (e.target.closest && e.target.closest('#boardsPanel')) return;
+  inchideSertarul();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') inchideSertarul(); });
+
+/* Câte table sunt salvate, scris mărunt pe filă. Nu e o veste importantă, e doar
+   un semn că înăuntru chiar e ceva: fără el, fila ar fi o ușă despre care nu se
+   știe dacă dă în vreo cameră. Lipsește când nu e nimic, fiindcă un zero nu
+   spune decât „gol", iar asta o spune mai bine tăcerea. */
+function scrieCateTable(cate) {
+  if (!boardsCat) return;
+  boardsCat.textContent = cate > 0 ? String(cate) : '';
+}
 
 function candSalvat(iso) {
   const d = new Date(iso), azi = new Date();
@@ -2630,6 +2689,10 @@ function candSalvat(iso) {
 async function aratăTablele() {
   boardsBody.innerHTML = '<p class="boards-empty">Se încarcă…</p>';
   const lista = await listSheets(LECTIE);
+  /* Numărul de pe filă se scrie ORICUM se ajunge aici: la deschidere, după o
+     salvare, după o ștergere. Ținut într-un singur loc, nu se poate întâmpla ca
+     un drum nou să-l uite. */
+  scrieCateTable(lista.length);
   if (!lista.length) {
     boardsBody.innerHTML = '<p class="boards-empty">N-ai încă nicio tablă salvată la lecția asta. Scrie ceva, apoi apasă „Salvează".</p>';
     return;
@@ -2671,7 +2734,7 @@ boardsBody.addEventListener('click', async (e) => {
     return;
   }
 
-  if (id === tabla.id) { inchidePanou(boardsPanel); return; }   // e deja deschisă
+  if (id === tabla.id) { inchideSertarul(); return; }   // e deja deschisă
 
   if (!tabla.curat && !await intreaba({
         titlu: 'Tabla de acum n-a fost salvată',
@@ -2684,7 +2747,7 @@ boardsBody.addEventListener('click', async (e) => {
   tabla = { id: f.id, titlu: f.title, curat: true };
   aratăStarea();
   aratăTablele();
-  inchidePanou(boardsPanel);
+  inchideSertarul();
 });
 
 /* PDF: deschide dialogul de printare (de acolo alegi „Salvează ca PDF") */
@@ -2832,6 +2895,10 @@ if (areCeva) {
   deseneazaTeancul();
 }
 aratăStarea();
+/* Numărul de pe fila sertarului se află de la bun început, nu abia când îl
+   deschizi: o filă fără cifră ar arăta ca o ușă despre care nu se știe dacă dă
+   în vreo cameră, iar elevul n-are de ce s-o deschidă ca să afle. */
+aratăTablele();
 const firstField = sheet.querySelector('.field');
 if (firstField) placeCaret(firstField, true);
 
