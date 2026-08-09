@@ -205,10 +205,15 @@
     </div>
     <div class="boards-body" id="boardsBody"></div>
   </div>
+  <!-- Mânerul e el însuși săgeata: se ascute spre dreapta. De-aia nu mai are și
+       un semn „›" desenat pe el, care ar fi spus a doua oară același lucru.
+       Două straturi, ca forma ascuțită să capete și un chenar subțire: cel de
+       dedesubt e chenarul, cel de deasupra, retras cu un pixel, e fața. -->
   <button class="sertar__fila" id="boardsFila" type="button"
           aria-expanded="false" aria-controls="boardsPanel" title="Tablele mele">
-    <span class="sertar__cat" id="boardsCat" aria-hidden="true"></span>
-    <span class="sertar__sageata" aria-hidden="true">›</span>
+    <span class="sertar__fata" aria-hidden="true">
+      <span class="sertar__cat" id="boardsCat"></span>
+    </span>
     <span class="sertar__citit">Tablele mele</span>
   </button>
 </aside>
