@@ -7,7 +7,27 @@
    fără culoare, iar greșeala s-ar fi văzut abia peste săptămâni.
    ========================================================= */
 
-/* ---------- comutatorul, lângă TO-DO ---------- */
+/* ---------- comutatorul, lângă TO-DO ----------
+
+   MĂNUNCHI PROPRIU, nu al lui TO-DO. Pus înăuntrul lui, butonul pierea: TO-DO
+   își rescrie tot cuprinsul la fiecare redesenare, iar el se redesenează îndată
+   ce răspunde serverul. Deci stau alături, nu unul în altul, iar alăturarea se
+   face de aici, unde se văd amândouă coordonatele.
+
+   Comutatorul stă JOS DE TOT, iar TO-DO deasupra lui (vezi `todo.css`, unde
+   marginea de jos e cu atât mai mare cât ține butonul ăsta). Așa panoul lui
+   TO-DO, care se deschide în sus, nu acoperă niciodată comutatorul. */
+.tagging-fab-wrap {
+  position: fixed;
+  left: 22px;
+  bottom: 26px;
+  /* Aceeași treaptă cu TO-DO: sunt frați, n-au de ce se acoperi. */
+  z-index: 2147482100;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .tagging-fab {
   display: inline-flex;
   align-items: center;

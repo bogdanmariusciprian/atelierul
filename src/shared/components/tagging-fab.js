@@ -65,15 +65,20 @@ export async function initTagging(basePath = "") {
   if (document.querySelector(".tagging-fab")) return;
   aduStilurile(basePath);
 
-  /* Locul e lângă TO-DO, în același mănunchi dacă el există deja: două butoane
-     plutitoare care se așază fiecare după capul lui ajung, mai devreme sau mai
-     târziu, unul peste altul. */
-  radacina = document.querySelector(".todo-fab-wrap");
-  if (!radacina) {
-    radacina = document.createElement("div");
-    radacina.className = "todo-fab-wrap";
-    document.body.appendChild(radacina);
-  }
+  /* MĂNUNCHI PROPRIU, NU AL LUI TO-DO, deși stau unul lângă altul.
+
+     Îl pusesem întâi în mănunchiul lui TO-DO, ca să nu se așeze fiecare după
+     capul lui. Numai că TO-DO își REscrie tot cuprinsul la fiecare redesenare
+     (`radacina.innerHTML = …`), iar el se redesenează îndată ce răspunde
+     serverul. Butonul se năștea și pierea o clipă mai târziu, fără nicio urmă
+     de greșeală nicăieri: se vedea doar că nu e.
+
+     Regula pe care o iau de-aici: nu-ți lăsa lucrul într-o cutie pe care o
+     stăpânește altcineva. Așezarea alături se face din foaia de stil, unde
+     amândouă coordonatele se văd una lângă alta. */
+  radacina = document.createElement("div");
+  radacina.className = "tagging-fab-wrap";
+  document.body.appendChild(radacina);
 
   buton = document.createElement("button");
   buton.type = "button";
