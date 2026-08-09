@@ -2569,7 +2569,7 @@ function gataAruncarea(fata) {
    După ce zarul a picat o dată, tăvița și-a spus ce avea de spus. De-aici
    încolo elevul se uită la exercițiul lui, nu la ea, iar un lucru care rămâne
    aprins după ce și-a făcut treaba nu mai e o unealtă, e o distragere. Se
-   retrage deci la patru zecimi, și se trezește la orice atingere.
+   retrage deci la două zecimi, și se trezește la orice atingere.
 
    Rămâne trează câteva secunde DUPĂ ce degetul a plecat, nu se stinge pe loc:
    altfel s-ar întuneca exact sub mâna care se întoarce spre ea, iar asta se
