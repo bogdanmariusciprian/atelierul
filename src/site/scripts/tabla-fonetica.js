@@ -833,15 +833,20 @@ sheet.addEventListener('keydown', (e) => {
   // (altfel, keydown-ul lui Shift ar reseta ciclul înainte de a ajunge la „A”)
   if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return;
 
-  // Enter -> rând nou
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    resetACycle(); resetCK();
-    addRowAfter(field.closest('.row'));
-    return;
-  }
-  // Tab -> etapa următoare / precedentă
-  if (e.key === 'Tab') {
+  /* ENTER MERGE MAI DEPARTE, ca Tab, și abia la capăt deschide un rând nou.
+
+     Făcea, până acum, rând nou de fiecare dată. Era o hotărâre luată pe vremea
+     când tabla avea un singur fel de rând și trei etape: mergeai cu Tab prin
+     ele și cu Enter treceai la cuvântul următor. Cu șase feluri de exercițiu și
+     rânduri de trei feluri, deosebirea asta nu se mai ține minte, iar mâna
+     cere de la Enter chiar lucrul pe care-l cere de la Tab: „gata aici, mai
+     departe". Un rând nou tot iese, dar când chiar s-a terminat rândul, adică
+     atunci când și mintea îl aștepta.
+
+     Amândouă tastele duc deci în același loc, iar `Shift` le întoarce pe
+     amândouă înapoi: dacă două taste fac același lucru, trebuie să-l facă
+     până la capăt, altfel deosebirea rămasă e cea mai greu de ținut minte. */
+  if (e.key === 'Enter' || e.key === 'Tab') {
     e.preventDefault();
     resetACycle(); resetCK();
     navigate(field, e.shiftKey);
@@ -961,7 +966,11 @@ function navigate(current, back) {
   const i = fields.indexOf(current);
   let target = back ? fields[i - 1] : fields[i + 1];
   if (!target && !back) {
-    const newRow = addRowAfter(current.closest('.row'));
+    /* Ciorna e ultima și rămâne ultima: după ea nu se naște nimic, fiindcă nu
+       e o cerință, e hârtia de pe margine. */
+    const row = current.closest('.row');
+    if (eCiorna(row)) return;
+    const newRow = addRowAfter(row);
     target = newRow.querySelector('.field');
   }
   if (target) {
