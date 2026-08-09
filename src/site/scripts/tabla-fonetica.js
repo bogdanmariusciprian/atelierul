@@ -2062,7 +2062,17 @@ function deslusesteExercitiile(state) {
       const dupaSablon = fataDupaText(bucati[0]);
       const sursa = e.sursa === 'zar' ? 'zar'
                   : (dupaSablon || e.sursa === 'tip') ? 'tip' : 'mana';
-      return {
+      /* CE SE IA DE LA TABLA SALVATĂ, se ia TOT.
+         Aici se scrie un exercițiu nou din unul citit, câmp cu câmp, iar asta
+         are o capcană care nu se vede: un câmp adăugat mai târziu în altă parte
+         a codului se salvează cuminte, dar nu se mai întoarce, fiindcă nimeni nu
+         l-a trecut și pe lista de mai jos. Așa s-a pierdut o vreme ciorna: era
+         scrisă în bază, dar nu ajungea înapoi pe tablă.
+
+         De-aia ce e la fel se copiază cu totul, iar mai jos se îndreaptă numai
+         ce chiar trebuie îndreptat pentru tablele vechi. */
+      const ex = {
+        ...e,
         id: e.id || ('e' + Math.random().toString(36).slice(2, 8)),
         cerinta: bucati[0] || '',
         sursa,
@@ -2071,6 +2081,8 @@ function deslusesteExercitiile(state) {
         cuvinte,
         randuri: Array.isArray(e.randuri) ? e.randuri : [],
       };
+      if (!ex.ciorna) delete ex.ciorna;      // o ciornă goală n-are ce căuta
+      return ex;
     });
   }
   const vechi = exercitiuNou({ cerinta: state.prompt || '' });
