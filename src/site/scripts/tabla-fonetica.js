@@ -648,31 +648,44 @@ function cycleA(field) {
   }
 }
 
-/* ---------- Regula 7: superscript pe o selecție ----------
-   caracterul selectat devine: superscript + bold + subliniat,
-   cu un spațiu inserat ÎNAINTEA lui. */
 /* „I"-UL SUPRASCRIS.
 
    Într-o transcriere, „i"-ul final care nu se aude se scrie mic, deasupra, cu o
    linie sub el, și cu un spațiu înaintea lui. Butonul face același lucru în
-   amândouă felurile în care poate fi cerut:
+   toate cele trei feluri în care poate fi cerut:
 
-     · ai ales un „i" pe care l-ai scris deja → el se preface în cel suprascris;
-     · n-ai ales nimic → se scrie unul acolo unde stă cursorul.
+     · ai ales un „i" scris deja → el se preface în cel suprascris;
+     · ai cursorul CHIAR DUPĂ un „i" → tot el se preface, nu se adaugă altul;
+     · nu e niciun „i" prin preajmă → se scrie unul unde stă cursorul.
 
-   Erau două lucruri deosebite până acum: fără nicio alegere, butonul doar
-   pornea „scrisul suprascris" al browserului, adică o stare care se ține minte
-   și se uită, nu un semn pus pe tablă. Un buton care uneori pune un lucru și
-   alteori pornește o stare nu se poate ține minte.
+   Al doilea caz e cel care lipsea, și se vedea: scriai „casi", puneai cursorul
+   după „i" și te trezeai cu doi. Or, mâna scrie întâi litera și abia pe urmă se
+   gândește s-o ridice: asta e ordinea firească, nu un caz mărunt. Butonul de
+   accent lucrează la fel, și e bine să lucreze la fel, că două unelte vecine
+   care se poartă altfel se învață de două ori.
 
    SPAȚIUL DINAINTE face parte din semn, nu e o podoabă: fără el, „i"-ul mic s-ar
    lipi de litera dinainte și s-ar citi ca parte din ea. */
 function superscriptSelection() {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return false;
-  const range = sel.getRangeAt(0);
-  const text = range.collapsed ? 'i' : range.toString();
-  if (!range.collapsed) range.deleteContents();
+  let range = sel.getRangeAt(0);
+  let text;
+  if (!range.collapsed) {
+    text = range.toString();
+    range.deleteContents();
+  } else {
+    /* Cursorul chiar după un „i": acela se ridică, nu se mai adaugă altul. */
+    const inainte = domeniulLiterei();
+    const litera = inainte ? inainte.toString() : '';
+    if (litera === 'i' || litera === 'I') {
+      range = inainte;
+      text = litera;
+      range.deleteContents();
+    } else {
+      text = 'i';
+    }
+  }
 
   const frag = document.createDocumentFragment();
   frag.appendChild(document.createTextNode(' '));   // spațiu înainte
