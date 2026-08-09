@@ -872,13 +872,24 @@
   position: relative;
   z-index: 2;
   display: flex;
-  flex-direction: column;
+  /* Numărul și săgeata stau UNUL LÂNGĂ ALTUL, numărul întâi: se citesc dintr-o
+     singură privire, în ordinea firească („trei table, deschide-le"). Unul sub
+     altul păreau două lucruri deosebite. */
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 22px;
+  /* LĂȚIMEA E SOCOTITĂ, nu aleasă din ochi: 5 (margine) + 16 (pastila) + 4
+     (spațiu) + 6 (săgeata) + 5 (margine) = 36. Contează, fiindcă la fereastra
+     cea mai strâmtă (sub 1080, unde nu mai e margine liberă) primul caracter de
+     pe rând începe la 38: 20 din marginea paginii + 10 din cea a foii + 8 din a
+     rândului. Deci fila se așază peste marginea albă a foii, ca o etichetă
+     lipită pe muchia ei, dar nu atinge nicio literă. Rămân 2 pixeli.
+     Fără table, pastila lipsește și rămâne fâșia îngustă de la început. */
+  width: auto;
+  min-width: 24px;
   min-height: 78px;
-  padding: 12px 0;
+  padding: 12px 5px;
   border: 1px solid var(--line);
   border-left: none;
   border-radius: 0 10px 10px 0;
@@ -888,14 +899,14 @@
   cursor: pointer;
   user-select: none;
   box-shadow: 3px 3px 12px -5px rgba(31, 36, 48, .35);
-  transition: width .15s ease, background .15s ease, color .15s ease,
+  transition: background .15s ease, color .15s ease,
               transform .22s cubic-bezier(.22, .7, .3, 1);
 }
-/* Se lățește spre DREAPTA, în gol: la marginea ecranului n-are pe cine
-   îmbrânci, iar fiind fixă nu mișcă nimic din pagină. */
+/* La hover se COLOREAZĂ, nu se mai lățește. Se lățea, și era o idee proastă: cei
+   doi pixeli de aer față de primul caracter s-ar fi dus, iar fila ar fi ajuns
+   peste text taman când mâna e pe ea. Culoarea și cursorul spun destul. */
 .sertar__fila:hover,
 .sertar__fila:focus-visible {
-  width: 28px;
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -911,13 +922,28 @@
 }
 .sertar.open .sertar__sageata { transform: rotate(180deg); }
 
-/* Câte table sunt salvate. Scris mărunt sub săgeată: nu e o veste importantă,
-   e doar un semn că înăuntru chiar e ceva. Lipsește când nu e nimic, fiindcă un
-   zero nu spune decât „gol", iar asta o spune mai bine tăcerea. */
+/* Câte table sunt salvate, într-o pastilă, înaintea săgeții. Pastila o scoate
+   din rândul lucrurilor mărunte de pe filă și o face un NUMĂR, adică ceva de
+   citit, nu un semn oarecare.
+
+   Lipsește când nu e nimic, fiindcă un zero nu spune decât „gol", iar asta o
+   spune mai bine tăcerea. Iar `:empty` face și fila să se strângă înapoi la
+   fâșia îngustă de la început: golul nu ocupă loc. */
 .sertar__cat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .02em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .01em;
 }
 .sertar__cat:empty { display: none; }
 
