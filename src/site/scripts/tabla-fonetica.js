@@ -748,7 +748,24 @@ const FARA_ACCENT = Object.fromEntries(
    celelalte cinci, cu movul tablei. */
 const ROSII = 'ăâîĂÂÎ';
 
-/** Litera dinaintea cursorului, ori cea aleasă: un domeniu peste ea. */
+/* Ce stă între sunete și nu e sunet: virgulele pe care le pune singură tabla
+   după fiecare sunet, spațiile din jurul lor și spațiul de lățime zero cu care
+   se ține deschisă o transcriere goală. */
+const NU_E_LITERA = /[\s,\u200b]/;
+
+/**
+ * Litera dinaintea cursorului, ori cea aleasă: un domeniu peste ea.
+ *
+ * SARE PESTE CE NU E LITERĂ, și trebuie să sară. În câmpul de transcriere,
+ * fiecare sunet scris capătă singur o virgulă și un spațiu după el, așa că
+ * imediat înaintea cursorului nu stă „i", ci „, ". Uneltele care lucrează pe
+ * litera dinainte (accentul, „i"-ul suprascris) găseau acolo o virgulă, ziceau
+ * „asta nu-i literă" și adăugau un semn nou în loc să-l prefacă pe cel scris.
+ * Se vedea limpede: „i ⁱ" în loc de „ⁱ".
+ *
+ * Ce sare peste rămâne pe loc: se ia numai litera, iar virgula de după ea nu se
+ * atinge, fiindcă e a rândului, nu a literei.
+ */
 function domeniulLiterei() {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return null;
@@ -758,12 +775,15 @@ function domeniulLiterei() {
      ai scris-o, deci cea la care te gândești. */
   const nod = r.startContainer, unde = r.startOffset;
   if (nod.nodeType !== 3 || unde === 0) return null;
-  let de = unde - 1;
+  let capat = unde;
+  while (capat > 0 && NU_E_LITERA.test(nod.data[capat - 1])) capat--;
+  if (capat === 0) return null;
+  let de = capat - 1;
   // un semn de accent merge întotdeauna cu litera lui, niciodată singur
   if (/[\u0300-\u036f]/.test(nod.data[de]) && de > 0) de--;
   const nou = document.createRange();
   nou.setStart(nod, de);
-  nou.setEnd(nod, unde);
+  nou.setEnd(nod, capat);
   return nou;
 }
 
