@@ -1115,6 +1115,18 @@ const acelasiSirDeCuvinte = (a, b) =>
   !!a && !!b && a.classList.contains('cuv') && b.classList.contains('cuv') &&
   a.closest('.cuvinte') === b.closest('.cuvinte');
 
+/* CIORNA E ALTĂ ÎNCĂPERE, iar Tab și Enter nu trec dintr-una într-alta.
+
+   Le lăsasem în același șir, și ieșea o purtare greșită: de la capătul ultimului
+   rând, Enter nu mai deschidea un rând nou, ci te muta în ciornă. Adică taman
+   când voiai să scrii al zecelea cuvânt, te trezeai pe hârtia de pe margine.
+
+   Ciorna nu e o urmare a exercițiului, e un loc alăturat, deci se intră în ea cu
+   degetul, ca într-o încăpere alăturată. Înăuntru, tastele merg mai departe ca
+   pretutindeni; numai pragul nu se trece cu ele. */
+const aceeasiIncapere = (a, b) =>
+  eCiorna(a && a.closest('.row')) === eCiorna(b && b.closest('.row'));
+
 function navigate(current, back) {
   const fields = Array.from(sheet.querySelectorAll('.field'));
   const i = fields.indexOf(current);
@@ -1122,6 +1134,7 @@ function navigate(current, back) {
   for (let k = i + (back ? -1 : 1); k >= 0 && k < fields.length; k += (back ? -1 : 1)) {
     if (!sePoateScrie(fields[k])) continue;
     if (acelasiSirDeCuvinte(current, fields[k])) continue;
+    if (!aceeasiIncapere(current, fields[k])) break;
     target = fields[k]; break;
   }
   if (!target && !back) {
