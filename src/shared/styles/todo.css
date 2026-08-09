@@ -17,8 +17,8 @@
   left: 22px;
   /* Deasupra comutatorului de etichetare, care stă jos de tot (vezi
      `tagging.css`). Amândouă se arată numai profesorului, deci ridicarea asta
-     nu se vede la nimeni care n-are și comutatorul. 26 + 38 + 10 = 74. */
-  bottom: 74px;
+     nu se vede la nimeni care n-are și comutatorul. 26 + 56 + 10 = 92. */
+  bottom: 92px;
   /* Sub toasturi, dar peste rama de admin și peste conținut. Aceeași treaptă cu
      trusa 🛡️ din colțul celălalt: sunt frați, n-au de ce se acoperi. */
   z-index: 2147482100;

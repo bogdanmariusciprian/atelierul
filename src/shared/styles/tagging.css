@@ -28,24 +28,28 @@
   -webkit-user-select: none;
 }
 
+/* DOUĂ RÂNDURI: sus LUCRUL, jos STAREA. Scria mai devreme doar „Etichetare:
+   DESCHISĂ", și era prea puțin: peste o lună, „etichetare" singur nu-ți mai
+   spune nici ce se etichetează, nici unde, nici cine. Un buton apăsat o dată pe
+   săptămână trebuie citit fără să-ți amintești nimic. */
 .tagging-fab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  height: 38px;
-  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  height: 56px;
+  padding: 0 16px;
   border: 2px solid #3d4457;
-  border-radius: 999px;
+  border-radius: 16px;
   background: #1f2430;
   color: #cbd2e0;
   font: inherit;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  text-align: left;
   cursor: pointer;
   box-shadow: 0 12px 28px -12px rgba(31, 36, 48, 0.6);
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
+  justify-content: center;
 }
 .tagging-fab:hover { transform: translateY(-1px); }
 .tagging-fab:active { transform: translateY(0); }
@@ -60,15 +64,27 @@
 }
 .tagging-fab.e-ocupat { opacity: 0.6; pointer-events: none; }
 
-.tagging-fab__semn { font-size: 0.7rem; line-height: 1; }
-.tagging-fab__t { font-weight: 600; letter-spacing: 0.02em; }
-.tagging-fab__stare {
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+/* Lucrul, mărunt și potolit: se citește o dată și pe urmă știi ce buton e. */
+.tagging-fab__lucru {
   font-size: 0.66rem;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.75;
+  white-space: nowrap;
 }
+/* Starea, spusă din punctul de vedere al ELEVULUI, fiindcă despre îngăduința
+   lui e vorba. Ea e ce se citește dintr-o privire, deci e mai mare și mai grea
+   decât lucrul de deasupra. */
+.tagging-fab__stare {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.tagging-fab__semn { font-size: 0.6rem; line-height: 1; }
 
 /* ---------- semnul de pe tablă ---------- */
 /* Stă lângă cuvântul din rând, mic și tăcut: apare numai cât e deschisă

@@ -5,10 +5,15 @@
 // lângă ei. Comutatorul ăsta deschide și închide treaba pentru toți deodată,
 // din orice pagină, ca să n-ai de umblat prin panouri când se așază la lucru.
 //
-// SCRIE PE EL CE FACE, ȘI ÎN CE STARE E. Un bec verde-roșu ar fi cerut ținut
-// minte care culoare ce înseamnă, iar tu îl vezi de câteva ori pe săptămână, nu
-// de zece ori pe zi. De-aia butonul zice în litere „Etichetare: DESCHISĂ" ori
-// „ÎNCHISĂ", iar culoarea vine pe deasupra, nu în locul cuvântului.
+// SPUNE ÎNTREG CE FACE, NU PE SCURT. Scria mai devreme doar „Etichetare:
+// DESCHISĂ", și era prea puțin: peste o lună, „etichetare" singur nu-ți mai
+// spune nici ce se etichetează, nici unde, nici cine. Un buton care stă pe toate
+// paginile și se apasă o dată pe săptămână trebuie citit fără să-ți amintești
+// nimic, deci scrie pe două rânduri: sus LUCRUL, jos STAREA, spusă din punctul
+// de vedere al elevului, fiindcă despre îngăduința lui e vorba.
+//
+// Culoarea vine pe deasupra cuvintelor, nu în locul lor. Un bec verde-roșu ar fi
+// cerut ținut minte care culoare ce înseamnă.
 //
 // NUMAI PROFESORUL îl vede. Iar dincolo de ce se vede, baza refuză oricum orice
 // scriere de la altcineva (migrarea 0082): butonul care lipsește e curtoazie,
@@ -40,12 +45,14 @@ function deseneaza() {
   buton.classList.toggle("e-ocupat", ocupat);
   buton.setAttribute("aria-pressed", deschis ? "true" : "false");
   buton.innerHTML =
-    '<span class="tagging-fab__semn" aria-hidden="true">' + (deschis ? "●" : "○") + "</span>" +
-    '<span class="tagging-fab__t">Etichetare</span>' +
-    '<span class="tagging-fab__stare">' + (deschis ? "DESCHISĂ" : "ÎNCHISĂ") + "</span>";
+    '<span class="tagging-fab__lucru">Etichetare cuvinte fonetică din #LaTablă</span>' +
+    '<span class="tagging-fab__stare">' +
+      '<span class="tagging-fab__semn" aria-hidden="true">' + (deschis ? "●" : "○") + "</span>" +
+      (deschis ? "Permisă elevilor" : "Blocată pentru elevi") +
+    "</span>";
   buton.title = deschis
-    ? "Elevii de la meditații pot pune etichete pe cuvinte. Apasă ca să închizi."
-    : "Elevii nu pot eticheta acum. Apasă ca să deschizi, cât lucrezi cu ei.";
+    ? "Elevii de la meditații pot pune etichete pe cuvinte. Apasă ca să blochezi."
+    : "Elevii nu pot eticheta acum. Apasă ca să le permiți, cât lucrezi cu ei.";
 }
 
 async function comuta() {
