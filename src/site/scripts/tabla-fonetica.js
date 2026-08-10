@@ -2636,242 +2636,6 @@ const boardsPanel = document.getElementById('boardsPanel');
 const boardsBody  = document.getElementById('boardsBody');
 const boardsFila  = document.getElementById('boardsFila');
 const boardsCat   = document.getElementById('boardsCat');
-const boardsForma = document.getElementById('boardsForma');
-const boardsSticla = document.getElementById('boardsSticla');
-const boardsCorp   = document.getElementById('boardsCorp');
-
-/* ---------- TRUPUL DE STICLĂ: panoul ȘI picătura, un singur contur ----------
-
-   PICĂTURA NU STĂ PESTE PANOU, e din același trup cu el. Conturul de mai jos e
-   unul singur: ocolește panoul pe muchii unduite, iar când ajunge în dreptul
-   picăturii iese din el, face gâtul și bobița, și se întoarce în muchie. De-aia
-   nu se vede nicio cusătură între ele: n-au unde se suprapune, fiindcă sunt
-   același desen.
-
-   GÂTUL NU E FĂCUT CU FILTRU. Trucul obișnuit (o neclaritate peste un contrast
-   mare) lipește două forme, dar topește și sticla din spate, iar din picătură ar
-   fi ieșit o pată tulbure. Aici gâtul se SOCOTEȘTE: două arce tangente la
-   amândouă cercurile, adică felul în care se leagă două picături adevărate.
-
-   DESCHIDEREA E UN SINGUR NUMĂR, de la 0 la 1, iar din el iese totul: unde stă
-   muchia din dreapta a panoului, unde e picătura, unde a ajuns cuprinsul. Panoul
-   nu apare și nu piere, ci LUNECĂ: la 0 e cu totul dincolo de marginea ecranului
-   și se vede numai picătura, iar la 1 e înăuntru. Așa forma nu se schimbă
-   niciodată dintr-un fel în altul, se mută doar; și tocmai de-aia nu poate
-   clipi.
-*/
-const TRUP_R = 24;                 // cât e picătura
-const GAT = 4;                     // cât stă bobița lipită de trup în repaus
-const BOB_R = 6, BOB_CREȘTE = 3;   // bobița: cât e și cât se umflă
-const IMBUCARE = 4;                // cât intră picătura în muchia panoului
-
-const punct = (p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1);
-const spre = (cx, cy, a, r) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
-
-/**
- * Racordarea a două cercuri: punctele de plecare de pe fiecare și mânerele
- * curbelor dintre ele. Nu întoarce un contur gata făcut, ci PIESELE lui, fiindcă
- * ele se montează în muchia panoului, nu într-un desen de sine stătător.
- */
-function racordul(ax, ay, r1, bx, by, r2) {
-  const dx = bx - ax, dy = by - ay;
-  /* O bobiță înghițită cu totul n-ar avea unde se racorda; o depărtăm cât să
-     rămână o adâncitură. Se face aici, în geometrie, nu printr-un `if` pus mai
-     târziu în desen: acolo s-ar fi uitat. */
-  let d = Math.max(Math.hypot(dx, dy), Math.abs(r1 - r2) + 1);
-  const intre = Math.atan2(dy, dx);
-  let u1 = 0, u2 = 0;
-  if (d < r1 + r2) {
-    u1 = Math.acos((r1 * r1 + d * d - r2 * r2) / (2 * r1 * d));
-    u2 = Math.acos((r2 * r2 + d * d - r1 * r1) / (2 * r2 * d));
-  }
-  const maxim = Math.acos((r1 - r2) / d);
-  const v = 0.5, moale = 2.4;
-  const a1 = intre + u1 + (maxim - u1) * v;
-  const a2 = intre - u1 - (maxim - u1) * v;
-  const a3 = intre + Math.PI - u2 - (Math.PI - u2 - maxim) * v;
-  const a4 = intre - Math.PI + u2 + (Math.PI - u2 - maxim) * v;
-  const p1 = spre(ax, ay, a1, r1), p2 = spre(ax, ay, a2, r1);
-  const p3 = spre(bx, by, a3, r2), p4 = spre(bx, by, a4, r2);
-  const tot = r1 + r2;
-  const cat = Math.min(v * moale, Math.hypot(p1[0] - p3[0], p1[1] - p3[1]) / tot) *
-              Math.min(1, d * 2 / tot);
-  return {
-    p1, p2, p3, p4,
-    h1: spre(p1[0], p1[1], a1 - Math.PI / 2, r1 * cat),
-    h2: spre(p2[0], p2[1], a2 + Math.PI / 2, r1 * cat),
-    h3: spre(p3[0], p3[1], a3 + Math.PI / 2, r2 * cat),
-    h4: spre(p4[0], p4[1], a4 - Math.PI / 2, r2 * cat),
-    r2, ocol: d > r1 ? 1 : 0,
-  };
-}
-
-/* Cât de departe simte cursorul, cât se poate întinde și câtă odaie are:
-   scrise în foaia de stil, ca să se poată încerca alte valori fără să umbli prin
-   socoteli. */
-function dinStil(nume, altfel) {
-  if (!boardsPanel || !window.getComputedStyle) return altfel;
-  const v = parseFloat(getComputedStyle(boardsPanel).getPropertyValue(nume));
-  return Number.isFinite(v) ? v : altfel;
-}
-
-/**
- * Conturul întregului trup: panoul cu muchii unduite, cu picătura ieșind din
- * muchia lui din dreapta.
- *
- * `deschis` 0…1 spune cât a intrat panoul; `atrasa` 0…1 și `unghi`, cât și
- * încotro se întinde picătura.
- */
-function conturulTrupului(deschis, atrasa, unghi, W, H, AER, INTINDERE) {
-  const X = deschis * W;                 // muchia din dreapta a panoului
-  const sus = AER, jos = AER + H;
-  const cy = AER + H / 2;
-  const ax = X - IMBUCARE, ay = cy;      // trupul picăturii, îmbucat în muchie
-  const d = TRUP_R + GAT + INTINDERE * atrasa;
-  const r2 = BOB_R + BOB_CREȘTE * atrasa;
-  const R = racordul(ax, ay, TRUP_R, ax + d * Math.cos(unghi), ay + d * Math.sin(unghi), r2);
-
-  /* Unde taie picătura muchia panoului: de-acolo pornește ocolul ei. */
-  const jum = Math.sqrt(Math.max(0, TRUP_R * TRUP_R - IMBUCARE * IMBUCARE));
-  const susPic = cy - jum, josPic = cy + jum;
-
-  /* VALURILE. Muchiile nu-s drepte, ci se leagănă puțin, ca o pojghiță de apă.
-     Adâncimea lor crește odată cu deschiderea, ca la panoul închis să nu
-     rămână niște cocoașe plutind în marginea ecranului. */
-  const v = 7 * deschis;
-  return [
-    `M 0 ${sus.toFixed(1)}`,
-    `C ${(X * .32).toFixed(1)} ${(sus - v).toFixed(1)} ${(X * .66).toFixed(1)} ${(sus + v * 1.3).toFixed(1)} ${X.toFixed(1)} ${(sus + v * .4).toFixed(1)}`,
-    `C ${(X + v * .9).toFixed(1)} ${(sus + (susPic - sus) * .4).toFixed(1)} ${(X - v * .8).toFixed(1)} ${(sus + (susPic - sus) * .75).toFixed(1)} ${X.toFixed(1)} ${susPic.toFixed(1)}`,
-    `A ${TRUP_R} ${TRUP_R} 0 0 0 ${punct(R.p1)}`,
-    `C ${punct(R.h1)} ${punct(R.h3)} ${punct(R.p3)}`,
-    `A ${R.r2} ${R.r2} 0 ${R.ocol} 0 ${punct(R.p4)}`,
-    `C ${punct(R.h4)} ${punct(R.h2)} ${punct(R.p2)}`,
-    `A ${TRUP_R} ${TRUP_R} 0 0 0 ${X.toFixed(1)} ${josPic.toFixed(1)}`,
-    `C ${(X + v * .8).toFixed(1)} ${(josPic + (jos - josPic) * .3).toFixed(1)} ${(X - v).toFixed(1)} ${(josPic + (jos - josPic) * .7).toFixed(1)} ${X.toFixed(1)} ${(jos - v * .4).toFixed(1)}`,
-    `C ${(X * .66).toFixed(1)} ${(jos + v * 1.2).toFixed(1)} ${(X * .32).toFixed(1)} ${(jos - v * 1.1).toFixed(1)} 0 ${jos.toFixed(1)}`,
-    'Z',
-  ].join(' ');
-}
-
-/* ȘTIE BROWSERUL SĂ TAIE PE O FORMĂ? Ciobul se taie cu `clip-path: path()`.
-   Dacă n-o știe, stratul de sticlă ar fi rămas un dreptunghi tulbure peste
-   tablă, adică o pată. Atunci îl lăsăm deoparte: rămâne conturul desenat, cu
-   umplutura lui. Pierdem sticla, nu unealta. */
-const STIE_FORMA = !!(window.CSS && CSS.supports &&
-                      CSS.supports('clip-path', 'path("M 0 0 L 1 1 Z")'));
-if (boardsPanel && STIE_FORMA) boardsPanel.classList.add('stie-forma');
-
-const PUTIN_MISCA = () => window.matchMedia &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-let deschiderea = 0, atrasaAcum = 0, unghiulAcum = 0;
-let cursorul = null, firul = 0;
-
-/** Înălțimea panoului, măsurată: atârnă de câte table ai salvate. */
-function masoaraPanoul() {
-  if (!boardsPanel || !boardsCorp) return;
-  /* Se măsoară CUPRINSUL, nu caseta: caseta e ținută de o variabilă pe care
-     tocmai vrem s-o aflăm, deci ar fi fost un cerc. */
-  const inalt = Math.min(
-    Math.max(140, boardsCorp.scrollHeight),
-    Math.max(220, window.innerHeight - 300));
-  boardsPanel.style.setProperty('--inalt', inalt + 'px');
-}
-
-function deseneazaTrupul() {
-  if (!boardsForma || !boardsPanel) return;
-  const W = dinStil('--lat', 300);
-  const H = dinStil('--inalt', 240);
-  const AER = dinStil('--aer', 80);
-  const INTINDERE = dinStil('--intindere', 30);
-  const d = conturulTrupului(deschiderea, atrasaAcum, unghiulAcum, W, H, AER, INTINDERE);
-  boardsForma.setAttribute('d', d);
-  if (boardsSticla && STIE_FORMA) boardsSticla.style.clipPath = `path('${d}')`;
-  /* Cuprinsul călătorește cu muchia, nu pe cont propriu: un singur număr le
-     mișcă pe amândouă, deci nu se pot dezlipi. */
-  if (boardsCorp) boardsCorp.style.transform = `translateX(${(deschiderea - 1) * W}px)`;
-  /* Butonul și numărul stau pe picătură, oriunde ar fi ea. */
-  const X = deschiderea * W, cy = AER + H / 2;
-  if (boardsFila) {
-    boardsFila.style.left = (X - IMBUCARE - 26) + 'px';
-    boardsFila.style.top = (cy - 26) + 'px';
-  }
-  if (boardsCat) {
-    boardsCat.style.left = (X - IMBUCARE - 8) + 'px';
-    boardsCat.style.top = (cy - 8) + 'px';
-  }
-}
-
-const lin = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-let spreDeschis = 0, plecatDe = 0, deLa = 0;
-const LUNECARE = 340;
-
-function socoteste(acum) {
-  firul = 0;
-  let maiAmDeLucru = false;
-
-  // 1. lunecarea panoului
-  if (deschiderea !== spreDeschis) {
-    const drum = Math.abs(spreDeschis - deLa) || 1;
-    const t = Math.min(1, (acum - plecatDe) / (LUNECARE * drum));
-    deschiderea = deLa + (spreDeschis - deLa) * lin(t);
-    if (t >= 1) deschiderea = spreDeschis; else maiAmDeLucru = true;
-  }
-
-  // 2. magnetismul picăturii
-  const W = dinStil('--lat', 300), H = dinStil('--inalt', 240), AER = dinStil('--aer', 80);
-  const RAZA = dinStil('--raza', 130);
-  let tinta = 0;
-  if (cursorul && boardsPanel) {
-    const c = boardsPanel.getBoundingClientRect();
-    const px = c.left + deschiderea * W - IMBUCARE, py = c.top + AER + H / 2;
-    const dx = cursorul.x - px, dy = cursorul.y - py;
-    const departe = Math.hypot(dx, dy);
-    if (departe < RAZA) {
-      /* Descreștere lină, nu liniară: aproape de picătură atracția e mare și
-         scade repede, iar la marginea razei se stinge de tot, fără prag. */
-      const t = 1 - departe / RAZA;
-      tinta = t * t;
-      unghiulAcum = Math.atan2(dy, dx);
-    }
-  }
-  /* Se merge spre țintă, nu se sare pe ea: altfel picătura ar tresări la fiecare
-     mișcare mai iute a mâinii. */
-  atrasaAcum += (tinta - atrasaAcum) * 0.22;
-  if (Math.abs(tinta - atrasaAcum) < 0.002) atrasaAcum = tinta;
-  if (atrasaAcum !== 0 || tinta !== 0) maiAmDeLucru = true;
-
-  deseneazaTrupul();
-  /* Firul se oprește când totul s-a liniștit: altfel s-ar socoti degeaba la
-     fiecare cadru, cât ține pagina deschisă. */
-  if (maiAmDeLucru) firul = requestAnimationFrame(socoteste);
-}
-
-function porneșteFirul() {
-  if (firul) return;
-  if (PUTIN_MISCA()) { deschiderea = spreDeschis; atrasaAcum = 0; deseneazaTrupul(); return; }
-  firul = requestAnimationFrame(socoteste);
-}
-
-function lunecaSpre(cat) {
-  spreDeschis = cat;
-  deLa = deschiderea;
-  plecatDe = performance.now();
-  porneșteFirul();
-}
-
-if (boardsForma) {
-  masoaraPanoul();
-  deseneazaTrupul();
-  window.addEventListener('pointermove', (e) => {
-    cursorul = { x: e.clientX, y: e.clientY };
-    porneșteFirul();
-  }, { passive: true });
-  /* Mâna plecată de pe ecran e tot o depărtare: picătura se strânge la loc. */
-  window.addEventListener('pointerleave', () => { cursorul = null; porneșteFirul(); });
-  window.addEventListener('resize', () => { masoaraPanoul(); deseneazaTrupul(); });
-}
 
 function sertarulEDeschis() { return !!(boardsPanel && boardsPanel.classList.contains('open')); }
 
@@ -2880,7 +2644,6 @@ function inchideSertarul() {
   boardsPanel.classList.remove('open');
   boardsPanel.setAttribute('aria-hidden', 'true');
   if (boardsFila) boardsFila.setAttribute('aria-expanded', 'false');
-  lunecaSpre(0);
 }
 
 function deschideSertarul() {
@@ -2888,7 +2651,6 @@ function deschideSertarul() {
   boardsPanel.classList.add('open');
   boardsPanel.setAttribute('aria-hidden', 'false');
   if (boardsFila) boardsFila.setAttribute('aria-expanded', 'true');
-  lunecaSpre(1);
   aratăTablele();
 }
 
@@ -2933,8 +2695,6 @@ async function aratăTablele() {
   scrieCateTable(lista.length);
   if (!lista.length) {
     boardsBody.innerHTML = '<p class="boards-empty">N-ai încă nicio tablă salvată la lecția asta. Scrie ceva, apoi apasă „Salvează".</p>';
-    masoaraPanoul();
-    deseneazaTrupul();
     return;
   }
   /* Rândul ÎNTREG e butonul de deschis, nu doar numele. Înainte, numele era
@@ -2947,11 +2707,6 @@ async function aratăTablele() {
       <span class="board__when">${candSalvat(f.updated_at)}</span>
       <button class="board__del" data-act="sterge" title="Șterge tabla" aria-label="Șterge „${f.title}"">×</button>
     </div>`).join('');
-  /* Lista s-a schimbat, deci și cât e de înalt panoul, deci și conturul lui:
-     valurile de pe muchii se socotesc din înălțime. Măsurătoarea stă lipită de
-     desenare, nu răzleț, ca să nu se poată face una fără cealaltă. */
-  masoaraPanoul();
-  deseneazaTrupul();
 }
 
 /* Enter și Space pe rândul selectat cu tastatura fac cât un clic. */

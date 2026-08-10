@@ -198,31 +198,24 @@
 
      Fila stă în afara corpului care lunecă, altfel ar pleca odată cu el. -->
 <aside class="sertar" id="boardsPanel" aria-hidden="true">
-  <!-- PICĂTURA ȘI PANOUL SUNT UN SINGUR TRUP, nu două lucruri suprapuse.
-       Conturul de mai jos e unul singur: ocolește panoul pe muchii unduite, iar
-       când ajunge în dreptul picăturii iese din el, face gâtul și bobița, și se
-       întoarce. De-aia nu se vede nicio cusătură între ele: n-au unde se
-       suprapune, fiindcă sunt același contur.
-
-       Panoul se deschide lunecând din stânga, iar picătura călătorește cu
-       marginea lui: e mereu bobul de pe buza cănii, oriunde ar fi cana. -->
-  <span class="sertar__sticla" id="boardsSticla" aria-hidden="true"></span>
-  <svg class="sertar__contur" id="boardsSvg" aria-hidden="true">
-    <path id="boardsForma" d=""></path>
-  </svg>
-
-  <div class="sertar__corp" id="boardsCorp">
+  <div class="sertar__corp">
     <div class="notes-head"><strong>Tablele mele</strong></div>
     <div class="boards-body" id="boardsBody"></div>
   </div>
 
-  <!-- Se apasă NUMAI picătura, nu tot trupul: altfel un clic pe listă ar fi
-       închis sertarul de sub degetul care tocmai alegea o tablă. -->
-  <button class="sertar__manet" id="boardsFila" type="button"
+  <!-- Butonul rotund cu săgeata. Închis, stă lipit de marginea din stânga și
+       arată spre dreapta: „trage de mine". Deschis, călătorește pe muchia
+       panoului, călare pe ea, și își întoarce săgeata: „împinge-mă la loc".
+       Un singur buton, două stări, nicio altă ușă: de-aia n-are „×" în antet. -->
+  <button class="sertar__buton" id="boardsFila" type="button"
           aria-expanded="false" aria-controls="boardsPanel" title="Tablele mele">
+    <svg class="sertar__sageata" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 5 L16 12 L9 19" fill="none" stroke="currentColor"
+            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="sertar__cat" id="boardsCat" aria-hidden="true"></span>
     <span class="sertar__citit">Tablele mele</span>
   </button>
-  <span class="sertar__cat" id="boardsCat" aria-hidden="true"></span>
 </aside>
 
 <!-- Fereastra de întrebat (nume de tablă, confirmări).
