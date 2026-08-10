@@ -2637,68 +2637,161 @@ const boardsBody  = document.getElementById('boardsBody');
 const boardsFila  = document.getElementById('boardsFila');
 const boardsCat   = document.getElementById('boardsCat');
 const boardsForma = document.getElementById('boardsForma');
+const boardsSticla = document.getElementById('boardsSticla');
 
-/* ---------- Mânerul: săgeată închis, stea deschis ----------
+/* ---------- PICĂTURA DE STICLĂ ----------
 
-   ÎNCHIS e o săgeată care atârnă din marginea ecranului: arată încotro, adică
-   „trage de mine". DESCHIS se rotește și se strânge în stea: nu mai are ce
-   arăta, fiindcă ai ajuns. Apăsată, steaua se topește la loc în săgeată.
+   Stă lipită de marginea din stânga și SIMTE CURSORUL: cu cât te apropii, cu
+   atât se întinde spre el, cu un gât subțire și o bobiță în vârf, ca două
+   picături de mercur care se caută. Apăsată, se rupe și iese panoul.
 
-   AMÂNDOUĂ DESENELE AU ACELEAȘI ZECE CURBE, în aceeași ordine, și tocmai de-aia
-   se pot topi una într-alta: se trec numerele dintr-un desen într-altul, pe
-   rând. Steaua are zece colțuri de la natura ei (cinci vârfuri și cinci
-   adâncituri), deci săgeata a fost desenată tot din zece puncte, ca să se
-   potrivească. Dacă unul dintre ele ar avea o curbă în plus, topirea s-ar
-   preface într-o săritură, fără să dea vreo eroare nicăieri.
+   GÂTUL NU E FĂCUT CU FILTRU. Trucul obișnuit (o neclaritate peste un contrast
+   mare) lipește două forme una de alta, dar topește și sticla din spate, iar din
+   picătură ar fi ieșit o pată tulbure. Aici gâtul se SOCOTEȘTE: două arce
+   tangente la amândouă cercurile, adică chiar felul în care se leagă două
+   picături adevărate. Iese curat, e ieftin, și merge la fel oriunde.
 
-   Numerele se plimbă cu mâna, dintr-un cadru în altul, nu cu `transition` pe
-   `d`. Aceea merge doar prin unele browsere, iar acolo unde nu merge n-ar da
-   greș zgomotos, ci ar lăsa mânerul înțepenit într-o formă: greșeala care se
-   vede cel mai greu. */
-const FORMA_SAGEATA = 'M 2.0 6.0 C 6.7 7.3 11.3 8.7 16.0 10.0 C 19.3 14.0 22.7 18.0 26.0 22.0 C 28.0 26.7 30.0 31.3 32.0 36.0 C 33.3 39.3 34.7 42.7 36.0 46.0 C 34.7 49.3 33.3 52.7 32.0 56.0 C 30.0 60.7 28.0 65.3 26.0 70.0 C 22.7 74.0 19.3 78.0 16.0 82.0 C 11.3 83.3 6.7 84.7 2.0 86.0 C 1.3 72.7 0.7 59.3 0.0 46.0 C 0.7 32.7 1.3 19.3 2.0 6.0 Z';
-const FORMA_STEA = 'M 26.0 20.0 C 28.2 25.7 30.3 31.4 32.5 37.1 C 38.6 37.4 44.6 37.7 50.7 38.0 C 46.0 41.8 41.2 45.6 36.5 49.4 C 38.1 55.3 39.7 61.2 41.3 67.0 C 36.2 63.7 31.1 60.3 26.0 57.0 C 20.9 60.3 15.8 63.7 10.7 67.0 C 12.3 61.2 13.9 55.3 15.5 49.4 C 10.8 45.6 6.0 41.8 1.3 38.0 C 7.4 37.7 13.4 37.4 19.5 37.1 C 21.7 31.4 23.8 25.7 26.0 20.0 Z';
+   Socoteala e cea știută pentru „metaballs": din unghiul dintre centre și din
+   raze ies patru puncte de plecare pe cele două cercuri, iar între ele se trag
+   două curbe care le racordează. Când bobița e încă înghițită de trup, unghiurile
+   se strâng singure și forma redevine o picătură simplă: nu e nevoie de niciun
+   `if` care să spună „acum sunt lipite".
+*/
+const TRUP_X = -4, TRUP_Y = 80, TRUP_R = 24;   // trupul, pe jumătate dincolo de margine
+const GAT = 4;                                  // cât stă bobița lipită de trup în repaus
+const BOB_R = 6, BOB_CREȘTE = 3;                // bobița: cât e și cât se umflă
 
-const NUMERELE = /-?\d+(?:\.\d+)?/g;
-const cifrele = (d) => (d.match(NUMERELE) || []).map(Number);
-/* Bucățile de literă dintre numere: din ele și din numerele plimbate se
-   recompune conturul, fără să mai fie nevoie să știm ce înseamnă fiecare. */
-const CUVINTELE = FORMA_SAGEATA.split(NUMERELE);
-const DE_LA = cifrele(FORMA_SAGEATA);
-const PANA_LA = cifrele(FORMA_STEA);
+const punct = (p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+const spre = (cx, cy, a, r) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
 
-function conturLa(t) {
-  let d = CUVINTELE[0];
-  for (let i = 0; i < DE_LA.length; i++) {
-    d += (DE_LA[i] + (PANA_LA[i] - DE_LA[i]) * t).toFixed(1) + CUVINTELE[i + 1];
-  }
-  return d;
+function cercul(cx, cy, r) {
+  return `M ${punct([cx - r, cy])} A ${r} ${r} 0 1 0 ${punct([cx + r, cy])}` +
+         ` A ${r} ${r} 0 1 0 ${punct([cx - r, cy])} Z`;
 }
 
-const TOPIRE = 280;                                   // cât ține topirea
-const lin = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-let topireaDeAcum = 0;                                // unde a rămas conturul
-let firulTopirii = 0;
+/** Conturul a două picături legate printr-un gât. */
+function douaPicaturi(ax, ay, r1, bx, by, r2) {
+  const dx = bx - ax, dy = by - ay;
+  const d = Math.hypot(dx, dy);
+  /* Una înghițită cu totul de cealaltă: n-are ce racorda, rămâne un cerc. */
+  if (d === 0 || d <= Math.abs(r1 - r2)) return cercul(ax, ay, Math.max(r1, r2));
 
-function topesteContur(catre) {
-  if (!boardsForma) return;
-  cancelAnimationFrame(firulTopirii);
-  const dela = topireaDeAcum;
-  const scurt = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (scurt || dela === catre) {
-    topireaDeAcum = catre;
-    boardsForma.setAttribute('d', conturLa(catre));
-    return;
+  let u1 = 0, u2 = 0;
+  if (d < r1 + r2) {                      // cercurile se ating: unghiul de intrare
+    u1 = Math.acos((r1 * r1 + d * d - r2 * r2) / (2 * r1 * d));
+    u2 = Math.acos((r2 * r2 + d * d - r1 * r1) / (2 * r2 * d));
   }
-  const pornit = performance.now();
-  /* Se pleacă DE UNDE E ACUM, nu de la capăt: cine apasă de două ori repede nu
-     vede mânerul sărind înapoi ca s-o ia de la început. */
-  const drum = Math.abs(catre - dela);
-  (function cadru(acum) {
-    const t = Math.min(1, (acum - pornit) / (TOPIRE * drum || 1));
-    topireaDeAcum = dela + (catre - dela) * lin(t);
-    boardsForma.setAttribute('d', conturLa(topireaDeAcum));
-    if (t < 1) firulTopirii = requestAnimationFrame(cadru);
-  })(pornit);
+  const intre = Math.atan2(dy, dx);
+  const maxim = Math.acos((r1 - r2) / d);
+  const v = 0.5, marime = 2.4;            // cât de „moale" e racordarea
+  const a1 = intre + u1 + (maxim - u1) * v;
+  const a2 = intre - u1 - (maxim - u1) * v;
+  const a3 = intre + Math.PI - u2 - (Math.PI - u2 - maxim) * v;
+  const a4 = intre - Math.PI + u2 + (Math.PI - u2 - maxim) * v;
+  const p1 = spre(ax, ay, a1, r1), p2 = spre(ax, ay, a2, r1);
+  const p3 = spre(bx, by, a3, r2), p4 = spre(bx, by, a4, r2);
+  const tot = r1 + r2;
+  const cat = Math.min(v * marime, Math.hypot(p1[0] - p3[0], p1[1] - p3[1]) / tot) *
+              Math.min(1, d * 2 / tot);
+  const h1 = spre(p1[0], p1[1], a1 - Math.PI / 2, r1 * cat);
+  const h2 = spre(p2[0], p2[1], a2 + Math.PI / 2, r1 * cat);
+  const h3 = spre(p3[0], p3[1], a3 + Math.PI / 2, r2 * cat);
+  const h4 = spre(p4[0], p4[1], a4 - Math.PI / 2, r2 * cat);
+  const ocol = d > r1 ? 1 : 0;
+  return `M ${punct(p1)} C ${punct(h1)} ${punct(h3)} ${punct(p3)}` +
+         ` A ${r2} ${r2} 0 ${ocol} 0 ${punct(p4)}` +
+         ` C ${punct(h4)} ${punct(h2)} ${punct(p2)}` +
+         ` A ${r1} ${r1} 0 ${ocol} 0 ${punct(p1)} Z`;
+}
+
+/** Conturul picăturii, întinsă cu `catAtrasa` (0…1) în direcția `unghi`. */
+function conturulPicaturii(catAtrasa, unghi) {
+  const d = TRUP_R + GAT + INTINDERE * catAtrasa;
+  const r2 = BOB_R + BOB_CREȘTE * catAtrasa;
+  return douaPicaturi(TRUP_X, TRUP_Y, TRUP_R,
+                      TRUP_X + d * Math.cos(unghi), TRUP_Y + d * Math.sin(unghi), r2);
+}
+
+/* Cât de departe simte cursorul și cât se poate întinde: scrise în foaia de
+   stil, ca să se poată încerca alte valori fără să umbli prin socoteli. */
+function dinStil(nume, altfel) {
+  if (!boardsPanel || !window.getComputedStyle) return altfel;
+  const v = parseFloat(getComputedStyle(boardsPanel).getPropertyValue(nume));
+  return Number.isFinite(v) ? v : altfel;
+}
+const RAZA = dinStil('--raza', 130);
+const INTINDERE = dinStil('--intindere', 30);
+
+/* ȘTIE BROWSERUL SĂ TAIE PE O FORMĂ? Sticla se taie cu `clip-path: path()`.
+   Dacă n-o știe, stratul de sticlă ar fi rămas un dreptunghi tulbure peste
+   tablă, adică o pată. Atunci îl ascundem cu totul: rămâne conturul desenat,
+   care se poartă la fel, doar că fără ciob. Pierdem sticla, nu unealta. */
+const STIE_FORMA = !!(window.CSS && CSS.supports &&
+                      CSS.supports('clip-path', 'path("M 0 0 L 1 1 Z")'));
+if (boardsPanel && STIE_FORMA) boardsPanel.classList.add('stie-forma');
+
+let atrasaAcum = 0, unghiulAcum = 0;
+let firulPicaturii = 0;
+
+function deseneazaPicatura() {
+  if (!boardsForma) return;
+  const d = conturulPicaturii(atrasaAcum, unghiulAcum);
+  boardsForma.setAttribute('d', d);
+  if (boardsSticla && STIE_FORMA) boardsSticla.style.clipPath = `path('${d}')`;
+}
+
+/* Unde stă trupul picăturii pe ecran, ca să știm de unde se măsoară cursorul.
+   Se cere de la browser, nu se socotește din cifre: sertarul se dă la o parte
+   când e deschis, iar o socoteală paralelă ar fi rămas în urmă. */
+function undeStaTrupul() {
+  if (!boardsPanel) return { x: 0, y: 0 };
+  const c = boardsPanel.getBoundingClientRect();
+  return { x: c.left + TRUP_X + (sertarulEDeschis() ? latimeaPanoului() : 0), y: c.top + TRUP_Y };
+}
+function latimeaPanoului() {
+  const corp = boardsPanel && boardsPanel.querySelector('.sertar__corp');
+  return corp ? corp.getBoundingClientRect().width : 0;
+}
+
+const PUTIN_MISCA = () => window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let cursorul = null;
+function socotestePicatura() {
+  firulPicaturii = 0;
+  const trup = undeStaTrupul();
+  let tinta = 0;
+  if (cursorul) {
+    const dx = cursorul.x - trup.x, dy = cursorul.y - trup.y;
+    const departe = Math.hypot(dx, dy);
+    if (departe < RAZA) {
+      /* Descreștere lină, nu liniară: aproape de picătură atracția e mare și
+         scade repede, iar la marginea razei se stinge de tot, fără prag. */
+      const t = 1 - departe / RAZA;
+      tinta = t * t;
+      unghiulAcum = Math.atan2(dy, dx);
+    }
+  }
+  /* Se merge spre țintă, nu se sare pe ea: altfel picătura ar tresări la
+     fiecare mișcare mai iute a mâinii. */
+  atrasaAcum += (tinta - atrasaAcum) * 0.22;
+  if (Math.abs(tinta - atrasaAcum) < 0.002) atrasaAcum = tinta;
+  deseneazaPicatura();
+  if (atrasaAcum !== 0 || tinta !== 0) firulPicaturii = requestAnimationFrame(socotestePicatura);
+}
+
+function porneșteFirul() {
+  if (!firulPicaturii && !PUTIN_MISCA()) firulPicaturii = requestAnimationFrame(socotestePicatura);
+}
+
+if (boardsForma) {
+  deseneazaPicatura();
+  window.addEventListener('pointermove', (e) => {
+    cursorul = { x: e.clientX, y: e.clientY };
+    porneșteFirul();
+  }, { passive: true });
+  /* Mâna plecată de pe ecran e tot o depărtare: picătura se strânge la loc. */
+  window.addEventListener('pointerleave', () => { cursorul = null; porneșteFirul(); });
 }
 
 function sertarulEDeschis() { return !!(boardsPanel && boardsPanel.classList.contains('open')); }
@@ -2708,7 +2801,6 @@ function inchideSertarul() {
   boardsPanel.classList.remove('open');
   boardsPanel.setAttribute('aria-hidden', 'true');
   if (boardsFila) boardsFila.setAttribute('aria-expanded', 'false');
-  topesteContur(0);
 }
 
 function deschideSertarul() {
@@ -2716,7 +2808,6 @@ function deschideSertarul() {
   boardsPanel.classList.add('open');
   boardsPanel.setAttribute('aria-hidden', 'false');
   if (boardsFila) boardsFila.setAttribute('aria-expanded', 'true');
-  topesteContur(1);
   aratăTablele();
 }
 

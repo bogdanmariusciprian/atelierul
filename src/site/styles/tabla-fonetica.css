@@ -826,20 +826,27 @@
   /* Pe ecrane mici, panoul nu se întinde peste toată tabla: lasă o palmă în
      dreapta, ca să se vadă că e ceva dedesubt și să ai unde apăsa. */
   --lat: min(300px, calc(100vw - 64px));
+  /* Cât de departe simte picătura cursorul, și cât se poate întinde spre el.
+     Stau aici, nu în cod, ca să se poată încerca alte valori fără să umbli prin
+     socoteli. Codul le citește de-aici. */
+  --raza: 130px;
+  --intindere: 30px;
 
   position: fixed;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 60px;
-  height: 92px;
+  /* Cutia picăturii: 72 pe 160, cu trupul la mijloc (0, 80). Atât îi trebuie ca
+     să încapă și bobița întinsă până la capăt. */
+  width: 72px;
+  height: 160px;
   z-index: 40;
-  /* Cutia e nevăzută pentru mouse: altfel dreptunghiul din jurul mânerului ar
-     înghiți clicurile de pe tablă. Își iau dreptul înapoi doar lucrurile care
-     chiar se apasă. */
+  /* Nevăzută pentru mouse: altfel dreptunghiul din jur ar înghiți clicurile de
+     pe tablă. Își ia dreptul înapoi doar conturul picăturii. */
   pointer-events: none;
 }
 
+/* ---------- panoul de sticlă ---------- */
 .sertar__corp {
   position: absolute;
   left: 0;
@@ -851,101 +858,117 @@
      așezat la mijloc, deci marginea lui de jos cade la (100vh − H) / 2 de podea.
      Ca să rămână deasupra lor, cu o palmă de aer: H ≤ 100vh − 292. Rotunjesc la
      300. `max` e podeaua podelei: pe un ecran foarte scund, mai bine un panou de
-     220 care se suprapune o idee decât unul de 40, în care nu încape nimic. */
+     220 care se suprapune o idee decât unul de 40. */
   max-height: max(220px, calc(100vh - 300px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--card);
-  border: 1px solid var(--line);
+  /* STICLA. Fundalul e mai mult decât o culoare: tulbură ce e dedesubt și îi
+     scoate culorile, ca un ciob gros. Fără `saturate`, sticla iese cenușie. */
+  background: rgba(255, 255, 255, .55);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, .75);
   border-left: none;
-  border-radius: 0 14px 14px 0;
-  box-shadow: var(--shadow);
+  border-radius: 0 18px 18px 0;
+  box-shadow: 10px 0 34px -14px rgba(41, 58, 120, .5);
   pointer-events: auto;
-  /* Închis, stă cu totul în afara ecranului, la stânga. */
   transform: translate(-100%, -50%);
-  transition: transform .28s cubic-bezier(.22, .7, .3, 1);
+  transition: transform .34s cubic-bezier(.22, .8, .3, 1), opacity .2s ease;
 }
 .sertar.open .sertar__corp { transform: translate(0, -50%); }
 
-/* MÂNERUL. Cutia lui nu se schimbă niciodată; se schimbă doar CONTURUL
-   dinăuntru, care se topește din săgeată în stea, și locul, care se dă la o
-   parte exact cât ține panoul. */
-.sertar__fila {
+/* TEXTUL NU STĂ PE STICLĂ, ci pe ceva liniștit pus sub el. Sticla e frumoasă
+   până dai peste o transcriere fonetică citită peste o pagină care se mișcă:
+   semnele mărunte se pierd în ce e dedesubt. Deci sticla rămâne pe margini și
+   în jur, iar rândurile capătă o foaie aproape opacă sub ele. */
+.sertar__corp .notes-head {
+  background: rgba(234, 239, 255, .82);
+  border-bottom: 1px solid rgba(255, 255, 255, .8);
+}
+.sertar__corp .boards-body { background: rgba(255, 255, 255, .72); }
+
+/* ---------- picătura ---------- */
+.sertar__manet {
   position: absolute;
   left: 0;
   top: 0;
   z-index: 2;
-  width: 60px;
-  height: 92px;
+  width: 72px;
+  height: 160px;
   margin: 0;
   padding: 0;
   border: none;
   background: none;
   font-family: var(--ui);
-  /* Se apasă chiar conturul, nu dreptunghiul din jurul lui. */
   pointer-events: none;
-  transition: transform .28s cubic-bezier(.22, .7, .3, 1);
+  transition: transform .34s cubic-bezier(.22, .8, .3, 1);
 }
-.sertar.open .sertar__fila { transform: translateX(var(--lat)); }
+.sertar.open .sertar__manet { transform: translateX(var(--lat)); }
 
-/* ROTIREA STĂ PE SVG, NU PE BUTON, ca pastila cu numărul să nu se învârtă odată
-   cu el: o cifră întoarsă cu capul în jos nu se mai citește. Din același motiv
-   pastila nici nu e copil al desenului.
-
-   Se învârte în jurul mijlocului stelei, nu al cutiei: altfel săgeata ar fi
-   plecat într-un ocol pe lângă, în loc să se strângă în stea pe loc. */
-.sertar__panglica {
+/* Cioburile: stratul care tulbură ce e dedesubt, tăiat pe chiar forma
+   picăturii. `clip-path` taie și neclaritatea, nu doar culoarea, deci sticla se
+   oprește fix pe contur. */
+.sertar__sticla {
+  position: absolute;
+  inset: 0;
   display: block;
-  overflow: visible;
-  transform-origin: 26px 46px;
-  transition: transform .28s cubic-bezier(.22, .7, .3, 1);
+  background: rgba(255, 255, 255, .38);
+  -webkit-backdrop-filter: blur(9px) saturate(1.7);
+  backdrop-filter: blur(9px) saturate(1.7);
+  pointer-events: none;
 }
-.sertar.open .sertar__panglica { transform: rotate(180deg); }
+/* Fără `clip-path: path()`, stratul de sticlă ar acoperi tot dreptunghiul: mai
+   bine deloc decât o pată. Vezi portița din cod. */
+.sertar:not(.stie-forma) .sertar__sticla { display: none; }
 
-.sertar__panglica path {
-  fill: var(--accent-soft);
-  stroke: var(--accent);
-  stroke-width: 1;
-  stroke-linejoin: round;
+/* Muchia lucioasă, și tot ea singurul lucru care se apasă. Umplutura e aproape
+   nevăzută, dar trebuie să existe: un contur fără umplutură nu primește
+   apăsarea decât pe linia lui, groasă de un pixel. */
+.sertar__contur { position: absolute; inset: 0; display: block; overflow: visible; }
+.sertar__contur path {
+  fill: rgba(160, 185, 255, .22);
+  stroke: rgba(255, 255, 255, .95);
+  stroke-width: 1.4;
   pointer-events: auto;
   cursor: pointer;
-  transition: fill .15s ease;
+  transition: fill .18s ease;
 }
-.sertar__fila:hover .sertar__panglica path,
-.sertar__fila:focus-visible .sertar__panglica path { fill: #dbe3ff; }
-.sertar__fila:focus-visible { outline: none; }
-.sertar__fila:focus-visible .sertar__panglica path { stroke-width: 2; }
+.sertar__manet:hover .sertar__contur path { fill: rgba(120, 150, 255, .3); }
+.sertar__manet:focus-visible { outline: none; }
+.sertar__manet:focus-visible .sertar__contur path {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
 
-/* Numărul tablelor, peste săgeată. Piere când sertarul se deschide: atunci
-   lista se vede întreagă, iar o cifră care spune ce ai deja sub ochi e zgomot.
-   Piere și când nu e nicio tablă, fiindcă un zero nu spune decât „gol", iar asta
-   o spune mai bine tăcerea. */
+/* Numărul tablelor, deasupra sticlei. Nu se deformează odată cu ea: o cifră
+   întinsă nu se mai citește. Piere cât e sertarul deschis, fiindcă atunci lista
+   se vede întreagă, și piere și când nu e nicio tablă, fiindcă un zero nu spune
+   decât „gol", iar asta o spune mai bine tăcerea. */
 .sertar__cat {
   position: absolute;
-  left: 5px;
-  top: 38px;
+  left: 3px;
+  top: 72px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border: 1px solid var(--accent);
   border-radius: 999px;
-  background: var(--card);
+  background: rgba(255, 255, 255, .9);
   color: var(--accent);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
-  transition: opacity .16s ease;
+  transition: opacity .18s ease;
 }
 .sertar__cat:empty { display: none; }
 .sertar.open .sertar__cat { opacity: 0; }
 
-/* Numele, pentru cititoarele de ecran: pe mâner n-ar încăpea, dar cine ascultă
-   pagina trebuie să audă ce e butonul ăsta. */
+/* Numele, pentru cititoarele de ecran: pe picătură n-ar încăpea, dar cine
+   ascultă pagina trebuie să audă ce e butonul ăsta. */
 .sertar__citit {
   position: absolute;
   width: 1px; height: 1px;
@@ -955,8 +978,12 @@
   white-space: nowrap;
 }
 
+/* Cine cere mai puțină mișcare primește picătura nemișcată: fără magnetism,
+   fără lunecare. Codul citește aceeași cerere și nu mai pornește urmărirea
+   cursorului, ca să nu se socotească degeaba la fiecare cadru. */
 @media (prefers-reduced-motion: reduce) {
-  .sertar__corp, .sertar__fila, .sertar__panglica, .sertar__cat { transition: none; }
+  .sertar__corp, .sertar__manet, .sertar__cat, .sertar__contur path { transition: none; }
+}
 }
 }
 }
