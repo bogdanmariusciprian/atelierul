@@ -198,30 +198,31 @@
 
      Fila stă în afara corpului care lunecă, altfel ar pleca odată cu el. -->
 <aside class="sertar" id="boardsPanel" aria-hidden="true">
-  <div class="sertar__corp">
+  <!-- PICĂTURA ȘI PANOUL SUNT UN SINGUR TRUP, nu două lucruri suprapuse.
+       Conturul de mai jos e unul singur: ocolește panoul pe muchii unduite, iar
+       când ajunge în dreptul picăturii iese din el, face gâtul și bobița, și se
+       întoarce. De-aia nu se vede nicio cusătură între ele: n-au unde se
+       suprapune, fiindcă sunt același contur.
+
+       Panoul se deschide lunecând din stânga, iar picătura călătorește cu
+       marginea lui: e mereu bobul de pe buza cănii, oriunde ar fi cana. -->
+  <span class="sertar__sticla" id="boardsSticla" aria-hidden="true"></span>
+  <svg class="sertar__contur" id="boardsSvg" aria-hidden="true">
+    <path id="boardsForma" d=""></path>
+  </svg>
+
+  <div class="sertar__corp" id="boardsCorp">
     <div class="notes-head"><strong>Tablele mele</strong></div>
     <div class="boards-body" id="boardsBody"></div>
   </div>
 
-  <!-- PICĂTURA DE STICLĂ. Stă lipită de marginea din stânga și simte cursorul:
-       cu cât te apropii, cu atât se întinde spre el, cu un gât subțire și o
-       bobiță în vârf, ca două picături de mercur care se caută. Apăsată, se
-       rupe și iese panoul; apăsată din nou, îl soarbe la loc.
-
-       TREI STRATURI, fiindcă fiecare face altceva și niciunul nu le poate face
-       pe toate: `__sticla` e cioburul care tulbură ce e dedesubt (`backdrop-filter`
-       tăiat pe formă), `__contur` e muchia lucioasă și, tot el, singurul lucru
-       care se apasă (conturul, nu dreptunghiul din jurul lui), iar `__cat` e
-       numărul, care stă deasupra și nu se deformează. -->
+  <!-- Se apasă NUMAI picătura, nu tot trupul: altfel un clic pe listă ar fi
+       închis sertarul de sub degetul care tocmai alegea o tablă. -->
   <button class="sertar__manet" id="boardsFila" type="button"
           aria-expanded="false" aria-controls="boardsPanel" title="Tablele mele">
-    <span class="sertar__sticla" id="boardsSticla" aria-hidden="true"></span>
-    <svg class="sertar__contur" width="72" height="160" aria-hidden="true">
-      <path id="boardsForma" d=""></path>
-    </svg>
-    <span class="sertar__cat" id="boardsCat" aria-hidden="true"></span>
     <span class="sertar__citit">Tablele mele</span>
   </button>
+  <span class="sertar__cat" id="boardsCat" aria-hidden="true"></span>
 </aside>
 
 <!-- Fereastra de întrebat (nume de tablă, confirmări).
