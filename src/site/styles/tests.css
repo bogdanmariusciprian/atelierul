@@ -831,6 +831,29 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 }
 .tdl__solved:hover { background: #86efac; transform: scale(1.15); }
 
+/* TABELUL CU COLOANE PE VARIANTĂ. Numai el; cel de la Drept rămâne cum e.
+
+   `table-layout: fixed` cu `width: 100%` e miezul: fără ele, tabelul își cere
+   lățimea după cel mai lat text și, cum coloana din grilă poate scădea sub
+   atât, dădea peste zona bilei — s-a văzut pe poza din 16 aug, la rândul cu
+   „octombrie 2023-februarie 2024". Așa, tabelul nu iese niciodată din coloana
+   lui, oricât de lung ar fi numele unei sesiuni: textul se rupe pe două
+   rânduri, ceea ce e o pagubă mult mai mică.
+
+   `word-break` NU se pune: ar tăia prin mijlocul cuvintelor. Numele nostru are
+   destule cratime și spații ca să se rupă frumos singur. */
+.tdl--varianta { table-layout: fixed; width: 100%; }
+.tdl--varianta td { vertical-align: top; }
+.tdl--varianta .tdl__file { overflow-wrap: break-word; }
+/* Capul coloanelor: mic și șters. El spune „varianta 1 / varianta 2", ca să nu
+   mai fie nevoie de „V1 -" în fiecare celulă. */
+.tdl__cap {
+  padding: 0 0 0.35rem; text-align: left;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--color-text-muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--cat-color) 18%, transparent);
+}
+
 /* ȘCOALA CARE A DAT SUBIECTUL. O categorie poate aduna teste de la mai multe
    instituții (la Câmpina: și Cluj-Napoca, și Jandarmi, și Poliția de
    Frontieră), iar elevul trebuie să vadă dintr-o privire de unde e hârtia din

@@ -109,6 +109,10 @@ function downloadList() {
   // ca să nu fie nimic de ținut la zi cu mâna.
   const eBarem = (nume) => /\s-\sbarem$/i.test(faraScoala(nume));
   const numeDeSubiect = (nume) => faraScoala(nume).replace(/\s-\sbarem$/i, "").trim();
+  /* Numele fără cuvântul coloanei: „V1 - ianuarie" → „ianuarie". Se taie și
+     despărțitorul de după el, altfel rămâne „- ianuarie" — tăiat pe cuvinte,
+     cratima era un cuvânt de sine stătător și trecea mai departe. */
+  const faraColoana = (nume) => nume.replace(/^\S+\s*[-–·]?\s*/, "").trim() || nume;
   // A column is a KIND OF EXAM, not a month — and in the naming scheme the
   // first word is exactly that: „Iulie" the real exam, „Septembrie" the autumn
   // one, „Simulare" the rehearsal whenever it happened to be held.
@@ -193,8 +197,14 @@ function downloadList() {
         ? `<a class="tdl__barem" href="${esc(b.href)}" target="_blank" rel="noopener noreferrer"
               title="Baremul — răspunsurile corecte"
               aria-label="Barem pentru ${esc(curat)} ${esc(String(year))}">barem</a>` : "";
+      /* CE SCRIE ÎN CELULĂ. La categoriile cu coloane pe variantă, „V1" stă în
+         capul coloanei, deci în celulă n-are ce căuta a doua oară: rămâne
+         sesiunea. Sunt cinci-șase litere pe celulă, dar ele hotărăsc dacă
+         tabelul încape în coloana lui ori dă peste zona bilei — arătat de
+         profesor pe o poză, 16 aug. */
+      const scris = cat.coloane === "varianta" ? faraColoana(curat) : curat;
       const cell = `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
-                 title="Descarcă — ${esc(tip)}">${esc(curat)}</a>${eticheta}${solved}${legatBarem}`;
+                 title="Descarcă — ${esc(tip)}">${esc(scris)}</a>${eticheta}${solved}${legatBarem}`;
       const at = columnar ? kinds.indexOf(sessionKind(curat)) : -1;
       if (at < 0) {                       // fără coloane: se umple stânga-dreapta
         let r = randuri.find((x) => x.some((c) => !c)) || null;
@@ -222,7 +232,7 @@ function downloadList() {
         r0[unde] = cell;
         continue;
       }
-      const sesiunea = curat.split(/\s+/).slice(1).join(" ") || curat;
+      const sesiunea = faraColoana(curat);
       let r = peSesiune.get(sesiunea);
       if (!r || r[at]) {
         r = new Array(cols).fill("");
@@ -239,7 +249,16 @@ function downloadList() {
         i ? "" : esc(year)}</th>${
         cells.map((c, k) => `<td class="tdl-k${k}">${c}</td>`).join("")}</tr>`);
   }).join("");
-  return `<table class="tdl"><tbody>${rows}</tbody></table>
+  /* CAPUL DE TABEL, numai unde coloanele înseamnă ceva de sine stătător. La
+     Drept coloana e sesiunea, iar numele ei stă deja în fiecare celulă, deci
+     un cap ar fi vorbă în plus — și, mai ales, ar schimba un tabel care merge
+     bine de un an. */
+  const cap = cat.coloane === "varianta"
+    ? `<thead><tr><td></td>${kinds.map((k) =>
+        `<th scope="col" class="tdl__cap">${esc(k === "V1" ? "Varianta 1"
+          : k === "V2" ? "Varianta 2" : k)}</th>`).join("")}</tr></thead>`
+    : "";
+  return `<table class="tdl${cat.coloane === "varianta" ? " tdl--varianta" : ""}">${cap}<tbody>${rows}</tbody></table>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
 }
 
