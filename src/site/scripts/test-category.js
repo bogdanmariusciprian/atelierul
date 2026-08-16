@@ -202,13 +202,27 @@ function downloadList() {
         r[r.findIndex((c) => !c)] = cell;
         continue;
       }
-      /* Rândul se caută după SESIUNE (numele fără cuvântul coloanei) numai la
-         categoriile care spun asta despre ele. La celelalte, cheia e una
-         singură pe an, deci iese un rând, ca până acum. Dacă sesiunea și-a
-         luat deja coloana — două fișiere la fel — se deschide un rând nou, ca
-         nimic să nu se piardă. */
-      const sesiunea = cat.coloane === "varianta"
-        ? (curat.split(/\s+/).slice(1).join(" ") || curat) : "·";
+      /* DOUĂ AȘEZĂRI, după cum e citit numele.
+
+         La categoriile cu `coloane: "varianta"`, rândul e SESIUNEA (numele
+         fără cuvântul coloanei), iar dacă ea și-a luat deja coloana se
+         deschide un rând nou.
+
+         La celelalte — Drept — se face întocmai ca înainte: coloana lui, iar
+         dacă e luată, prima celulă liberă. Pare o scăpare, dar nu e: acolo
+         coloana e chiar sesiunea, deci „Iulie - G1" și „Iulie - G2" trebuie să
+         stea umăr la umăr, nu pe două rânduri. Am schimbat asta o dată pentru
+         toată lumea și profesorul m-a întrebat, pe bună dreptate, dacă n-am
+         atins Dreptul; îl atinsesem, în cazul acela. Acum nu. */
+      if (cat.coloane !== "varianta") {
+        if (!randuri.length) randuri.push(new Array(cols).fill(""));
+        const r0 = randuri[0];
+        let unde = r0[at] ? r0.findIndex((c) => !c) : at;
+        if (unde < 0) { r0.push(cell); continue; }
+        r0[unde] = cell;
+        continue;
+      }
+      const sesiunea = curat.split(/\s+/).slice(1).join(" ") || curat;
       let r = peSesiune.get(sesiunea);
       if (!r || r[at]) {
         r = new Array(cols).fill("");
