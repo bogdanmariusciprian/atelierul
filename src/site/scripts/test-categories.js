@@ -16,7 +16,12 @@ export const TEST_CATEGORIES = [
     title: "Admitere Poliție", desc: "Subiecte de limba română pentru admiterea la Academia de Poliție." },
   { slug: "admitere-drept", icon: "⚖️", color: "#b45309", live: true,
     title: "Admitere Drept", desc: "Itemi de limba română de la admiterea la Facultatea de Drept (2002–2026)." },
-  { slug: "admitere-campina", icon: "👮", color: "#0f766e", live: false,
+  /* `coloane: "varianta"` spune cum e citit numele fișierului: aici primul
+     cuvânt e VARIANTA (V1/V2), iar restul e sesiunea, deci un rând = o sesiune,
+     cu variantele ei alături. Fără el (cazul obișnuit, ca la Drept), primul
+     cuvânt e chiar sesiunea, iar un rând = un an. Două forme de tabel, spuse
+     limpede, în loc de o ghicire care merge la unul și strică la celălalt. */
+  { slug: "admitere-campina", icon: "👮", color: "#0f766e", live: false, coloane: "varianta",
     title: "Admitere Câmpina", desc: "Subiecte de limba română pentru admiterea la Școala de Agenți de Poliție „Vasile Lascăr” Câmpina." },
 ];
 

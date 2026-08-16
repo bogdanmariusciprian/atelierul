@@ -831,6 +831,38 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 }
 .tdl__solved:hover { background: #86efac; transform: scale(1.15); }
 
+/* ȘCOALA CARE A DAT SUBIECTUL. O categorie poate aduna teste de la mai multe
+   instituții (la Câmpina: și Cluj-Napoca, și Jandarmi, și Poliția de
+   Frontieră), iar elevul trebuie să vadă dintr-o privire de unde e hârtia din
+   fața lui. Numele vine din numele fișierului, dintre paranteze; culoarea, de
+   mai jos. Mică și pală: e o lămurire, nu un titlu. */
+.tdl__scoala {
+  display: inline-block; margin-left: 0.45em; vertical-align: 0.05em;
+  padding: 0.05em 0.55em; border-radius: 999px;
+  font-size: 0.72em; font-weight: 700; line-height: 1.6;
+  white-space: nowrap; user-select: none;
+  background: #eef2f7; color: #334155;
+}
+.tdl__scoala--verde      { background: #dcfce7; color: #14532d; }
+.tdl__scoala--albastru   { background: #dbeafe; color: #1e3a8a; }
+.tdl__scoala--chihlimbar { background: #fef3c7; color: #78350f; }
+.tdl__scoala--caramiziu  { background: #ffe4e6; color: #881337; }
+.tdl__scoala--mov        { background: #ede9fe; color: #4c1d95; }
+
+/* BAREMUL, lipit de subiectul lui. Al doilea link din celulă, șters, ca ochiul
+   să cadă întâi pe subiect. Precedat de un punct despărțitor, ca să nu pară
+   parte din numele sesiunii. */
+.tdl__barem {
+  margin-left: 0.5em; font-size: 0.82em; font-weight: 600;
+  color: var(--color-text-muted); text-decoration: none;
+}
+.tdl__barem::before { content: "· "; color: var(--color-text-muted); }
+.tdl__barem:hover { color: var(--cat-color); text-decoration: underline; }
+
+/* Rândul de urmare al aceluiași an (a doua sesiune): capul rămâne gol, ca
+   ochiul să-l citească drept continuare, nu drept an nou. */
+.tdl__year--urmare { color: transparent; }
+
 /* „Toate, pe Drive" — ieșirea de rezervă, pentru cine vrea tot dintr-o dată.
    Google face arhiva; noi doar deschidem folderul. Discret (contur, nu plin),
    fiindcă drumul obișnuit rămâne linkul direct pe fiecare test.

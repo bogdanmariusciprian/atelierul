@@ -98,6 +98,17 @@ function downloadList() {
   // „2024 - Iulie - G1" reads simply „Iulie - G1".
   const sessionName = (f, year) =>
     String(f.label || "").replace(new RegExp(`^\\s*${year}\\s*[-–·]?\\s*`), "").trim() || String(f.label || "");
+  // INSTITUȚIA, dacă numele o poartă în paranteză la coadă: „V1 - ianuarie
+  // (Câmpina)". Categoriile care adună subiecte de la mai multe școli o scriu
+  // acolo, iar pagina o scoate și o arată ca etichetă colorată. Unde nu e
+  // paranteză (Drept), nu se schimbă nimic: numele rămâne întreg.
+  const scoalaDin = (nume) => (nume.match(/\(([^()]+)\)\s*$/) || [])[1] || "";
+  const faraScoala = (nume) => nume.replace(/\s*\([^()]+\)\s*$/, "").trim();
+  // BAREMUL nu-i un rând de sine stătător, ci perechea subiectului: același
+  // nume, plus un cuvânt. Îl caut după nume, nu după vreo coloană din bază,
+  // ca să nu fie nimic de ținut la zi cu mâna.
+  const eBarem = (nume) => /\s-\sbarem$/i.test(faraScoala(nume));
+  const numeDeSubiect = (nume) => faraScoala(nume).replace(/\s-\sbarem$/i, "").trim();
   // A column is a KIND OF EXAM, not a month — and in the naming scheme the
   // first word is exactly that: „Iulie" the real exam, „Septembrie" the autumn
   // one, „Simulare" the rehearsal whenever it happened to be held.
@@ -109,51 +120,110 @@ function downloadList() {
   // A COLUMN IS A SESSION, not a position. 2026 has only its „Simulare mai",
   // and it belongs under the other years' „Simulare mai" — not in the first
   // free slot. Columns are the distinct sessions, in alphabetical order.
+  // Baremele nu-și cer coloană: ele stau lângă subiectul lor.
+  const eSubiect = (f, y) => !eBarem(sessionName(f, y));
   const kinds = [...new Set(
-    [...byYear.entries()].flatMap(([y, files]) => files.map((f) => sessionKind(sessionName(f, y))))
+    [...byYear.entries()].flatMap(([y, files]) =>
+      files.filter((f) => eSubiect(f, y)).map((f) => sessionKind(faraScoala(sessionName(f, y)))))
   )].sort((a, b) => a.localeCompare(b, "ro"));
 
   // Safety valve: past a handful of distinct sessions the table would grow
   // wider than the panel, so we fall back to filling cells left to right.
   const columnar = kinds.length <= 5;
-  const cols = columnar ? kinds.length : Math.max(1, ...[...byYear.values()].map((f) => f.length));
+  const cols = columnar
+    ? kinds.length
+    : Math.max(1, ...[...byYear.values()].map((f) => f.filter((x) => eSubiect(x, x.year)).length));
 
-  const rows = [...byYear.entries()].map(([year, files]) => {
+  /* CULORILE ȘCOLILOR. Câte una de instituție, ca ochiul să le deosebească
+     dintr-o privire. Stau aici, într-un singur loc; o școală nouă capătă o
+     culoare adăugând un rând. Cine nu-i în listă primește tonul neutru. */
+  const CULORI_SCOALA = {
+    "Câmpina": "tdl__scoala--verde",
+    "Cluj-Napoca": "tdl__scoala--albastru",
+    "Jandarmi Fălticeni": "tdl__scoala--chihlimbar",
+    "Jandarmi Drăgășani": "tdl__scoala--caramiziu",
+    "Frontieră Oradea": "tdl__scoala--mov",
+  };
+
+  const rows = [...byYear.entries()].flatMap(([year, files]) => {
     // Order inside a year comes from the session names, NOT from the stored
     // `sort`. That column can go stale — every row currently holds 0 — and a
     // page that renders differently depending on a field nobody maintains is
     // a page that breaks quietly. The names are the truth; use them.
-    const ordered = [...files].sort((a, b) => {
-      const ka = sessionKind(sessionName(a, year)), kb = sessionKind(sessionName(b, year));
-      return kinds.indexOf(ka) - kinds.indexOf(kb)
-          || sessionName(a, year).localeCompare(sessionName(b, year), "ro");
+    const subiecte = files.filter((f) => eSubiect(f, year));
+    const barem = new Map(files.filter((f) => !eSubiect(f, year))
+      .map((f) => [numeDeSubiect(sessionName(f, year)), f]));
+    const ordered = [...subiecte].sort((a, b) => {
+      const na = faraScoala(sessionName(a, year)), nb = faraScoala(sessionName(b, year));
+      return kinds.indexOf(sessionKind(na)) - kinds.indexOf(sessionKind(nb))
+          || na.localeCompare(nb, "ro");
     });
-    const cells = new Array(cols).fill("");
+    /* UN RÂND = O SESIUNE, nu un an. Coloana ține un lucru (la Câmpina,
+       varianta), iar rândul ține tot restul numelui — adică sesiunea. Așa,
+       2018 arată ianuarie pe un rând și august-septembrie pe altul, fiecare cu
+       variantele ei alături.
+
+       Fără regula asta, 2024 ar fi pus aprilie-iulie și octombrie-februarie
+       umăr la umăr, doar fiindcă una e V1 și cealaltă V2 — două sesiuni
+       deosebite care ar fi arătat ca o pereche. Prinsă de `proba-descarcari.js`.
+
+       La Drept nu se schimbă nimic: acolo coloana e chiar sesiunea („Iulie",
+       „Simulare mai"), iar restul numelui e grupa, aceeași pe tot anul — deci
+       tot un singur rând, ca până acum. */
+    const peSesiune = new Map();
+    const randuri = [];
     for (const f of ordered) {
-      const name = sessionName(f, year);
+      const nume = sessionName(f, year);
+      const curat = faraScoala(nume);
+      const scoala = scoalaDin(nume);
       const tip = [f.note, f.kind || "PDF"].filter(Boolean).join(" · ");
       // The teacher's mark: this paper is in the bank from end to end. It's a
       // separate link, next to the download — not wrapped around it, which
       // would be an <a> inside an <a>. Only for playable categories: promising
       // a game where there's no item bank would be a broken promise.
       const solved = f.solved && cat.live
-        ? `<a class="tdl__solved" href="?an=${encodeURIComponent(year)}&ses=${encodeURIComponent(name)}#joc"
+        ? `<a class="tdl__solved" href="?an=${encodeURIComponent(year)}&ses=${encodeURIComponent(curat)}#joc"
               title="Rezolvat integral în aplicație, cu explicații. Click pentru a te antrena pe această sesiune."
-              aria-label="Rezolvat integral — antrenează-te pe ${esc(name)} ${esc(String(year))}">✓</a>`
+              aria-label="Rezolvat integral — antrenează-te pe ${esc(curat)} ${esc(String(year))}">✓</a>`
         : "";
+      const eticheta = scoala
+        ? `<span class="tdl__scoala ${CULORI_SCOALA[scoala] || ""}">${esc(scoala)}</span>` : "";
+      const b = barem.get(curat);
+      const legatBarem = b
+        ? `<a class="tdl__barem" href="${esc(b.href)}" target="_blank" rel="noopener noreferrer"
+              title="Baremul — răspunsurile corecte"
+              aria-label="Barem pentru ${esc(curat)} ${esc(String(year))}">barem</a>` : "";
       const cell = `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
-                 title="Descarcă — ${esc(tip)}">${esc(name)}</a>${solved}`;
-      // Its own column; if that one is taken (two „Iulie" in one year), the
-      // next free one, so nothing is ever dropped.
-      let at = columnar ? kinds.indexOf(sessionKind(name)) : -1;
-      if (at < 0 || cells[at]) at = cells.findIndex((c) => !c);
-      if (at < 0) { cells.push(cell); continue; }
-      cells[at] = cell;
+                 title="Descarcă — ${esc(tip)}">${esc(curat)}</a>${eticheta}${solved}${legatBarem}`;
+      const at = columnar ? kinds.indexOf(sessionKind(curat)) : -1;
+      if (at < 0) {                       // fără coloane: se umple stânga-dreapta
+        let r = randuri.find((x) => x.some((c) => !c)) || null;
+        if (!r) { r = new Array(cols).fill(""); randuri.push(r); }
+        r[r.findIndex((c) => !c)] = cell;
+        continue;
+      }
+      /* Rândul se caută după SESIUNE (numele fără cuvântul coloanei) numai la
+         categoriile care spun asta despre ele. La celelalte, cheia e una
+         singură pe an, deci iese un rând, ca până acum. Dacă sesiunea și-a
+         luat deja coloana — două fișiere la fel — se deschide un rând nou, ca
+         nimic să nu se piardă. */
+      const sesiunea = cat.coloane === "varianta"
+        ? (curat.split(/\s+/).slice(1).join(" ") || curat) : "·";
+      let r = peSesiune.get(sesiunea);
+      if (!r || r[at]) {
+        r = new Array(cols).fill("");
+        randuri.push(r);
+        peSesiune.set(sesiunea, r);
+      }
+      r[at] = cell;
     }
-    // Each cell carries its column's index, so hovering a row can tint every
-    // kind of exam in its own shade — see .tdl-k* in tests.css.
-    return `<tr><th scope="row" class="tdl__year">${esc(year)}</th>${
-      cells.map((c, i) => `<td class="tdl-k${i}">${c}</td>`).join("")}</tr>`;
+    if (!randuri.length) randuri.push(new Array(cols).fill(""));
+    // Anul se scrie o dată, pe rândul dintâi; celelalte rânduri ale lui rămân
+    // cu capul gol, ca ochiul să vadă că țin de același an.
+    return randuri.map((cells, i) =>
+      `<tr><th scope="row" class="tdl__year${i ? " tdl__year--urmare" : ""}">${
+        i ? "" : esc(year)}</th>${
+        cells.map((c, k) => `<td class="tdl-k${k}">${c}</td>`).join("")}</tr>`);
   }).join("");
   return `<table class="tdl"><tbody>${rows}</tbody></table>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
