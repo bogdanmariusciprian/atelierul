@@ -1,7 +1,7 @@
 // =========================================================
 // Test categories — ONE source of truth (DRY), shared by:
 //   • the /teste/ hub grid (tests-hub.js), and
-//   • the five dedicated category pages (test-category.js).
+//   • the dedicated category pages (test-category.js), one folder each.
 // Each page borrows its category's colour, so the symbol and the page agree.
 // Content Romanian, identifiers English.
 // =========================================================
@@ -16,6 +16,8 @@ export const TEST_CATEGORIES = [
     title: "Admitere Poliție", desc: "Subiecte de limba română pentru admiterea la Academia de Poliție." },
   { slug: "admitere-drept", icon: "⚖️", color: "#b45309", live: true,
     title: "Admitere Drept", desc: "Itemi de limba română de la admiterea la Facultatea de Drept (2002–2026)." },
+  { slug: "admitere-campina", icon: "👮", color: "#0f766e", live: false,
+    title: "Admitere Câmpina", desc: "Subiecte de limba română pentru admiterea la Școala de Agenți de Poliție „Vasile Lascăr” Câmpina." },
 ];
 
 export const TEST_CAT_BY_SLUG = Object.fromEntries(TEST_CATEGORIES.map((c) => [c.slug, c]));
