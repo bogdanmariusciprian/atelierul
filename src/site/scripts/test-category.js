@@ -110,7 +110,7 @@ function downloadList() {
   const eBarem = (nume) => /\s-\sbarem$/i.test(faraScoala(nume));
   const numeDeSubiect = (nume) => faraScoala(nume).replace(/\s-\sbarem$/i, "").trim();
   /* Numele fără cuvântul coloanei: „V1 - ianuarie" → „ianuarie". Se taie și
-     despărțitorul de după el, altfel rămâne „- ianuarie" — tăiat pe cuvinte,
+     despărțitorul de după el, altfel rămâne „- ianuarie": tăiat pe cuvinte,
      cratima era un cuvânt de sine stătător și trecea mai departe. */
   const faraColoana = (nume) => nume.replace(/^\S+\s*[-–·]?\s*/, "").trim() || nume;
   // A column is a KIND OF EXAM, not a month — and in the naming scheme the
@@ -157,22 +157,50 @@ function downloadList() {
     const subiecte = files.filter((f) => eSubiect(f, year));
     const barem = new Map(files.filter((f) => !eSubiect(f, year))
       .map((f) => [numeDeSubiect(sessionName(f, year)), f]));
+    /* ORDINEA SESIUNILOR ÎNTR-UN AN. Alfabetic, „august-septembrie" venea
+       înaintea lui „ianuarie": citit de sus în jos, anul mergea de-a-ndoaselea.
+       La categoriile cu variantă, rândurile se pun după CALENDAR: se caută
+       prima lună pomenită în numele sesiunii. Numai acolo: la Drept ordinea e
+       dată de felul examenului, iar el n-are luni în nume. */
+    const LUNI = [
+      ["ianuarie", "ian"], ["februarie", "feb"], ["martie", "mar"], ["aprilie", "apr"],
+      ["mai"], ["iunie", "iun"], ["iulie", "iul"], ["august", "aug"],
+      ["septembrie", "sept", "sep"], ["octombrie", "oct"], ["noiembrie", "nov", "noi"],
+      ["decembrie", "dec"],
+    ];
+    /* Se caută pe cuvinte întregi, cu prescurtări cu tot: numele scurtat
+       „oct. 2023 - feb. 2024" trebuie să cadă înaintea lui „aprilie-iulie", că
+       așa a fost și sesiunea. Fără prescurtări, el nu era recunoscut deloc și
+       se ducea la coada anului: văzut pe machetă, nu bănuit. */
+    const luna = (nume) => {
+      const cuvinte = nume.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean);
+      let cea = 99;
+      LUNI.forEach((forme, i) => {
+        if (i < cea && forme.some((x) => cuvinte.includes(x))) cea = i;
+      });
+      return cea;
+    };
     const ordered = [...subiecte].sort((a, b) => {
       const na = faraScoala(sessionName(a, year)), nb = faraScoala(sessionName(b, year));
+      if (cat.coloane === "varianta") {
+        return luna(faraColoana(na)) - luna(faraColoana(nb))
+            || kinds.indexOf(sessionKind(na)) - kinds.indexOf(sessionKind(nb))
+            || na.localeCompare(nb, "ro");
+      }
       return kinds.indexOf(sessionKind(na)) - kinds.indexOf(sessionKind(nb))
           || na.localeCompare(nb, "ro");
     });
     /* UN RÂND = O SESIUNE, nu un an. Coloana ține un lucru (la Câmpina,
-       varianta), iar rândul ține tot restul numelui — adică sesiunea. Așa,
+       varianta), iar rândul ține tot restul numelui: adică sesiunea. Așa,
        2018 arată ianuarie pe un rând și august-septembrie pe altul, fiecare cu
        variantele ei alături.
 
        Fără regula asta, 2024 ar fi pus aprilie-iulie și octombrie-februarie
-       umăr la umăr, doar fiindcă una e V1 și cealaltă V2 — două sesiuni
+       umăr la umăr, doar fiindcă una e V1 și cealaltă V2: două sesiuni
        deosebite care ar fi arătat ca o pereche. Prinsă de `proba-descarcari.js`.
 
        La Drept nu se schimbă nimic: acolo coloana e chiar sesiunea („Iulie",
-       „Simulare mai"), iar restul numelui e grupa, aceeași pe tot anul — deci
+       „Simulare mai"), iar restul numelui e grupa, aceeași pe tot anul: deci
        tot un singur rând, ca până acum. */
     const peSesiune = new Map();
     const randuri = [];
@@ -188,23 +216,31 @@ function downloadList() {
       const solved = f.solved && cat.live
         ? `<a class="tdl__solved" href="?an=${encodeURIComponent(year)}&ses=${encodeURIComponent(curat)}#joc"
               title="Rezolvat integral în aplicație, cu explicații. Click pentru a te antrena pe această sesiune."
-              aria-label="Rezolvat integral — antrenează-te pe ${esc(curat)} ${esc(String(year))}">✓</a>`
+              aria-label="Rezolvat integral: antrenează-te pe ${esc(curat)} ${esc(String(year))}">✓</a>`
         : "";
       const eticheta = scoala
         ? `<span class="tdl__scoala ${CULORI_SCOALA[scoala] || ""}">${esc(scoala)}</span>` : "";
       const b = barem.get(curat);
       const legatBarem = b
         ? `<a class="tdl__barem" href="${esc(b.href)}" target="_blank" rel="noopener noreferrer"
-              title="Baremul — răspunsurile corecte"
+              title="Baremul: răspunsurile corecte"
               aria-label="Barem pentru ${esc(curat)} ${esc(String(year))}">barem</a>` : "";
       /* CE SCRIE ÎN CELULĂ. La categoriile cu coloane pe variantă, „V1" stă în
          capul coloanei, deci în celulă n-are ce căuta a doua oară: rămâne
          sesiunea. Sunt cinci-șase litere pe celulă, dar ele hotărăsc dacă
-         tabelul încape în coloana lui ori dă peste zona bilei — arătat de
+         tabelul încape în coloana lui ori dă peste zona bilei: arătat de
          profesor pe o poză, 16 aug. */
       const scris = cat.coloane === "varianta" ? faraColoana(curat) : curat;
-      const cell = `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
-                 title="Descarcă — ${esc(tip)}">${esc(scris)}</a>${eticheta}${solved}${legatBarem}`;
+      /* ORDINEA DIN CELULĂ. La categoriile cu variantă, eticheta școlii trece
+         SUB nume, deci trebuie scrisă la urmă; altfel ar rupe rândul înaintea
+         baremului. Măsurat cu metricile fontului: numele cel mai lung cere
+         atunci 249px, iar celula are 309px: încape cu marjă. Ținută pe rândul
+         numelui, cerea 371px și dădea peste zona bilei. */
+      const cell = cat.coloane === "varianta"
+        ? `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
+                 title="Descarcă: ${esc(tip)}">${esc(scris)}</a>${solved}${legatBarem}${eticheta}`
+        : `<a class="tdl__file" href="${esc(f.href)}" target="_blank" rel="noopener noreferrer"
+                 title="Descarcă: ${esc(tip)}">${esc(scris)}</a>${eticheta}${solved}${legatBarem}`;
       const at = columnar ? kinds.indexOf(sessionKind(curat)) : -1;
       if (at < 0) {                       // fără coloane: se umple stânga-dreapta
         let r = randuri.find((x) => x.some((c) => !c)) || null;
@@ -218,7 +254,7 @@ function downloadList() {
          fără cuvântul coloanei), iar dacă ea și-a luat deja coloana se
          deschide un rând nou.
 
-         La celelalte — Drept — se face întocmai ca înainte: coloana lui, iar
+         La celelalte: Drept: se face întocmai ca înainte: coloana lui, iar
          dacă e luată, prima celulă liberă. Pare o scăpare, dar nu e: acolo
          coloana e chiar sesiunea, deci „Iulie - G1" și „Iulie - G2" trebuie să
          stea umăr la umăr, nu pe două rânduri. Am schimbat asta o dată pentru
@@ -251,14 +287,22 @@ function downloadList() {
   }).join("");
   /* CAPUL DE TABEL, numai unde coloanele înseamnă ceva de sine stătător. La
      Drept coloana e sesiunea, iar numele ei stă deja în fiecare celulă, deci
-     un cap ar fi vorbă în plus — și, mai ales, ar schimba un tabel care merge
+     un cap ar fi vorbă în plus: și, mai ales, ar schimba un tabel care merge
      bine de un an. */
   const cap = cat.coloane === "varianta"
     ? `<thead><tr><td></td>${kinds.map((k) =>
         `<th scope="col" class="tdl__cap">${esc(k === "V1" ? "Varianta 1"
           : k === "V2" ? "Varianta 2" : k)}</th>`).join("")}</tr></thead>`
     : "";
-  return `<table class="tdl${cat.coloane === "varianta" ? " tdl--varianta" : ""}">${cap}<tbody>${rows}</tbody></table>
+  /* LĂȚIMILE, SPUSE O DATĂ. Cu `table-layout: fixed`, browserul le ia din
+     PRIMUL rând: care e acum capul de tabel, iar acolo `.tdl__year` nu se
+     află. Fără `<colgroup>`, coloana anului ar înghiți o treime din tabel, iar
+     socoteala de mai sus (341px pe celulă) ar fi fost o închipuire. Aici se
+     spune limpede: anul cât îi trebuie, restul în părți egale. */
+  const stalpi = cat.coloane === "varianta"
+    ? `<colgroup><col class="tdl__c-an" />${kinds.map(() => "<col />").join("")}</colgroup>`
+    : "";
+  return `<table class="tdl${cat.coloane === "varianta" ? " tdl--varianta" : ""}">${stalpi}${cap}<tbody>${rows}</tbody></table>
     <p class="tcat__hint">Fișierele se descarcă direct. În funcție de setările browserului, unele se pot deschide într-o filă nouă.</p>`;
 }
 

@@ -835,7 +835,7 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
 
    `table-layout: fixed` cu `width: 100%` e miezul: fără ele, tabelul își cere
    lățimea după cel mai lat text și, cum coloana din grilă poate scădea sub
-   atât, dădea peste zona bilei — s-a văzut pe poza din 16 aug, la rândul cu
+   atât, dădea peste zona bilei: s-a văzut pe poza din 16 aug, la rândul cu
    „octombrie 2023-februarie 2024". Așa, tabelul nu iese niciodată din coloana
    lui, oricât de lung ar fi numele unei sesiuni: textul se rupe pe două
    rânduri, ceea ce e o pagubă mult mai mică.
@@ -843,8 +843,23 @@ body.tg-mode .container { max-width: none; padding-left: 10px; padding-right: 10
    `word-break` NU se pune: ar tăia prin mijlocul cuvintelor. Numele nostru are
    destule cratime și spații ca să se rupă frumos singur. */
 .tdl--varianta { table-layout: fixed; width: 100%; }
+/* Coloana anilor: cât îi trebuie, nu o treime din tabel. Vezi `stalpi` în
+   test-category.js: cu `fixed`, lățimile se citesc din colgroup, nu din
+   celulele de mai jos. */
+.tdl--varianta .tdl__c-an { width: 3.4rem; }
 .tdl--varianta td { vertical-align: top; }
+/* `.tdl td` are `white-space: nowrap`, ca numele să nu se rupă. Bun la Drept,
+   unde numele sunt scurte; aici însă nowrap-ul ANULA lățimea hotărâtă de mai
+   sus: celula nu se putea rupe, deci ieșea din tabel și dădea peste zona
+   bilei. Aici se lasă să curgă. */
+.tdl--varianta td { white-space: normal; }
 .tdl--varianta .tdl__file { overflow-wrap: break-word; }
+/* ETICHETA ȘCOLII PE RÂNDUL EI. Măsurat cu metricile fontului: pe rândul
+   numelui, cea mai lungă celulă cerea 371px într-un loc de 309px; dedesubt,
+   cere 249px. De aceea stă jos, nu fiindcă ar arăta mai bine: deși arată. */
+.tdl--varianta .tdl__scoala {
+  display: table; margin: 3px 0 0; vertical-align: baseline;
+}
 /* Capul coloanelor: mic și șters. El spune „varianta 1 / varianta 2", ca să nu
    mai fie nevoie de „V1 -" în fiecare celulă. */
 .tdl__cap {
