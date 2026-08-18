@@ -22,8 +22,9 @@ stiluri, componente) trăiește sub `src/`, scrisă o singură dată (**DRY**).
 ```
 Atelierul-LRO/
 ├── index.html                     # Home
-├── lectii/  teste/  comunitate/  despre/  confidentialitate/  termeni/
+├── lectii/  teste/  comunitate/  meditatii/  despre/  confidentialitate/  termeni/
 │                                  # paginile live; comunitate/ are login/ + descopera/
+│                                  # meditatii/ = planificatorul de ore (acces pe drept)
 ├── in-curand/  404.html           # poartă pre-lansare + router URL-uri curate
 ├── src/
 │   ├── site/{scripts,styles}/         # lecții + teste
