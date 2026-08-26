@@ -4,13 +4,18 @@
 //     downloadable tests and the interactive practice.
 //   • Only „Admitere Drept" is live; the rest simply say „va urma".
 //   • #joc turns the page into the practice itself:
-//       PUPIL / GUEST → the mini-game (tests-game.js)
+//       PUPIL / GUEST → the mini-game, one file per exam:
+//         admitere-drept   → tests-game-drept.js
+//         admitere-campina → tests-game-campina.js
+//       Un fișier pe examen, nu condiții într-unul singur: așa lucrul la un
+//       examen nu poate strica jocul altuia. Plumbăria împărțită de-adevărat
+//       (chemările spre Supabase) stă în test-repo.js, unde îi e locul.
 //       ADMIN         → the item grid (tests-admin-grid.js)
 //     A ?item=<uuid> deep link (from a flagged report) goes straight there.
 // Content Romanian, identifiers English.
 // =========================================================
 import { TEST_CAT_BY_SLUG } from "./test-categories.js";
-import { initTestGame } from "./tests-game.js";
+import { initTestGame } from "./tests-game-drept.js";
 import { initTestAdminGrid } from "./tests-admin-grid.js";
 import { isAdmin } from "../../shared/scripts/session.js";
 import { fetchTestDownloads, fetchDriveFolderUrl } from "../../shared/scripts/test-repo.js";
