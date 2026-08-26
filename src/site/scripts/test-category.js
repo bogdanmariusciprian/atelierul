@@ -75,6 +75,125 @@ function route() {
 }
 
 // Grouped by year, and every button says plainly WHAT it hands you: the
+/* Numele fișierelor, citite o singură dată. Erau scrise ca funcții locale
+   înăuntrul lui `downloadList`; le scot aici, ca să le folosească și banda,
+   nu ca să le copiez. */
+const numeSesiunii = (f, an) =>
+  String(f.label || "").replace(new RegExp(`^\\s*${an}\\s*[-–·]?\\s*`), "").trim() || String(f.label || "");
+const scoalaDinNume = (n) => (n.match(/\(([^()]+)\)\s*$/) || [])[1] || "";
+const faraScoalaDin = (n) => n.replace(/\s*\([^()]+\)\s*$/, "").trim();
+const eBaremul = (n) => /\s-\sbarem$/i.test(faraScoalaDin(n));
+const subiectulBaremului = (n) => faraScoalaDin(n).replace(/\s-\sbarem$/i, "").trim();
+const faraVarianta = (n) => n.replace(/^\S+\s*[-–·]?\s*/, "").trim() || n;
+const variantaDin = (n) => n.trim().split(/\s+/)[0] || "";
+
+/* Luna cu care începe sesiunea, ca rândurile unui an să stea în ordinea
+   calendarului, nu alfabetic („august-septembrie" venea înaintea lui
+   „ianuarie"). Prescurtările contează: „oct. 2023 - feb. 2024" trebuie să cadă
+   înaintea lui „aprilie-iulie", că așa a fost și sesiunea. */
+const LUNILE = [
+  ["ianuarie", "ian"], ["februarie", "feb"], ["martie", "mar"], ["aprilie", "apr"],
+  ["mai"], ["iunie", "iun"], ["iulie", "iul"], ["august", "aug"],
+  ["septembrie", "sept", "sep"], ["octombrie", "oct"], ["noiembrie", "nov", "noi"],
+  ["decembrie", "dec"],
+];
+const lunaDin = (nume) => {
+  const cuvinte = nume.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean);
+  let cea = 99;
+  LUNILE.forEach((forme, i) => { if (i < cea && forme.some((x) => cuvinte.includes(x))) cea = i; });
+  return cea;
+};
+
+const CULORI_SCOALA = {
+  "Câmpina": "tdl__scoala--verde",
+  "Cluj-Napoca": "tdl__scoala--albastru",
+  "Jandarmi Fălticeni": "tdl__scoala--chihlimbar",
+  "Jandarmi Drăgășani": "tdl__scoala--caramiziu",
+  "Frontieră Oradea": "tdl__scoala--mov",
+};
+
+/* SESIUNILE UNUI AN, gata de desenat. Un subiect și baremul lui poartă același
+   nume, plus un cuvânt; îi împerechez după nume, nu după vreo coloană din
+   bază, ca să nu fie nimic de ținut la zi cu mâna. */
+function sesiunileAnului(an, fisiere) {
+  const subiecte = fisiere.filter((f) => !eBaremul(numeSesiunii(f, an)));
+  const bareme = new Map(fisiere.filter((f) => eBaremul(numeSesiunii(f, an)))
+    .map((f) => [subiectulBaremului(numeSesiunii(f, an)), f]));
+  const pe = new Map();
+  for (const f of subiecte) {
+    const nume = numeSesiunii(f, an);
+    const curat = faraScoalaDin(nume);
+    const cheie = faraVarianta(curat);
+    if (!pe.has(cheie)) {
+      pe.set(cheie, { nume: cheie, scoala: scoalaDinNume(nume), luna: lunaDin(cheie), hartii: [] });
+    }
+    pe.get(cheie).hartii.push({ f, varianta: variantaDin(curat), barem: bareme.get(curat) || null });
+  }
+  const iesire = [...pe.values()];
+  iesire.forEach((s) => s.hartii.sort((a, b) => a.varianta.localeCompare(b.varianta, "ro")));
+  iesire.sort((a, b) => a.luna - b.luna || a.nume.localeCompare(b.nume, "ro"));
+  return iesire;
+}
+
+function numeVariantei(v) {
+  return v === "V1" ? "Varianta 1" : v === "V2" ? "Varianta 2" : v;
+}
+
+/* Panoul unui an: câte sesiuni are și, pe rânduri, fiecare cu variantele ei. */
+function panouAn(an, fisiere) {
+  const ses = sesiunileAnului(an, fisiere);
+  const cateHartii = ses.reduce((a, s) => a + s.hartii.length, 0);
+  const spune = (n, unu, multe) => `${n} ${n === 1 ? unu : multe}`;
+  const randuri = ses.map((s) => {
+    const eticheta = s.scoala
+      ? `<span class="tdl__scoala ${CULORI_SCOALA[s.scoala] || ""}">${esc(s.scoala)}</span>` : "";
+    const hartii = s.hartii.map((h) => {
+      const tip = [h.f.note, h.f.kind || "PDF"].filter(Boolean).join(" · ");
+      const barem = h.barem
+        ? `<a class="tdl__barem" href="${esc(h.barem.href)}" target="_blank" rel="noopener noreferrer"
+              title="Baremul: răspunsurile corecte">barem</a>` : "";
+      return `<span class="tb__v"><a class="tdl__file" href="${esc(h.f.href)}"
+            target="_blank" rel="noopener noreferrer"
+            title="Descarcă: ${esc(tip)}">${esc(numeVariantei(h.varianta))}</a>${barem}</span>`;
+    }).join("");
+    return `<li class="tb__ses"><span class="tb__ses-nume">${esc(s.nume)}</span>${eticheta}
+      <span class="tb__hartii">${hartii}</span></li>`;
+  }).join("");
+  return `<p class="tb__cap"><b>${esc(an)}</b>
+      <span>${esc(spune(ses.length, "sesiune", "sesiuni"))} · ${esc(spune(cateHartii, "subiect", "subiecte"))}</span></p>
+    <ul class="tb__lista">${randuri}</ul>`;
+}
+
+/* BANDA ÎNTREAGĂ. Anii lipsă dintre primul și ultimul se pun și ei pe bandă,
+   punctați: altfel 2021 ar dispărea, iar cititorul n-ar afla niciodată că
+   lipsește. */
+function bandaDeAni(byYear) {
+  const ani = [...byYear.keys()].filter((a) => Number.isFinite(Number(a))).map(Number).sort((a, b) => a - b);
+  if (!ani.length) return "";
+  const toti = [];
+  for (let a = ani[0]; a <= ani[ani.length - 1]; a++) toti.push(a);
+  const ales = ani[ani.length - 1];
+  const butoane = toti.map((a) => {
+    const fisiere = byYear.get(a) || byYear.get(String(a)) || [];
+    const cate = fisiere.length ? sesiunileAnului(a, fisiere).length : 0;
+    if (!cate) {
+      return `<span class="tb__an tb__an--gol" aria-hidden="true"><span class="tb__an-nr">${a}</span>
+        <span class="tb__buline"></span></span>`;
+    }
+    const buline = Array.from({ length: cate }, () => "<i></i>").join("");
+    return `<button type="button" class="tb__an" role="tab" data-an="${a}"
+        aria-selected="${a === ales}" aria-controls="tb-panou"
+        title="${a}: ${cate === 1 ? "o sesiune" : cate + " sesiuni"}">
+        <span class="tb__an-nr">${a}</span><span class="tb__buline">${buline}</span></button>`;
+  }).join("");
+  const fisiereAles = byYear.get(ales) || byYear.get(String(ales)) || [];
+  return `<div class="tb">
+      <div class="tb__ani" role="tablist" aria-label="Anii cu subiecte">${butoane}</div>
+      <div class="tb__panou" id="tb-panou" role="tabpanel">${panouAn(ales, fisiereAles)}</div>
+    </div>
+    <p class="tcat__hint">O bulină pe an înseamnă o sesiune de admitere. Fișierele se descarcă direct.</p>`;
+}
+
 // session, a short note, and the file kind. Nobody should have to click to
 // find out what they're downloading.
 function downloadList() {
@@ -87,6 +206,28 @@ function downloadList() {
     if (!byYear.has(y)) byYear.set(y, []);
     byYear.get(y).push(d);
   }
+  /* ══════════════════════════════════════════════════════════════════════
+     BANDA DE ANI (numai categoriile cu `asezare: "banda"`).
+
+     DE CE NU MAI E TABEL AICI. Tabelul avea rândul = anul și coloana =
+     varianta. Dar un an poate avea DOUĂ sesiuni (2018 are ianuarie și
+     august-septembrie), iar a doua își deschidea rând nou: ieșeau trepte și
+     jumătăți de rând goale, fiindcă nu orice sesiune are și V1 și V2. Ochiul
+     citea goluri, nu structură. Cauza nu era stilul, ci alegerea coloanei:
+     varianta e un amănunt ridicat la rangul de axă. V1 și V2 sunt același
+     subiect în două tipare, nu două lucruri deosebite.
+
+     CE SPUNE BANDA. Anii, unul lângă altul, toți la fel de înalți: înălțimea
+     NU măsoară nimic (hotărât de Marius: „fără să spună cât de mulți itemi
+     are fiecare an"). Ce numără sunt BULINELE: o bulină = o sesiune. Anul
+     fără subiecte în folder rămâne pe bandă, punctat: o lipsă spusă pe față
+     e o informație, nu o scăpare.
+
+     Dedesubt, sesiunile anului ales, fiecare cu variantele ei alături. Așa
+     dispar și treptele, și celulele goale.
+     ══════════════════════════════════════════════════════════════════════ */
+  if (cat.asezare === "banda") return bandaDeAni(byYear);
+
   // A real <table>. Year down the side, one session per cell — which is what
   // this data actually is, so the element that describes it is the honest one.
   // It also solves the alignment for free: a table sizes each column to its
@@ -424,4 +565,46 @@ function renderIntro() {
   // they stack up, each pushing the same button.
   stopFloat?.();
   stopFloat = initFloatingPlay(root.querySelector(".tcat__tank"));
+  legBanda();
+}
+
+/* APĂSAREA PE UN AN. Ascultătorul stă pe BANDĂ, nu pe fiecare buton: panoul
+   se redesenează la fiecare `renderIntro` (fetch, schimbare de rol), iar
+   ascultători puși pe butoane s-ar duce odată cu ele, ori s-ar stivui.
+   Nu se redesenează banda, ci doar panoul: altfel butonul apăsat ar dispărea
+   de sub deget și s-ar pierde și focalizarea de la tastatură. */
+function legBanda() {
+  const banda = root.querySelector(".tb__ani");
+  const panou = root.querySelector("#tb-panou");
+  if (!banda || !panou) return;
+  const arata = (an) => {
+    const fisiere = fisiereleAnului(an);
+    if (!fisiere.length) return;
+    panou.innerHTML = panouAn(an, fisiere);
+    banda.querySelectorAll("[data-an]").forEach((b) =>
+      b.setAttribute("aria-selected", String(b.dataset.an === String(an))));
+  };
+  banda.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-an]");
+    if (b) arata(Number(b.dataset.an));
+  });
+  /* Săgețile stânga-dreapta plimbă prin ani, cum se cere la un rând de file.
+     Fără ele, banda ar fi o listă de butoane pe care le poți doar tab-ui unul
+     câte unul, ceea ce la nouă ani e obositor. */
+  banda.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const toate = [...banda.querySelectorAll("[data-an]")];
+    const acum = toate.findIndex((b) => b.getAttribute("aria-selected") === "true");
+    const urm = toate[acum + (e.key === "ArrowRight" ? 1 : -1)];
+    if (!urm) return;
+    e.preventDefault();
+    urm.focus();
+    arata(Number(urm.dataset.an));
+  });
+}
+
+/* Fișierele unui an, luate din `downloads`. Cheia poate fi număr ori șir, după
+   cum a venit din bază; se caută în amândouă felurile. */
+function fisiereleAnului(an) {
+  return downloads.filter((d) => String(d.year) === String(an));
 }

@@ -1873,3 +1873,71 @@ body.tgame-active .page-hero { max-height: 0; opacity: 0; margin-block: 0; paddi
   text-decoration: none;
   background: linear-gradient(currentColor, currentColor) no-repeat left 0 top 63% / 100% 1.5px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BANDA DE ANI (numai categoriile cu `asezare: "banda"`; Dreptul rămâne pe
+   tabel). Anii unul lângă altul, toți la fel de înalți: înălțimea NU măsoară
+   nimic, dinadins. Ce numără sunt bulinele: una pe sesiune.
+   ══════════════════════════════════════════════════════════════════════════ */
+.tb__ani {
+  display: flex; gap: 0.25rem; align-items: stretch;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--cat-color) 22%, transparent);
+  padding-bottom: 0.4rem; margin-bottom: 0.9rem;
+}
+.tb__an {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  padding: 0.4rem 0.15rem 0.35rem;
+  border: 0; border-radius: 8px; background: none;
+  font: inherit; cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.tb__an-nr {
+  font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted); line-height: 1;
+}
+/* Bulinele: rândul lor are mereu aceeași înălțime, ca anii să nu se clatine
+   când unul are o sesiune și altul două. */
+.tb__buline { display: flex; gap: 3px; align-items: center; height: 8px; }
+.tb__buline i {
+  width: 7px; height: 7px; border-radius: 999px; display: block;
+  background: color-mix(in srgb, var(--cat-color) 45%, transparent);
+}
+.tb__an:hover { background: color-mix(in srgb, var(--cat-color) 8%, transparent); }
+.tb__an:hover .tb__an-nr { color: var(--cat-color); }
+.tb__an[aria-selected="true"] { background: color-mix(in srgb, var(--cat-color) 14%, transparent); }
+.tb__an[aria-selected="true"] .tb__an-nr { color: var(--cat-color); }
+.tb__an[aria-selected="true"] .tb__buline i { background: var(--cat-color); }
+.tb__an:focus-visible { outline: 2px solid var(--cat-color); outline-offset: 1px; }
+/* ANUL FĂRĂ SUBIECTE rămâne pe bandă, punctat. O lipsă spusă pe față e o
+   informație („nu s-a dat / n-am subiectul"), nu o scăpare. */
+.tb__an--gol { cursor: default; opacity: 0.45; }
+.tb__an--gol .tb__buline {
+  width: 100%; max-width: 2.2rem;
+  border-bottom: 1px dashed var(--color-text-muted); height: 8px;
+}
+
+.tb__cap { display: flex; align-items: baseline; gap: 0.5rem; margin: 0 0 0.5rem; }
+.tb__cap b { font-size: 1.05rem; color: var(--cat-color); font-variant-numeric: tabular-nums; }
+.tb__cap span { font-size: 0.78rem; color: var(--color-text-muted); }
+
+.tb__lista { list-style: none; margin: 0; padding: 0; }
+/* UN RÂND = O SESIUNE, cu variantele ei alături. Aici e toată vindecarea:
+   varianta nu mai deschide rând nou, deci nu mai rămân jumătăți de rând goale
+   la sesiunile care au numai V1 ori numai V2. */
+.tb__ses {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.15rem 0.4rem;
+  padding: 0.42rem 0.5rem; border-radius: 8px;
+}
+.tb__ses + .tb__ses { border-top: 1px solid color-mix(in srgb, var(--color-text-muted) 14%, transparent); }
+.tb__ses:hover { background: color-mix(in srgb, var(--cat-color) 8%, transparent); }
+.tb__ses-nume { font-weight: 700; font-size: 0.92rem; }
+/* Hârtiile se duc la dreapta cât e loc, dar pe ecran îngust cad sub nume în
+   loc să iasă din coloană: panoul stă lângă zona bilei și n-are voie s-o
+   calce (vezi comentariile de la `.tdl--varianta`). */
+.tb__hartii { margin-left: auto; display: flex; flex-wrap: wrap; gap: 0.15rem 0.9rem; }
+.tb__v { white-space: nowrap; }
+@media (max-width: 560px) {
+  .tb__hartii { margin-left: 0; width: 100%; }
+  .tb__an-nr { font-size: 0.72rem; }
+}

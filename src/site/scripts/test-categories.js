@@ -21,7 +21,11 @@ export const TEST_CATEGORIES = [
      cu variantele ei alături. Fără el (cazul obișnuit, ca la Drept), primul
      cuvânt e chiar sesiunea, iar un rând = un an. Două forme de tabel, spuse
      limpede, în loc de o ghicire care merge la unul și strică la celălalt. */
-  { slug: "admitere-campina", icon: "👮", color: "#0f766e", live: false, coloane: "varianta",
+  /* `asezare: "banda"` schimbă FORMA panoului, nu citirea numelui: în loc de
+     tabel, o bandă de ani cu buline (o bulină = o sesiune) și, dedesubt,
+     sesiunile anului ales. Numai aici; Dreptul și celelalte rămân pe tabel. */
+  { slug: "admitere-campina", icon: "👮", color: "#0f766e", live: false,
+    coloane: "varianta", asezare: "banda",
     title: "Admitere Câmpina", desc: "Subiecte de limba română pentru admiterea la Școala de Agenți de Poliție „Vasile Lascăr” Câmpina." },
 ];
 
