@@ -57,6 +57,7 @@ const J = {
   itemi: [], peId: new Map(),
   hartii: [], // { cheie, an, sesiune, itemi: [] } — o „hârtie" = o sesiune de admitere
   ani: [],
+  numarGlobal: new Map(), // id → numărul lui din toată banca, 1..N
   incarcat: false,
   ecran: "alege", // alege | relaxat | clasic | aventura | levelup
   /* Unde ești ÎN modul ales. Relaxed n-are faze (e o singură pagină); Classic
@@ -160,6 +161,24 @@ async function incarcaItemii() {
   }
   J.hartii = [...pe.values()].sort((a, b) => a.an - b.an || a.sesiune.localeCompare(b.sesiune, "ro"));
   J.hartii.forEach((h) => h.itemi.sort((a, b) => (a.itemNo ?? 0) - (b.itemNo ?? 0)));
+  /* NUMĂRUL GLOBAL, 1..N peste toată banca. Un item poartă pe hârtia lui un
+     număr de la 1 la 60, iar acela se repetă la fiecare sesiune: în Level-up,
+     unde treci prin toată banca în ordine, „itemul 7" n-ar spune nimic. Așa,
+     „#412 din 902" spune și unde ești, și cât a mai rămas.
+
+     Se scoate din ACEEAȘI listă din care `nivelele()` taie feliile de câte
+     cinci, nu dintr-o socoteală paralelă. De aceea levelul L ține exact
+     numerele (L-1)*5+1 … L*5, iar cele două nu se pot despărți niciodată.
+
+     Adăugarea unei sesiuni NOI (an mai mare) lasă numerele de până acum neatinse
+     și continuă de la capăt. O sesiune mai VECHE, strecurată între ani, le-ar
+     muta pe toate de după ea; atunci s-ar muta și levelurile, deci problema ar
+     fi oricum mai adâncă decât numerotarea, iar răspunsul ei ar fi un număr
+     păstrat în bază. Până acolo, ordinea firească e și cea așteptată. */
+  J.numarGlobal = new Map();
+  let n = 0;
+  for (const h of J.hartii) for (const it of h.itemi) J.numarGlobal.set(it.id, ++n);
+
   J.ani = [...new Set(J.hartii.map((h) => h.an))].sort((a, b) => a - b);
   J.anAles = J.ani[J.ani.length - 1] ?? null;
   J.hartieAleasa = hartiileAnului(J.anAles)[0]?.cheie ?? null;
@@ -925,9 +944,13 @@ function deseneazaHarta() {
       const gata = !!(l && l.passed);
       const deschis = n <= desfacut;
       const cazut = !gata && l && l.tries > 0;
+      /* Ce itemi ține levelul, scris în tooltip: numerele ies din aceeași
+         ordine, deci levelul n ține exact (n-1)*5+1 … n*5. */
+      const de_la_it = (n - 1) * ITEMI_PE_NIVEL + 1;
+      const pana_it = Math.min(n * ITEMI_PE_NIVEL, J.numarGlobal.size);
       patrate.push(`<button type="button" class="cmp-lvl${gata ? " is-done" : ""}${cazut ? " is-tried" : ""}${deschis ? "" : " is-locked"}"
           data-act="nivel" data-n="${n}"${deschis ? "" : " disabled"}
-          title="${deschis ? `Level ${n}${l ? ` · ${l.tries} ${l.tries === 1 ? "încercare" : "încercări"}` : ""}` : "Se deschide după levelul dinainte"}">${n}</button>`);
+          title="${deschis ? `Level ${n} · itemii #${de_la_it}-${pana_it}${l ? ` · ${l.tries} ${l.tries === 1 ? "încercare" : "încercări"}` : ""}` : "Se deschide după levelul dinainte"}">${n}</button>`);
     }
     const treuteAici = [...J.leveluri].filter(([n, l]) => l.passed && n >= de_la && n <= pana).length;
     return `<section class="cmp-world${eUltimaLume(li) ? " e-summit" : ""}" style="--lume:${L.culoare}">
@@ -989,13 +1012,16 @@ function deseneazaNivel() {
   });
   const pasi = Array.from({ length: ITEMI_PE_NIVEL }, (_, i) =>
     `<i class="cmp-step${i < J.pozitie ? " is-done" : i === J.pozitie ? " is-now" : ""}" aria-hidden="true"></i>`).join("");
+  const numar = J.numarGlobal.get(it.id) || 0;
   radacina.className = "cmp cmp--play cmp--levelup";
   radacina.innerHTML = `
     <section class="cmp-play cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
-      ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
+      ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn,
+        `<span class="cmp-hud__pos">#${numar} / ${J.numarGlobal.size}</span><span class="cmp-steps">${pasi}</span>`, "harta")}
       <div class="cmp-orbit">
         ${insigneleHtml()}
         <article class="tgame-card cmp-card${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
+          <div class="cmp-item__nr cmp-item__nr--global" title="Itemul ${numar} din cei ${J.numarGlobal.size} ai băncii">#${numar}</div>
           ${capulItemului(it)}
           <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
           <div class="tgame-opts">${variante}</div>

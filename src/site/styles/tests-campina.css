@@ -164,6 +164,13 @@
   background: var(--color-primary); color: var(--color-bg);
 }
 .cmp-item__fb { margin-top: 0.9rem; }
+/* Numărul din toată banca, la Level-up. Poartă culoarea world-ului, nu pe cea a
+   categoriei: acolo el e un reper al urcușului, nu o etichetă de pagină. */
+.cmp-item__nr--global {
+  left: auto; right: -0.6rem;
+  background: var(--lume, var(--color-primary));
+  color: #fff; font-variant-numeric: tabular-nums;
+}
 
 .cmp-note { margin-top: 0.9rem; }
 .cmp-note__lab {
