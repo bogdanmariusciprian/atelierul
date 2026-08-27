@@ -16,7 +16,7 @@
 //     niciuna. Are configurator, ca la Drept.
 //   • Adventure - tot ce ai ales, item cu item, numerotat 1..N. Greșitul se duce
 //     la coada rândului și revine până îl nimerești.
-//   • Crazy    - 5 itemi pe level, o greșeală și s-a terminat. Levelurile
+//   • Level-up - 5 itemi pe level, o greșeală și s-a terminat. Levelurile
 //     sunt strânse în worlds, fiecare cu înfățișarea lui, și se adună badges.
 //
 // CINSTIT PRIN CONSTRUCȚIE. Itemii pleacă de pe server fără răspuns (coloana
@@ -58,9 +58,9 @@ const J = {
   hartii: [], // { cheie, an, sesiune, itemi: [] } — o „hârtie" = o sesiune de admitere
   ani: [],
   incarcat: false,
-  ecran: "alege", // alege | relaxat | clasic | aventura | nebun
+  ecran: "alege", // alege | relaxat | clasic | aventura | levelup
   /* Unde ești ÎN modul ales. Relaxed n-are faze (e o singură pagină); Classic
-     și Adventure merg config → joc → gata; Crazy, hartă → joc → gata. */
+     și Adventure merg config → joc → gata; Level-up, hartă → joc → gata. */
   faza: "config",
   // — Relaxed —
   anAles: null, hartieAleasa: null,
@@ -75,7 +75,7 @@ const J = {
   deViata: new Set(), // itemii care dau o inimă, aleși la pornire
   sesiune: null,      // id-ul rundei, pentru punctele date de server
   gata: false,
-  // — Crazy —
+  // — Level-up —
   lume: 0, nivel: 0,
   leveluri: new Map(), // level → { tries, passed }
   insigne: new Set(),  // codurile câștigate
@@ -247,7 +247,7 @@ const MODURI = [
            Vezi mereu câți ai bun, câți greșit și câți ți-au mai rămas.`,
   },
   {
-    id: "nebun", nume: "Crazy", semn: "🔥",
+    id: "levelup", nume: "Level-up", semn: "🔥",
     scurt: "5 itemi, zero greșeli",
     lung: `Levels de câte cinci itemi. O singură greșeală și levelul se închide;
            îl iei de la capăt. Levelurile sunt strânse în worlds, iar fiecare
@@ -259,7 +259,7 @@ const MODURI = [
 function deseneazaAlegerea() {
   const n = J.itemi.length;
   const carduri = MODURI.map((m) => {
-    const insigna = m.id === "nebun" && levelMax() > 0
+    const insigna = m.id === "levelup" && levelMax() > 0
       ? `<span class="cmp-mode__badge">Level ${levelMax()}</span>` : "";
     return `<button type="button" class="cmp-mode" data-act="mod" data-mod="${m.id}">
         <span class="cmp-mode__sign" aria-hidden="true">${m.semn}</span>
@@ -488,7 +488,7 @@ async function stergeHartia() {
 
 /* ÎNTOARCEREA E PE O TREAPTĂ, nu până la capăt. Din interiorul unui level,
    butonul duce la harta levelurilor, fiindcă acolo vrei să ajungi: să alegi
-   altul. Abia de pe hartă se iese din Crazy. Un singur buton care sărea de la
+   altul. Abia de pe hartă se iese din Level-up. Un singur buton care sărea de la
    item drept la alegerea modului te scotea din tot ce făceai, iar drumul înapoi
    trebuia refăcut de fiecare dată. */
 function baraDeSus(nume, semn, dreapta = "", inapoiLa = "inapoi") {
@@ -799,7 +799,7 @@ function deseneazaFinal() {
     </section>`;
 }
 
-// ---------- 4. CRAZY ----------
+// ---------- 4. LEVEL-UP ----------
 
 const ITEMI_PE_NIVEL = 5;
 const NIVELE_PE_LUME = 22;
@@ -822,7 +822,7 @@ const LUMI = [
    · faptele (First Step, Hot Streak, On Fire, Comeback, Halfway) se câștigă
      făcând ceva anume, nu ajungând undeva;
    · worlds (Dawn Cleared, Forest Cleared…) se câștigă la capătul unui world.
-   „Perfect" ar fi fost o insignă goală: în Crazy, un level trecut e ORICUM 5
+   „Perfect" ar fi fost o insignă goală: în Level-up, un level trecut e ORICUM 5
    din 5, fiindcă o greșeală îl închide. O insignă care se dă mereu nu spune
    nimic, așa că n-am pus-o. */
 const INSIGNE = {
@@ -873,7 +873,7 @@ function hainaLumii(n) {
   return `--lume:${L.culoare}; --tarie:${tarie}`;
 }
 
-function deseneazaNebunia() {
+function deseneazaLevelUp() {
   if (J.faza === "joc") return deseneazaNivel();
   if (J.faza === "gata") return deseneazaSfarsitNivel();
   return deseneazaHarta();
@@ -946,7 +946,7 @@ function deseneazaHarta() {
   radacina.className = "cmp cmp--map";
   radacina.innerHTML = `
     <section class="cmp-map">
-      ${baraDeSus("Crazy", "🔥", `<span class="cmp-hud__pos">Level ${trecut} / ${felii.length}</span>`)}
+      ${baraDeSus("Level-up", "🔥", `<span class="cmp-hud__pos">Level ${trecut} / ${felii.length}</span>`)}
       <p class="cmp-map__intro">Cinci itemi pe level. O singură greșeală și levelul se închide,
         îl iei de la capăt. Levelurile sunt aceleași de fiecare dată, așa că
         „am trecut de ${trecut || 12}" chiar înseamnă ceva.</p>
@@ -981,7 +981,7 @@ function deseneazaNivel() {
       if (k === r.cheie) cls = " opt-correct";
       else if (k === r.ales) cls = " opt-wrong";
     }
-    return `<button type="button" class="tgame-opt${cls}" data-act="raspunde-nebun"
+    return `<button type="button" class="tgame-opt${cls}" data-act="raspunde-levelup"
         data-k="${k}"${r ? " disabled" : ""}>
         <span class="tgame-opt__k">${k}</span>
         <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
@@ -989,7 +989,7 @@ function deseneazaNivel() {
   });
   const pasi = Array.from({ length: ITEMI_PE_NIVEL }, (_, i) =>
     `<i class="cmp-step${i < J.pozitie ? " is-done" : i === J.pozitie ? " is-now" : ""}" aria-hidden="true"></i>`).join("");
-  radacina.className = "cmp cmp--play cmp--nebun";
+  radacina.className = "cmp cmp--play cmp--levelup";
   radacina.innerHTML = `
     <section class="cmp-play cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
       ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
@@ -1000,14 +1000,14 @@ function deseneazaNivel() {
           <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
           <div class="tgame-opts">${variante}</div>
           ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>
-            <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe-nebun">${r.corect ? "Continue ▸" : "Vezi ce-a ieșit ▸"}</button></div>` : ""}
+            <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe-levelup">${r.corect ? "Continue ▸" : "Vezi ce-a ieșit ▸"}</button></div>` : ""}
         </article>
       </div>
     </section>`;
   J.proaspete = new Set(); // pâlpâie o dată, la desenul de după câștig
 }
 
-async function raspundeNebun(buton) {
+async function raspundeLevelUp(buton) {
   const it = itemCurent();
   if (!it || J.raspunsCurent) return;
   const card = radacina.querySelector(".cmp-card");
@@ -1024,7 +1024,7 @@ async function raspundeNebun(buton) {
   deseneaza();
 }
 
-async function maiDeparteNebun() {
+async function maiDeparteLevelUp() {
   const gresit = J.raspunsCurent && !J.raspunsCurent.corect;
   J.raspunsCurent = null;
   if (gresit) { await inchideNivelul(false); return deseneaza(); }
@@ -1077,7 +1077,7 @@ function deseneazaSfarsitNivel() {
   radacina.className = "cmp cmp--done";
   radacina.innerHTML = `
     <section class="cmp-done cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
-      ${baraDeSus("Crazy", "🔥", "", "harta")}
+      ${baraDeSus("Level-up", "🔥", "", "harta")}
       <div class="cmp-done__in">
         <p class="cmp-done__sign" aria-hidden="true">${trecut ? L.semn : "💥"}</p>
         <h2 class="cmp-done__title">${trecut ? `Level ${J.nivel} complete` : "Game Over"}</h2>
@@ -1105,7 +1105,7 @@ function deseneaza() {
   }
   if (J.ecran === "relaxat") return deseneazaRelaxat();
   if (J.ecran === "clasic" || J.ecran === "aventura") return deseneazaRunda();
-  if (J.ecran === "nebun") return deseneazaNebunia();
+  if (J.ecran === "levelup") return deseneazaLevelUp();
   return deseneazaAlegerea();
 }
 
@@ -1149,11 +1149,11 @@ function laApasare(e) {
     case "mai-departe": return maiDeparte();
     case "din-nou": J.faza = "config"; J.gata = false; return deseneaza();
 
-    // — Nebunia —
+    // — Level-up —
     case "nivel": return incepeNivelul(Number(b.dataset.n));
     case "harta": J.faza = "harta"; return deseneaza();
-    case "raspunde-nebun": return void raspundeNebun(b);
-    case "mai-departe-nebun": return void maiDeparteNebun();
+    case "raspunde-levelup": return void raspundeLevelUp(b);
+    case "mai-departe-levelup": return void maiDeparteLevelUp();
     default: return;
   }
 }
@@ -1183,8 +1183,8 @@ function laScris(e) {
 function alegeModul(mod) {
   if (!MODURI.some((m) => m.id === mod)) return;
   J.ecran = mod;
-  // Nebunia se deschide pe hartă, celelalte pe configurator; Relaxatul n-are faze.
-  J.faza = mod === "nebun" ? "harta" : "config";
+  // Level-up se deschide pe hartă, celelalte pe configurator; Relaxatul n-are faze.
+  J.faza = mod === "levelup" ? "harta" : "config";
   J.gata = false;
   J.raspunsCurent = null;
   deseneaza();
