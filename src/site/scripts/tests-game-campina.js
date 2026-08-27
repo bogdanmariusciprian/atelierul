@@ -908,9 +908,10 @@ function insigneleHtml() {
   const bucati = coduri.map((cod, i) => {
     const d = despreInsigna(cod);
     if (!d) return "";
-    /* Pornim din stânga-sus și mergem în jurul cardului. Elipsa e mai lată
-       decât înaltă fiindcă și cardul e. */
-    const unghi = (-140 + (i * 280) / Math.max(1, n - 1)) * Math.PI / 180;
+    /* Arcul e numai pe DREAPTA cardului, de la -80° la +80°. Golul din stânga
+       nu-i liber: acolo stă numărul mare al itemului, iar două lucruri care se
+       calcă nu sunt o podoabă, ci o dezordine. */
+    const unghi = (-80 + (i * 160) / Math.max(1, n - 1)) * Math.PI / 180;
     const x = 50 + Math.cos(unghi) * 62;
     const y = 50 + Math.sin(unghi) * 58;
     const noua = J.proaspete.has(cod) ? " e-noua" : "";
@@ -1016,12 +1017,16 @@ function deseneazaNivel() {
   radacina.className = "cmp cmp--play cmp--levelup";
   radacina.innerHTML = `
     <section class="cmp-play cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
-      ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn,
-        `<span class="cmp-hud__pos">#${numar} / ${J.numarGlobal.size}</span><span class="cmp-steps">${pasi}</span>`, "harta")}
+      ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
+      <div class="cmp-veil" aria-hidden="true"></div>
+      <p class="cmp-bignum">
+        <b>#${numar}</b>
+        <i>din ${J.numarGlobal.size}</i>
+        <em class="cmp-bignum__go">Game Over</em>
+      </p>
       <div class="cmp-orbit">
         ${insigneleHtml()}
         <article class="tgame-card cmp-card${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
-          <div class="cmp-item__nr cmp-item__nr--global" title="Itemul ${numar} din cei ${J.numarGlobal.size} ai băncii">#${numar}</div>
           ${capulItemului(it)}
           <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
           <div class="tgame-opts">${variante}</div>
@@ -1053,10 +1058,29 @@ async function raspundeLevelUp(buton) {
 async function maiDeparteLevelUp() {
   const gresit = J.raspunsCurent && !J.raspunsCurent.corect;
   J.raspunsCurent = null;
-  if (gresit) { await inchideNivelul(false); return deseneaza(); }
+  if (gresit) { await inchideNivelul(false); return caderea(); }
   J.pozitie++;
   if (J.pozitie >= J.rand.length) { await inchideNivelul(true); }
   deseneaza();
+}
+
+/* CĂDEREA. Numărul itemului pleacă din marginea lui spre mijlocul ecranului, iar
+   ce rămâne în urmă se încețoșează: enunțul și verdictul nu dispar, se retrag.
+   Pe urmă vine harta singură, fără niciun buton de apăsat, fiindcă la capătul
+   unui level pierdut n-ai de ales nimic - ai de ales unde mergi mai departe.
+
+   NU se redesenează nimic înainte de animație: tocmai cardul cu răspunsul
+   corect și explicația trebuie să rămână dedesubt, altfel elevul ar pierde
+   singurul lucru pe care avea ce învăța din greșeala aceea.
+
+   Cine a cerut mai puțină mișcare din sistem primește doar întunecarea, scurtă. */
+const CADEREA_MS = 1500;
+function caderea() {
+  const sectiune = radacina.querySelector(".cmp-play");
+  if (!sectiune) { J.faza = "harta"; return deseneaza(); }
+  sectiune.classList.add("e-cade");
+  const potolit = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  setTimeout(() => { J.faza = "harta"; deseneaza(); }, potolit ? 450 : CADEREA_MS);
 }
 
 /* ÎNCHIDEREA UNUI LEVEL, într-un singur loc: numărul de încercări, trecerea,

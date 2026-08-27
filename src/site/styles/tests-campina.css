@@ -164,13 +164,6 @@
   background: var(--color-primary); color: var(--color-bg);
 }
 .cmp-item__fb { margin-top: 0.9rem; }
-/* Numărul din toată banca, la Level-up. Poartă culoarea world-ului, nu pe cea a
-   categoriei: acolo el e un reper al urcușului, nu o etichetă de pagină. */
-.cmp-item__nr--global {
-  left: auto; right: -0.6rem;
-  background: var(--lume, var(--color-primary));
-  color: #fff; font-variant-numeric: tabular-nums;
-}
 
 .cmp-note { margin-top: 0.9rem; }
 .cmp-note__lab {
@@ -470,7 +463,82 @@
 }
 
 /* ---------------------------------------------------------
-   9. Fereastra de semnalare
+   9. Numărul mare al itemului, și căderea lui
+   --------------------------------------------------------- */
+/* AȘEZAREA E ABSOLUTĂ LA ORICE LĂȚIME, și nu din capriciu: zborul spre mijloc e
+   o tranziție pe `left`/`top`, iar tranziția cere ca amândouă capetele să fie
+   poziționate. Dacă pe telefon numărul ar sta în firul paginii, saltul spre
+   centru n-ar avea de unde porni și ar apărea brusc acolo.
+   Pe ecran îngust stă deasupra cardului, iar `.cmp-play` îi face loc; de la
+   900px încolo trece în golul din stânga, unde nu se calcă cu nimic. */
+.cmp-play { position: relative; padding-top: 5rem; }
+
+.cmp-bignum {
+  position: absolute; left: 50%; top: 1.2rem; transform: translateX(-50%);
+  margin: 0; text-align: center; line-height: 1; z-index: 3;
+  transition: left 0.75s cubic-bezier(.4,0,.2,1), top 0.75s cubic-bezier(.4,0,.2,1),
+              transform 0.75s cubic-bezier(.34,1.3,.64,1);
+}
+.cmp-bignum b {
+  display: block; font-size: clamp(2rem, 5.5vw, 3.1rem); font-weight: 800;
+  letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+  color: var(--lume, var(--color-primary));
+  animation: cmp-batai 2.4s ease-in-out infinite;
+}
+.cmp-bignum i {
+  display: block; margin-top: 0.15rem; font-style: normal;
+  font-size: 0.72rem; letter-spacing: 0.04em; color: var(--color-text-muted);
+}
+/* „Game Over" există în pagină de la început, dar nu ocupă loc și nu se citește
+   decât la cădere: pus abia atunci, ar fi apărut fără să apuce să se aprindă. */
+.cmp-bignum__go {
+  display: block; margin-top: 0.4rem; font-style: normal;
+  font-size: 0; opacity: 0; letter-spacing: 0.12em; text-transform: uppercase;
+  font-weight: 700; color: var(--color-text);
+  transition: opacity 0.4s ease 0.45s, font-size 0s linear 0.45s;
+}
+
+/* Bătaia inimii: mică, rară, cât să se vadă că numărul e viu. */
+@keyframes cmp-batai {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
+@media (min-width: 900px) {
+  .cmp-play { padding-top: 0; }
+  .cmp-bignum { left: 4.2rem; top: 50%; transform: translate(-50%, -50%); }
+}
+
+/* Vălul: întuneric plus încețoșare a ce e dedesubt. Culoarea singură ar fi fost
+   de-ajuns și fără `backdrop-filter`, deci acolo unde el lipsește nu se pierde
+   nimic esențial - doar finețea. */
+.cmp-veil {
+  position: absolute; inset: 0; z-index: 2;
+  background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(7px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.55s ease;
+}
+.cmp-play.e-cade .cmp-veil { opacity: 1; }
+.cmp-play.e-cade .cmp-bignum {
+  left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1.9);
+}
+.cmp-play.e-cade .cmp-bignum b { animation: none; color: #fff; }
+.cmp-play.e-cade .cmp-bignum i { color: rgb(255 255 255 / 0.7); }
+.cmp-play.e-cade .cmp-bignum__go { font-size: 0.9rem; opacity: 1; color: #fff; }
+/* Cardul rămâne dedesubt, retras: răspunsul corect și explicația nu se pierd,
+   doar se dau la o parte. */
+.cmp-play.e-cade .cmp-orbit { pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cmp-bignum { transition: none; }
+  .cmp-bignum b { animation: none; }
+  .cmp-veil { transition: opacity 0.2s linear; }
+  .cmp-play.e-cade .cmp-bignum { left: 50%; top: 50%; transform: translate(-50%, -50%); }
+}
+
+/* ---------------------------------------------------------
+   10. Fereastra de semnalare
    --------------------------------------------------------- */
 .cmp-dlg {
   border: 0; border-radius: 18px; padding: 0; max-width: 32rem; width: calc(100% - 2rem);
