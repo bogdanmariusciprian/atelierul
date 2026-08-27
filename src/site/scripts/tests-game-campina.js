@@ -34,6 +34,7 @@ import {
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { isLoggedIn } from "../../shared/scripts/session.js";
+import { CAPITOLE, LEVELS_PE_CAPITOL, fragmentul } from "./campina-poveste.js";
 
 const OPTS = ["A", "B", "C", "D"];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -45,7 +46,7 @@ const uuid = () => (crypto.randomUUID
       (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
 
 /* VOCABULARUL DE JOC E ÎN ENGLEZĂ, restul textului în română, și e o despărțire
-   voită. „Lives", „Level", „World", „Streak", „Game Over" sunt semne, nu
+   voită. „Lives", „Level", „Chapter", „Streak", „Game Over" sunt semne, nu
    explicații: orice copil le-a văzut în orice joc și le citește dintr-o
    privire, iar engleza le dă chiar aerul de joc. Tot ce EXPLICĂ, în schimb,
    rămâne românesc: acolo se înțelege, iar înțelegerea se face în limba ta. */
@@ -77,7 +78,7 @@ const J = {
   sesiune: null,      // id-ul rundei, pentru punctele date de server
   gata: false,
   // — Level-up —
-  lume: 0, nivel: 0,
+  capitol: 0, nivel: 0,
   leveluri: new Map(), // level → { tries, passed }
   insigne: new Set(),  // codurile câștigate
   proaspete: new Set(), // insignele câștigate ACUM, ca să pâlpâie o dată
@@ -822,26 +823,13 @@ function deseneazaFinal() {
 // ---------- 4. LEVEL-UP ----------
 
 const ITEMI_PE_NIVEL = 5;
-const NIVELE_PE_LUME = 22;
-/* WORLDS: drumul unui caz, de la sesizare la sentință. Numărul lor nu e ales pe
-   ghicite (880 de itemi împărțiți la 5 dau 176 de levels, iar 176 la 8 dau 22
-   rotund), dar numele sunt: elevul care învață aici se pregătește pentru Școala
-   de Agenți de la Câmpina, deci urcușul lui prin gramatică merge pe alături cu
-   drumul unui dosar. Nu tipuri de infractori, ci pașii prin care sunt prinși:
-   aceeași lume, luată dinspre partea bună a mesei.
+/* CAPITOLELE vin din `campina-poveste.js`: acolo e text, aici e joc. Un capitol
+   ține zece levels, iar fiecare level trecut descoperă un fragment din caz.
 
-   Numele lumilor sunt ROMÂNEȘTI, fiindcă sunt conținut, nu semne de joc.
-   Englezescul rămâne unde era: World, Level, Lives, Game Over. */
-const LUMI = [
-  { nume: "Sesizarea",     semn: "🚨", culoare: "#2563eb", insigna: "Dosar deschis" },
-  { nume: "Fața locului",  semn: "🚧", culoare: "#a16207", insigna: "Perimetru securizat" },
-  { nume: "Urmele",        semn: "🔍", culoare: "#475569", insigna: "Amprente ridicate" },
-  { nume: "Martorii",      semn: "🗣️", culoare: "#0f766e", insigna: "Declarații luate" },
-  { nume: "Suspecții",     semn: "🕵️", culoare: "#9a3412", insigna: "Suspect identificat" },
-  { nume: "Probele",       semn: "🧾", culoare: "#15803d", insigna: "Probe la dosar" },
-  { nume: "Rechizitoriul", semn: "📜", culoare: "#6d28d9", insigna: "Rechizitoriu întocmit" },
-  { nume: "Sentința",      semn: "🏛️", culoare: "#b45309", insigna: "Caz închis" },
-];
+   De ce zece, și nu douăzeci și doi ca la început: la 22 de levels, capătul
+   unui capitol venea o dată la o oră bună de joc, iar povestea se târa. La
+   zece, fiecare seară de învățat mută dosarul mai departe. */
+const NIVELE_PE_LUME = LEVELS_PE_CAPITOL;
 
 /* BADGES. Trei feluri, și niciunul nu se dă pentru simplă înaintare:
    · faptele (First Step, Hot Streak, On Fire, Comeback, Halfway) se câștigă
@@ -857,15 +845,15 @@ const INSIGNE = {
   "comeback":   { nume: "Comeback",   semn: "💪", de_ce: "ai trecut un level pe care picaseși" },
   "halfway":    { nume: "Halfway",    semn: "🧭", de_ce: "jumătate din drum" },
 };
-const codLume = (i) => `world-${i + 1}`;
+const codCapitol = (i) => `cap-${i + 1}`;
 /* Insigna unui world poartă numele pasului din dosar, nu „X Cleared": lipit
    după un nume românesc, cuvântul englezesc suna a traducere neterminată, iar
    „Amprente ridicate" spune și ce-ai făcut, nu doar că ai terminat ceva. */
-const insignaLumii = (i) => ({
-  nume: LUMI[i].insigna, semn: LUMI[i].semn, de_ce: `ai încheiat world-ul ${LUMI[i].nume}`,
+const insignaCapitolului = (i) => ({
+  nume: CAPITOLE[i].insigna, semn: CAPITOLE[i].semn, de_ce: `ai încheiat capitolul „${CAPITOLE[i].titlu}”`,
 });
 const despreInsigna = (cod) => INSIGNE[cod]
-  || (cod.startsWith("world-") ? insignaLumii(Number(cod.slice(6)) - 1) : null);
+  || (cod.startsWith("cap-") ? insignaCapitolului(Number(cod.slice(6)) - 1) : null);
 
 /* Toți itemii, în ordinea lor firească (an, sesiune, numărul de pe hârtie),
    tăiați în felii de câte cinci. Ordinea e AȘEZATĂ, nu amestecată: un level
@@ -880,7 +868,7 @@ function nivelele() {
 }
 
 const cateNivele = () => nivelele().length;
-const lumeaNivelului = (n) => Math.min(LUMI.length - 1, Math.floor((n - 1) / NIVELE_PE_LUME));
+const capitolulLevelului = (n) => Math.min(CAPITOLE.length - 1, Math.floor((n - 1) / NIVELE_PE_LUME));
 /* Cât de încins e levelul ÎN world-ul lui: 0 la primul, 1 la al 22-lea. Din el
    iese și tăria fundalului, ca lumina să crească pe măsură ce urci, nu doar
    când sari dintr-un world în altul. */
@@ -888,17 +876,17 @@ const incinsul = (n) => {
   const inauntru = (n - 1) % NIVELE_PE_LUME;
   return NIVELE_PE_LUME > 1 ? inauntru / (NIVELE_PE_LUME - 1) : 0;
 };
-const eUltimaLume = (i) => i === LUMI.length - 1;  // Sentința: fundal viu
+const eUltimulCapitol = (i) => i === CAPITOLE.length - 1;  // Sentința: fundal viu
 
 /* Fundalul unui level. Tăria se socotește AICI, în JavaScript, și pleacă spre
    CSS ca număr gata făcut: `color-mix` cu procent calculat merge în browserele
    noi, dar nu în toate, iar un fundal care lipsește pe unele ecrane ar fi fost
    un preț prea mare pentru o linie mai scurtă. */
-function hainaLumii(n) {
-  const i = lumeaNivelului(n);
-  const L = LUMI[i];
+function hainaCapitolului(n) {
+  const i = capitolulLevelului(n);
+  const L = CAPITOLE[i];
   const tarie = (7 + Math.round(incinsul(n) * 15)) + "%";
-  return `--lume:${L.culoare}; --tarie:${tarie}; --zbor:${ZBOR_MS}ms; --pompa:${POMPA_MS}ms; --pompe:${POMPE}`;
+  return `--cap:${L.culoare}; --tarie:${tarie}; --zbor:${ZBOR_MS}ms; --pompa:${POMPA_MS}ms; --pompe:${POMPE}`;
 }
 
 function deseneazaLevelUp() {
@@ -946,30 +934,30 @@ function deseneazaHarta() {
      limpede câte au mai rămas, ca să știi cât drum ai.
 
      Regula se sprijină pe cea a levelurilor, nu se bate cu ea: levelurile se
-     deschid unul câte unul, deci ca să ajungi la primul level al unui world
+     deschid unul câte unul, deci ca să ajungi la primul level al unui capitol
      trebuie oricum să le fi trecut pe toate ale celui dinainte. */
-  const ultimaDeschisa = LUMI.findIndex((_, li) => trecut < li * NIVELE_PE_LUME);
-  const cateSeVad = ultimaDeschisa === -1 ? LUMI.length : ultimaDeschisa; // câte sunt DESCHISE
-  const lumi = LUMI.map((L, li) => {
+  const ultimaDeschisa = CAPITOLE.findIndex((_, li) => trecut < li * NIVELE_PE_LUME);
+  const cateSeVad = ultimaDeschisa === -1 ? CAPITOLE.length : ultimaDeschisa; // câte sunt DESCHISE
+  const lumi = CAPITOLE.map((L, li) => {
     if (li > cateSeVad) return "";          // dincolo de ușa închisă: nimic
     if (li === cateSeVad) {                  // chiar ușa închisă
-      const cerut = LUMI[li - 1]?.nume || "";
-      return `<section class="cmp-world cmp-world--inchis" aria-label="World ${li + 1}, încă închis">
-          <header class="cmp-world__head">
-            <span class="cmp-world__sign" aria-hidden="true">🔒</span>
-            <b class="cmp-world__name">World ${li + 1}</b>
-            <span class="cmp-world__n">${cerut ? `se deschide când închei ${esc(cerut)}` : ""}</span>
+      const cerut = CAPITOLE[li - 1]?.titlu || "";
+      return `<section class="cmp-cap cmp-cap--inchis" aria-label="Chapter ${li + 1}, încă închis">
+          <header class="cmp-cap__head">
+            <span class="cmp-cap__sign" aria-hidden="true">🔒</span>
+            <b class="cmp-cap__name">Chapter ${li + 1}</b>
+            <span class="cmp-cap__n">${cerut ? `se deschide când închei „${esc(cerut)}”` : ""}</span>
           </header>
         </section>`;
     }
     const de_la = li * NIVELE_PE_LUME + 1;
-    /* ULTIMUL WORLD ÎNGHITE TOT CE PRISOSEȘTE. Cele 8 worlds a câte 22 ies exact
-       din cei 880 de itemi de azi; dar prima sesiune adăugată strică socoteala,
-       iar `lumeaNivelului` retează oricum la ultimul world. Dacă harta ar tăia
-       la 22 și acolo, levelurile de peste 176 n-ar mai apărea nicăieri: ar
-       exista, s-ar putea juca prin adresa lor, dar n-ar avea buton. Summit
-       crește, deci, în loc să ascundă. */
-    const pana = li === LUMI.length - 1
+    /* ULTIMUL CAPITOL ÎNGHITE TOT CE PRISOSEȘTE. Cele 18 capitole a câte zece
+       acoperă 180 de levels, iar banca de azi are 176. Prima sesiune adăugată
+       strică socoteala, iar `capitolulLevelului` retează oricum la ultimul
+       capitol. Dacă harta ar tăia și ea la zece, levelurile de peste capătul
+       socotelii n-ar mai apărea nicăieri: ar exista, s-ar putea juca prin
+       adresa lor, dar n-ar avea buton. Ultimul capitol crește, nu ascunde. */
+    const pana = li === CAPITOLE.length - 1
       ? felii.length
       : Math.min(de_la + NIVELE_PE_LUME - 1, felii.length);
     if (de_la > felii.length) return "";
@@ -988,13 +976,23 @@ function deseneazaHarta() {
           title="${deschis ? `Level ${n} · itemii #${de_la_it}-${pana_it}${l ? ` · ${l.tries} ${l.tries === 1 ? "încercare" : "încercări"}` : ""}` : "Se deschide după levelul dinainte"}">${n}</button>`);
     }
     const treuteAici = [...J.leveluri].filter(([n, l]) => l.passed && n >= de_la && n <= pana).length;
-    return `<section class="cmp-world${eUltimaLume(li) ? " e-final" : ""}" style="--lume:${L.culoare}">
-        <header class="cmp-world__head">
-          <span class="cmp-world__sign" aria-hidden="true">${L.semn}</span>
-          <b class="cmp-world__name">World ${li + 1} · ${esc(L.nume)}</b>
-          <span class="cmp-world__n">${treuteAici} / ${pana - de_la + 1}</span>
+    /* POVESTEA STRÂNSĂ. Fragmentele levelurilor trecute din capitolul ăsta, în
+       ordine. Ele nu se pierd după ce le-ai văzut o dată: harta e și locul unde
+       reciteşti ce-ai aflat până acum, ca la o carte pe care o iei de pe raft. */
+    const povestea = [];
+    for (let n = de_la; n <= pana; n++) {
+      if (!J.leveluri.get(n)?.passed) continue;
+      const f = fragmentul(n);
+      if (f) povestea.push(`<li class="cmp-frag"><b>${n}</b><span>${esc(f)}</span></li>`);
+    }
+    return `<section class="cmp-cap${eUltimulCapitol(li) ? " e-final" : ""}" style="--cap:${L.culoare}">
+        <header class="cmp-cap__head">
+          <span class="cmp-cap__sign" aria-hidden="true">${L.semn}</span>
+          <b class="cmp-cap__name">Chapter ${li + 1} · ${esc(L.titlu)}</b>
+          <span class="cmp-cap__n">${treuteAici} / ${pana - de_la + 1}</span>
         </header>
         <div class="cmp-lvls">${patrate.join("")}</div>
+        ${povestea.length ? `<ol class="cmp-frags">${povestea.join("")}</ol>` : ""}
       </section>`;
   }).join("");
   const galerie = [...J.insigne].map((cod) => {
@@ -1010,9 +1008,9 @@ function deseneazaHarta() {
         „am trecut de ${trecut || 12}" chiar înseamnă ceva.</p>
       ${galerie ? `<div class="cmp-gallery"><span class="cmp-gallery__lab">Badges</span>${galerie}</div>` : ""}
       ${lumi}
-      ${cateSeVad + 1 < LUMI.length
-        ? `<p class="cmp-map__rest">Mai sunt <b>${LUMI.length - cateSeVad - 1}</b> worlds dincolo de aceasta.
-             Se arată pe rând, pe măsură ce dosarul înaintează.</p>`
+      ${cateSeVad + 1 < CAPITOLE.length
+        ? `<p class="cmp-map__rest">Mai sunt <b>${CAPITOLE.length - cateSeVad - 1}</b> chapters dincolo de acesta.
+             Se deschid pe rând, pe măsură ce dosarul înaintează.</p>`
         : ""}
     </section>`;
 }
@@ -1021,7 +1019,7 @@ function incepeNivelul(n) {
   const felii = nivelele();
   if (n < 1 || n > felii.length || n > levelMax() + 1) return;
   J.nivel = n;
-  J.lume = lumeaNivelului(n);
+  J.capitol = capitolulLevelului(n);
   J.rand = felii[n - 1].slice();
   J.pozitie = 0;
   J.bune = 0; J.rele = 0; J.puncte = 0;
@@ -1036,7 +1034,7 @@ function incepeNivelul(n) {
 function deseneazaNivel() {
   const it = itemCurent();
   if (!it) { J.faza = "gata"; return deseneaza(); }
-  const L = LUMI[J.lume];
+  const L = CAPITOLE[J.capitol];
   const r = J.raspunsCurent;
   const variante = varianteHtml(it, (k) => {
     let cls = "";
@@ -1055,8 +1053,8 @@ function deseneazaNivel() {
   const numar = J.numarGlobal.get(it.id) || 0;
   radacina.className = "cmp cmp--play cmp--levelup";
   radacina.innerHTML = `
-    <section class="cmp-play cmp-lume${eUltimaLume(J.lume) ? " e-final" : ""}" style="${hainaLumii(J.nivel)}">
-      ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
+    <section class="cmp-play cmp-cap-scena${eUltimulCapitol(J.capitol) ? " e-final" : ""}" style="${hainaCapitolului(J.nivel)}">
+      ${baraDeSus(`${L.titlu}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
       <div class="cmp-veil" aria-hidden="true"></div>
       <p class="cmp-bignum">
         <b>#${numar}</b>
@@ -1177,13 +1175,13 @@ async function inchideNivelul(trecut) {
     if (J.serie >= 10) da("on-fire");
     if (eraCazut) da("comeback");
     if (levelMax() >= Math.ceil(cateNivele() / 2)) da("halfway");
-    // World încheiat: toate levelurile lui sunt trecute.
-    const li = lumeaNivelului(n);
+    // Capitol încheiat: toate levelurile lui sunt trecute.
+    const li = capitolulLevelului(n);
     const de_la = li * NIVELE_PE_LUME + 1;
     const pana = Math.min(de_la + NIVELE_PE_LUME - 1, cateNivele());
     let tot = true;
     for (let x = de_la; x <= pana; x++) if (!J.leveluri.get(x)?.passed) { tot = false; break; }
-    if (tot) da(codLume(li));
+    if (tot) da(codCapitol(li));
     if (isLoggedIn()) await Promise.all(castigate.map((cod) => awardBadge(J.exam, cod)));
   }
   if (isLoggedIn()) await saveMyLevel({ exam: J.exam, level: n, tries: acum.tries, passed: acum.passed });
@@ -1192,7 +1190,7 @@ async function inchideNivelul(trecut) {
 function deseneazaSfarsitNivel() {
   const l = J.leveluri.get(J.nivel);
   const trecut = J.rele === 0 && J.pozitie >= J.rand.length;
-  const L = LUMI[J.lume];
+  const L = CAPITOLE[J.capitol];
   const felii = cateNivele();
   const urmator = J.nivel + 1;
   const noi = [...J.proaspete].map((cod) => {
@@ -1201,7 +1199,7 @@ function deseneazaSfarsitNivel() {
   }).join("");
   radacina.className = "cmp cmp--done";
   radacina.innerHTML = `
-    <section class="cmp-done cmp-lume${eUltimaLume(J.lume) ? " e-final" : ""}" style="${hainaLumii(J.nivel)}">
+    <section class="cmp-done cmp-cap-scena${eUltimulCapitol(J.capitol) ? " e-final" : ""}" style="${hainaCapitolului(J.nivel)}">
       ${baraDeSus("Level-up", "🔥", "", "harta")}
       <div class="cmp-done__in">
         <p class="cmp-done__sign" aria-hidden="true">${trecut ? L.semn : "💥"}</p>
@@ -1209,6 +1207,11 @@ function deseneazaSfarsitNivel() {
         <p class="cmp-done__stats">${trecut
           ? `Cinci din cinci${J.puncte ? ` · <b class="is-pts">+${J.puncte}</b> puncte` : ""}${J.serie > 1 ? ` · streak ${J.serie}` : ""}`
           : `Ai ținut <b>${J.bune}</b> ${J.bune === 1 ? "item" : "itemi"} din ${ITEMI_PE_NIVEL}. Greșeala oprește levelul, dar levelul e mereu același, deci a doua oară îl știi.${l && l.tries > 1 ? ` A ${l.tries}-a încercare.` : ""}`}</p>
+        ${trecut && fragmentul(J.nivel) ? `
+          <blockquote class="cmp-descoperit">
+            <span class="cmp-descoperit__lab">Din dosar</span>
+            <p>${esc(fragmentul(J.nivel))}</p>
+          </blockquote>` : ""}
         ${noi ? `<div class="cmp-newbadges"><span class="cmp-gallery__lab">Badge nou</span>${noi}</div>` : ""}
         <div class="cmp-done__acts">
           ${trecut && urmator <= felii

@@ -280,19 +280,19 @@
   margin: 0 0 var(--space-lg); max-width: 52ch;
   font-size: 0.88rem; line-height: 1.7; color: var(--color-text-muted);
 }
-/* `--lume` e culoarea lumii, pusă inline de JS. Amestecul cu fundalul o ține
+/* `--cap` e culoarea lumii, pusă inline de JS. Amestecul cu fundalul o ține
    mereu citibilă, și pe temă deschisă, și pe consola întunecată: nu punem
    culoarea brută nicăieri unde stă text. */
-.cmp-world {
+.cmp-cap {
   margin-bottom: var(--space-lg); padding: var(--space-md);
   border-radius: 18px;
-  border: 1.5px solid color-mix(in srgb, var(--lume) 40%, transparent);
-  background: color-mix(in srgb, var(--lume) 7%, var(--color-surface));
+  border: 1.5px solid color-mix(in srgb, var(--cap) 40%, transparent);
+  background: color-mix(in srgb, var(--cap) 7%, var(--color-surface));
 }
-.cmp-world__head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
-.cmp-world__sign { font-size: 1.2rem; }
-.cmp-world__name { font-size: 1rem; letter-spacing: -0.01em; }
-.cmp-world__n {
+.cmp-cap__head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
+.cmp-cap__sign { font-size: 1.2rem; }
+.cmp-cap__name { font-size: 1rem; letter-spacing: -0.01em; }
+.cmp-cap__n {
   margin-left: auto; font-size: 0.78rem; color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -306,27 +306,27 @@
   font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
   font-variant-numeric: tabular-nums;
   aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px;
-  border: 1.5px solid color-mix(in srgb, var(--lume) 45%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--cap) 45%, transparent);
   background: var(--color-bg); color: var(--color-text);
   transition: transform 0.08s ease, border-color 0.12s ease;
 }
-.cmp-lvl:hover:not([disabled]) { transform: scale(1.06); border-color: var(--lume); }
+.cmp-lvl:hover:not([disabled]) { transform: scale(1.06); border-color: var(--cap); }
 .cmp-lvl.is-done {
-  background: color-mix(in srgb, var(--lume) 65%, var(--color-bg));
-  border-color: var(--lume); color: #fff;
+  background: color-mix(in srgb, var(--cap) 65%, var(--color-bg));
+  border-color: var(--cap); color: #fff;
 }
 .cmp-lvl.is-locked { opacity: 0.32; cursor: not-allowed; }
 
 /* Ușa închisă: aceeași casetă, dar fără grilă și fără culoare proprie. Nu-i o
    lume ștearsă, e una care încă n-a fost deschisă, și se vede că e acolo. */
-.cmp-world--inchis {
+.cmp-cap--inchis {
   border-style: dashed;
   border-color: var(--color-border);
   background: transparent;
   opacity: 0.62;
 }
-.cmp-world--inchis .cmp-world__head { margin-bottom: 0; }
-.cmp-world--inchis .cmp-world__n { font-style: italic; }
+.cmp-cap--inchis .cmp-cap__head { margin-bottom: 0; }
+.cmp-cap--inchis .cmp-cap__n { font-style: italic; }
 .cmp-map__rest {
   margin: 0; padding: 0.7rem 0.9rem; border-radius: 12px;
   border: 1px dashed var(--color-border);
@@ -355,8 +355,8 @@
 
 /* Lumea își colorează butonul de mers mai departe și dunga cărții, ca trecerea
    dintr-o lume în alta să se vadă fără să scrie nimeni „ai intrat în Furtuna". */
-.cmp-lume .tgame-btn--primary { background: var(--lume); border-color: var(--lume); }
-.cmp-lume .cmp-card { border-top: 3px solid var(--lume); }
+.cmp-cap-scena .tgame-btn--primary { background: var(--cap); border-color: var(--cap); }
+.cmp-cap-scena .cmp-card { border-top: 3px solid var(--cap); }
 
 /* Vizitatorul, anunțat o dată, în ecranul de alegere. Nu-l oprim din joc; îi
    spunem doar de ce merită contul, ca să nu afle închizând fila. */
@@ -435,28 +435,28 @@
 /* ---------------------------------------------------------
    8. Fundalul care se încinge de la level la level
    --------------------------------------------------------- */
-/* `--lume` e culoarea world-ului, `--tarie` cât de mult din ea intră în fundal.
+/* `--cap` e culoarea world-ului, `--tarie` cât de mult din ea intră în fundal.
    Amândouă vin din JavaScript: procentul se socotește acolo și ajunge gata
    făcut, fiindcă `color-mix` cu procent calculat în CSS nu merge peste tot, iar
    un fundal care lipsește pe unele ecrane ar fi fost un preț prea mare. */
-.cmp-lume {
+.cmp-cap-scena {
   border-radius: 18px;
   padding: var(--space-md);
-  background: color-mix(in srgb, var(--lume) var(--tarie, 8%), transparent);
+  background: color-mix(in srgb, var(--cap) var(--tarie, 8%), transparent);
   transition: background 0.5s ease;
 }
-.cmp-lume .cmp-top { border-bottom-color: color-mix(in srgb, var(--lume) 35%, transparent); }
+.cmp-cap-scena .cmp-top { border-bottom-color: color-mix(in srgb, var(--cap) 35%, transparent); }
 
 /* SENTINȚA, ultimul world: fundal viu. Trei opriri care se plimbă încet peste o
    suprafață de două ori cât caseta - de aceea se vede mișcare fără să se miște
    nimic de fapt. Nu e o podoabă întâmplătoare: e semnul că ai ajuns sus. */
-.cmp-lume.e-final,
-.cmp-world.e-final {
+.cmp-cap-scena.e-final,
+.cmp-cap.e-final {
   background: linear-gradient(120deg,
-    color-mix(in srgb, var(--lume) 26%, transparent) 0%,
+    color-mix(in srgb, var(--cap) 26%, transparent) 0%,
     color-mix(in srgb, #b45309 20%, transparent) 35%,
     color-mix(in srgb, #6d28d9 22%, transparent) 65%,
-    color-mix(in srgb, var(--lume) 26%, transparent) 100%);
+    color-mix(in srgb, var(--cap) 26%, transparent) 100%);
   background-size: 300% 300%;
   animation: cmp-summit 18s ease-in-out infinite;
 }
@@ -466,16 +466,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cmp-lume.e-final, .cmp-world.e-final { animation: none; background-size: 100% 100%; }
+  .cmp-cap-scena.e-final, .cmp-cap.e-final { animation: none; background-size: 100% 100%; }
   .cmp-badge.e-noua { animation: none; }
-  .cmp-lume { transition: none; }
+  .cmp-cap-scena { transition: none; }
 }
 
 /* Levelul încercat și nereușit se vede altfel decât cel neatins: nu-i o
    mustrare, e un reper - „aici am fost, aici m-am oprit". */
 .cmp-lvl.is-tried {
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--lume) 70%, transparent);
+  border-color: color-mix(in srgb, var(--cap) 70%, transparent);
 }
 
 /* ---------------------------------------------------------
@@ -529,7 +529,7 @@
 .cmp-bignum b {
   display: block; font-size: clamp(2rem, 5.5vw, 3.1rem); font-weight: 800;
   letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
-  color: var(--lume, var(--color-primary));
+  color: var(--cap, var(--color-primary));
   animation: cmp-batai 2.4s ease-in-out infinite;
 }
 .cmp-bignum i {
@@ -581,7 +581,7 @@
    centru: fără `translate(-50%,-50%)` în cadre, numărul ar zvâcni în colț. */
 .cmp-play.e-reusit .cmp-veil {
   opacity: 1;
-  background: color-mix(in srgb, var(--lume, var(--color-primary)) 30%, rgb(0 0 0 / 0.25));
+  background: color-mix(in srgb, var(--cap, var(--color-primary)) 30%, rgb(0 0 0 / 0.25));
   backdrop-filter: blur(4px);
 }
 .cmp-play.e-reusit .cmp-bignum {
@@ -623,7 +623,44 @@
 }
 
 /* ---------------------------------------------------------
-   10. Fereastra de semnalare
+   10. Povestea: fragmentul descoperit și dosarul strâns
+   --------------------------------------------------------- */
+/* Fragmentul de la capătul unui level. E citat, nu anunț: are bară în stânga și
+   se citește mai lat decât restul, fiindcă e singura bucată de pe ecran care
+   cere citit, nu privit. */
+.cmp-descoperit {
+  margin: 0 0 var(--space-md); padding: 0.85rem 1rem;
+  text-align: left; border-radius: 0;
+  border-left: 3px solid var(--cap, var(--color-primary));
+  background: color-mix(in srgb, var(--cap, var(--color-primary)) 8%, transparent);
+}
+.cmp-descoperit__lab {
+  display: block; margin-bottom: 0.3rem;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-text-muted);
+}
+.cmp-descoperit p {
+  margin: 0; font-size: 0.95rem; line-height: 1.75; font-family: var(--font-serif, inherit);
+}
+
+/* Dosarul strâns până acum, sub capitolul lui pe hartă. Numărul levelului stă
+   în stânga, ca la o carte cu paragrafe numerotate: așa se vede și povestea, și
+   unde ai ajuns cu ea. */
+.cmp-frags {
+  margin: var(--space-md) 0 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.cmp-frag {
+  display: grid; grid-template-columns: 1.9rem 1fr; gap: 0.6rem;
+  font-size: 0.87rem; line-height: 1.7; color: var(--color-text);
+}
+.cmp-frag b {
+  font-variant-numeric: tabular-nums; font-size: 0.72rem; font-weight: 800;
+  color: var(--cap, var(--color-primary)); padding-top: 0.35rem;
+}
+
+/* ---------------------------------------------------------
+   11. Fereastra de semnalare
    --------------------------------------------------------- */
 .cmp-dlg {
   border: 0; border-radius: 18px; padding: 0; max-width: 32rem; width: calc(100% - 2rem);
