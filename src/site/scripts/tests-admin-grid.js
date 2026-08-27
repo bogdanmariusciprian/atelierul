@@ -1,7 +1,12 @@
 // =========================================================
-// Teste → Admitere Drept — ADMIN grid (Excel-like), teacher only.
+// Teste → ADMIN grid (Excel-like), teacher only. ORICE examen: grila primește
+// slugul categoriei (`admitere-drept`, `admitere-campina`, …) și-l trimite mai
+// departe la RPC-uri, care sunt deja parametrizate pe examen. Nimic din ce
+// urmează nu e legat de un examen anume — nici măcar coloana „Corect 2026",
+// care înseamnă „răspunsul pe gramatica de azi" și e de folos la orice subiect
+// vechi, indiferent de școala care l-a dat.
 //
-// A spreadsheet-style editor over `test_items` (loaded per year via the
+// A spreadsheet-style editor over `tests_items` (loaded per year via the
 // admin_test_items RPC, which returns the answers + unverified rows):
 //   • fills the browser (width + height); sticky header + sticky first columns
 //     (An/Sesiune/Nr); the active row highlighted with a gradient; zoom +/−/Fit.
@@ -64,8 +69,20 @@ const state = {
   colWidths: {}, // Excel-like column resize: 1-based column index → px width
 };
 
-export async function initTestAdminGrid(mountEl) {
+export async function initTestAdminGrid(mountEl, exam = "admitere-drept") {
   root = mountEl;
+  /* SCHIMBAREA EXAMENULUI. `state` trăiește între vizite (filtre, zoom, lățimi
+     de coloană), ca să regăsești grila cum ai lăsat-o. Dar dacă intri la alt
+     examen cu anii și itemii celui dinainte încă în mână, primul desen arată
+     datele altcuiva, iar un an care nu există la examenul nou rămâne ales.
+     Deci: la schimbare golesc TOT ce ține de examen și păstrez doar ce ține de
+     felul tău de a privi (zoom, lățimi). */
+  if (exam !== state.exam) {
+    state.exam = exam;
+    state.years = []; state.year = null; state.items = [];
+    state.session = ""; state.search = ""; state.mIndex = 0;
+    state.hideVerified = false; state.onlyNo2026 = false;
+  }
   if (!isMobile()) lockPageScroll(true); // desktop: Excel-like full screen (no page scroll). Phone scrolls normally.
   document.body.classList.add("tg-mode");
   if (!wired) { wireEvents(); wired = true; }

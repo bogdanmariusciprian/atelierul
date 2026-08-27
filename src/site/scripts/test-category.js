@@ -69,12 +69,19 @@ const wantsPractice = () =>
   (location.hash || "").replace(/^#/, "") === "joc"
   || !!new URLSearchParams(location.search).get("item"); // report deep link
 
+/* CINE POATE INTRA. `live` spune că jocul e deschis ELEVILOR. Profesorul intră
+   și înainte de asta: el nu vine să se antreneze, ci să pregătească itemii în
+   grilă — și tocmai categoria încă neangajată are nevoie de asta. Legat doar
+   de `live`, o categorie nouă ar fi fost închisă chiar și celui care o
+   construiește, iar itemii ar fi rămas fără nicio ușă. */
+const poateIntra = () => !!cat.live || adminMode;
+
 function route() {
-  const play = !!cat.live && wantsPractice();
+  const play = poateIntra() && wantsPractice();
   document.body.classList.toggle("tgame-active", play); // shrink the page hero while playing
   if (play) { stopFloat?.(); stopFloat = null; }        // leaving the intro → drop the loop
   if (!play) { leaveAdminMode(); return renderIntro(); }
-  if (adminMode) return initTestAdminGrid(root); // teacher → item grid
+  if (adminMode) return initTestAdminGrid(root, cat.slug); // teacher → item grid
   leaveAdminMode();
   initTestGame(root, cat.slug);                  // pupil / guest → mini-game
 }
@@ -499,21 +506,31 @@ function ballGlobe(word, reps = 2) {
 // there isn't — rather than a link that's disabled, which still invites the
 // click and then refuses it.
 function ballHtml() {
-  const word = cat.live ? "Exersează" : "În curând";
-  const tag = cat.live ? "a" : "span";
-  const attrs = cat.live
-    ? ` href="#joc" aria-label="Exersează — antrenament interactiv"`
+  const intra = poateIntra();                  // profesorul intră și la categoria închisă
+  const doarProf = adminMode && !cat.live;     // închisă elevilor, deschisă lui
+  /* Cuvântul de pe bilă are o lungime de respectat: literele se împart în jurul
+     sferei, deci un cuvânt lung le înghesuie până se ating. „Pregătește" (10) e
+     vecin cu „Exersează" (9) și „În curând" (9); „Grila de itemi" (14) le-ar fi
+     îndesat. Ce face profesorul acolo scrie oricum dedesubt. */
+  const word = doarProf ? "Pregătește" : cat.live ? "Exersează" : "În curând";
+  const tag = intra ? "a" : "span";
+  const attrs = intra
+    ? ` href="#joc" aria-label="${esc(word)} — ${doarProf ? "pregătește banca de itemi" : "antrenament interactiv"}"`
     : ` role="note" aria-label="${esc(word)} — banca de itemi se pregătește"`;
-  const body = cat.live
-    ? `<b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
-       explicație imediată. Cei greșiți revin până îi nimerești.`
-    : `<b>Se pregătește.</b> Strângem itemii pentru această categorie și îi
-       verificăm unul câte unul. Între timp, subiectele se pot descărca.`;
+  const body = doarProf
+    ? `<b>Deocamdată numai pentru tine.</b> Elevii încă nu văd jocul aici.
+       Intri în grilă și pui cerințele, răspunsurile și etichetele; când banca
+       e gata, se deschide și lor.`
+    : cat.live
+      ? `<b>Antrenament interactiv.</b> Rezolvi câte un item pe rând, cu
+         explicație imediată. Cei greșiți revin până îi nimerești.`
+      : `<b>Se pregătește.</b> Strângem itemii pentru această categorie și îi
+         verificăm unul câte unul. Între timp, subiectele se pot descărca.`;
   return `<${tag} class="tcat__ball"${attrs}>
       <span class="tcat__ball__globe">${ballGlobe(word)}</span>
       <span class="tcat__ball__shade" aria-hidden="true"></span>
       <span class="tcat__ball__in">
-        <span class="tcat__ball__ic" aria-hidden="true">${adminMode && cat.live ? "🛠️" : cat.icon}</span>
+        <span class="tcat__ball__ic" aria-hidden="true">${adminMode && intra ? "🛠️" : cat.icon}</span>
         <span class="tcat__ball__title" aria-hidden="true">${esc(word)}</span>
         <span class="tcat__ball__more">${body}</span>
       </span>
@@ -559,7 +576,7 @@ function renderIntro() {
            come back. What changes is only what it says and whether it leads
            anywhere — a ball that isn't a link can't promise a game that
            doesn't exist yet. -->
-      <aside class="tcat__tank${cat.live ? "" : " is-soon"}">
+      <aside class="tcat__tank${poateIntra() ? "" : " is-soon"}">
         <span class="tcat__shadow" aria-hidden="true"></span>
         ${ballHtml()}
       </aside>
