@@ -270,9 +270,9 @@ const MODURI = [
     id: "levelup", nume: "Level-up", semn: "🔥",
     scurt: "5 itemi, zero greșeli",
     lung: `Levels de câte cinci itemi. O singură greșeală și levelul se închide;
-           îl iei de la capăt. Levelurile sunt strânse în worlds, iar fiecare
-           world are altă înfățișare: cu cât urci, cu atât se schimbă lumina.
-           Pe drum aduni badges.`,
+           îl iei de la capăt. Levelurile sunt strânse în opt worlds, care duc
+           un caz de la sesizare până la sentință: cu cât urci, cu atât înaintează
+           dosarul. Pe drum aduni badges.`,
   },
 ];
 
@@ -823,19 +823,24 @@ function deseneazaFinal() {
 
 const ITEMI_PE_NIVEL = 5;
 const NIVELE_PE_LUME = 22;
-/* Worlds. Numărul lor nu e ales pe ghicite: 880 de itemi împărțiți la 5 dau 176
-   de levels, iar 176 la 8 dau 22 rotund. Fiecare world are numele lui, semnul
-   lui și culoarea lui, ca urcușul să se simtă ca o trecere dintr-un loc în
-   altul, nu ca o bară care crește. */
+/* WORLDS: drumul unui caz, de la sesizare la sentință. Numărul lor nu e ales pe
+   ghicite (880 de itemi împărțiți la 5 dau 176 de levels, iar 176 la 8 dau 22
+   rotund), dar numele sunt: elevul care învață aici se pregătește pentru Școala
+   de Agenți de la Câmpina, deci urcușul lui prin gramatică merge pe alături cu
+   drumul unui dosar. Nu tipuri de infractori, ci pașii prin care sunt prinși:
+   aceeași lume, luată dinspre partea bună a mesei.
+
+   Numele lumilor sunt ROMÂNEȘTI, fiindcă sunt conținut, nu semne de joc.
+   Englezescul rămâne unde era: World, Level, Lives, Game Over. */
 const LUMI = [
-  { nume: "Dawn",    semn: "🌅", culoare: "#0f766e" },
-  { nume: "Forest",  semn: "🌲", culoare: "#15803d" },
-  { nume: "Fields",  semn: "🌾", culoare: "#a16207" },
-  { nume: "River",   semn: "🌊", culoare: "#0369a1" },
-  { nume: "Mountain",semn: "⛰️", culoare: "#57534e" },
-  { nume: "Storm",   semn: "⚡", culoare: "#6d28d9" },
-  { nume: "Night",   semn: "🌙", culoare: "#1e293b" },
-  { nume: "Summit",  semn: "👑", culoare: "#b45309" },
+  { nume: "Sesizarea",     semn: "🚨", culoare: "#2563eb", insigna: "Dosar deschis" },
+  { nume: "Fața locului",  semn: "🚧", culoare: "#a16207", insigna: "Perimetru securizat" },
+  { nume: "Urmele",        semn: "🔍", culoare: "#475569", insigna: "Amprente ridicate" },
+  { nume: "Martorii",      semn: "🗣️", culoare: "#0f766e", insigna: "Declarații luate" },
+  { nume: "Suspecții",     semn: "🕵️", culoare: "#9a3412", insigna: "Suspect identificat" },
+  { nume: "Probele",       semn: "🧾", culoare: "#15803d", insigna: "Probe la dosar" },
+  { nume: "Rechizitoriul", semn: "📜", culoare: "#6d28d9", insigna: "Rechizitoriu întocmit" },
+  { nume: "Sentința",      semn: "🏛️", culoare: "#b45309", insigna: "Caz închis" },
 ];
 
 /* BADGES. Trei feluri, și niciunul nu se dă pentru simplă înaintare:
@@ -853,8 +858,11 @@ const INSIGNE = {
   "halfway":    { nume: "Halfway",    semn: "🧭", de_ce: "jumătate din drum" },
 };
 const codLume = (i) => `world-${i + 1}`;
+/* Insigna unui world poartă numele pasului din dosar, nu „X Cleared": lipit
+   după un nume românesc, cuvântul englezesc suna a traducere neterminată, iar
+   „Amprente ridicate" spune și ce-ai făcut, nu doar că ai terminat ceva. */
 const insignaLumii = (i) => ({
-  nume: `${LUMI[i].nume} Cleared`, semn: LUMI[i].semn, de_ce: `ai încheiat world-ul ${LUMI[i].nume}`,
+  nume: LUMI[i].insigna, semn: LUMI[i].semn, de_ce: `ai încheiat world-ul ${LUMI[i].nume}`,
 });
 const despreInsigna = (cod) => INSIGNE[cod]
   || (cod.startsWith("world-") ? insignaLumii(Number(cod.slice(6)) - 1) : null);
@@ -880,7 +888,7 @@ const incinsul = (n) => {
   const inauntru = (n - 1) % NIVELE_PE_LUME;
   return NIVELE_PE_LUME > 1 ? inauntru / (NIVELE_PE_LUME - 1) : 0;
 };
-const eUltimaLume = (i) => i === LUMI.length - 1;
+const eUltimaLume = (i) => i === LUMI.length - 1;  // Sentința: fundal viu
 
 /* Fundalul unui level. Tăria se socotește AICI, în JavaScript, și pleacă spre
    CSS ca număr gata făcut: `color-mix` cu procent calculat merge în browserele
@@ -955,7 +963,7 @@ function deseneazaHarta() {
           title="${deschis ? `Level ${n} · itemii #${de_la_it}-${pana_it}${l ? ` · ${l.tries} ${l.tries === 1 ? "încercare" : "încercări"}` : ""}` : "Se deschide după levelul dinainte"}">${n}</button>`);
     }
     const treuteAici = [...J.leveluri].filter(([n, l]) => l.passed && n >= de_la && n <= pana).length;
-    return `<section class="cmp-world${eUltimaLume(li) ? " e-summit" : ""}" style="--lume:${L.culoare}">
+    return `<section class="cmp-world${eUltimaLume(li) ? " e-final" : ""}" style="--lume:${L.culoare}">
         <header class="cmp-world__head">
           <span class="cmp-world__sign" aria-hidden="true">${L.semn}</span>
           <b class="cmp-world__name">World ${li + 1} · ${esc(L.nume)}</b>
@@ -1018,7 +1026,7 @@ function deseneazaNivel() {
   const numar = J.numarGlobal.get(it.id) || 0;
   radacina.className = "cmp cmp--play cmp--levelup";
   radacina.innerHTML = `
-    <section class="cmp-play cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
+    <section class="cmp-play cmp-lume${eUltimaLume(J.lume) ? " e-final" : ""}" style="${hainaLumii(J.nivel)}">
       ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
       <div class="cmp-veil" aria-hidden="true"></div>
       <p class="cmp-bignum">
@@ -1164,7 +1172,7 @@ function deseneazaSfarsitNivel() {
   }).join("");
   radacina.className = "cmp cmp--done";
   radacina.innerHTML = `
-    <section class="cmp-done cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
+    <section class="cmp-done cmp-lume${eUltimaLume(J.lume) ? " e-final" : ""}" style="${hainaLumii(J.nivel)}">
       ${baraDeSus("Level-up", "🔥", "", "harta")}
       <div class="cmp-done__in">
         <p class="cmp-done__sign" aria-hidden="true">${trecut ? L.semn : "💥"}</p>

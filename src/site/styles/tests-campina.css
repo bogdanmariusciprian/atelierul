@@ -431,11 +431,11 @@
 }
 .cmp-lume .cmp-top { border-bottom-color: color-mix(in srgb, var(--lume) 35%, transparent); }
 
-/* SUMMIT, ultimul world: fundal viu. Trei opriri care se plimbă încet peste o
+/* SENTINȚA, ultimul world: fundal viu. Trei opriri care se plimbă încet peste o
    suprafață de două ori cât caseta - de aceea se vede mișcare fără să se miște
    nimic de fapt. Nu e o podoabă întâmplătoare: e semnul că ai ajuns sus. */
-.cmp-lume.e-summit,
-.cmp-world.e-summit {
+.cmp-lume.e-final,
+.cmp-world.e-final {
   background: linear-gradient(120deg,
     color-mix(in srgb, var(--lume) 26%, transparent) 0%,
     color-mix(in srgb, #b45309 20%, transparent) 35%,
@@ -450,7 +450,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cmp-lume.e-summit, .cmp-world.e-summit { animation: none; background-size: 100% 100%; }
+  .cmp-lume.e-final, .cmp-world.e-final { animation: none; background-size: 100% 100%; }
   .cmp-badge.e-noua { animation: none; }
   .cmp-lume { transition: none; }
 }
