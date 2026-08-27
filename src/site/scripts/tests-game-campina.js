@@ -82,6 +82,7 @@ const J = {
   insigne: new Set(),  // codurile câștigate
   proaspete: new Set(), // insignele câștigate ACUM, ca să pâlpâie o dată
   serie: 0,            // leveluri trecute la rând, fără cădere
+  ceasuri: [],         // ceasurile mersului singur, oprite la orice plecare
   // — configurator (Classic / Adventure) —
   cfg: { ani: new Set(), tipuri: new Set(), totiAnii: true, toateTipurile: true },
   semnalate: new Set(),
@@ -991,6 +992,7 @@ function incepeNivelul(n) {
   J.proaspete = new Set();
   J.sesiune = uuid();
   J.faza = "joc";
+  opresteCeasurile();
   deseneaza();
 }
 
@@ -1030,8 +1032,7 @@ function deseneazaNivel() {
           ${capulItemului(it)}
           <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
           <div class="tgame-opts">${variante}</div>
-          ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>
-            <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe-levelup">${r.corect ? "Continue ▸" : "Vezi ce-a ieșit ▸"}</button></div>` : ""}
+          ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>` : ""}
         </article>
       </div>
     </section>`;
@@ -1053,34 +1054,56 @@ async function raspundeLevelUp(buton) {
   };
   if (r.correct) { J.bune++; J.puncte += J.raspunsCurent.puncte; } else J.rele++;
   deseneaza();
+  mergeSingur(r.correct);
 }
 
-async function maiDeparteLevelUp() {
-  const gresit = J.raspunsCurent && !J.raspunsCurent.corect;
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEVEL-UP MERGE SINGUR. Nu mai există buton de „mai departe": ai răspuns, deci
+   ai spus tot ce aveai de spus. Un buton între două întrebări e o întrebare în
+   plus, iar modul ăsta trăiește din ritm.
+
+   Dar ritmul nu poate mânca timpul de citit. De aceea sunt DOUĂ răgazuri, nu
+   unul: la răspuns bun ajunge o clipire, fiindcă n-ai ce învăța din ce știai
+   deja; la răspuns greșit rămâi mai mult cu cardul LIMPEDE în față, cu litera
+   corectă și cu explicația, fiindcă acolo e tot câștigul greșelii. Abia după
+   aceea se lasă ceața peste el.
+
+   Ordinea la cădere e, deci: citești, PE URMĂ se întunecă. Invers, ceața ar
+   acoperi exact lucrul pentru care merita să pierzi levelul.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const CITIRE_BUN_MS = 800;    // cât stai cu bifa verde înainte de zbor
+const CITIRE_GRESIT_MS = 2400; // cât ai la dispoziție să citești ce era corect
+const REUSITA_MS = 1250;      // zborul spre mijloc (750) + pomparea (500)
+const CADEREA_MS = 1500;      // zborul + „Game Over"
+
+/* Ceasurile pornite de aici se opresc la orice plecare din level (harta,
+   modurile, alt level). Fără asta, un ceas rămas în urmă ar redesena peste
+   ecranul în care tocmai ai intrat. */
+function opresteCeasurile() {
+  (J.ceasuri || []).forEach(clearTimeout);
+  J.ceasuri = [];
+}
+function pesteo(ms, ce) {
+  (J.ceasuri ||= []).push(setTimeout(ce, ms));
+}
+
+function mergeSingur(corect) {
+  const potolit = !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  opresteCeasurile();
+  pesteo(corect ? CITIRE_BUN_MS : CITIRE_GRESIT_MS, () => {
+    const sectiune = radacina.querySelector(".cmp-play");
+    if (!sectiune) return;
+    sectiune.classList.add(corect ? "e-reusit" : "e-cade");
+    pesteo(potolit ? 400 : (corect ? REUSITA_MS : CADEREA_MS), () => void dupaItem(corect));
+  });
+}
+
+async function dupaItem(corect) {
   J.raspunsCurent = null;
-  if (gresit) { await inchideNivelul(false); return caderea(); }
+  if (!corect) { await inchideNivelul(false); J.faza = "harta"; return deseneaza(); }
   J.pozitie++;
   if (J.pozitie >= J.rand.length) { await inchideNivelul(true); }
   deseneaza();
-}
-
-/* CĂDEREA. Numărul itemului pleacă din marginea lui spre mijlocul ecranului, iar
-   ce rămâne în urmă se încețoșează: enunțul și verdictul nu dispar, se retrag.
-   Pe urmă vine harta singură, fără niciun buton de apăsat, fiindcă la capătul
-   unui level pierdut n-ai de ales nimic - ai de ales unde mergi mai departe.
-
-   NU se redesenează nimic înainte de animație: tocmai cardul cu răspunsul
-   corect și explicația trebuie să rămână dedesubt, altfel elevul ar pierde
-   singurul lucru pe care avea ce învăța din greșeala aceea.
-
-   Cine a cerut mai puțină mișcare din sistem primește doar întunecarea, scurtă. */
-const CADEREA_MS = 1500;
-function caderea() {
-  const sectiune = radacina.querySelector(".cmp-play");
-  if (!sectiune) { J.faza = "harta"; return deseneaza(); }
-  sectiune.classList.add("e-cade");
-  const potolit = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-  setTimeout(() => { J.faza = "harta"; deseneaza(); }, potolit ? 450 : CADEREA_MS);
 }
 
 /* ÎNCHIDEREA UNUI LEVEL, într-un singur loc: numărul de încercări, trecerea,
@@ -1175,7 +1198,7 @@ function laApasare(e) {
   switch (act) {
     // — de peste tot —
     case "mod": return alegeModul(b.dataset.mod);
-    case "inapoi": J.ecran = "alege"; J.faza = "config"; return deseneaza();
+    case "inapoi": opresteCeasurile(); J.ecran = "alege"; J.faza = "config"; return deseneaza();
     case "semnaleaza": return cereSemnalare(b.dataset.id);
 
     // — Relaxed —
@@ -1200,10 +1223,9 @@ function laApasare(e) {
     case "din-nou": J.faza = "config"; J.gata = false; return deseneaza();
 
     // — Level-up —
-    case "nivel": return incepeNivelul(Number(b.dataset.n));
-    case "harta": J.faza = "harta"; return deseneaza();
+    case "nivel": opresteCeasurile(); return incepeNivelul(Number(b.dataset.n));
+    case "harta": opresteCeasurile(); J.faza = "harta"; return deseneaza();
     case "raspunde-levelup": return void raspundeLevelUp(b);
-    case "mai-departe-levelup": return void maiDeparteLevelUp();
     default: return;
   }
 }

@@ -523,6 +523,32 @@
 .cmp-play.e-cade .cmp-bignum {
   left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1.9);
 }
+
+/* REUȘITA. Același zbor spre mijloc, dar cu alt sfârșit și cu alt fundal:
+   vălul e mai subțire și poartă culoarea world-ului, nu întuneric. Căderea
+   închide, reușita doar clipește.
+
+   Pomparea începe exact când se termină zborul (`animation-delay` = durata
+   tranziției), altfel cele două s-ar bate pe `transform` și numărul ar sări.
+   Iar fiindcă animația ia frâiele, ea trebuie să poarte cu ea și mutarea în
+   centru: fără `translate(-50%,-50%)` în cadre, numărul ar zvâcni în colț. */
+.cmp-play.e-reusit .cmp-veil {
+  opacity: 1;
+  background: color-mix(in srgb, var(--lume, var(--color-primary)) 30%, rgb(0 0 0 / 0.25));
+  backdrop-filter: blur(4px);
+}
+.cmp-play.e-reusit .cmp-bignum {
+  left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1.9);
+  animation: cmp-pompa 0.5s cubic-bezier(.34,1.56,.64,1) 0.75s;
+}
+.cmp-play.e-reusit .cmp-bignum b { animation: none; color: #fff; }
+.cmp-play.e-reusit .cmp-bignum i { color: rgb(255 255 255 / 0.75); }
+.cmp-play.e-reusit .cmp-orbit { pointer-events: none; }
+@keyframes cmp-pompa {
+  0%   { transform: translate(-50%, -50%) scale(1.9); }
+  45%  { transform: translate(-50%, -50%) scale(2.7); }
+  100% { transform: translate(-50%, -50%) scale(2.1); }
+}
 .cmp-play.e-cade .cmp-bignum b { animation: none; color: #fff; }
 .cmp-play.e-cade .cmp-bignum i { color: rgb(255 255 255 / 0.7); }
 .cmp-play.e-cade .cmp-bignum__go { font-size: 0.9rem; opacity: 1; color: #fff; }
@@ -534,7 +560,10 @@
   .cmp-bignum { transition: none; }
   .cmp-bignum b { animation: none; }
   .cmp-veil { transition: opacity 0.2s linear; }
-  .cmp-play.e-cade .cmp-bignum { left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  .cmp-play.e-cade .cmp-bignum,
+  .cmp-play.e-reusit .cmp-bignum {
+    left: 50%; top: 50%; transform: translate(-50%, -50%); animation: none;
+  }
 }
 
 /* ---------------------------------------------------------
