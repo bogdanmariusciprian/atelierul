@@ -250,6 +250,111 @@ export async function deleteTestSession(id) {
   if (error) console.warn("deleteTestSession:", error.message);
 }
 
+// ---- Progresul elevului, ținut pe CONT (migrarea 0085) ----
+//
+// Trei mese, toate cu RLS „doar rândurile mele": ce a bifat și ce și-a scris la
+// Relaxed (`tests_progress`), levelurile încercate și trecute la Crazy
+// (`tests_levels`), insignele (`tests_badges`).
+//
+// EXAMENUL E MEREU CERUT, fără implicit. Restul fișierului poartă încă
+// `= "admitere-drept"` din vremea când exista un singur examen, iar acela e
+// tocmai felul de greșeală tăcută pe care 0085 a venit s-o închidă: un argument
+// uitat scria în sertarul altcuiva. Aici nu se mai poate: dacă nu spui examenul,
+// funcția nu face nimic și se plânge în consolă.
+//
+// Vizitatorul (fără cont) primește listă goală și scrierile trec pe lângă. Jocul
+// merge mai departe din memoria paginii; nu-l oprim, doar nu-i ținem minte nimic.
+
+function cerExamenul(unde, exam) {
+  if (exam) return true;
+  console.warn(`${unde}: examenul lipsește. Nu scriu nimic, ca să nu nimeresc alt sertar.`);
+  return false;
+}
+
+/** Tot ce a lucrat elevul la un examen: bifa, verdictul, explicația lui. */
+export async function fetchMyProgress(exam) {
+  if (!CURRENT_USER.authId || !cerExamenul("fetchMyProgress", exam)) return [];
+  const { data, error } = await supabase
+    .from("tests_progress")
+    .select("item_id, chosen, correct, answer_key, observation, note")
+    .eq("exam", exam);
+  if (error) { console.warn("fetchMyProgress:", error.message); return []; }
+  return (data || []).map((r) => ({
+    itemId: r.item_id,
+    chosen: r.chosen || null,
+    correct: !!r.correct,
+    answerKey: r.answer_key || null,
+    observation: r.observation || "",
+    note: r.note || "",
+  }));
+}
+
+/** Un item lucrat. `note` lipsă înseamnă „n-o atinge", ca salvarea răspunsului
+ *  să nu șteargă explicația scrisă mai devreme. */
+export async function saveMyProgress({ exam, itemId, chosen, correct, answerKey, observation, note } = {}) {
+  if (!CURRENT_USER.authId || !cerExamenul("saveMyProgress", exam) || !itemId) return false;
+  const rand = {
+    user_id: CURRENT_USER.authId, item_id: itemId, exam,
+    chosen: chosen || null,
+    correct: typeof correct === "boolean" ? correct : null,
+    answer_key: answerKey || null,
+    observation: observation || null,
+  };
+  if (note !== undefined) rand.note = note || null;
+  const { error } = await supabase.from("tests_progress").upsert(rand, { onConflict: "user_id,item_id" });
+  if (error) { console.warn("saveMyProgress:", error.message); return false; }
+  return true;
+}
+
+/** Curăță o sesiune de subiect: ștergerea e pe itemii daţi, nu pe tot examenul. */
+export async function clearMyProgress(itemIds = []) {
+  if (!CURRENT_USER.authId || !itemIds.length) return false;
+  const { error } = await supabase.from("tests_progress").delete().in("item_id", itemIds);
+  if (error) { console.warn("clearMyProgress:", error.message); return false; }
+  return true;
+}
+
+/** Levelurile atinse la Crazy. `passedAt` gol = încercat, nu trecut. */
+export async function fetchMyLevels(exam) {
+  if (!CURRENT_USER.authId || !cerExamenul("fetchMyLevels", exam)) return [];
+  const { data, error } = await supabase
+    .from("tests_levels").select("level, tries, passed_at").eq("exam", exam);
+  if (error) { console.warn("fetchMyLevels:", error.message); return []; }
+  return (data || []).map((r) => ({ level: r.level, tries: r.tries || 1, passed: !!r.passed_at }));
+}
+
+/** Scrie un level. `tries` se socotește în client din lista adusă la pornire:
+ *  o singură persoană joacă un cont, deci n-are cu cine se bate pe rând. */
+export async function saveMyLevel({ exam, level, tries, passed } = {}) {
+  if (!CURRENT_USER.authId || !cerExamenul("saveMyLevel", exam) || !level) return false;
+  const { error } = await supabase.from("tests_levels").upsert({
+    user_id: CURRENT_USER.authId, exam, level,
+    tries: Math.max(1, tries || 1),
+    passed_at: passed ? new Date().toISOString() : null,
+  }, { onConflict: "user_id,exam,level" });
+  if (error) { console.warn("saveMyLevel:", error.message); return false; }
+  return true;
+}
+
+/** Insignele mele la un examen. */
+export async function fetchMyBadges(exam) {
+  if (!CURRENT_USER.authId || !cerExamenul("fetchMyBadges", exam)) return [];
+  const { data, error } = await supabase
+    .from("tests_badges").select("code, earned_at").eq("exam", exam).eq("user_id", CURRENT_USER.authId);
+  if (error) { console.warn("fetchMyBadges:", error.message); return []; }
+  return (data || []).map((r) => ({ code: r.code, at: r.earned_at }));
+}
+
+/** Dă o insignă. A doua oară nu strică nimic: cheia primară o oprește, iar noi
+ *  nu socotim asta eroare, fiindcă „o are deja" e chiar răspunsul dorit. */
+export async function awardBadge(exam, code) {
+  if (!CURRENT_USER.authId || !cerExamenul("awardBadge", exam) || !code) return false;
+  const { error } = await supabase.from("tests_badges")
+    .insert({ user_id: CURRENT_USER.authId, exam, code });
+  if (error && error.code !== "23505") { console.warn("awardBadge:", error.message); return false; }
+  return true;
+}
+
 // ---- Flying bonus questions + boosters (classic mode) ----
 // The accepted answers and the booster odds live on the server; the wallet is
 // keyed by game session, so a new run always starts empty.

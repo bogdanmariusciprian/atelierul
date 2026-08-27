@@ -342,8 +342,128 @@
 .cmp-lume .tgame-btn--primary { background: var(--lume); border-color: var(--lume); }
 .cmp-lume .cmp-card { border-top: 3px solid var(--lume); }
 
+/* Vizitatorul, anunțat o dată, în ecranul de alegere. Nu-l oprim din joc; îi
+   spunem doar de ce merită contul, ca să nu afle închizând fila. */
+.cmp-guest {
+  display: flex; gap: .6rem; align-items: flex-start;
+  margin: 0 0 var(--space-md); padding: .75rem .9rem; border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  font-size: 0.85rem; line-height: 1.6; color: var(--color-text-muted);
+}
+.cmp-guest__s { font-style: normal; font-size: 1.05rem; }
+
 /* ---------------------------------------------------------
-   7. Fereastra de semnalare
+   7. Badges: în jurul cardului pe ecran lat, deasupra pe telefon
+   --------------------------------------------------------- */
+/* Așezarea de bază e cea de pe TELEFON: un rând care se rupe, deasupra
+   cardului. Orbita vine abia de la 900px, unde chiar e loc pe lături. Invers,
+   pornind de la orbită, insignele ar fi căzut peste enunț pe ecranul mic. */
+.cmp-orbit { position: relative; }
+.cmp-badges {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+  justify-content: center; margin-bottom: var(--space-md);
+}
+.cmp-badge {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .25rem .6rem; border-radius: 999px;
+  border: 1px solid var(--color-border); background: var(--color-surface);
+  font-size: 0.72rem; color: var(--color-text-muted); white-space: nowrap;
+}
+.cmp-badge i { font-style: normal; font-size: 0.95rem; }
+.cmp-badge b { font-weight: 700; color: var(--color-text); }
+
+@media (min-width: 900px) {
+  /* Cardul lasă o margine cât insignele, ca orbita să nu iasă din pagină. */
+  .cmp-orbit { padding: 0 7.5rem; }
+  .cmp-badges { display: block; margin: 0; }
+  .cmp-badge {
+    position: absolute; left: var(--x); top: var(--y);
+    transform: translate(-50%, -50%);
+    z-index: 2;
+  }
+}
+
+/* Insigna tocmai câștigată pâlpâie o dată. `e-static` e cea din ecranul de
+   sfârșit, care stă în rând, nu pe orbită. */
+.cmp-badge.e-noua {
+  border-color: var(--color-primary); color: var(--color-text);
+  animation: cmp-pop .7s cubic-bezier(.34,1.56,.64,1);
+}
+.cmp-badge.e-static { position: static; transform: none; }
+@keyframes cmp-pop {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  60% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+.cmp-badge.e-static.e-noua { animation-name: cmp-pop-static; }
+@keyframes cmp-pop-static {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cmp-gallery {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  margin-bottom: var(--space-lg);
+}
+.cmp-gallery__lab {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--color-text-muted); margin-right: .2rem;
+}
+.cmp-gallery .cmp-chip i { font-style: normal; }
+.cmp-newbadges {
+  display: flex; align-items: center; justify-content: center;
+  gap: .4rem; flex-wrap: wrap; margin-bottom: var(--space-md);
+}
+
+/* ---------------------------------------------------------
+   8. Fundalul care se încinge de la level la level
+   --------------------------------------------------------- */
+/* `--lume` e culoarea world-ului, `--tarie` cât de mult din ea intră în fundal.
+   Amândouă vin din JavaScript: procentul se socotește acolo și ajunge gata
+   făcut, fiindcă `color-mix` cu procent calculat în CSS nu merge peste tot, iar
+   un fundal care lipsește pe unele ecrane ar fi fost un preț prea mare. */
+.cmp-lume {
+  border-radius: 18px;
+  padding: var(--space-md);
+  background: color-mix(in srgb, var(--lume) var(--tarie, 8%), transparent);
+  transition: background 0.5s ease;
+}
+.cmp-lume .cmp-top { border-bottom-color: color-mix(in srgb, var(--lume) 35%, transparent); }
+
+/* SUMMIT, ultimul world: fundal viu. Trei opriri care se plimbă încet peste o
+   suprafață de două ori cât caseta - de aceea se vede mișcare fără să se miște
+   nimic de fapt. Nu e o podoabă întâmplătoare: e semnul că ai ajuns sus. */
+.cmp-lume.e-summit,
+.cmp-world.e-summit {
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--lume) 26%, transparent) 0%,
+    color-mix(in srgb, #b45309 20%, transparent) 35%,
+    color-mix(in srgb, #6d28d9 22%, transparent) 65%,
+    color-mix(in srgb, var(--lume) 26%, transparent) 100%);
+  background-size: 300% 300%;
+  animation: cmp-summit 18s ease-in-out infinite;
+}
+@keyframes cmp-summit {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmp-lume.e-summit, .cmp-world.e-summit { animation: none; background-size: 100% 100%; }
+  .cmp-badge.e-noua { animation: none; }
+  .cmp-lume { transition: none; }
+}
+
+/* Levelul încercat și nereușit se vede altfel decât cel neatins: nu-i o
+   mustrare, e un reper - „aici am fost, aici m-am oprit". */
+.cmp-lvl.is-tried {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--lume) 70%, transparent);
+}
+
+/* ---------------------------------------------------------
+   9. Fereastra de semnalare
    --------------------------------------------------------- */
 .cmp-dlg {
   border: 0; border-radius: 18px; padding: 0; max-width: 32rem; width: calc(100% - 2rem);

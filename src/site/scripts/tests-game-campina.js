@@ -8,30 +8,32 @@
 // pe care îl FOLOSESC fără să-l ating, ca itemul să arate la fel oriunde.
 //
 // PATRU MODURI, fiecare cu altă întrebare pusă elevului:
-//   • Relaxat  — „vreau să văd tot subiectul." Toată sesiunea pe o pagină, pe
+//   • Relaxed  - „vreau să văd tot subiectul." Toată sesiunea pe o pagină, pe
 //     file de ani. Apeși, se face verde ori roșu, iar tu îți scrii explicația
 //     ta lângă item. Fără puncte, fără ceas: aici se citește, nu se aleargă.
-//   • Clasic   — 3 vieți (până la 6), cel mult 30 de itemi, câte unul pe ecran.
+//   • Classic  - 3 lives (până la 6), cel mult 30 de itemi, câte unul pe ecran.
 //     Unii itemi sunt „de viață": nimerit, îți dă o inimă; greșit, nu-ți ia
 //     niciuna. Are configurator, ca la Drept.
-//   • Aventura — tot ce ai ales, item cu item, numerotat 1..N. Greșitul se duce
+//   • Adventure - tot ce ai ales, item cu item, numerotat 1..N. Greșitul se duce
 //     la coada rândului și revine până îl nimerești.
-//   • Nebunia  — 5 itemi pe nivel, o greșeală și s-a terminat. Nivelele sunt
-//     strânse în lumi, iar fiecare lume are altă înfățișare.
+//   • Crazy    - 5 itemi pe level, o greșeală și s-a terminat. Levelurile
+//     sunt strânse în worlds, fiecare cu înfățișarea lui, și se adună badges.
 //
 // CINSTIT PRIN CONSTRUCȚIE. Itemii pleacă de pe server fără răspuns (coloana
 // `correct` are SELECT-ul revocat). Singura cale de a afla răspunsul e să-l
 // dai: `check_test_item` (fără puncte) ori `answer_test_item` (cu puncte, o
-// singură dată pe item și sesiune, socotite de server). Relaxatul cheamă
+// singură dată pe item și sesiune, socotite de server). Modul Relaxed cheamă
 // dinadins varianta FĂRĂ puncte: cu tot subiectul deschis în față, ai putea
 // apăsa toate cele patru variante și tot le-ai aduna.
 // =========================================================
 import {
   fetchTestItems, checkTestItem, answerTestItem, reportTestItem, TEST_ITEM_TYPES,
+  fetchMyProgress, saveMyProgress, clearMyProgress,
+  fetchMyLevels, saveMyLevel, fetchMyBadges, awardBadge,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
-import { isLoggedIn, iaLocal, punLocal } from "../../shared/scripts/session.js";
+import { isLoggedIn } from "../../shared/scripts/session.js";
 
 const OPTS = ["A", "B", "C", "D"];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -42,12 +44,11 @@ const uuid = () => (crypto.randomUUID
   : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
       (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
 
-/* Cheile de memorie locală. Trec prin `iaLocal`/`punLocal`, deci sunt legate de
-   CONT: pe un calculator împărțit, elevul următor nu moștenește răspunsurile
-   celui dinainte. Nimeni nu atinge `localStorage` de-a dreptul. */
-const CHEIE_RELAX = "campina:relax"; // ce-ai bifat, pe sesiuni
-const CHEIE_NOTE = "campina:note";   // explicațiile scrise de tine
-const CHEIE_NEBUN = "campina:nebun"; // cel mai înalt nivel atins
+/* VOCABULARUL DE JOC E ÎN ENGLEZĂ, restul textului în română, și e o despărțire
+   voită. „Lives", „Level", „World", „Streak", „Game Over" sunt semne, nu
+   explicații: orice copil le-a văzut în orice joc și le citește dintr-o
+   privire, iar engleza le dă chiar aerul de joc. Tot ce EXPLICĂ, în schimb,
+   rămâne românesc: acolo se înțelege, iar înțelegerea se face în limba ta. */
 
 let radacina = null;
 
@@ -58,10 +59,10 @@ const J = {
   ani: [],
   incarcat: false,
   ecran: "alege", // alege | relaxat | clasic | aventura | nebun
-  /* Unde ești ÎN modul ales. Relaxatul n-are faze (e o singură pagină); Clasicul
-     și Aventura merg config → joc → gata; Nebunia, hartă → joc → gata. */
+  /* Unde ești ÎN modul ales. Relaxed n-are faze (e o singură pagină); Classic
+     și Adventure merg config → joc → gata; Crazy, hartă → joc → gata. */
   faza: "config",
-  // — Relaxat —
+  // — Relaxed —
   anAles: null, hartieAleasa: null,
   raspunsuri: {}, // id → { ales, corect, cheie, obs, istoric }
   note: {},       // id → text scris de elev
@@ -74,9 +75,13 @@ const J = {
   deViata: new Set(), // itemii care dau o inimă, aleși la pornire
   sesiune: null,      // id-ul rundei, pentru punctele date de server
   gata: false,
-  // — Nebunia —
-  lume: 0, nivel: 0, nivelMax: 0,
-  // — configurator (Clasic / Aventura) —
+  // — Crazy —
+  lume: 0, nivel: 0,
+  leveluri: new Map(), // level → { tries, passed }
+  insigne: new Set(),  // codurile câștigate
+  proaspete: new Set(), // insignele câștigate ACUM, ca să pâlpâie o dată
+  serie: 0,            // leveluri trecute la rând, fără cădere
+  // — configurator (Classic / Adventure) —
   cfg: { ani: new Set(), tipuri: new Set(), totiAnii: true, toateTipurile: true },
   semnalate: new Set(),
 };
@@ -98,15 +103,45 @@ export async function initTestGameCampina(mountEl, exam) {
   J.exam = exam || "admitere-campina";
   aduStilurile();
   if (!ascultatorPus) { puneAscultatorii(); ascultatorPus = true; }
-  J.raspunsuri = iaLocal(CHEIE_RELAX, {}) || {};
-  J.note = iaLocal(CHEIE_NOTE, {}) || {};
-  J.nivelMax = Number(iaLocal(CHEIE_NEBUN, 0)) || 0;
   if (!J.incarcat) {
     deseneazaAsteptarea();
     await incarcaItemii();
   }
+  await incarcaProgresul();
   deseneaza();
 }
+
+/* PROGRESUL STĂ PE CONT, nu în browser. Vizitatorul joacă mai departe, dar
+   nimic nu-i rămâne după ce închide fila; i-o spunem pe față, în ecranul de
+   alegere, în loc să-l lăsăm să afle singur. Nu ținem nimic în `localStorage`:
+   pe un calculator împărțit, acolo ar fi ajuns munca lui sub ochii altuia. */
+async function incarcaProgresul() {
+  if (!isLoggedIn()) { J.raspunsuri = {}; J.note = {}; J.leveluri = new Map(); J.insigne = new Set(); return; }
+  const [progres, leveluri, insigne] = await Promise.all([
+    fetchMyProgress(J.exam), fetchMyLevels(J.exam), fetchMyBadges(J.exam),
+  ]);
+  J.raspunsuri = {};
+  J.note = {};
+  for (const r of progres) {
+    if (r.chosen) {
+      J.raspunsuri[r.itemId] = {
+        ales: r.chosen, corect: r.correct, cheie: r.answerKey,
+        obs: r.observation || "", istoric: null,
+      };
+    }
+    if (r.note) J.note[r.itemId] = r.note;
+  }
+  J.leveluri = new Map(leveluri.map((l) => [l.level, { tries: l.tries, passed: l.passed }]));
+  J.insigne = new Set(insigne.map((b) => b.code));
+}
+
+/* Cel mai înalt level trecut se AFLĂ din leveluri, nu se ține de mână într-un
+   contor: un contor s-ar putea desincroniza de listă, iar lista e adevărul. */
+const levelMax = () => {
+  let m = 0;
+  for (const [n, l] of J.leveluri) if (l.passed && n > m) m = n;
+  return m;
+};
 
 async function incarcaItemii() {
   const itemi = await fetchTestItems({ exam: J.exam });
@@ -189,42 +224,43 @@ function verdictHtml(r) {
 
 const MODURI = [
   {
-    id: "relaxat", nume: "Relaxat", semn: "🫖",
+    id: "relaxat", nume: "Relaxed", semn: "🫖",
     scurt: "Tot subiectul, dintr-o privire",
     lung: `Alegi un an și o sesiune, iar subiectul întreg ți se așterne în față.
            Apeși o variantă: se face verde ori roșie pe loc. Lângă fiecare item
-           ai un loc unde să-ți scrii explicația TA — aceea rămâne a ta.
-           Fără vieți, fără ceas, fără puncte.`,
+           ai un loc unde să-ți scrii explicația TA, iar aceea rămâne a ta.
+           Fără lives, fără ceas, fără puncte.`,
   },
   {
-    id: "clasic", nume: "Clasic", semn: "🎯",
-    scurt: "3 vieți, 30 de itemi",
+    id: "clasic", nume: "Classic", semn: "🎯",
+    scurt: "3 lives, 30 de itemi",
     lung: `Câte un item pe ecran. Pornești cu trei inimi și poți ajunge la șase:
-           printre itemi sunt câțiva „de viață", însemnați, care îți dau o inimă
-           dacă-i nimerești și nu-ți iau niciuna dacă greșești. Runda ține până
-           la 30 de itemi sau până rămâi fără inimi.`,
+           printre itemi sunt câțiva <b>extra life</b>, însemnați, care îți dau o
+           inimă dacă-i nimerești și nu-ți iau niciuna dacă greșești. Runda ține
+           până la 30 de itemi sau până rămâi fără lives.`,
   },
   {
-    id: "aventura", nume: "Aventura", semn: "🧭",
+    id: "aventura", nume: "Adventure", semn: "🧭",
     scurt: "Tot, până iese",
     lung: `Toți itemii aleși, unul câte unul, numerotați. Cel greșit nu se pierde:
            se duce la coada rândului și revine mai târziu, până îl nimerești.
            Vezi mereu câți ai bun, câți greșit și câți ți-au mai rămas.`,
   },
   {
-    id: "nebun", nume: "Nebunia", semn: "🔥",
+    id: "nebun", nume: "Crazy", semn: "🔥",
     scurt: "5 itemi, zero greșeli",
-    lung: `Nivele de câte cinci itemi. O singură greșeală și nivelul se închide;
-           îl iei de la capăt. Nivelele sunt strânse în lumi, iar fiecare lume
-           are altă înfățișare — cu cât urci, cu atât se schimbă lumina.`,
+    lung: `Levels de câte cinci itemi. O singură greșeală și levelul se închide;
+           îl iei de la capăt. Levelurile sunt strânse în worlds, iar fiecare
+           world are altă înfățișare: cu cât urci, cu atât se schimbă lumina.
+           Pe drum aduni badges.`,
   },
 ];
 
 function deseneazaAlegerea() {
   const n = J.itemi.length;
   const carduri = MODURI.map((m) => {
-    const insigna = m.id === "nebun" && J.nivelMax > 0
-      ? `<span class="cmp-mode__badge">nivelul ${J.nivelMax}</span>` : "";
+    const insigna = m.id === "nebun" && levelMax() > 0
+      ? `<span class="cmp-mode__badge">Level ${levelMax()}</span>` : "";
     return `<button type="button" class="cmp-mode" data-act="mod" data-mod="${m.id}">
         <span class="cmp-mode__sign" aria-hidden="true">${m.semn}</span>
         <span class="cmp-mode__body">
@@ -234,6 +270,10 @@ function deseneazaAlegerea() {
         </span>
       </button>`;
   }).join("");
+  const faraCont = isLoggedIn() ? "" : `
+    <p class="cmp-guest"><i class="cmp-guest__s" aria-hidden="true">🔓</i>
+      Joci ca vizitator: totul merge, dar nimic nu se ține minte după ce închizi fila.
+      Cu un cont, îți rămân bifele, explicațiile scrise de tine, levelurile și badges.</p>`;
   radacina.className = "cmp";
   radacina.innerHTML = `
     <section class="cmp-pick">
@@ -243,14 +283,26 @@ function deseneazaAlegerea() {
           de la Câmpina, Cluj-Napoca, Fălticeni, Drăgășani și Oradea.
           Patru feluri de a-i lua în piept.</p>
       </header>
+      ${faraCont}
       <div class="cmp-modes">${carduri}</div>
     </section>`;
 }
 
 // ---------- 1. RELAXAT ----------
 
-function salveazaRelax() { punLocal(CHEIE_RELAX, J.raspunsuri); }
-function salveazaNote() { punLocal(CHEIE_NOTE, J.note); }
+/* O SINGURĂ CALE DE SALVARE pentru un item, ca să nu existe două care se pot
+   despărți. Trimite tot rândul, și bifa, și explicația: masa are cheie primară
+   pe (elev, item), deci scrierea e o suprapunere, nu o adăugare. */
+async function salveazaItem(id) {
+  if (!isLoggedIn()) return;
+  const r = J.raspunsuri[id];
+  if (!r) return;
+  await saveMyProgress({
+    exam: J.exam, itemId: id,
+    chosen: r.ales, correct: r.corect, answerKey: r.cheie,
+    observation: r.obs, note: J.note[id] || "",
+  });
+}
 
 /* Cât s-a lucrat dintr-o hârtie. Se numără din răspunsurile ținute minte, nu
    dintr-un contor de sine stătător: un contor s-ar putea desincroniza, lista de
@@ -339,7 +391,7 @@ function deseneazaRelaxat() {
   radacina.className = "cmp cmp--relax";
   radacina.innerHTML = `
     <section class="cmp-relax">
-      ${baraDeSus("Relaxat", "🫖")}
+      ${baraDeSus("Relaxed", "🫖")}
       <div class="cmp-tabs" role="tablist" aria-label="Anii cu subiecte">${fileDeAni()}</div>
       <div class="cmp-papers">${pastileleHartiilor()}</div>
       <div class="cmp-progress">
@@ -369,7 +421,7 @@ async function raspundeRelax(buton) {
     ales: k, corect: r.correct, cheie: r.correctAnswer,
     obs: r.observation || "", istoric: r.historical || null,
   };
-  salveazaRelax();
+  salveazaItem(id);
   /* Se redesenează DOAR cardul acesta, nu toată lista: pe o sesiune de 60 de
      itemi, un redesen întreg ar arunca pagina înapoi sus și ai pierde locul. */
   const proaspat = document.createElement("div");
@@ -408,29 +460,42 @@ function scrieNota(camp) {
   if (stare) stare.textContent = "se scrie…";
   clearTimeout(ceasNota);
   /* Se scrie la o secundă după ce te-ai oprit din tastat, nu la fiecare literă:
-     altfel am atinge memoria de zeci de ori pe rând, degeaba.
-     SUPABASE: când explicațiile elevilor se mută în bază (o masă `campina_note`
-     cu RLS pe propriul rând), aici se schimbă o singură chemare. */
-  ceasNota = setTimeout(() => {
-    salveazaNote();
+     altfel am bate drumul la server de zeci de ori pe rând, degeaba. */
+  ceasNota = setTimeout(async () => {
+    if (!isLoggedIn()) { if (stare) stare.textContent = "nesalvat (n-ai cont)"; return; }
+    if (stare) stare.textContent = "se salvează…";
+    await salveazaItem(id);
     if (stare) stare.textContent = J.note[id] ? "✓ salvat" : "";
   }, 1000);
 }
 
-function stergeHartia() {
+async function stergeHartia() {
   const h = hartia(J.hartieAleasa);
   if (!h) return;
-  for (const it of h.itemi) delete J.raspunsuri[it.id];
-  salveazaRelax();
+  const ids = h.itemi.map((it) => it.id).filter((id) => J.raspunsuri[id]);
+  for (const id of ids) delete J.raspunsuri[id];
   deseneazaRelaxat();
+  /* Ștergerea locală se vede pe loc, iar cea de pe server vine din urmă. Dacă
+     serverul refuză, spun; nu prefac că s-a întâmplat. */
+  if (isLoggedIn() && ids.length) {
+    const bun = await clearMyProgress(ids);
+    if (!bun) { showToast("N-am putut șterge pe server. Reîncarcă pagina."); return; }
+  }
   showToast("Sesiunea e din nou nerezolvată.");
 }
 
 // ---------- bara de sus, comună modurilor ----------
 
-function baraDeSus(nume, semn, dreapta = "") {
+/* ÎNTOARCEREA E PE O TREAPTĂ, nu până la capăt. Din interiorul unui level,
+   butonul duce la harta levelurilor, fiindcă acolo vrei să ajungi: să alegi
+   altul. Abia de pe hartă se iese din Crazy. Un singur buton care sărea de la
+   item drept la alegerea modului te scotea din tot ce făceai, iar drumul înapoi
+   trebuia refăcut de fiecare dată. */
+function baraDeSus(nume, semn, dreapta = "", inapoiLa = "inapoi") {
+  const spreHarta = inapoiLa === "harta";
   return `<header class="cmp-top">
-      <button type="button" class="cmp-back" data-act="inapoi" title="Înapoi la alegerea modului">‹ moduri</button>
+      <button type="button" class="cmp-back" data-act="${spreHarta ? "harta" : "inapoi"}"
+        title="${spreHarta ? "Înapoi la harta levelurilor" : "Înapoi la alegerea modului"}">‹ ${spreHarta ? "map" : "modes"}</button>
       <span class="cmp-top__mode"><span aria-hidden="true">${semn}</span> ${esc(nume)}</span>
       <span class="cmp-top__right">${dreapta}</span>
     </header>`;
@@ -465,7 +530,7 @@ function cereSemnalare(id) {
     if (!bun) { showToast("N-am putut trimite semnalarea."); return; }
     J.semnalate.add(id);
     showToast("Trimis. Mulțumesc — profesorul se uită.");
-    /* Se schimbă DOAR butonul acelui item, nu tot ecranul: în Relaxat, un
+    /* Se schimbă DOAR butonul acelui item, nu tot ecranul: în Relaxed, un
        redesen ar arunca pagina înapoi sus, iar tu tocmai citeai itemul 47. */
     for (const b of radacina.querySelectorAll(`[data-act="semnaleaza"][data-id="${id}"]`)) {
       b.outerHTML = `<button type="button" class="tgame-report" disabled>⚑ semnalat</button>`;
@@ -476,7 +541,7 @@ function cereSemnalare(id) {
 
 // ---------- 2+3. CLASIC și AVENTURA: configuratorul ----------
 
-const LIMITA_CLASIC = 30; // cel mult atâția itemi într-o rundă de Clasic
+const LIMITA_CLASIC = 30; // cel mult atâția itemi într-o rundă de Classic
 const VIETI_START = 3;
 const VIETI_MAX = 6;
 /* Cam unul din șase itemi e „de viață". Nu un număr fix: pe o rundă scurtă,
@@ -539,9 +604,9 @@ function deseneazaConfig() {
       încă se pun, item cu item. Când apar, vei putea alege și după ele.</p>`;
   const regula = eClasic
     ? `<ul class="cmp-rules">
-        <li><b>${VIETI_START} inimi</b> la pornire, cel mult ${VIETI_MAX}.</li>
-        <li>Itemii însemnați cu <b>❤</b> îți dau o inimă dacă-i nimerești și nu-ți iau niciuna dacă greșești.</li>
-        <li>Runda ține până la <b>${LIMITA_CLASIC} de itemi</b> sau până rămâi fără inimi.</li>
+        <li><b>${VIETI_START} lives</b> la pornire, cel mult ${VIETI_MAX}.</li>
+        <li>Itemii însemnați <b>extra life</b> îți dau o inimă dacă-i nimerești și nu-ți iau niciuna dacă greșești.</li>
+        <li>Runda ține până la <b>${LIMITA_CLASIC} de itemi</b> sau până rămâi fără <b>lives</b>.</li>
       </ul>`
     : `<ul class="cmp-rules">
         <li>Toți itemii aleși, unul câte unul, <b>numerotați</b>.</li>
@@ -570,7 +635,7 @@ function deseneazaConfig() {
             ? `<p class="cmp-cfg__sub">aleși la întâmplare din ${potriviti.length}</p>` : ""}
           ${regula}
           <button type="button" class="tgame-btn tgame-btn--primary cmp-go"
-            data-act="porneste"${cati ? "" : " disabled"}>Începe ▸</button>
+            data-act="porneste"${cati ? "" : " disabled"}>Start ▸</button>
           ${cati ? "" : `<p class="cmp-cfg__sub">Nicio potrivire — mai lasă un an ori un tip.</p>`}
         </aside>
       </div>
@@ -611,14 +676,14 @@ const inimi = () => Array.from({ length: VIETI_MAX }, (_, i) =>
 function hudRunda() {
   if (J.ecran === "clasic") {
     return `<div class="cmp-hud">
-        <span class="cmp-hud__lives" aria-label="${J.vieti} vieți din ${VIETI_MAX}">${inimi()}</span>
+        <span class="cmp-hud__lives" aria-label="${J.vieti} lives din ${VIETI_MAX}">${inimi()}</span>
         <span class="cmp-hud__pos">${Math.min(J.pozitie + 1, J.rand.length)} / ${J.rand.length}</span>
         <span class="cmp-hud__sc"><b class="is-ok">${J.bune}</b> · <b class="is-no">${J.rele}</b></span>
       </div>`;
   }
   const ramase = J.rand.length - J.pozitie;
   return `<div class="cmp-hud">
-      <span class="cmp-hud__pos">itemul ${Math.min(J.pozitie + 1, J.rand.length)}</span>
+      <span class="cmp-hud__pos">Item ${Math.min(J.pozitie + 1, J.rand.length)}</span>
       <span class="cmp-hud__sc"><b class="is-ok">${J.bune}</b> corecte · <b class="is-no">${J.rele}</b> greșite</span>
       <span class="cmp-hud__left">${ramase} ${ramase === 1 ? "rămas" : "rămași"}</span>
     </div>`;
@@ -649,13 +714,13 @@ function deseneazaRunda() {
     <section class="cmp-play">
       ${baraDeSus(m.nume, m.semn, hudRunda())}
       <article class="tgame-card cmp-card${viata ? " is-life" : ""}${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
-        ${viata ? `<span class="cmp-lifetag" title="Item de viață: nimerit, îți dă o inimă; greșit, nu-ți ia niciuna">❤ item de viață</span>` : ""}
+        ${viata ? `<span class="cmp-lifetag" title="Extra life: nimerit, îți dă o inimă; greșit, nu-ți ia niciuna">❤ extra life</span>` : ""}
         ${capulItemului(it)}
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
         <div class="tgame-opts">${variante}</div>
         ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}
             ${r.puncte ? `<p class="cmp-pts">+${r.puncte} puncte</p>` : ""}</div>
-          <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe">Continuă ▸</button></div>` : ""}
+          <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe">Continue ▸</button></div>` : ""}
       </article>
     </section>`;
 }
@@ -711,7 +776,7 @@ function deseneazaFinal() {
   const total = J.bune + J.rele;
   const procent = total ? Math.round((J.bune / total) * 100) : 0;
   const faraInimi = eClasic && J.vieti <= 0;
-  const titlu = faraInimi ? "Ai rămas fără inimi" : eClasic ? "Rundă încheiată" : "Gata — toți itemii rezolvați";
+  const titlu = faraInimi ? "Game Over" : eClasic ? "Run complete" : "All clear";
   const m = MODURI.find((x) => x.id === J.ecran);
   radacina.className = "cmp cmp--done";
   radacina.innerHTML = `
@@ -727,35 +792,57 @@ function deseneazaFinal() {
         </p>
         ${!isLoggedIn() ? `<p class="cmp-done__hint">Punctele se strâng doar dacă ai cont. Fără el, exersezi liniștit, dar nu urci în clasament.</p>` : ""}
         <div class="cmp-done__acts">
-          <button type="button" class="tgame-btn tgame-btn--primary" data-act="din-nou">Încă o rundă</button>
+          <button type="button" class="tgame-btn tgame-btn--primary" data-act="din-nou">Play again</button>
           <button type="button" class="tgame-btn" data-act="inapoi">Alt mod</button>
         </div>
       </div>
     </section>`;
 }
 
-// ---------- 4. NEBUNIA ----------
+// ---------- 4. CRAZY ----------
 
 const ITEMI_PE_NIVEL = 5;
 const NIVELE_PE_LUME = 22;
-/* Lumile nu sunt doar culori: fiecare are un nume și un semn, ca urcușul să se
-   simtă ca o trecere, nu ca o bară care crește. Numărul lor nu e ales pe
-   ghicite — 880 de itemi ÷ 5 = 176 de nivele, iar 176 ÷ 8 = 22 rotund. */
+/* Worlds. Numărul lor nu e ales pe ghicite: 880 de itemi împărțiți la 5 dau 176
+   de levels, iar 176 la 8 dau 22 rotund. Fiecare world are numele lui, semnul
+   lui și culoarea lui, ca urcușul să se simtă ca o trecere dintr-un loc în
+   altul, nu ca o bară care crește. */
 const LUMI = [
-  { nume: "Zorii", semn: "🌅", culoare: "#0f766e" },
-  { nume: "Pădurea", semn: "🌲", culoare: "#15803d" },
-  { nume: "Câmpia", semn: "🌾", culoare: "#a16207" },
-  { nume: "Râul", semn: "🌊", culoare: "#0369a1" },
-  { nume: "Muntele", semn: "⛰️", culoare: "#57534e" },
-  { nume: "Furtuna", semn: "⚡", culoare: "#6d28d9" },
-  { nume: "Noaptea", semn: "🌙", culoare: "#1e293b" },
-  { nume: "Vârful", semn: "👑", culoare: "#b45309" },
+  { nume: "Dawn",    semn: "🌅", culoare: "#0f766e" },
+  { nume: "Forest",  semn: "🌲", culoare: "#15803d" },
+  { nume: "Fields",  semn: "🌾", culoare: "#a16207" },
+  { nume: "River",   semn: "🌊", culoare: "#0369a1" },
+  { nume: "Mountain",semn: "⛰️", culoare: "#57534e" },
+  { nume: "Storm",   semn: "⚡", culoare: "#6d28d9" },
+  { nume: "Night",   semn: "🌙", culoare: "#1e293b" },
+  { nume: "Summit",  semn: "👑", culoare: "#b45309" },
 ];
 
+/* BADGES. Trei feluri, și niciunul nu se dă pentru simplă înaintare:
+   · faptele (First Step, Hot Streak, On Fire, Comeback, Halfway) se câștigă
+     făcând ceva anume, nu ajungând undeva;
+   · worlds (Dawn Cleared, Forest Cleared…) se câștigă la capătul unui world.
+   „Perfect" ar fi fost o insignă goală: în Crazy, un level trecut e ORICUM 5
+   din 5, fiindcă o greșeală îl închide. O insignă care se dă mereu nu spune
+   nimic, așa că n-am pus-o. */
+const INSIGNE = {
+  "first-step": { nume: "First Step", semn: "🐣", de_ce: "primul level trecut" },
+  "hot-streak": { nume: "Hot Streak", semn: "✨", de_ce: "3 levels la rând, fără cădere" },
+  "on-fire":    { nume: "On Fire",    semn: "🔥", de_ce: "10 levels la rând, fără cădere" },
+  "comeback":   { nume: "Comeback",   semn: "💪", de_ce: "ai trecut un level pe care picaseși" },
+  "halfway":    { nume: "Halfway",    semn: "🧭", de_ce: "jumătate din drum" },
+};
+const codLume = (i) => `world-${i + 1}`;
+const insignaLumii = (i) => ({
+  nume: `${LUMI[i].nume} Cleared`, semn: LUMI[i].semn, de_ce: `ai încheiat world-ul ${LUMI[i].nume}`,
+});
+const despreInsigna = (cod) => INSIGNE[cod]
+  || (cod.startsWith("world-") ? insignaLumii(Number(cod.slice(6)) - 1) : null);
+
 /* Toți itemii, în ordinea lor firească (an, sesiune, numărul de pe hârtie),
-   tăiați în felii de câte cinci. Ordinea e AȘEZATĂ, nu amestecată: un nivel
+   tăiați în felii de câte cinci. Ordinea e AȘEZATĂ, nu amestecată: un level
    trebuie să fie de fiecare dată același, altfel „am trecut de 37" n-ar
-   însemna nimic. Și, fiindcă felia urmează hârtia, un nivel e chiar o bucată
+   însemna nimic. Și, fiindcă felia urmează hârtia, un level e chiar o bucată
    dintr-un subiect adevărat. */
 function nivelele() {
   const toti = J.hartii.flatMap((h) => h.itemi.map((it) => it.id));
@@ -766,6 +853,25 @@ function nivelele() {
 
 const cateNivele = () => nivelele().length;
 const lumeaNivelului = (n) => Math.min(LUMI.length - 1, Math.floor((n - 1) / NIVELE_PE_LUME));
+/* Cât de încins e levelul ÎN world-ul lui: 0 la primul, 1 la al 22-lea. Din el
+   iese și tăria fundalului, ca lumina să crească pe măsură ce urci, nu doar
+   când sari dintr-un world în altul. */
+const incinsul = (n) => {
+  const inauntru = (n - 1) % NIVELE_PE_LUME;
+  return NIVELE_PE_LUME > 1 ? inauntru / (NIVELE_PE_LUME - 1) : 0;
+};
+const eUltimaLume = (i) => i === LUMI.length - 1;
+
+/* Fundalul unui level. Tăria se socotește AICI, în JavaScript, și pleacă spre
+   CSS ca număr gata făcut: `color-mix` cu procent calculat merge în browserele
+   noi, dar nu în toate, iar un fundal care lipsește pe unele ecrane ar fi fost
+   un preț prea mare pentru o linie mai scurtă. */
+function hainaLumii(n) {
+  const i = lumeaNivelului(n);
+  const L = LUMI[i];
+  const tarie = (7 + Math.round(incinsul(n) * 15)) + "%";
+  return `--lume:${L.culoare}; --tarie:${tarie}`;
+}
 
 function deseneazaNebunia() {
   if (J.faza === "joc") return deseneazaNivel();
@@ -773,51 +879,92 @@ function deseneazaNebunia() {
   return deseneazaHarta();
 }
 
+/* Insignele câștigate, așezate în jurul cardului. Poziția o pun tot din
+   JavaScript, ca variabile CSS: pe ecran lat ele orbitează, iar pe telefon
+   foaia de stil le pune într-un rând deasupra, unde nu se calcă cu enunțul. */
+function insigneleHtml() {
+  const coduri = [...J.insigne];
+  if (!coduri.length) return "";
+  const n = coduri.length;
+  const bucati = coduri.map((cod, i) => {
+    const d = despreInsigna(cod);
+    if (!d) return "";
+    /* Pornim din stânga-sus și mergem în jurul cardului. Elipsa e mai lată
+       decât înaltă fiindcă și cardul e. */
+    const unghi = (-140 + (i * 280) / Math.max(1, n - 1)) * Math.PI / 180;
+    const x = 50 + Math.cos(unghi) * 62;
+    const y = 50 + Math.sin(unghi) * 58;
+    const noua = J.proaspete.has(cod) ? " e-noua" : "";
+    return `<span class="cmp-badge${noua}" style="--x:${x.toFixed(1)}%; --y:${y.toFixed(1)}%"
+        title="${esc(d.nume)}: ${esc(d.de_ce)}">
+        <i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b>
+      </span>`;
+  }).join("");
+  return `<div class="cmp-badges" aria-label="Badges câștigate">${bucati}</div>`;
+}
+
 function deseneazaHarta() {
   const felii = nivelele();
-  const desfacut = J.nivelMax + 1; // nivelul următor celui atins e deschis
+  const trecut = levelMax();
+  const desfacut = trecut + 1; // levelul următor celui atins e deschis
   const lumi = LUMI.map((L, li) => {
     const de_la = li * NIVELE_PE_LUME + 1;
-    const pana = Math.min(de_la + NIVELE_PE_LUME - 1, felii.length);
+    /* ULTIMUL WORLD ÎNGHITE TOT CE PRISOSEȘTE. Cele 8 worlds a câte 22 ies exact
+       din cei 880 de itemi de azi; dar prima sesiune adăugată strică socoteala,
+       iar `lumeaNivelului` retează oricum la ultimul world. Dacă harta ar tăia
+       la 22 și acolo, levelurile de peste 176 n-ar mai apărea nicăieri: ar
+       exista, s-ar putea juca prin adresa lor, dar n-ar avea buton. Summit
+       crește, deci, în loc să ascundă. */
+    const pana = li === LUMI.length - 1
+      ? felii.length
+      : Math.min(de_la + NIVELE_PE_LUME - 1, felii.length);
     if (de_la > felii.length) return "";
     const patrate = [];
     for (let n = de_la; n <= pana; n++) {
-      const trecut = n <= J.nivelMax;
+      const l = J.leveluri.get(n);
+      const gata = !!(l && l.passed);
       const deschis = n <= desfacut;
-      patrate.push(`<button type="button" class="cmp-lvl${trecut ? " is-done" : ""}${deschis ? "" : " is-locked"}"
+      const cazut = !gata && l && l.tries > 0;
+      patrate.push(`<button type="button" class="cmp-lvl${gata ? " is-done" : ""}${cazut ? " is-tried" : ""}${deschis ? "" : " is-locked"}"
           data-act="nivel" data-n="${n}"${deschis ? "" : " disabled"}
-          title="${deschis ? `Nivelul ${n}` : "Se deschide după nivelul dinainte"}">${n}</button>`);
+          title="${deschis ? `Level ${n}${l ? ` · ${l.tries} ${l.tries === 1 ? "încercare" : "încercări"}` : ""}` : "Se deschide după levelul dinainte"}">${n}</button>`);
     }
-    const trecuteAici = Math.max(0, Math.min(J.nivelMax, pana) - de_la + 1);
-    return `<section class="cmp-world" style="--lume:${L.culoare}">
+    const treuteAici = [...J.leveluri].filter(([n, l]) => l.passed && n >= de_la && n <= pana).length;
+    return `<section class="cmp-world${eUltimaLume(li) ? " e-summit" : ""}" style="--lume:${L.culoare}">
         <header class="cmp-world__head">
           <span class="cmp-world__sign" aria-hidden="true">${L.semn}</span>
-          <b class="cmp-world__name">${esc(L.nume)}</b>
-          <span class="cmp-world__n">${trecuteAici} / ${pana - de_la + 1}</span>
+          <b class="cmp-world__name">World ${li + 1} · ${esc(L.nume)}</b>
+          <span class="cmp-world__n">${treuteAici} / ${pana - de_la + 1}</span>
         </header>
         <div class="cmp-lvls">${patrate.join("")}</div>
       </section>`;
   }).join("");
+  const galerie = [...J.insigne].map((cod) => {
+    const d = despreInsigna(cod);
+    return d ? `<span class="cmp-chip is-on" title="${esc(d.de_ce)}"><i aria-hidden="true">${d.semn}</i> ${esc(d.nume)}</span>` : "";
+  }).join("");
   radacina.className = "cmp cmp--map";
   radacina.innerHTML = `
     <section class="cmp-map">
-      ${baraDeSus("Nebunia", "🔥", `<span class="cmp-hud__pos">${J.nivelMax} / ${felii.length} nivele</span>`)}
-      <p class="cmp-map__intro">Cinci itemi pe nivel. O singură greșeală și nivelul se închide —
-        îl iei de la capăt. Nivelele sunt aceleași de fiecare dată, așa că
-        „am trecut de ${J.nivelMax || 12}" chiar înseamnă ceva.</p>
+      ${baraDeSus("Crazy", "🔥", `<span class="cmp-hud__pos">Level ${trecut} / ${felii.length}</span>`)}
+      <p class="cmp-map__intro">Cinci itemi pe level. O singură greșeală și levelul se închide,
+        îl iei de la capăt. Levelurile sunt aceleași de fiecare dată, așa că
+        „am trecut de ${trecut || 12}" chiar înseamnă ceva.</p>
+      ${galerie ? `<div class="cmp-gallery"><span class="cmp-gallery__lab">Badges</span>${galerie}</div>` : ""}
       ${lumi}
     </section>`;
 }
 
 function incepeNivelul(n) {
   const felii = nivelele();
-  if (n < 1 || n > felii.length || n > J.nivelMax + 1) return;
+  if (n < 1 || n > felii.length || n > levelMax() + 1) return;
   J.nivel = n;
   J.lume = lumeaNivelului(n);
   J.rand = felii[n - 1].slice();
   J.pozitie = 0;
   J.bune = 0; J.rele = 0; J.puncte = 0;
   J.raspunsCurent = null;
+  J.proaspete = new Set();
   J.sesiune = uuid();
   J.faza = "joc";
   deseneaza();
@@ -844,16 +991,20 @@ function deseneazaNivel() {
     `<i class="cmp-step${i < J.pozitie ? " is-done" : i === J.pozitie ? " is-now" : ""}" aria-hidden="true"></i>`).join("");
   radacina.className = "cmp cmp--play cmp--nebun";
   radacina.innerHTML = `
-    <section class="cmp-play cmp-lume" style="--lume:${L.culoare}">
-      ${baraDeSus(`${L.nume} · nivelul ${J.nivel}`, L.semn, `<span class="cmp-steps">${pasi}</span>`)}
-      <article class="tgame-card cmp-card${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
-        ${capulItemului(it)}
-        <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
-        <div class="tgame-opts">${variante}</div>
-        ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>
-          <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe-nebun">${r.corect ? "Continuă ▸" : "Vezi ce-a ieșit ▸"}</button></div>` : ""}
-      </article>
+    <section class="cmp-play cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
+      ${baraDeSus(`${L.nume} · Level ${J.nivel}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
+      <div class="cmp-orbit">
+        ${insigneleHtml()}
+        <article class="tgame-card cmp-card${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
+          ${capulItemului(it)}
+          <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
+          <div class="tgame-opts">${variante}</div>
+          ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>
+            <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe-nebun">${r.corect ? "Continue ▸" : "Vezi ce-a ieșit ▸"}</button></div>` : ""}
+        </article>
+      </div>
     </section>`;
+  J.proaspete = new Set(); // pâlpâie o dată, la desenul de după câștig
 }
 
 async function raspundeNebun(buton) {
@@ -873,43 +1024,76 @@ async function raspundeNebun(buton) {
   deseneaza();
 }
 
-function maiDeparteNebun() {
+async function maiDeparteNebun() {
   const gresit = J.raspunsCurent && !J.raspunsCurent.corect;
   J.raspunsCurent = null;
-  if (gresit) { J.faza = "gata"; return deseneaza(); }
+  if (gresit) { await inchideNivelul(false); return deseneaza(); }
   J.pozitie++;
-  if (J.pozitie >= J.rand.length) {
-    if (J.nivel > J.nivelMax) { J.nivelMax = J.nivel; punLocal(CHEIE_NEBUN, J.nivelMax); }
-    J.faza = "gata";
-  }
+  if (J.pozitie >= J.rand.length) { await inchideNivelul(true); }
   deseneaza();
 }
 
+/* ÎNCHIDEREA UNUI LEVEL, într-un singur loc: numărul de încercări, trecerea,
+   seria și badges-urile se hotărăsc împreună, fiindcă depind unele de altele. */
+async function inchideNivelul(trecut) {
+  const n = J.nivel;
+  const vechi = J.leveluri.get(n) || { tries: 0, passed: false };
+  const eraCazut = !vechi.passed && vechi.tries > 0;   // pentru „Comeback"
+  const acum = { tries: vechi.tries + 1, passed: vechi.passed || trecut };
+  J.leveluri.set(n, acum);
+  J.serie = trecut ? J.serie + 1 : 0;
+  J.faza = "gata";
+
+  if (trecut) {
+    const castigate = [];
+    const da = (cod) => { if (!J.insigne.has(cod)) { J.insigne.add(cod); J.proaspete.add(cod); castigate.push(cod); } };
+    if (levelMax() >= 1) da("first-step");
+    if (J.serie >= 3) da("hot-streak");
+    if (J.serie >= 10) da("on-fire");
+    if (eraCazut) da("comeback");
+    if (levelMax() >= Math.ceil(cateNivele() / 2)) da("halfway");
+    // World încheiat: toate levelurile lui sunt trecute.
+    const li = lumeaNivelului(n);
+    const de_la = li * NIVELE_PE_LUME + 1;
+    const pana = Math.min(de_la + NIVELE_PE_LUME - 1, cateNivele());
+    let tot = true;
+    for (let x = de_la; x <= pana; x++) if (!J.leveluri.get(x)?.passed) { tot = false; break; }
+    if (tot) da(codLume(li));
+    if (isLoggedIn()) await Promise.all(castigate.map((cod) => awardBadge(J.exam, cod)));
+  }
+  if (isLoggedIn()) await saveMyLevel({ exam: J.exam, level: n, tries: acum.tries, passed: acum.passed });
+}
+
 function deseneazaSfarsitNivel() {
+  const l = J.leveluri.get(J.nivel);
   const trecut = J.rele === 0 && J.pozitie >= J.rand.length;
   const L = LUMI[J.lume];
   const felii = cateNivele();
   const urmator = J.nivel + 1;
+  const noi = [...J.proaspete].map((cod) => {
+    const d = despreInsigna(cod);
+    return d ? `<span class="cmp-badge e-noua e-static"><i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b></span>` : "";
+  }).join("");
   radacina.className = "cmp cmp--done";
   radacina.innerHTML = `
-    <section class="cmp-done cmp-lume" style="--lume:${L.culoare}">
-      ${baraDeSus("Nebunia", "🔥")}
+    <section class="cmp-done cmp-lume${eUltimaLume(J.lume) ? " e-summit" : ""}" style="${hainaLumii(J.nivel)}">
+      ${baraDeSus("Crazy", "🔥", "", "harta")}
       <div class="cmp-done__in">
         <p class="cmp-done__sign" aria-hidden="true">${trecut ? L.semn : "💥"}</p>
-        <h2 class="cmp-done__title">${trecut ? `Nivelul ${J.nivel}, trecut` : `Nivelul ${J.nivel} s-a închis`}</h2>
+        <h2 class="cmp-done__title">${trecut ? `Level ${J.nivel} complete` : "Game Over"}</h2>
         <p class="cmp-done__stats">${trecut
-          ? `Cinci din cinci${J.puncte ? ` · <b class="is-pts">+${J.puncte}</b> puncte` : ""}`
-          : `Ai ținut <b>${J.bune}</b> ${J.bune === 1 ? "item" : "itemi"} din ${ITEMI_PE_NIVEL}. Greșeala oprește nivelul — dar nivelul e mereu același, deci a doua oară îl știi.`}</p>
+          ? `Cinci din cinci${J.puncte ? ` · <b class="is-pts">+${J.puncte}</b> puncte` : ""}${J.serie > 1 ? ` · streak ${J.serie}` : ""}`
+          : `Ai ținut <b>${J.bune}</b> ${J.bune === 1 ? "item" : "itemi"} din ${ITEMI_PE_NIVEL}. Greșeala oprește levelul, dar levelul e mereu același, deci a doua oară îl știi.${l && l.tries > 1 ? ` A ${l.tries}-a încercare.` : ""}`}</p>
+        ${noi ? `<div class="cmp-newbadges"><span class="cmp-gallery__lab">Badge nou</span>${noi}</div>` : ""}
         <div class="cmp-done__acts">
           ${trecut && urmator <= felii
-            ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">Nivelul ${urmator} ▸</button>`
-            : `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${J.nivel}">Încă o dată</button>`}
-          <button type="button" class="tgame-btn" data-act="harta">Harta nivelelor</button>
+            ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">Level ${urmator} ▸</button>`
+            : `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${J.nivel}">Retry</button>`}
+          <button type="button" class="tgame-btn" data-act="harta">Level map</button>
         </div>
       </div>
     </section>`;
 }
-
 // ---------- desenul de sus ----------
 
 function deseneaza() {
@@ -944,14 +1128,14 @@ function laApasare(e) {
     case "inapoi": J.ecran = "alege"; J.faza = "config"; return deseneaza();
     case "semnaleaza": return cereSemnalare(b.dataset.id);
 
-    // — Relaxat —
+    // — Relaxed —
     case "an":
       J.anAles = Number(b.dataset.an);
       J.hartieAleasa = hartiileAnului(J.anAles)[0]?.cheie ?? null;
       return deseneazaRelaxat();
     case "hartie": J.hartieAleasa = b.dataset.cheie; return deseneazaRelaxat();
     case "raspunde-relax": return void raspundeRelax(b);
-    case "sterge-hartia": return stergeHartia();
+    case "sterge-hartia": return void stergeHartia();
 
     // — configuratorul (Clasic / Aventura) —
     case "cfg-toti-anii": J.cfg.totiAnii = true; J.cfg.ani.clear(); return deseneazaConfig();
@@ -969,7 +1153,7 @@ function laApasare(e) {
     case "nivel": return incepeNivelul(Number(b.dataset.n));
     case "harta": J.faza = "harta"; return deseneaza();
     case "raspunde-nebun": return void raspundeNebun(b);
-    case "mai-departe-nebun": return maiDeparteNebun();
+    case "mai-departe-nebun": return void maiDeparteNebun();
     default: return;
   }
 }
