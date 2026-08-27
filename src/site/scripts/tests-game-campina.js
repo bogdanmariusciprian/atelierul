@@ -890,7 +890,7 @@ function hainaLumii(n) {
   const i = lumeaNivelului(n);
   const L = LUMI[i];
   const tarie = (7 + Math.round(incinsul(n) * 15)) + "%";
-  return `--lume:${L.culoare}; --tarie:${tarie}`;
+  return `--lume:${L.culoare}; --tarie:${tarie}; --zbor:${ZBOR_MS}ms; --pompa:${POMPA_MS}ms`;
 }
 
 function deseneazaLevelUp() {
@@ -1071,10 +1071,16 @@ async function raspundeLevelUp(buton) {
    Ordinea la cădere e, deci: citești, PE URMĂ se întunecă. Invers, ceața ar
    acoperi exact lucrul pentru care merita să pierzi levelul.
    ═══════════════════════════════════════════════════════════════════════════ */
-const CITIRE_BUN_MS = 800;    // cât stai cu bifa verde înainte de zbor
+/* DURATELE, toate aici. Cele două de mișcare (`ZBOR_MS`, `POMPA_MS`) pleacă și
+   spre CSS, ca variabile puse pe secțiune: altfel aceeași durată ar fi scrisă
+   în două fișiere și s-ar despărți la prima ajustare, iar pomparea ar porni
+   ori peste zbor, ori după o pauză. */
+const ZBOR_MS = 450;          // cât ține drumul numărului spre mijloc
+const POMPA_MS = 400;         // pomparea de la capăt, semnul de izbândă
+const CITIRE_BUN_MS = 350;    // cât stai cu bifa verde înainte de zbor
 const CITIRE_GRESIT_MS = 2400; // cât ai la dispoziție să citești ce era corect
-const REUSITA_MS = 1250;      // zborul spre mijloc (750) + pomparea (500)
-const CADEREA_MS = 1500;      // zborul + „Game Over"
+const REUSITA_MS = ZBOR_MS + POMPA_MS;
+const CADEREA_MS = ZBOR_MS + 750; // zborul, plus răgazul de citit „Game Over"
 
 /* Ceasurile pornite de aici se opresc la orice plecare din level (harta,
    modurile, alt level). Fără asta, un ceas rămas în urmă ar redesena peste

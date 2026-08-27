@@ -476,8 +476,11 @@
 .cmp-bignum {
   position: absolute; left: 50%; top: 1.2rem; transform: translateX(-50%);
   margin: 0; text-align: center; line-height: 1; z-index: 3;
-  transition: left 0.75s cubic-bezier(.4,0,.2,1), top 0.75s cubic-bezier(.4,0,.2,1),
-              transform 0.75s cubic-bezier(.34,1.3,.64,1);
+  /* `--zbor` și `--pompa` vin din JavaScript, puse pe secțiune: durata mișcării
+     e aceeași cifră și acolo, și aici, deci nu se pot despărți. */
+  transition: left var(--zbor, 450ms) cubic-bezier(.4,0,.2,1),
+              top var(--zbor, 450ms) cubic-bezier(.4,0,.2,1),
+              transform var(--zbor, 450ms) cubic-bezier(.34,1.3,.64,1);
 }
 .cmp-bignum b {
   display: block; font-size: clamp(2rem, 5.5vw, 3.1rem); font-weight: 800;
@@ -517,7 +520,7 @@
   background: rgb(0 0 0 / 0.55);
   backdrop-filter: blur(7px);
   opacity: 0; pointer-events: none;
-  transition: opacity 0.55s ease;
+  transition: opacity var(--zbor, 450ms) ease;
 }
 .cmp-play.e-cade .cmp-veil { opacity: 1; }
 .cmp-play.e-cade .cmp-bignum {
@@ -539,7 +542,7 @@
 }
 .cmp-play.e-reusit .cmp-bignum {
   left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1.9);
-  animation: cmp-pompa 0.5s cubic-bezier(.34,1.56,.64,1) 0.75s;
+  animation: cmp-pompa var(--pompa, 400ms) cubic-bezier(.34,1.56,.64,1) var(--zbor, 450ms);
 }
 .cmp-play.e-reusit .cmp-bignum b { animation: none; color: #fff; }
 .cmp-play.e-reusit .cmp-bignum i { color: rgb(255 255 255 / 0.75); }
