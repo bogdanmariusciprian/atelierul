@@ -24,7 +24,7 @@ export const TEST_CATEGORIES = [
   /* `asezare: "banda"` schimbă FORMA panoului, nu citirea numelui: în loc de
      tabel, o bandă de ani cu buline (o bulină = o sesiune) și, dedesubt,
      sesiunile anului ales. Numai aici; Dreptul și celelalte rămân pe tabel. */
-  { slug: "admitere-campina", icon: "👮", color: "#0f766e", live: false,
+  { slug: "admitere-campina", icon: "👮", color: "#0f766e", live: true,
     coloane: "varianta", asezare: "banda",
     title: "Admitere Câmpina", desc: "Subiecte de limba română pentru admiterea la Școala de Agenți de Poliție „Vasile Lascăr” Câmpina." },
 ];

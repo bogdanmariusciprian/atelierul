@@ -1,0 +1,365 @@
+/* =========================================================
+   Teste → Admitere Câmpina — stilurile jocului.
+
+   FIȘIER PROPRIU, cu prefixul `cmp-`, din același motiv pentru care jocul are
+   fișierul lui: o schimbare făcută aici nu poate reașeza jocul de la Drept.
+   Ce NU se repetă aici: cartea itemului, variantele, verdictul, butoanele.
+   Acelea sunt vocabularul de stil al testelor (`.tgame-*` din tests.css) și le
+   folosesc așa cum sunt — un item trebuie să arate la fel oriunde e pus.
+
+   Culoarea vine de sus, prin `--cat-color` (teal, #0f766e, dat de pagină), iar
+   consola întunecată se aprinde din `body.tgame-active`, tot din tests.css. Aici
+   nu se fixează nicio culoare de fundal: dacă mâine se schimbă culoarea
+   categoriei, ecranele astea se schimbă cu ea, fără să atingă nimeni nimic.
+   ========================================================= */
+
+.cmp { display: block; }
+.cmp-wait {
+  text-align: center; padding: var(--space-xl) 0;
+  color: var(--color-text-muted); font-size: 0.95rem;
+}
+
+/* ---------------------------------------------------------
+   Bara de sus, aceeași în toate modurile: întoarcerea la
+   stânga, numele modului la mijloc, socoteala la dreapta.
+   --------------------------------------------------------- */
+.cmp-top {
+  display: flex; align-items: center; gap: var(--space-md);
+  padding-bottom: 0.75rem; margin-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+.cmp-top__mode { font-weight: 800; letter-spacing: -0.01em; }
+.cmp-top__right { margin-left: auto; }
+.cmp-back {
+  font: inherit; font-size: 0.85rem; cursor: pointer; user-select: none;
+  padding: 0.35rem 0.7rem; border-radius: 999px;
+  border: 1.5px solid var(--color-border); background: var(--color-bg);
+  color: var(--color-text-muted);
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.cmp-back:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* ---------------------------------------------------------
+   1. Alegerea modului
+   --------------------------------------------------------- */
+.cmp-pick__head { text-align: center; margin-bottom: var(--space-lg); }
+.cmp-pick__title { margin: 0 0 0.4rem; font-size: clamp(1.3rem, 3vw, 1.8rem); letter-spacing: -0.02em; }
+.cmp-pick__sub {
+  margin: 0 auto; max-width: 46ch; line-height: 1.7;
+  font-size: 0.92rem; color: var(--color-text-muted);
+}
+
+/* Patru cartonașe. Pe telefon stau unul sub altul; de la 720px încolo, două pe
+   rând — mai mult de două ar face textul lung să curgă în coloane subțiri. */
+.cmp-modes { display: grid; gap: var(--space-md); }
+@media (min-width: 720px) { .cmp-modes { grid-template-columns: 1fr 1fr; } }
+
+.cmp-mode {
+  display: flex; align-items: flex-start; gap: var(--space-md);
+  width: 100%; text-align: left; font: inherit; cursor: pointer;
+  padding: var(--space-md); border-radius: 18px;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text);
+  transition: border-color 0.14s ease, transform 0.1s ease, box-shadow 0.14s ease;
+}
+.cmp-mode:hover {
+  border-color: var(--color-primary); transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+.cmp-mode:active { transform: translateY(0); }
+.cmp-mode__sign {
+  flex: none; width: 3rem; height: 3rem; display: grid; place-items: center;
+  font-size: 1.6rem; border-radius: 14px; background: var(--color-bg);
+}
+.cmp-mode__body { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.cmp-mode__name {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  font-weight: 800; font-size: 1.05rem;
+}
+.cmp-mode__badge {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  padding: 0.12rem 0.45rem; border-radius: 999px;
+  background: var(--color-primary); color: var(--color-bg);
+}
+.cmp-mode__short { font-size: 0.82rem; color: var(--color-primary); font-weight: 600; }
+.cmp-mode__long { font-size: 0.84rem; line-height: 1.65; color: var(--color-text-muted); }
+
+/* ---------------------------------------------------------
+   2. Relaxat: file de ani, pastile de sesiuni, lista lungă
+   --------------------------------------------------------- */
+
+/* Filele de ani se pot depăși pe telefon; se derulează pe orizontală în loc să
+   se rupă pe două rânduri, ca linia anilor să rămână o singură linie. */
+.cmp-tabs {
+  display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.4rem;
+  scrollbar-width: thin; margin-bottom: 0.6rem;
+}
+.cmp-tab {
+  flex: none; font: inherit; cursor: pointer; user-select: none;
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+  padding: 0.5rem 0.8rem; border-radius: 12px;
+  border: 1.5px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.cmp-tab:hover { border-color: var(--color-primary); }
+.cmp-tab.is-on { border-color: var(--color-primary); background: var(--color-bg); }
+.cmp-tab__nr { font-weight: 800; font-size: 0.95rem; }
+/* O bulină = o sesiune. Aceeași convenție ca pe banda de descărcări: cine a
+   citit-o o dată acolo, o recunoaște aici. */
+.cmp-tab__dots { display: flex; gap: 3px; }
+.cmp-tab__dots i {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--color-text-muted); opacity: 0.55;
+}
+.cmp-tab.is-on .cmp-tab__dots i { background: var(--color-primary); opacity: 1; }
+.cmp-tab.is-done .cmp-tab__nr::after { content: " ✓"; color: #16a34a; font-size: 0.75em; }
+
+.cmp-papers { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: var(--space-md); }
+.cmp-paper {
+  font: inherit; font-size: 0.85rem; cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.45rem 0.8rem; border-radius: 999px;
+  border: 1.5px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color 0.12s ease;
+}
+.cmp-paper:hover { border-color: var(--color-primary); }
+.cmp-paper.is-on { border-color: var(--color-primary); background: var(--color-bg); }
+.cmp-paper__school {
+  font-size: 0.72rem; padding: 0.1rem 0.4rem; border-radius: 999px;
+  background: var(--color-bg); color: var(--color-text-muted);
+}
+.cmp-paper__n { font-size: 0.75rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+.cmp-progress { margin-bottom: var(--space-lg); }
+.cmp-progress__bar {
+  height: 6px; border-radius: 999px; background: var(--color-bg); overflow: hidden;
+}
+.cmp-progress__bar i {
+  display: block; height: 100%; background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+.cmp-progress__txt {
+  margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--color-text-muted);
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+}
+.cmp-progress__txt .is-ok { color: #16a34a; }
+.cmp-link {
+  font: inherit; font-size: 0.78rem; cursor: pointer;
+  background: none; border: 0; padding: 0; color: var(--color-text-muted);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.cmp-link:hover { color: var(--color-primary); }
+
+.cmp-list { display: flex; flex-direction: column; gap: var(--space-md); }
+/* Numărul itemului stă în colț, nu în rând cu enunțul: pe o listă de 60, ochiul
+   are nevoie de un reper fix pe verticală ca să numere din priviri. */
+.cmp-item { position: relative; }
+.cmp-item__nr {
+  position: absolute; top: -0.6rem; left: -0.6rem;
+  min-width: 1.75rem; height: 1.75rem; padding: 0 0.4rem;
+  display: grid; place-items: center; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  background: var(--color-primary); color: var(--color-bg);
+}
+.cmp-item__fb { margin-top: 0.9rem; }
+
+.cmp-note { margin-top: 0.9rem; }
+.cmp-note__lab {
+  display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 0.3rem;
+}
+.cmp-note__in {
+  width: 100%; font: inherit; font-size: 0.88rem; line-height: 1.6;
+  padding: 0.6rem 0.75rem; border-radius: 10px; resize: vertical;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg); color: var(--color-text);
+}
+.cmp-note__in:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.cmp-note__state {
+  display: block; margin-top: 0.25rem; min-height: 1em;
+  font-size: 0.72rem; color: var(--color-text-muted);
+}
+
+/* ---------------------------------------------------------
+   3. Configuratorul (Clasic / Aventura)
+   --------------------------------------------------------- */
+.cmp-cfg__grid { display: grid; gap: var(--space-lg); }
+@media (min-width: 900px) { .cmp-cfg__grid { grid-template-columns: 1fr 20rem; } }
+
+.cmp-cfg__block { margin-bottom: var(--space-lg); }
+.cmp-cfg__lab {
+  margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--color-text-muted);
+}
+.cmp-cfg__note {
+  margin: 0; padding: 0.8rem 1rem; border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  font-size: 0.85rem; line-height: 1.65; color: var(--color-text-muted);
+}
+.cmp-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.cmp-chip {
+  font: inherit; font-size: 0.85rem; cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.75rem; border-radius: 999px;
+  border: 1.5px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.cmp-chip:hover { border-color: var(--color-primary); }
+.cmp-chip.is-on { border-color: var(--color-primary); background: var(--color-bg); font-weight: 700; }
+.cmp-chip__n {
+  font-size: 0.72rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums;
+}
+
+.cmp-cfg__right {
+  align-self: start; padding: var(--space-md); border-radius: 18px;
+  background: var(--color-surface); border: 1.5px solid var(--color-border);
+}
+.cmp-cfg__count { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+.cmp-cfg__count b { color: var(--color-primary); }
+.cmp-cfg__sub { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--color-text-muted); }
+.cmp-rules {
+  margin: var(--space-md) 0; padding-left: 1.1rem;
+  font-size: 0.84rem; line-height: 1.7; color: var(--color-text-muted);
+}
+.cmp-rules li + li { margin-top: 0.35rem; }
+.cmp-go { width: 100%; }
+
+/* ---------------------------------------------------------
+   4. Runda: un item pe ecran
+   --------------------------------------------------------- */
+.cmp-hud {
+  display: flex; align-items: center; gap: var(--space-md);
+  font-size: 0.85rem; font-variant-numeric: tabular-nums;
+}
+.cmp-hud__lives { display: flex; gap: 1px; }
+.cmp-heart { font-style: normal; opacity: 0.3; transition: opacity 0.2s ease; }
+.cmp-heart.is-on { opacity: 1; color: #f43f5e; }
+.cmp-hud__pos, .cmp-hud__left { color: var(--color-text-muted); }
+.cmp-hud__sc .is-ok { color: #16a34a; }
+.cmp-hud__sc .is-no { color: #dc2626; }
+
+.cmp-card { position: relative; }
+/* Itemul „de viață" nu-și schimbă forma, doar capătă o dungă și o etichetă: dacă
+   ar arăta cu totul altfel, ai citi eticheta în loc să citești enunțul. */
+.cmp-card.is-life { border-color: #f43f5e; }
+.cmp-lifetag {
+  position: absolute; top: -0.65rem; right: 1rem;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem; border-radius: 999px;
+  background: #f43f5e; color: #fff;
+}
+.cmp-next { margin-top: var(--space-md); display: flex; justify-content: flex-end; }
+.cmp-pts { margin: 0.5rem 0 0; font-weight: 700; color: var(--color-primary); }
+
+/* ---------------------------------------------------------
+   5. Sfârșitul unei runde / al unui nivel
+   --------------------------------------------------------- */
+.cmp-done__in {
+  max-width: 34rem; margin: 0 auto; text-align: center;
+  padding: var(--space-xl) var(--space-md);
+}
+.cmp-done__sign { margin: 0 0 0.5rem; font-size: 3rem; line-height: 1; }
+.cmp-done__title { margin: 0 0 0.5rem; font-size: 1.4rem; letter-spacing: -0.02em; }
+.cmp-done__stats { margin: 0 0 var(--space-md); font-size: 0.95rem; line-height: 1.7; }
+.cmp-done__stats .is-ok { color: #16a34a; }
+.cmp-done__stats .is-no { color: #dc2626; }
+.cmp-done__stats .is-pts { color: var(--color-primary); }
+.cmp-done__hint {
+  margin: 0 0 var(--space-md); font-size: 0.82rem; line-height: 1.65;
+  color: var(--color-text-muted);
+}
+.cmp-done__acts { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------
+   6. Nebunia: harta lumilor și pașii nivelului
+   --------------------------------------------------------- */
+.cmp-map__intro {
+  margin: 0 0 var(--space-lg); max-width: 52ch;
+  font-size: 0.88rem; line-height: 1.7; color: var(--color-text-muted);
+}
+/* `--lume` e culoarea lumii, pusă inline de JS. Amestecul cu fundalul o ține
+   mereu citibilă, și pe temă deschisă, și pe consola întunecată: nu punem
+   culoarea brută nicăieri unde stă text. */
+.cmp-world {
+  margin-bottom: var(--space-lg); padding: var(--space-md);
+  border-radius: 18px;
+  border: 1.5px solid color-mix(in srgb, var(--lume) 40%, transparent);
+  background: color-mix(in srgb, var(--lume) 7%, var(--color-surface));
+}
+.cmp-world__head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
+.cmp-world__sign { font-size: 1.2rem; }
+.cmp-world__name { font-size: 1rem; letter-spacing: -0.01em; }
+.cmp-world__n {
+  margin-left: auto; font-size: 0.78rem; color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Pătrate care se așază singure: câte încap, atâtea pe rând. Cu 22 de nivele pe
+   lume, o grilă cu număr fix de coloane ar lăsa un rând ciung pe orice lățime. */
+.cmp-lvls {
+  display: grid; gap: 0.4rem;
+  grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+}
+.cmp-lvl {
+  font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--lume) 45%, transparent);
+  background: var(--color-bg); color: var(--color-text);
+  transition: transform 0.08s ease, border-color 0.12s ease;
+}
+.cmp-lvl:hover:not([disabled]) { transform: scale(1.06); border-color: var(--lume); }
+.cmp-lvl.is-done {
+  background: color-mix(in srgb, var(--lume) 65%, var(--color-bg));
+  border-color: var(--lume); color: #fff;
+}
+.cmp-lvl.is-locked { opacity: 0.32; cursor: not-allowed; }
+
+/* Cei cinci pași ai nivelului, în bara de sus. Punctul de acum pulsează încet —
+   destul cât să-l găsești, nu cât să te grăbească. */
+.cmp-steps { display: flex; gap: 0.3rem; }
+.cmp-step {
+  width: 0.6rem; height: 0.6rem; border-radius: 50%;
+  background: var(--color-border);
+}
+.cmp-step.is-done { background: #16a34a; }
+.cmp-step.is-now { background: var(--color-primary); animation: cmp-puls 1.6s ease-in-out infinite; }
+@keyframes cmp-puls {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.65; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmp-step.is-now { animation: none; }
+  .cmp-mode { transition: border-color 0.14s ease; }
+  .cmp-mode:hover { transform: none; }
+  .cmp-lvl:hover:not([disabled]) { transform: none; }
+}
+
+/* Lumea își colorează butonul de mers mai departe și dunga cărții, ca trecerea
+   dintr-o lume în alta să se vadă fără să scrie nimeni „ai intrat în Furtuna". */
+.cmp-lume .tgame-btn--primary { background: var(--lume); border-color: var(--lume); }
+.cmp-lume .cmp-card { border-top: 3px solid var(--lume); }
+
+/* ---------------------------------------------------------
+   7. Fereastra de semnalare
+   --------------------------------------------------------- */
+.cmp-dlg {
+  border: 0; border-radius: 18px; padding: 0; max-width: 32rem; width: calc(100% - 2rem);
+  background: var(--color-surface); color: var(--color-text);
+  box-shadow: var(--shadow-md);
+}
+.cmp-dlg::backdrop { background: rgb(0 0 0 / 0.5); }
+.cmp-dlg__in { padding: var(--space-lg); }
+.cmp-dlg__title { margin: 0 0 0.4rem; font-size: 1.05rem; }
+.cmp-dlg__sub { margin: 0 0 var(--space-md); font-size: 0.85rem; line-height: 1.65; color: var(--color-text-muted); }
+.cmp-dlg__txt {
+  width: 100%; font: inherit; font-size: 0.9rem; line-height: 1.6;
+  padding: 0.6rem 0.75rem; border-radius: 10px; resize: vertical;
+  border: 1.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text);
+}
+.cmp-dlg__acts {
+  display: flex; gap: 0.6rem; justify-content: flex-end;
+  margin: var(--space-md) 0 0; padding: 0;
+}

@@ -16,6 +16,7 @@
 // =========================================================
 import { TEST_CAT_BY_SLUG } from "./test-categories.js";
 import { initTestGame } from "./tests-game-drept.js";
+import { initTestGameCampina } from "./tests-game-campina.js";
 import { initTestAdminGrid } from "./tests-admin-grid.js";
 import { isAdmin } from "../../shared/scripts/session.js";
 import { fetchTestDownloads, fetchDriveFolderUrl } from "../../shared/scripts/test-repo.js";
@@ -76,6 +77,17 @@ const wantsPractice = () =>
    construiește, iar itemii ar fi rămas fără nicio ușă. */
 const poateIntra = () => !!cat.live || adminMode;
 
+/* UN JOC PE EXAMEN, ales dintr-un tabel, nu dintr-un lanț de `if`-uri. Tabelul
+   se citește dintr-o privire, iar un examen nou se adaugă cu un rând. Un lanț de
+   condiții ar fi ținut toate jocurile pe același drum: o greșeală strecurată la
+   Câmpina ar fi putut opri Dreptul înainte să apuce să pornească.
+   Cine nu-i în tabel merge pe jocul de la Drept — dar acolo nu ajunge nimeni
+   până nu i se pune `live: true`, iar atunci i se scrie și rândul. */
+const JOCURI = {
+  "admitere-campina": initTestGameCampina,
+};
+const joculPentru = (slug) => JOCURI[slug] || initTestGame;
+
 function route() {
   const play = poateIntra() && wantsPractice();
   document.body.classList.toggle("tgame-active", play); // shrink the page hero while playing
@@ -83,7 +95,7 @@ function route() {
   if (!play) { leaveAdminMode(); return renderIntro(); }
   if (adminMode) return initTestAdminGrid(root, cat.slug); // teacher → item grid
   leaveAdminMode();
-  initTestGame(root, cat.slug);                  // pupil / guest → mini-game
+  joculPentru(cat.slug)(root, cat.slug);         // pupil / guest → mini-game
 }
 
 // Grouped by year, and every button says plainly WHAT it hands you: the
