@@ -487,7 +487,35 @@
    centru n-ar avea de unde porni și ar apărea brusc acolo.
    Pe ecran îngust stă deasupra cardului, iar `.cmp-play` îi face loc; de la
    900px încolo trece în golul din stânga, unde nu se calcă cu nimic. */
-.cmp-play { position: relative; padding-top: 5rem; }
+/* ÎNĂLȚIMEA SCENEI. Cardul stătea lipit de bara de sus, cu un gol mare sub el:
+   pe un ecran de laptop, jumătate din chenarul de joc rămânea nefolosit, iar
+   ochiul cădea în pustiu. Acum scena are o înălțime a ei, iar cardul se așază
+   la mijlocul ei, între bară și marginea de jos.
+
+   `min-height`, nu `height`: e un PRAG, nu o cușcă. Un item cu variante lungi
+   crește peste el și nu se taie nimic - regula casei, un lucru nu se strâmtează
+   ca să încapă într-o măsură aleasă de mine.
+
+   `svh` e înălțimea ferestrei fără barele browserului de telefon, care apar și
+   dispar la derulare; cu `vh`, scena ar fi săltat de fiecare dată. Linia cu
+   `vh` rămâne dedesubt pentru browserele care încă nu știu `svh`.
+
+   NUMAI la modurile cu un item pe ecran. Relaxed e o listă lungă, el are clasa
+   lui, `.cmp-relax`, și nu-l atinge nimic de aici. */
+.cmp-play {
+  position: relative; padding-top: 5rem;
+  display: flex; flex-direction: column;
+  min-height: 68vh;
+  min-height: min(68svh, 42rem);
+}
+/* Bara rămâne sus; golul care prisosește se împarte în jurul cardului.
+   `margin-block: auto` într-o coloană flexibilă înghite spațiul liber deasupra
+   și dedesubt în părți egale, adică exact centrarea cerută. `flex: 1` ar fi
+   ÎNTINS cardul pe toată înălțimea, nu l-ar fi așezat la mijloc.
+   Se pune pe amândouă felurile de scenă: Level-up are cardul într-un `.cmp-orbit`
+   (fiindcă acolo orbitează insignele), Classic și Adventure îl au de-a dreptul. */
+.cmp-play > .cmp-orbit,
+.cmp-play > .cmp-card { margin-block: auto; }
 
 .cmp-bignum {
   position: absolute; left: 50%; top: 1.2rem; transform: translateX(-50%);
