@@ -1086,7 +1086,10 @@ const CITIRE_BUN_MS = 350;    // cât stai cu bifa verde înainte de zbor
    rămâne pe card, iar cine o vrea o are în Relaxed ori la reluarea levelului. */
 const CITIRE_GRESIT_MS = 700;
 const REUSITA_MS = ZBOR_MS + POMPA_MS * POMPE;
-const CADEREA_MS = ZBOR_MS + 1400; // zborul, plus răgazul de citit ce era corect
+/* Trei secunde cu numărul în mijloc: destul cât să citești litera corectă și
+   să iei greșeala în piept, nu atât cât să te plictisești așteptând harta. */
+const STAT_LA_MIJLOC_MS = 3000;
+const CADEREA_MS = ZBOR_MS + STAT_LA_MIJLOC_MS;
 
 /* Ceasurile pornite de aici se opresc la orice plecare din level (harta,
    modurile, alt level). Fără asta, un ceas rămas în urmă ar redesena peste
