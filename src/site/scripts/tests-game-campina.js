@@ -936,7 +936,32 @@ function deseneazaHarta() {
   const felii = nivelele();
   const trecut = levelMax();
   const desfacut = trecut + 1; // levelul următor celui atins e deschis
+  /* CÂTE WORLDS SE VĂD. Doar cele la care ai ajuns, plus UNA închisă, fără nume.
+     Nu-i o toană: un drum al cărui capăt îl vezi din prima nu mai e un drum, e o
+     listă. Ținând worlds-urile acoperite, fiecare capăt de world descoperă o
+     bucată din poveste, iar cazul chiar se desfășoară pe măsură ce înveți.
+
+     Ușa închisă rămâne totuși desenată, cu numărul ei: altfel harta ar minți în
+     partea cealaltă, lăsând impresia că nu mai urmează nimic. Iar dedesubt scrie
+     limpede câte au mai rămas, ca să știi cât drum ai.
+
+     Regula se sprijină pe cea a levelurilor, nu se bate cu ea: levelurile se
+     deschid unul câte unul, deci ca să ajungi la primul level al unui world
+     trebuie oricum să le fi trecut pe toate ale celui dinainte. */
+  const ultimaDeschisa = LUMI.findIndex((_, li) => trecut < li * NIVELE_PE_LUME);
+  const cateSeVad = ultimaDeschisa === -1 ? LUMI.length : ultimaDeschisa; // câte sunt DESCHISE
   const lumi = LUMI.map((L, li) => {
+    if (li > cateSeVad) return "";          // dincolo de ușa închisă: nimic
+    if (li === cateSeVad) {                  // chiar ușa închisă
+      const cerut = LUMI[li - 1]?.nume || "";
+      return `<section class="cmp-world cmp-world--inchis" aria-label="World ${li + 1}, încă închis">
+          <header class="cmp-world__head">
+            <span class="cmp-world__sign" aria-hidden="true">🔒</span>
+            <b class="cmp-world__name">World ${li + 1}</b>
+            <span class="cmp-world__n">${cerut ? `se deschide când închei ${esc(cerut)}` : ""}</span>
+          </header>
+        </section>`;
+    }
     const de_la = li * NIVELE_PE_LUME + 1;
     /* ULTIMUL WORLD ÎNGHITE TOT CE PRISOSEȘTE. Cele 8 worlds a câte 22 ies exact
        din cei 880 de itemi de azi; dar prima sesiune adăugată strică socoteala,
@@ -985,6 +1010,10 @@ function deseneazaHarta() {
         „am trecut de ${trecut || 12}" chiar înseamnă ceva.</p>
       ${galerie ? `<div class="cmp-gallery"><span class="cmp-gallery__lab">Badges</span>${galerie}</div>` : ""}
       ${lumi}
+      ${cateSeVad + 1 < LUMI.length
+        ? `<p class="cmp-map__rest">Mai sunt <b>${LUMI.length - cateSeVad - 1}</b> worlds dincolo de aceasta.
+             Se arată pe rând, pe măsură ce dosarul înaintează.</p>`
+        : ""}
     </section>`;
 }
 

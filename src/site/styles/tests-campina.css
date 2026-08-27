@@ -317,6 +317,22 @@
 }
 .cmp-lvl.is-locked { opacity: 0.32; cursor: not-allowed; }
 
+/* Ușa închisă: aceeași casetă, dar fără grilă și fără culoare proprie. Nu-i o
+   lume ștearsă, e una care încă n-a fost deschisă, și se vede că e acolo. */
+.cmp-world--inchis {
+  border-style: dashed;
+  border-color: var(--color-border);
+  background: transparent;
+  opacity: 0.62;
+}
+.cmp-world--inchis .cmp-world__head { margin-bottom: 0; }
+.cmp-world--inchis .cmp-world__n { font-style: italic; }
+.cmp-map__rest {
+  margin: 0; padding: 0.7rem 0.9rem; border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  font-size: 0.84rem; line-height: 1.6; color: var(--color-text-muted);
+}
+
 /* Cei cinci pași ai nivelului, în bara de sus. Punctul de acum pulsează încet —
    destul cât să-l găsești, nu cât să te grăbească. */
 .cmp-steps { display: flex; gap: 0.3rem; }
