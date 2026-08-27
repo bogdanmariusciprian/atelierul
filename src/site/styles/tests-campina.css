@@ -542,19 +542,28 @@
 }
 .cmp-play.e-reusit .cmp-bignum {
   left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1.9);
-  animation: cmp-pompa var(--pompa, 400ms) cubic-bezier(.34,1.56,.64,1) var(--zbor, 450ms);
+  animation: cmp-pompa var(--pompa, 280ms) ease-in-out var(--zbor, 450ms) var(--pompe, 3);
 }
 .cmp-play.e-reusit .cmp-bignum b { animation: none; color: #fff; }
 .cmp-play.e-reusit .cmp-bignum i { color: rgb(255 255 255 / 0.75); }
 .cmp-play.e-reusit .cmp-orbit { pointer-events: none; }
 @keyframes cmp-pompa {
-  0%   { transform: translate(-50%, -50%) scale(1.9); }
-  45%  { transform: translate(-50%, -50%) scale(2.7); }
-  100% { transform: translate(-50%, -50%) scale(2.1); }
+  0%, 100% { transform: translate(-50%, -50%) scale(1.9); }
+  45%      { transform: translate(-50%, -50%) scale(2.45); }
 }
 .cmp-play.e-cade .cmp-bignum b { animation: none; color: #fff; }
 .cmp-play.e-cade .cmp-bignum i { color: rgb(255 255 255 / 0.7); }
 .cmp-play.e-cade .cmp-bignum__go { font-size: 0.9rem; opacity: 1; color: #fff; }
+/* Litera corectă urcă din card în ecranul de cădere. Sub ceață, cardul nu se
+   mai citește; fără ea, greșeala n-ar mai învăța pe nimeni nimic. */
+.cmp-bignum__cheie {
+  display: block; margin-top: 0.5rem; letter-spacing: 0.02em;
+  text-transform: none; font-weight: 400; color: rgb(255 255 255 / 0.85);
+}
+.cmp-bignum__cheie b {
+  display: inline; font-size: 1.15em; font-weight: 800; color: #fff;
+  animation: none;
+}
 /* Cardul rămâne dedesubt, retras: răspunsul corect și explicația nu se pierd,
    doar se dau la o parte. */
 .cmp-play.e-cade .cmp-orbit { pointer-events: none; }

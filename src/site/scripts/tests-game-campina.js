@@ -890,7 +890,7 @@ function hainaLumii(n) {
   const i = lumeaNivelului(n);
   const L = LUMI[i];
   const tarie = (7 + Math.round(incinsul(n) * 15)) + "%";
-  return `--lume:${L.culoare}; --tarie:${tarie}; --zbor:${ZBOR_MS}ms; --pompa:${POMPA_MS}ms`;
+  return `--lume:${L.culoare}; --tarie:${tarie}; --zbor:${ZBOR_MS}ms; --pompa:${POMPA_MS}ms; --pompe:${POMPE}`;
 }
 
 function deseneazaLevelUp() {
@@ -1024,7 +1024,8 @@ function deseneazaNivel() {
       <p class="cmp-bignum">
         <b>#${numar}</b>
         <i>din ${J.numarGlobal.size}</i>
-        <em class="cmp-bignum__go">Game Over</em>
+        <em class="cmp-bignum__go">Game Over${r && !r.corect && r.cheie
+          ? `<span class="cmp-bignum__cheie">era <b>${esc(r.cheie)}</b></span>` : ""}</em>
       </p>
       <div class="cmp-orbit">
         ${insigneleHtml()}
@@ -1076,11 +1077,16 @@ async function raspundeLevelUp(buton) {
    în două fișiere și s-ar despărți la prima ajustare, iar pomparea ar porni
    ori peste zbor, ori după o pauză. */
 const ZBOR_MS = 450;          // cât ține drumul numărului spre mijloc
-const POMPA_MS = 400;         // pomparea de la capăt, semnul de izbândă
+const POMPA_MS = 280;         // o bătaie din pompare
+const POMPE = 3;              // câte bătăi la rând, ca semn de izbândă
 const CITIRE_BUN_MS = 350;    // cât stai cu bifa verde înainte de zbor
-const CITIRE_GRESIT_MS = 2400; // cât ai la dispoziție să citești ce era corect
-const REUSITA_MS = ZBOR_MS + POMPA_MS;
-const CADEREA_MS = ZBOR_MS + 750; // zborul, plus răgazul de citit „Game Over"
+/* La greșeală, numărul pleacă aproape la fel de repede ca la reușită. Litera
+   corectă NU se pierde din pricina asta: ea urcă în ecranul de cădere, sub
+   „Game Over", deci se citește prin ceață, nu pe sub ea. Explicația întreagă
+   rămâne pe card, iar cine o vrea o are în Relaxed ori la reluarea levelului. */
+const CITIRE_GRESIT_MS = 700;
+const REUSITA_MS = ZBOR_MS + POMPA_MS * POMPE;
+const CADEREA_MS = ZBOR_MS + 1400; // zborul, plus răgazul de citit ce era corect
 
 /* Ceasurile pornite de aici se opresc la orice plecare din level (harta,
    modurile, alt level). Fără asta, un ceas rămas în urmă ar redesena peste
