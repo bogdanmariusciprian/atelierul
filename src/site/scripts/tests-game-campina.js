@@ -271,11 +271,13 @@ const MODURI = [
   },
   {
     id: "levelup", nume: "Level-up", semn: "🔥",
-    scurt: "5 itemi, zero greșeli",
-    lung: `Levels de câte cinci itemi. O singură greșeală și levelul se închide;
-           îl iei de la capăt. Levelurile sunt strânse în opt worlds, care duc
-           un caz de la sesizare până la sentință: cu cât urci, cu atât înaintează
-           dosarul. Pe drum aduni badges.`,
+    scurt: "5 itemi pe level, 3 greșeli pe capitol",
+    lung: `Cinci itemi pe level, iar o greșeală îl închide. Ai voie la trei
+           greșeli într-un capitol; a patra îl ia de la început, cu tot cu
+           levelurile trecute în el. Cele 18 capitole duc un caz adevărat de
+           furt de patrimoniu, de la alarma din muzeu până la sentință, iar
+           fiecare level trecut descoperă un fragment nou din dosar.
+           Pe drum aduni badges.`,
   },
 ];
 
@@ -931,25 +933,19 @@ function deseneazaLevelUp() {
   return deseneazaHarta();
 }
 
-/* Insignele câștigate, așezate în jurul cardului. Poziția o pun tot din
-   JavaScript, ca variabile CSS: pe ecran lat ele orbitează, iar pe telefon
-   foaia de stil le pune într-un rând deasupra, unde nu se calcă cu enunțul. */
+/* INSIGNELE, TOATE ÎNTR-UN LOC, deasupra cardului. Prima formă le punea pe o
+   orbită în jurul lui, socotindu-le poziția cu sinus și cosinus. Arăta bine cu
+   două, dar la opt se împrăștiau pe toată lățimea, iar ochiul le căuta una câte
+   una în loc să le vadă dintr-o privire. Un rând strâns le ține împreună și le
+   lasă să curgă pe al doilea rând când se înmulțesc, fără nicio socoteală. */
 function insigneleHtml() {
   const coduri = [...J.insigne];
   if (!coduri.length) return "";
-  const n = coduri.length;
-  const bucati = coduri.map((cod, i) => {
+  const bucati = coduri.map((cod) => {
     const d = despreInsigna(cod);
     if (!d) return "";
-    /* Arcul e numai pe DREAPTA cardului, de la -80° la +80°. Golul din stânga
-       nu-i liber: acolo stă numărul mare al itemului, iar două lucruri care se
-       calcă nu sunt o podoabă, ci o dezordine. */
-    const unghi = (-80 + (i * 160) / Math.max(1, n - 1)) * Math.PI / 180;
-    const x = 50 + Math.cos(unghi) * 62;
-    const y = 50 + Math.sin(unghi) * 58;
     const noua = J.proaspete.has(cod) ? " e-noua" : "";
-    return `<span class="cmp-badge${noua}" style="--x:${x.toFixed(1)}%; --y:${y.toFixed(1)}%"
-        title="${esc(d.nume)}: ${esc(d.de_ce)}">
+    return `<span class="cmp-badge${noua}" title="${esc(d.nume)}: ${esc(d.de_ce)}">
         <i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b>
       </span>`;
   }).join("");
@@ -1042,9 +1038,10 @@ function deseneazaHarta() {
   radacina.innerHTML = `
     <section class="cmp-map">
       ${baraDeSus("Level-up", "🔥", `<span class="cmp-hud__pos">Level ${trecut} / ${felii.length}</span>`)}
-      <p class="cmp-map__intro">Cinci itemi pe level. O singură greșeală și levelul se închide,
-        îl iei de la capăt. Levelurile sunt aceleași de fiecare dată, așa că
-        „am trecut de ${trecut || 12}" chiar înseamnă ceva.</p>
+      <p class="cmp-map__intro">Cinci itemi pe level. O greșeală îl închide, iar
+        <b>trei greșeli îți sunt îngăduite pe capitol</b>: a patra ia capitolul de la
+        început. Levelurile sunt aceleași de fiecare dată, deci a doua oară le știi,
+        iar fiecare level trecut descoperă un fragment din dosar.</p>
       ${galerie ? `<div class="cmp-gallery"><span class="cmp-gallery__lab">Badges</span>${galerie}</div>` : ""}
       ${lumi}
       ${cateSeVad + 1 < CAPITOLE.length
@@ -1263,7 +1260,7 @@ function deseneazaSfarsitNivel() {
   const { deLa } = hotarele(J.capitol);
   const noi = [...J.proaspete].map((cod) => {
     const d = despreInsigna(cod);
-    return d ? `<span class="cmp-badge e-noua e-static"><i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b></span>` : "";
+    return d ? `<span class="cmp-badge e-noua"><i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b></span>` : "";
   }).join("");
 
   /* PATRU SFÂRȘITURI, nu două. Levelul trecut, capitolul încheiat, levelul
@@ -1285,8 +1282,14 @@ function deseneazaSfarsitNivel() {
     titlu = `Chapter ${J.capitol + 1} complete`;
     spune = `Ai închis „${esc(L.titlu)}", cu toate cele ${NIVELE_PE_LUME} levels ale lui.
       ${urmator <= felii ? "Dosarul merge mai departe." : "Aici se termină dosarul."}`;
+    /* Două butoane, nu unul: la capătul unui capitol vrei ori să mergi mai
+       departe, ori să te uiți pe hartă la ce-ai strâns - iar cel de continuare
+       spune și ÎNCOTRO, cu titlul capitolului următor, nu doar „mai departe". */
+    const urmatorulCap = CAPITOLE[J.capitol + 1];
     butonul = urmator <= felii
-      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">Chapter ${J.capitol + 2} ▸</button>`
+      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">
+           Chapter ${J.capitol + 2}${urmatorulCap ? ` · ${esc(urmatorulCap.titlu)}` : ""} ▸
+         </button>`
       : "";
   } else if (trecut) {
     semn = L.semn;
