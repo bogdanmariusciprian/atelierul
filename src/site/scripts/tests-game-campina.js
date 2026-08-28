@@ -122,8 +122,14 @@ export async function initTestGameCampina(mountEl, exam) {
    pe un calculator împărțit, acolo ar fi ajuns munca lui sub ochii altuia. */
 async function incarcaProgresul() {
   if (!isLoggedIn()) { J.raspunsuri = {}; J.note = {}; J.leveluri = new Map(); J.insigne = new Set(); return; }
+  /* Dacă serverul nu răspunde, jocul MERGE MAI DEPARTE, doar fără ce-ai lucrat
+     înainte. Înainte, o singură chemare căzută oprea tot `init`-ul și pagina
+     rămânea la „Se aduc itemii…", ceea ce arăta ca un joc stricat, nu ca o
+     legătură proastă. */
   const [progres, leveluri, insigne] = await Promise.all([
-    fetchMyProgress(J.exam), fetchMyLevels(J.exam), fetchMyBadges(J.exam),
+    fetchMyProgress(J.exam).catch(() => []),
+    fetchMyLevels(J.exam).catch(() => []),
+    fetchMyBadges(J.exam).catch(() => []),
   ]);
   J.raspunsuri = {};
   J.note = {};
@@ -849,15 +855,27 @@ const INSIGNE = {
   "comeback":   { nume: "Comeback",   semn: "💪", de_ce: "ai trecut un level pe care picaseși" },
   "halfway":    { nume: "Halfway",    semn: "🧭", de_ce: "jumătate din drum" },
 };
-const codCapitol = (i) => `cap-${i + 1}`;
-/* Insigna unui world poartă numele pasului din dosar, nu „X Cleared": lipit
+/* PREFIXUL SE SCRIE O SINGURĂ DATĂ, iar tăierea se măsoară din el. Prima formă
+   avea prefixul într-un loc și lungimea lui scrisă cu mâna în altul: la
+   redenumirea din `world-` în `cap-`, prefixul s-a schimbat, cifra 6 a rămas,
+   iar `"cap-1".slice(6)` a dat gol. De acolo ieșea capitolul −1 și tot ecranul
+   hărții crăpa. Nu se vedea decât după ce câștigai o insignă de capitol.
+   Acum lungimea nu mai poate rămâne în urmă: se socotește din prefix. */
+const PREFIX_CAPITOL = "cap-";
+const codCapitol = (i) => `${PREFIX_CAPITOL}${i + 1}`;
+
+/* Insigna unui capitol poartă numele pasului din dosar, nu „X Cleared": lipit
    după un nume românesc, cuvântul englezesc suna a traducere neterminată, iar
-   „Amprente ridicate" spune și ce-ai făcut, nu doar că ai terminat ceva. */
-const insignaCapitolului = (i) => ({
-  nume: CAPITOLE[i].insigna, semn: CAPITOLE[i].semn, de_ce: `ai încheiat capitolul „${CAPITOLE[i].titlu}”`,
-});
+   „Amprente ridicate" spune și ce-ai făcut, nu doar că ai terminat ceva.
+
+   Întoarce `null` pentru un capitol care nu există. O insignă rămasă de la o
+   numerotare veche n-are voie să golească ecranul: e o podoabă, nu un stâlp. */
+const insignaCapitolului = (i) => {
+  const c = CAPITOLE[i];
+  return c ? { nume: c.insigna, semn: c.semn, de_ce: `ai încheiat capitolul „${c.titlu}”` } : null;
+};
 const despreInsigna = (cod) => INSIGNE[cod]
-  || (cod.startsWith("cap-") ? insignaCapitolului(Number(cod.slice(6)) - 1) : null);
+  || (cod.startsWith(PREFIX_CAPITOL) ? insignaCapitolului(Number(cod.slice(PREFIX_CAPITOL.length)) - 1) : null);
 
 /* Toți itemii, în ordinea lor firească (an, sesiune, numărul de pe hârtie),
    tăiați în felii de câte cinci. Ordinea e AȘEZATĂ, nu amestecată: un level
@@ -1331,7 +1349,30 @@ function deseneazaSfarsitNivel() {
 }
 // ---------- desenul de sus ----------
 
+/* O EROARE DE DESEN NU MAI LASĂ ECRANUL GOL. Dacă un desen crapă la mijloc,
+   `innerHTML` rămâne cum era, iar din afară arată ca un buton care nu face
+   nimic: apeși și nu se întâmplă nimic, fără niciun semn. Aici se prinde
+   căderea și se scrie pe ecran ce s-a rupt, cu tot cu locul din cod.
+
+   Nu-i o cârpeală care ascunde greșeala, ci una care o arată: fără ea, singurul
+   loc unde se vedea era consola browserului, adică nicăieri pentru cine nu știe
+   s-o deschidă. */
 function deseneaza() {
+  try {
+    return deseneazaDeAdevarat();
+  } catch (e) {
+    console.error("Level-up / Câmpina:", e);
+    radacina.className = "cmp";
+    radacina.innerHTML = `<div class="cmp-crapat">
+        <p><b>S-a rupt ceva la desenarea ecranului.</b></p>
+        <p class="cmp-crapat__ce">${esc(e && e.message ? e.message : String(e))}</p>
+        <p class="cmp-crapat__unde">${esc((e && e.stack ? e.stack : "").split("\\n").slice(1, 3).join(" · "))}</p>
+        <button type="button" class="tgame-btn" data-act="inapoi">‹ înapoi la moduri</button>
+      </div>`;
+  }
+}
+
+function deseneazaDeAdevarat() {
   if (!J.incarcat) return deseneazaAsteptarea();
   if (!J.itemi.length) {
     radacina.className = "cmp";

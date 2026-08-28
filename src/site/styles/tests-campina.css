@@ -14,6 +14,18 @@
    ========================================================= */
 
 .cmp { display: block; }
+/* Ecranul de eroare. Nu-i frumos anume: trebuie să se vadă că s-a rupt ceva,
+   nu să treacă drept o stare obișnuită a jocului. */
+.cmp-crapat {
+  padding: var(--space-lg); border-radius: 12px;
+  border: 1px solid var(--border-danger, #dc2626);
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  font-size: 0.9rem; line-height: 1.7;
+}
+.cmp-crapat p { margin: 0 0 0.5rem; }
+.cmp-crapat__ce { font-family: var(--font-mono, monospace); font-size: 0.85rem; }
+.cmp-crapat__unde { font-size: 0.75rem; color: var(--color-text-muted); word-break: break-all; }
+
 .cmp-wait {
   text-align: center; padding: var(--space-xl) 0;
   color: var(--color-text-muted); font-size: 0.95rem;
