@@ -30,6 +30,7 @@ import {
 } from "../../shared/scripts/moderation.js";
 import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
+  propuneriDeAprobat, aprobaExplicatia, respingeExplicatia,
   adminFetchTestDownloads, setTestDownloadSolved, directDownloadUrl,
   listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
   addTestDownloads, updateTestDownloads, deleteTestDownloads, guessFromFileName,
@@ -306,6 +307,7 @@ export function renderCommunity(basePath = "") {
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
     contentReports: [], // REAL open reports (posts/comments/test items/exercises)
     reportItems: {},    // id → full test item behind a flagged-item report
+    propuneriExpl: [],  // explicații propuse de elevii de la meditații, în așteptare
     bonusQs: [],        // flying bonus questions (teacher-authored)
     downloads: [],      // downloadable tests (files on the teacher's Drive)
     settings: {},       // private settings: Drive key + folder per category
@@ -3275,6 +3277,53 @@ export function renderCommunity(basePath = "") {
     // mie de rânduri, cu editare pe celulă; a o muta ar fi însemnat s-o rescriu
     // pentru un câștig de nimic. Din panou pleacă o legătură spre ea.
     const cat = doarExamenul ? TEST_CAT_BY_SLUG[doarExamenul] : null;
+
+    /* EXPLICAȚIILE PROPUSE DE ELEVI (migrarea 0087). Se judecă aici, nu în
+       grila de itemi: în grilă lucrezi pe coloane, la o sută de itemi deodată,
+       pe când aici ai de citit un text și de luat o hotărâre, câte una.
+
+       Fiecare propunere vine cu itemul ei întreg, ca s-o poți cântări fără să
+       pleci: enunțul, cele patru variante cu litera corectă însemnată, apoi
+       textul elevului într-un câmp pe care-l poți rescrie. Ce aprobi e ce se
+       publică, nu neapărat ce a scris el.
+
+       Nu scrie cine a propus pe explicația publicată - așa a ales Marius - dar
+       AICI scrie, fiindcă tu trebuie să știi cu cine lucrezi. */
+    const propuneri = state.propuneriExpl.filter((pr) => !cat || pr.item.exam === cat.slug);
+    const cardPropunere = (pr) => {
+      const it = pr.item;
+      const opts = ["A", "B", "C", "D"].filter((k) => it.options?.[k]).map((k) => `
+        <li class="cx-repopt${it.correct === k ? " is-key" : ""}">
+          <b>${k}</b><span>${sanitizeRich(it.options[k])}</span>
+          ${it.correct === k ? `<em class="cx-reptag cx-reptag--key">corect</em>` : ""}
+        </li>`).join("");
+      return `<div class="cx-repcard">
+          <div class="cx-repcard__go" style="cursor:default">
+            <span class="cx-repcard__meta">${it.year ?? ""}${it.session ? ` · ${escapeHtml(it.session)}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}</span>
+            <p class="cx-repcard__q">${sanitizeRich(it.question)}</p>
+            <ul class="cx-repopts">${opts}</ul>
+          </div>
+          <div class="cx-repcard__say">
+            <span class="cx-repcard__lab">Explicația propusă de ${escapeHtml(pr.elev)}</span>
+            <textarea class="cx-input cx-explan__text" data-prop="${pr.id}" rows="4"
+              maxlength="2000">${escapeHtml(pr.text)}</textarea>
+            <p class="cx-muted">O poți rescrie înainte s-o aprobi. Publicată, se vede la toți, după ce răspund la item.</p>
+          </div>
+          <div class="cx-repacts">
+            <button type="button" class="btn-mini btn-mini--ok" data-action="explan-approve" data-id="${pr.id}">✓ Aprobă și publică</button>
+            <button type="button" class="btn-mini btn-mini--no" data-action="explan-reject" data-id="${pr.id}">✕ Nu de data asta</button>
+          </div>
+        </div>`;
+    };
+    const bloculPropunerilor = `<div class="cx-box">
+        <div class="cx-admin__head"><h3>✍️ Explicații propuse de elevi · ${propuneri.length}</h3></div>
+        ${propuneri.length
+          ? propuneri.map(cardPropunere).join("")
+          : `<p class="cx-muted">Nicio propunere în așteptare. Elevii de la meditații pot scrie explicații
+              doar la itemii care n-au încă una, și numai cât îi ții porniți din butonul
+              „Propuneri de explicații" din colțul de jos.</p>`}
+      </div>`;
+
     const spreGrila = !cat ? "" : `<div class="cx-box">
         <div class="cx-admin__head"><h3>Itemii examenului</h3></div>
         <p class="cx-muted">Banca de itemi se editează în pagina examenului, în grila ei, unde ai
@@ -3290,6 +3339,7 @@ export function renderCommunity(basePath = "") {
         ])}
       </div>` : ""}
       ${spreGrila}
+      ${bloculPropunerilor}
       <div class="cx-box">
         <div class="cx-admin__head"><h3>🔑 Legătura cu Drive</h3></div>
         <p class="cx-muted">Cheia se citește DOAR din contul tău de profesor — elevii n-o primesc niciodată. Folderele trebuie partajate în Drive ca „oricine are linkul".</p>
@@ -3767,6 +3817,10 @@ export function renderCommunity(basePath = "") {
           .filter((r) => r.targetType === "test_item").map((r) => r.targetId))]
           .map(async (id) => { const it = await adminFetchTestItem(id); if (it) state.reportItems[id] = it; }));
         state.bonusQs = await adminFetchBonusQuestions(); // with their answers (definer RPC)
+        // Explicațiile propuse de elevi vin ÎMPREUNĂ cu itemul lor (RPC definer):
+        // ca să judeci o explicație îți trebuie enunțul și litera corectă, iar
+        // pe aceea clientul n-o poate citi singur.
+        state.propuneriExpl = await propuneriDeAprobat();
         state.downloads = await adminFetchTestDownloads(); // all categories
         state.settings = await fetchAppSettings();         // Drive key + folders
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
@@ -4949,6 +5003,36 @@ export function renderCommunity(basePath = "") {
           ? "✓ Întemeiată — elevul a fost anunțat și premiat."
           : "Respinsă — explicația a plecat în mesageria elevului.");
         return render();
+      }
+      /* APROBAREA E O SINGURĂ MIȘCARE, făcută pe server: scrie explicația în
+         bancă ȘI închide propunerea. Aici doar trimitem textul din câmp, ca să
+         plece varianta ta, nu cea a elevului, dacă ai îndreptat-o.
+
+         Serverul poate spune „nu": itemul a căpătat între timp o explicație
+         (regula ta: doar golurile se completează) ori propunerea a fost deja
+         hotărâtă din altă filă. Atunci NU scoatem cardul din listă și spunem de
+         ce; altfel ai crede că s-a publicat ceva ce n-a intrat nicăieri. */
+      case "explan-approve": {
+        const id = btn.dataset.id;
+        const text = (mount.querySelector(`.cx-explan__text[data-prop="${id}"]`)?.value || "").trim();
+        btn.disabled = true;
+        aprobaExplicatia(id, text).then((r) => {
+          if (r && r.error) { btn.disabled = false; showToast(`N-am publicat: ${r.error}`); return; }
+          state.propuneriExpl = state.propuneriExpl.filter((pr) => pr.id !== id);
+          showToast("✓ Publicată. O văd toți, după ce răspund la item.");
+          render();
+        });
+        return;
+      }
+      case "explan-reject": {
+        const id = btn.dataset.id;
+        btn.disabled = true;
+        respingeExplicatia(id).then(() => {
+          state.propuneriExpl = state.propuneriExpl.filter((pr) => pr.id !== id);
+          showToast("Respinsă. Itemul rămâne fără explicație.");
+          render();
+        });
+        return;
       }
       case "drive-save-key": {
         const v = (mount.querySelector("#cx-drive-key")?.value || "").trim();

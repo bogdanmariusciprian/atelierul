@@ -30,6 +30,7 @@ import {
   fetchTestItems, checkTestItem, answerTestItem, reportTestItem, TEST_ITEM_TYPES,
   fetchMyProgress, saveMyProgress, clearMyProgress,
   fetchMyLevels, saveMyLevel, clearMyLevels, fetchMyBadges, awardBadge,
+  potPropune, propuneExplicatia, propunerileMele,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -89,6 +90,10 @@ const J = {
   // — configurator (Classic / Adventure) —
   cfg: { ani: new Set(), tipuri: new Set(), totiAnii: true, toateTipurile: true },
   semnalate: new Set(),
+  /* Propunerile de explicații: dacă profesorul m-a pornit, și în ce stare e
+     ce am trimis până acum (id item → „in_asteptare”/„aprobata”/„respinsa”). */
+  potPropune: false,
+  propuneri: {},
 };
 
 /* Stilurile proprii și le aduce singur modulul, socotite față de EL, nu față de
@@ -144,6 +149,13 @@ async function incarcaProgresul() {
   }
   J.leveluri = new Map(leveluri.map((l) => [l.level, { tries: l.tries, passed: l.passed }]));
   J.insigne = new Set(insigne.map((b) => b.code));
+
+  /* Pot propune explicații? Se întreabă baza, nu se ghicește din rol: e o
+     îngăduință pe care profesorul o aprinde și o stinge cât lucrează cu elevul.
+     Dacă întrebarea cade, răspunsul e „nu": mai bine lipsește un câmp decât să
+     scrie elevul într-un loc care oricum îl refuză. */
+  J.potPropune = await potPropune().catch(() => false);
+  J.propuneri = J.potPropune ? await propunerileMele(J.exam).catch(() => ({})) : {};
 }
 
 /* Cel mai înalt level trecut se AFLĂ din leveluri, nu se ține de mână într-un
@@ -333,6 +345,17 @@ async function salveazaItem(id) {
     chosen: r.ales, correct: r.corect, answerKey: r.cheie,
     observation: r.obs, note: J.note[id] || "",
   });
+
+  /* NOTA PLEACĂ ȘI CA PROPUNERE, dar numai dacă sunt toate trei la un loc:
+     profesorul m-a pornit, itemul n-are încă explicație, iar ce-am scris e o
+     explicație, nu un început de frază. Nota rămâne oricum a mea, mai sus:
+     propunerea e o copie trimisă, nu o mutare. */
+  if (!J.potPropune) return;
+  if ((r.obs || "").trim()) return;             // itemul are deja explicație
+  const text = (J.note[id] || "").trim();
+  if (text.length < 10) return;
+  const bine = await propuneExplicatia({ exam: J.exam, itemId: id, text });
+  if (bine) J.propuneri[id] = "in_asteptare";
 }
 
 /* Cât s-a lucrat dintr-o hârtie. Se numără din răspunsurile ținute minte, nu
@@ -395,13 +418,22 @@ function itemRelaxat(it, i) {
   /* Locul tău de explicat apare DOAR după ce ai ales. Înainte de asta ar fi o
      cutie goală lângă fiecare item — și, mai rău, te-ar pune să-ți motivezi un
      răspuns pe care încă nu l-ai dat. */
+  /* Când elevul e pornit de profesor ȘI itemul n-are explicație, nota lui e și o
+     propunere. I se spune limpede: altfel ar scrie pentru el și ar afla abia
+     mai târziu că textul a plecat mai departe. */
+  const propune = r && J.potPropune && !(r.obs || "").trim();
+  const stareaPropunerii = { in_asteptare: "trimisă profesorului", aprobata: "publicată la toți", respinsa: "nefolosită de data asta" }[J.propuneri[it.id]] || "";
   const alTau = r ? `
-    <div class="cmp-note">
-      <label class="cmp-note__lab" for="nota-${it.id}">Explicația ta</label>
+    <div class="cmp-note${propune ? " e-propune" : ""}">
+      <label class="cmp-note__lab" for="nota-${it.id}">Explicația ta${propune
+        ? ` <span class="cmp-note__catre">ajunge și la profesor</span>` : ""}</label>
       <textarea class="cmp-note__in" id="nota-${it.id}" data-act="nota" data-id="${it.id}"
         rows="2" maxlength="800"
-        placeholder="De ce e corect așa? Scrie cu vorbele tale — te ajută la recitire.">${esc(nota)}</textarea>
+        placeholder="${propune
+          ? "Itemul ăsta n-are explicație. Scrie-o tu, cu vorbele tale; dacă profesorul o aprobă, o vor citi toți."
+          : "De ce e corect așa? Scrie cu vorbele tale, te ajută la recitire."}">${esc(nota)}</textarea>
       <span class="cmp-note__state" data-nota-stare="${it.id}">${nota ? "✓ salvat" : ""}</span>
+      ${stareaPropunerii ? `<span class="cmp-note__prop">${esc(stareaPropunerii)}</span>` : ""}
     </div>` : "";
   return `<article class="tgame-card cmp-item${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
       <div class="cmp-item__nr" aria-hidden="true">${i + 1}</div>

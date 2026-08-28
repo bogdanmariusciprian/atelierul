@@ -193,6 +193,19 @@
   display: block; margin-top: 0.25rem; min-height: 1em;
   font-size: 0.72rem; color: var(--color-text-muted);
 }
+/* Când nota e și propunere, câmpul se însemnează: elevul trebuie să știe că ce
+   scrie aici poate ajunge sub ochii tuturor, nu doar sub ai lui. */
+.cmp-note.e-propune .cmp-note__in { border-color: color-mix(in srgb, var(--color-primary) 55%, transparent); }
+.cmp-note__catre {
+  margin-left: 0.4rem; padding: 0.1rem 0.4rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary); font-weight: 700; letter-spacing: 0;
+  text-transform: none; font-size: 0.66rem;
+}
+.cmp-note__prop {
+  display: block; margin-top: 0.15rem;
+  font-size: 0.72rem; font-style: italic; color: var(--color-primary);
+}
 
 /* ---------------------------------------------------------
    3. Configuratorul (Clasic / Aventura)
