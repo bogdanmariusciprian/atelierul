@@ -336,6 +336,16 @@ export async function saveMyLevel({ exam, level, tries, passed } = {}) {
   return true;
 }
 
+/** Șterge levelurile dintr-un interval: capitolul o ia de la capăt.
+ *  Numai ale mele; RLS n-ar lăsa oricum altceva. */
+export async function clearMyLevels({ exam, deLa, panaLa } = {}) {
+  if (!CURRENT_USER.authId || !cerExamenul("clearMyLevels", exam)) return false;
+  const { error } = await supabase.from("tests_levels").delete()
+    .eq("exam", exam).gte("level", deLa).lte("level", panaLa);
+  if (error) { console.warn("clearMyLevels:", error.message); return false; }
+  return true;
+}
+
 /** Insignele mele la un examen. */
 export async function fetchMyBadges(exam) {
   if (!CURRENT_USER.authId || !cerExamenul("fetchMyBadges", exam)) return [];

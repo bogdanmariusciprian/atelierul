@@ -29,7 +29,7 @@
 import {
   fetchTestItems, checkTestItem, answerTestItem, reportTestItem, TEST_ITEM_TYPES,
   fetchMyProgress, saveMyProgress, clearMyProgress,
-  fetchMyLevels, saveMyLevel, fetchMyBadges, awardBadge,
+  fetchMyLevels, saveMyLevel, clearMyLevels, fetchMyBadges, awardBadge,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
@@ -83,6 +83,8 @@ const J = {
   insigne: new Set(),  // codurile câștigate
   proaspete: new Set(), // insignele câștigate ACUM, ca să pâlpâie o dată
   serie: 0,            // leveluri trecute la rând, fără cădere
+  capitolCazut: false, // a patra greșeală a luat capitolul de la capăt
+  capitolIncheiat: false, // levelul ăsta a fost ultimul din capitol
   ceasuri: [],         // ceasurile mersului singur, oprite la orice plecare
   // — configurator (Classic / Adventure) —
   cfg: { ani: new Set(), tipuri: new Set(), totiAnii: true, toateTipurile: true },
@@ -868,6 +870,40 @@ function nivelele() {
 }
 
 const cateNivele = () => nivelele().length;
+
+/* HOTARELE UNUI CAPITOL. Ultimul capitol înghite ce prisosește peste socoteala
+   rotundă, la fel ca pe hartă: dacă banca mai crește, levelurile în plus au
+   unde sta. */
+function hotarele(cap) {
+  const deLa = cap * NIVELE_PE_LUME + 1;
+  const panaLa = cap === CAPITOLE.length - 1
+    ? Math.max(cateNivele(), deLa)
+    : Math.min(deLa + NIVELE_PE_LUME - 1, cateNivele());
+  return { deLa, panaLa };
+}
+
+/* GREȘELILE DINTR-UN CAPITOL nu se țin într-un contor aparte: se socotesc din
+   ce e deja scris. Fiecare level are numărul lui de încercări, iar o încercare
+   care n-a fost cea izbutită e o greșeală. Deci:
+
+       greșeli = (toate încercările din capitol) − (levelurile trecute)
+
+   De ce așa: un contor de sine stătător ar trebui ținut la zi în trei locuri
+   (la cădere, la trecere, la resetare) și s-ar desincroniza de restul la prima
+   scăpare. Așa, nu poate minți: dacă levelurile sunt adevărul, și numărul e. */
+const GRESELI_PE_CAPITOL = 3;
+function greseliIn(cap) {
+  const { deLa, panaLa } = hotarele(cap);
+  let incercari = 0, trecute = 0;
+  for (let n = deLa; n <= panaLa; n++) {
+    const l = J.leveluri.get(n);
+    if (!l) continue;
+    incercari += l.tries;
+    if (l.passed) trecute++;
+  }
+  return Math.max(0, incercari - trecute);
+}
+const greseliRamase = (cap) => Math.max(0, GRESELI_PE_CAPITOL - greseliIn(cap));
 const capitolulLevelului = (n) => Math.min(CAPITOLE.length - 1, Math.floor((n - 1) / NIVELE_PE_LUME));
 /* Cât de încins e levelul ÎN world-ul lui: 0 la primul, 1 la al 22-lea. Din el
    iese și tăria fundalului, ca lumina să crească pe măsură ce urci, nu doar
@@ -991,6 +1027,9 @@ function deseneazaHarta() {
           <b class="cmp-cap__name">Chapter ${li + 1} · ${esc(L.titlu)}</b>
           <span class="cmp-cap__n">${treuteAici} / ${pana - de_la + 1}</span>
         </header>
+        ${trecut >= de_la - 1 && trecut <= pana ? `<p class="cmp-cap__vieti"
+          title="A patra greșeală ia capitolul de la capăt">Greșeli rămase în capitol:
+          <b>${greseliRamase(li)}</b> din ${GRESELI_PE_CAPITOL}</p>` : ""}
         <div class="cmp-lvls">${patrate.join("")}</div>
         ${povestea.length ? `<ol class="cmp-frags">${povestea.join("")}</ol>` : ""}
       </section>`;
@@ -1054,7 +1093,8 @@ function deseneazaNivel() {
   radacina.className = "cmp cmp--play cmp--levelup";
   radacina.innerHTML = `
     <section class="cmp-play cmp-cap-scena${eUltimulCapitol(J.capitol) ? " e-final" : ""}" style="${hainaCapitolului(J.nivel)}">
-      ${baraDeSus(`${L.titlu}`, L.semn, `<span class="cmp-steps">${pasi}</span>`, "harta")}
+      ${baraDeSus(`${L.titlu} · Level ${J.nivel}`, L.semn,
+        `<span class="cmp-hud__lives" title="Greșeli rămase în capitol">${Array.from({ length: GRESELI_PE_CAPITOL }, (_, i) => `<i class="cmp-heart${i < greseliRamase(J.capitol) ? " is-on" : ""}">${i < greseliRamase(J.capitol) ? "❤" : "♡"}</i>`).join("")}</span><span class="cmp-steps">${pasi}</span>`, "harta")}
       <div class="cmp-veil" aria-hidden="true"></div>
       <p class="cmp-bignum">
         <b>#${numar}</b>
@@ -1150,7 +1190,12 @@ function mergeSingur(corect) {
 
 async function dupaItem(corect) {
   J.raspunsCurent = null;
-  if (!corect) { await inchideNivelul(false); J.faza = "harta"; return deseneaza(); }
+  /* La greșeală se oprește pe ECRANUL DE SFÂRȘIT, nu pe hartă. Înainte mergea
+     drept la hartă, și era bine cât timp singurul lucru de spus era „ai pierdut
+     levelul". De când a patra greșeală ia capitolul de la capăt, tăcerea nu mai
+     merge: elevul s-ar întoarce pe o hartă golită fără să afle de ce. Zborul
+     numărului rămâne automat; doar capătul lui e un ecran care spune ceva. */
+  if (!corect) { await inchideNivelul(false); return deseneaza(); }
   J.pozitie++;
   if (J.pozitie >= J.rand.length) { await inchideNivelul(true); }
   deseneaza();
@@ -1160,12 +1205,15 @@ async function dupaItem(corect) {
    seria și badges-urile se hotărăsc împreună, fiindcă depind unele de altele. */
 async function inchideNivelul(trecut) {
   const n = J.nivel;
+  const cap = capitolulLevelului(n);
   const vechi = J.leveluri.get(n) || { tries: 0, passed: false };
   const eraCazut = !vechi.passed && vechi.tries > 0;   // pentru „Comeback"
   const acum = { tries: vechi.tries + 1, passed: vechi.passed || trecut };
   J.leveluri.set(n, acum);
   J.serie = trecut ? J.serie + 1 : 0;
   J.faza = "gata";
+  J.capitolCazut = false;
+  J.capitolIncheiat = false;
 
   if (trecut) {
     const castigate = [];
@@ -1176,15 +1224,34 @@ async function inchideNivelul(trecut) {
     if (eraCazut) da("comeback");
     if (levelMax() >= Math.ceil(cateNivele() / 2)) da("halfway");
     // Capitol încheiat: toate levelurile lui sunt trecute.
-    const li = capitolulLevelului(n);
-    const de_la = li * NIVELE_PE_LUME + 1;
-    const pana = Math.min(de_la + NIVELE_PE_LUME - 1, cateNivele());
+    const { deLa, panaLa } = hotarele(cap);
     let tot = true;
-    for (let x = de_la; x <= pana; x++) if (!J.leveluri.get(x)?.passed) { tot = false; break; }
-    if (tot) da(codCapitol(li));
+    for (let x = deLa; x <= panaLa; x++) if (!J.leveluri.get(x)?.passed) { tot = false; break; }
+    if (tot) { da(codCapitol(cap)); J.capitolIncheiat = true; }
     if (isLoggedIn()) await Promise.all(castigate.map((cod) => awardBadge(J.exam, cod)));
   }
   if (isLoggedIn()) await saveMyLevel({ exam: J.exam, level: n, tries: acum.tries, passed: acum.passed });
+
+  /* A PATRA GREȘEALĂ ÎNCHIDE CAPITOLUL. Trei îți sunt îngăduite; a patra îl ia
+     de la început, cu tot cu levelurile pe care le trecuseși în el. Numai pe
+     ACELA: capitolele dinainte rămân închise și povestea lor citită.
+
+     De ce așa și nu altfel: o greșeală care costă doar reluarea aceluiași level
+     nu costă nimic, fiindcă levelul e mereu același și a doua oară îl știi.
+     Prețul trebuie să fie mai mare decât itemul greșit, dar mai mic decât tot
+     drumul; capitolul e chiar măsura potrivită. */
+  // `>` nu `>=`: trei greșeli sunt ÎNGĂDUITE, a patra e cea care închide.
+  if (!trecut && greseliIn(cap) > GRESELI_PE_CAPITOL) await reseteazaCapitolul(cap);
+}
+
+async function reseteazaCapitolul(cap) {
+  const { deLa, panaLa } = hotarele(cap);
+  for (let n = deLa; n <= panaLa; n++) J.leveluri.delete(n);
+  J.capitolCazut = true;
+  J.serie = 0;
+  /* Insigna capitolului, dacă o câștigase cumva, NU se ia înapoi: e a lui, a
+     fost câștigată cinstit. Se ia doar drumul, nu și amintirea lui. */
+  if (isLoggedIn()) await clearMyLevels({ exam: J.exam, deLa, panaLa });
 }
 
 function deseneazaSfarsitNivel() {
@@ -1193,20 +1260,59 @@ function deseneazaSfarsitNivel() {
   const L = CAPITOLE[J.capitol];
   const felii = cateNivele();
   const urmator = J.nivel + 1;
+  const { deLa } = hotarele(J.capitol);
   const noi = [...J.proaspete].map((cod) => {
     const d = despreInsigna(cod);
     return d ? `<span class="cmp-badge e-noua e-static"><i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b></span>` : "";
   }).join("");
+
+  /* PATRU SFÂRȘITURI, nu două. Levelul trecut, capitolul încheiat, levelul
+     pierdut și capitolul căzut sunt lucruri deosebite, iar elevul trebuie să
+     vadă din prima privire care dintre ele i s-a întâmplat. Un singur ecran
+     care spune „Game Over" și la a doua greșeală, și la a patra, ar ascunde
+     tocmai lucrul care contează: că de data asta a pierdut capitolul. */
+  const ramase = greseliRamase(J.capitol);
+  let semn, titlu, spune, butonul;
+  if (J.capitolCazut) {
+    semn = "🗂️";
+    titlu = "Capitolul o ia de la capăt";
+    spune = `A patra greșeală în „${esc(L.titlu)}". Capitolul se închide și se
+      deschide iar de la primul level. Ce ai citit rămâne citit, iar badge-urile
+      rămân ale tale; se pierde doar drumul, nu și amintirea lui.`;
+    butonul = `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${deLa}">De la început ▸</button>`;
+  } else if (J.capitolIncheiat) {
+    semn = L.semn;
+    titlu = `Chapter ${J.capitol + 1} complete`;
+    spune = `Ai închis „${esc(L.titlu)}", cu toate cele ${NIVELE_PE_LUME} levels ale lui.
+      ${urmator <= felii ? "Dosarul merge mai departe." : "Aici se termină dosarul."}`;
+    butonul = urmator <= felii
+      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">Chapter ${J.capitol + 2} ▸</button>`
+      : "";
+  } else if (trecut) {
+    semn = L.semn;
+    titlu = `Level ${J.nivel} complete`;
+    spune = `Cinci din cinci${J.puncte ? ` · <b class="is-pts">+${J.puncte}</b> puncte` : ""}${J.serie > 1 ? ` · streak ${J.serie}` : ""}`;
+    butonul = urmator <= felii
+      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">Level ${urmator} ▸</button>`
+      : "";
+  } else {
+    semn = "💥";
+    titlu = "Game Over";
+    spune = `Ai ținut <b>${J.bune}</b> ${J.bune === 1 ? "item" : "itemi"} din ${ITEMI_PE_NIVEL}.
+      ${ramase === 1
+        ? "<b>Mai ai o singură greșeală</b> în capitolul ăsta; a patra îl ia de la capăt."
+        : `Îți mai sunt îngăduite <b>${ramase} greșeli</b> în capitolul ăsta.`}${l && l.tries > 1 ? ` A ${l.tries}-a încercare la levelul ăsta.` : ""}`;
+    butonul = `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${J.nivel}">Retry</button>`;
+  }
+
   radacina.className = "cmp cmp--done";
   radacina.innerHTML = `
     <section class="cmp-done cmp-cap-scena${eUltimulCapitol(J.capitol) ? " e-final" : ""}" style="${hainaCapitolului(J.nivel)}">
       ${baraDeSus("Level-up", "🔥", "", "harta")}
       <div class="cmp-done__in">
-        <p class="cmp-done__sign" aria-hidden="true">${trecut ? L.semn : "💥"}</p>
-        <h2 class="cmp-done__title">${trecut ? `Level ${J.nivel} complete` : "Game Over"}</h2>
-        <p class="cmp-done__stats">${trecut
-          ? `Cinci din cinci${J.puncte ? ` · <b class="is-pts">+${J.puncte}</b> puncte` : ""}${J.serie > 1 ? ` · streak ${J.serie}` : ""}`
-          : `Ai ținut <b>${J.bune}</b> ${J.bune === 1 ? "item" : "itemi"} din ${ITEMI_PE_NIVEL}. Greșeala oprește levelul, dar levelul e mereu același, deci a doua oară îl știi.${l && l.tries > 1 ? ` A ${l.tries}-a încercare.` : ""}`}</p>
+        <p class="cmp-done__sign" aria-hidden="true">${semn}</p>
+        <h2 class="cmp-done__title">${esc(titlu)}</h2>
+        <p class="cmp-done__stats">${spune}</p>
         ${trecut && fragmentul(J.nivel) ? `
           <blockquote class="cmp-descoperit">
             <span class="cmp-descoperit__lab">Din dosar</span>
@@ -1214,9 +1320,7 @@ function deseneazaSfarsitNivel() {
           </blockquote>` : ""}
         ${noi ? `<div class="cmp-newbadges"><span class="cmp-gallery__lab">Badge nou</span>${noi}</div>` : ""}
         <div class="cmp-done__acts">
-          ${trecut && urmator <= felii
-            ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">Level ${urmator} ▸</button>`
-            : `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${J.nivel}">Retry</button>`}
+          ${butonul}
           <button type="button" class="tgame-btn" data-act="harta">Level map</button>
         </div>
       </div>

@@ -296,6 +296,12 @@
   margin-left: auto; font-size: 0.78rem; color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
+/* Greșelile rămase, scrise doar la capitolul în care ești. La celelalte n-ar
+   însemna nimic: cele închise sunt trecute, cele de dincolo n-au început. */
+.cmp-cap__vieti {
+  margin: 0 0 0.6rem; font-size: 0.8rem; color: var(--color-text-muted);
+}
+.cmp-cap__vieti b { color: var(--cap-lum); font-size: 0.95rem; }
 /* Pătrate care se așază singure: câte încap, atâtea pe rând. Cu 22 de nivele pe
    lume, o grilă cu număr fix de coloane ar lăsa un rând ciung pe orice lățime. */
 .cmp-lvls {
@@ -311,9 +317,13 @@
   transition: transform 0.08s ease, border-color 0.12s ease;
 }
 .cmp-lvl:hover:not([disabled]) { transform: scale(1.06); border-color: var(--cap); }
+/* Levelul trecut se vede de departe: pastilă în culoarea capitolului, dar cea
+   citibilă, și cifra îngroșată. Cu bruta, capitolele de noapte dădeau un pătrat
+   negru pe fundal negru, adică exact ce trebuia să se vadă cel mai bine. */
 .cmp-lvl.is-done {
-  background: color-mix(in srgb, var(--cap) 65%, var(--color-bg));
-  border-color: var(--cap); color: #fff;
+  background: var(--cap-lum);
+  border-color: var(--cap-lum);
+  color: #101828; font-weight: 800;
 }
 .cmp-lvl.is-locked { opacity: 0.32; cursor: not-allowed; }
 
@@ -353,10 +363,20 @@
   .cmp-lvl:hover:not([disabled]) { transform: none; }
 }
 
-/* Lumea își colorează butonul de mers mai departe și dunga cărții, ca trecerea
-   dintr-o lume în alta să se vadă fără să scrie nimeni „ai intrat în Furtuna". */
-.cmp-cap-scena .tgame-btn--primary { background: var(--cap); border-color: var(--cap); }
-.cmp-cap-scena .cmp-card { border-top: 3px solid var(--cap); }
+/* CULOAREA CAPITOLULUI, ȘI VARIANTA EI CITIBILĂ. `--cap` merge de la albastrul
+   nopții la auriu, deci primele capitole sunt aproape negre: bune ca fundal, dar
+   nevăzute pe o consolă întunecată. Un buton „Level 2" în #1e293b se pierde cu
+   totul, iar elevul crede că nu există.
+
+   De aceea, orice lucru care trebuie CITIT nu ia culoarea brută, ci `--cap-lum`:
+   aceeași culoare amestecată cu alb, cum își face și situl accentul de consolă.
+   Fundalurile păstrează bruta, unde întunericul e tocmai ce se vrea. */
+.cmp-cap-scena, .cmp-cap { --cap-lum: color-mix(in srgb, var(--cap, #0f766e) 45%, #ffffff); }
+
+.cmp-cap-scena .tgame-btn--primary {
+  background: var(--cap-lum); border-color: var(--cap-lum); color: #101828;
+}
+.cmp-cap-scena .cmp-card { border-top: 3px solid var(--cap-lum); }
 
 /* Vizitatorul, anunțat o dată, în ecranul de alegere. Nu-l oprim din joc; îi
    spunem doar de ce merită contul, ca să nu afle închizând fila. */
@@ -529,7 +549,7 @@
 .cmp-bignum b {
   display: block; font-size: clamp(2rem, 5.5vw, 3.1rem); font-weight: 800;
   letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
-  color: var(--cap, var(--color-primary));
+  color: var(--cap-lum, var(--color-primary));
   animation: cmp-batai 2.4s ease-in-out infinite;
 }
 .cmp-bignum i {
