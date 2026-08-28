@@ -88,6 +88,15 @@
 .explan-fab__nume { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .explan-fab__gol { padding: 10px 8px; opacity: 0.7; line-height: 1.5; }
 
+/* Defecțiunea se vede că e defecțiune, nu o listă goală: altfel ai crede că
+   n-ai elevi, cum s-a și întâmplat o dată. */
+.explan-fab__rau { opacity: 1; color: #fca5a5; }
+.explan-fab__rau code {
+  display: block; margin-top: 6px; padding: 6px 8px;
+  border-radius: 8px; background: #2b1c1c; color: #fecaca;
+  font-size: 0.76rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+}
+
 /* Un comutator adevărat, nu o bifă: starea se citește din poziția bilei, nu
    dintr-un semn de citit. `role="switch"` o spune și cititoarelor de ecran. */
 .explan-fab__sw {

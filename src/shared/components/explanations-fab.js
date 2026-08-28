@@ -27,6 +27,11 @@ let lista = null;
 let deschis = false;   // e desfăcută lista?
 let elevi = [];
 let ocupat = new Set(); // elevii pentru care așteptăm răspunsul serverului
+/* De ce n-a venit lista, dacă n-a venit. „N-ai elevi" și „n-am putut întreba"
+   arată la fel pe un ecran gol, dar înseamnă lucruri opuse: primul e o stare
+   normală, al doilea e o defecțiune. Ținute la un loc, panoul minte cu
+   încredere, iar tu cauți vina în altă parte. */
+let eroare = "";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -53,12 +58,20 @@ function deseneaza() {
       '<span class="explan-fab__semn" aria-hidden="true">' + (n > 0 ? "●" : "○") + "</span>" +
       (n > 0 ? `${n} ${n === 1 ? "elev pornit" : "elevi porniți"}` : "Niciun elev pornit") +
     "</span>";
-  buton.title = n > 0
-    ? "Elevii porniți pot propune explicații la itemii fără explicație. Apasă ca să vezi lista."
-    : "Niciun elev nu poate propune acum. Apasă ca să pornești pe cine lucrează cu tine.";
+  buton.title = eroare
+    ? "N-am putut citi lista de la meditații. Apasă ca să vezi de ce."
+    : n > 0
+      ? "Elevii porniți pot propune explicații la itemii fără explicație. Apasă ca să vezi lista."
+      : "Niciun elev nu poate propune acum. Apasă ca să pornești pe cine lucrează cu tine.";
 
   lista.hidden = !deschis;
   if (!deschis) return;
+  if (eroare) {
+    lista.innerHTML = `<li class="explan-fab__gol explan-fab__rau">
+      N-am putut citi lista de la meditații.<br><code>${esc(eroare)}</code>
+    </li>`;
+    return;
+  }
   lista.innerHTML = elevi.length
     ? elevi.map((e) => `
         <li class="explan-fab__rand">
@@ -116,6 +129,13 @@ export async function initPropuneriExplicatii(basePath = "") {
   radacina.appendChild(lista);
 
   deseneaza();                    // întâi butonul, ca să nu clipească
-  elevi = await elevilMeditatii();
+  try {
+    elevi = await elevilMeditatii();
+  } catch (e) {
+    /* Motivul se arată pe ecran, nu doar în consolă: butonul stă pe toate
+       paginile, iar cine îl apasă trebuie să afle din el de ce e gol. */
+    eroare = e?.message || String(e);
+    console.warn("elevilMeditatii:", eroare);
+  }
   deseneaza();
 }
