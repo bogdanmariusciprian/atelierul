@@ -64,13 +64,11 @@ export function randuriDinLista(text, { kind, inTabel = [], inBanca = new Set() 
   return { randuri, sarite };
 }
 
-/** Câte pleacă, câte nu, și de ce.
- *  `staged` e teancul de rânduri așezate pentru trimitere: lipite din listă,
- *  bifate pe exerciții, dar încă netrimise în bancă. */
-export function socoteala(staged) {
-  const gata = staged.filter((r) => r.gata).length;
-  const fara = staged.filter((r) => !r.gata && !r.tags.length).length;
-  return { pleaca: staged.length - gata - fara, gata, fara };
+/** Câte pleacă, câte nu, și de ce. */
+export function socoteala(masa) {
+  const gata = masa.filter((r) => r.gata).length;
+  const fara = masa.filter((r) => !r.gata && !r.tags.length).length;
+  return { pleaca: masa.length - gata - fara, gata, fara };
 }
 
 /** Panoul întreg. `st` e felia de stare a tablei din panoul de admin. */
@@ -80,8 +78,8 @@ export function boardPanelHtml(lectie, st) {
 
   const kind = st.kind || desc.feluri[0].kind;
   const fel = felulMaterialului(lectie.slug, kind) || desc.feluri[0];
-  const staged = st.staged || [];
-  const s = socoteala(staged);
+  const masa = st.masa || [];
+  const s = socoteala(masa);
 
   return `
     <div class="cx-box">
@@ -94,9 +92,9 @@ export function boardPanelHtml(lectie, st) {
         <label class="cx-label" for="bkFel">Fel</label>
         <select class="cx-input cxbk__fel" id="bkFel" data-action="bk-fel">
           ${desc.feluri.map((f) => `<option value="${f.kind}"${f.kind === kind ? " selected" : ""}
-            ${staged.length && staged[0].kind !== f.kind ? " disabled" : ""}>${esc(f.nume)}</option>`).join("")}
+            ${masa.length && masa[0].kind !== f.kind ? " disabled" : ""}>${esc(f.nume)}</option>`).join("")}
         </select>
-        ${staged.length ? `<span class="cx-muted cxbk__blocat">tabelul ține un singur fel deodată</span>` : ""}
+        ${masa.length ? `<span class="cx-muted cxbk__blocat">tabelul ține un singur fel deodată</span>` : ""}
       </div>
 
       <div class="cxbk__intrare">
@@ -106,14 +104,14 @@ export function boardPanelHtml(lectie, st) {
       </div>
       ${st.nota ? `<p class="cx-warn${st.notaBuna ? " cx-warn--bine" : ""}" role="status">${esc(st.nota)}</p>` : ""}
 
-      ${staged.length ? tabelul(staged, fel, s) : ""}
+      ${masa.length ? tabelul(masa, fel, s) : ""}
     </div>
 
     ${bancaDeAcum(lectie, st)}`;
 }
 
-function tabelul(staged, fel, s) {
-  const deTrimis = staged.filter((r) => !r.gata);
+function tabelul(masa, fel, s) {
+  const deTrimis = masa.filter((r) => !r.gata);
   const plina = (et) => deTrimis.length > 0 && deTrimis.every((r) => r.tags.includes(et));
   const cols = fel.etichete;
 
@@ -128,7 +126,7 @@ function tabelul(staged, fel, s) {
     </select></th>
     <th class="cxbk__x"></th></tr>`;
 
-  const trup = staged.map((r, i) => `<tr class="cxbk__r${r.gata ? " e-gata" : ""}">
+  const trup = masa.map((r, i) => `<tr class="cxbk__r${r.gata ? " e-gata" : ""}">
     <td class="cxbk__nr">${i + 1}.</td>
     <td class="cxbk__corp">${esc(r.body)}${r.gata ? `<span class="cxbk__gata">e în bancă</span>` : ""}</td>
     ${cols.map((c) => {

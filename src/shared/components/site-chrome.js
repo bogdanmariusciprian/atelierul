@@ -22,7 +22,7 @@ import { LESSON_DOMAINS } from "../scripts/domains.js";
 import { initUserMenu } from "../scripts/user-menu.js";
 import { initTodo } from "./todo-fab.js";
 import { initTagging } from "./tagging-fab.js";
-import { initPropuneriExplicatii } from "./explanations-fab.js";
+import { initExplanationProposals } from "./explanations-fab.js";
 import { fetchOpenModerationCount } from "../scripts/forum-repo.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications, clearAllNotifications } from "../scripts/notif.js";
@@ -97,7 +97,7 @@ export async function renderChrome(basePath = "") {
   /* Al treilea din mănunchiul profesorului, deasupra celorlalte două.
      Înălțimea la care se așază e socotită în `explanations-fab.css`, unde
      stau și cifrele din care iese. */
-  safe(() => initPropuneriExplicatii(basePath), "propuneriExplicatii");
+  safe(() => initExplanationProposals(basePath), "explanationProposals");
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
   safe(addPlannerLink, "plannerLink"); // „Meditații" — added only if allowed

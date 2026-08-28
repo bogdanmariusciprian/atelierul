@@ -30,17 +30,17 @@ import {
   fetchTestItems, checkTestItem, answerTestItem, reportTestItem, TEST_ITEM_TYPES,
   fetchMyProgress, saveMyProgress, clearMyProgress,
   fetchMyLevels, saveMyLevel, clearMyLevels, fetchMyBadges, awardBadge,
-  potPropune, propuneExplicatia, propunerileMele,
+  canPropose, proposeExplanation, myProposals,
 } from "../../shared/scripts/test-repo.js";
 import { sanitizeRich } from "../../shared/scripts/rich-text.js";
 import { showToast } from "../../shared/scripts/toast.js";
 import { isLoggedIn } from "../../shared/scripts/session.js";
-import { CAPITOLE, LEVELS_PE_CAPITOL, fragmentul } from "./campina-poveste.js";
+import { CHAPTERS, LEVELS_PER_CHAPTER, storyFragment } from "./campina-poveste.js";
 
 const OPTS = ["A", "B", "C", "D"];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const NUME_TIP = Object.fromEntries(TEST_ITEM_TYPES.map((t) => [t.code, t.label]));
+const TYPE_LABEL = Object.fromEntries(TEST_ITEM_TYPES.map((t) => [t.code, t.label]));
 const uuid = () => (crypto.randomUUID
   ? crypto.randomUUID()
   : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
@@ -52,53 +52,53 @@ const uuid = () => (crypto.randomUUID
    privire, iar engleza le dă chiar aerul de joc. Tot ce EXPLICĂ, în schimb,
    rămâne românesc: acolo se înțelege, iar înțelegerea se face în limba ta. */
 
-let radacina = null;
+let root = null;
 
 const J = {
   exam: "admitere-campina",
-  itemi: [], peId: new Map(),
-  hartii: [], // { cheie, an, sesiune, itemi: [] } — o „hârtie" = o sesiune de admitere
-  ani: [],
-  numarGlobal: new Map(), // id → numărul lui din toată banca, 1..N
-  incarcat: false,
-  ecran: "alege", // alege | relaxat | clasic | aventura | levelup
+  items: [], byId: new Map(),
+  papers: [], // { key, year, sessionId, items: [] } — o „hârtie" = o sesiune de admitere
+  years: [],
+  globalNo: new Map(), // id → numărul lui din toată banca, 1..N
+  loaded: false,
+  screen: "pick", // pick | relaxed | classic | adventure | levelup
   /* Unde ești ÎN modul ales. Relaxed n-are faze (e o singură pagină); Classic
      și Adventure merg config → joc → gata; Level-up, hartă → joc → gata. */
-  faza: "config",
+  phase: "config",
   // — Relaxed —
-  anAles: null, hartieAleasa: null,
-  raspunsuri: {}, // id → { ales, corect, cheie, obs, istoric }
-  note: {},       // id → text scris de elev
+  pickedYear: null, pickedPaper: null,
+  answers: {}, // id → { chosen, isRight, key, explanation, historical }
+  notes: {},       // id → text scris de elev
   // — modurile pe un item pe ecran —
-  rand: [],       // ids, în ordinea de jucat
-  pozitie: 0,
-  raspunsCurent: null, // verdictul itemului de acum, cât timp e pe ecran
-  bune: 0, rele: 0, puncte: 0,
-  vieti: 0,
-  deViata: new Set(), // itemii care dau o inimă, aleși la pornire
-  sesiune: null,      // id-ul rundei, pentru punctele date de server
-  gata: false,
+  queue: [],       // ids, în ordinea de jucat
+  position: 0,
+  currentAnswer: null, // verdictul itemului de acum, cât timp e pe ecran
+  rightCount: 0, wrongCount: 0, points: 0,
+  lives: 0,
+  lifeItems: new Set(), // itemii care dau o inimă, aleși la pornire
+  sessionId: null,      // id-ul rundei, pentru punctele date de server
+  done: false,
   // — Level-up —
-  capitol: 0, nivel: 0,
-  leveluri: new Map(), // level → { tries, passed }
-  insigne: new Set(),  // codurile câștigate
-  proaspete: new Set(), // insignele câștigate ACUM, ca să pâlpâie o dată
-  serie: 0,            // leveluri trecute la rând, fără cădere
-  capitolCazut: false, // a patra greșeală a luat capitolul de la capăt
-  capitolIncheiat: false, // levelul ăsta a fost ultimul din capitol
-  ceasuri: [],         // ceasurile mersului singur, oprite la orice plecare
+  chapter: 0, level: 0,
+  levelLog: new Map(), // level → { tries, passed }
+  badges: new Set(),  // codurile câștigate
+  freshBadges: new Set(), // insignele câștigate ACUM, ca să pâlpâie o dată
+  streak: 0,            // leveluri trecute la rând, fără cădere
+  chapterReset: false, // a patra greșeală a luat capitolul de la capăt
+  chapterDone: false, // levelul ăsta a fost ultimul din capitol
+  timers: [],         // ceasurile mersului singur, oprite la orice plecare
   // — configurator (Classic / Adventure) —
-  cfg: { ani: new Set(), tipuri: new Set(), totiAnii: true, toateTipurile: true },
-  semnalate: new Set(),
+  cfg: { years: new Set(), types: new Set(), allYears: true, allTypes: true },
+  reported: new Set(),
   /* Propunerile de explicații: dacă profesorul m-a pornit, și în ce stare e
      ce am trimis până acum (id item → „in_asteptare”/„aprobata”/„respinsa”). */
-  potPropune: false,
-  propuneri: {},
+  canPropose: false,
+  proposals: {},
 };
 
 /* Stilurile proprii și le aduce singur modulul, socotite față de EL, nu față de
    pagina care-l cheamă: așa merge oriunde, fără să numere nimeni „../". */
-function aduStilurile() {
+function loadStyles() {
   if (document.querySelector("link[data-campina-css]")) return;
   const l = document.createElement("link");
   l.rel = "stylesheet";
@@ -109,80 +109,80 @@ function aduStilurile() {
 
 // ---------- intrare ----------
 export async function initTestGameCampina(mountEl, exam) {
-  radacina = mountEl;
+  root = mountEl;
   J.exam = exam || "admitere-campina";
-  aduStilurile();
-  if (!ascultatorPus) { puneAscultatorii(); ascultatorPus = true; }
-  if (!J.incarcat) {
-    deseneazaAsteptarea();
-    await incarcaItemii();
+  loadStyles();
+  if (!eventsBound) { bindEvents(); eventsBound = true; }
+  if (!J.loaded) {
+    renderLoading();
+    await loadItems();
   }
-  await incarcaProgresul();
-  deseneaza();
+  await loadProgress();
+  render();
 }
 
 /* PROGRESUL STĂ PE CONT, nu în browser. Vizitatorul joacă mai departe, dar
    nimic nu-i rămâne după ce închide fila; i-o spunem pe față, în ecranul de
    alegere, în loc să-l lăsăm să afle singur. Nu ținem nimic în `localStorage`:
    pe un calculator împărțit, acolo ar fi ajuns munca lui sub ochii altuia. */
-async function incarcaProgresul() {
-  if (!isLoggedIn()) { J.raspunsuri = {}; J.note = {}; J.leveluri = new Map(); J.insigne = new Set(); return; }
+async function loadProgress() {
+  if (!isLoggedIn()) { J.answers = {}; J.notes = {}; J.levelLog = new Map(); J.badges = new Set(); return; }
   /* Dacă serverul nu răspunde, jocul MERGE MAI DEPARTE, doar fără ce-ai lucrat
      înainte. Înainte, o singură chemare căzută oprea tot `init`-ul și pagina
      rămânea la „Se aduc itemii…", ceea ce arăta ca un joc stricat, nu ca o
      legătură proastă. */
-  const [progres, leveluri, insigne] = await Promise.all([
+  const [progressRows, levelLog, badges] = await Promise.all([
     fetchMyProgress(J.exam).catch(() => []),
     fetchMyLevels(J.exam).catch(() => []),
     fetchMyBadges(J.exam).catch(() => []),
   ]);
-  J.raspunsuri = {};
-  J.note = {};
-  for (const r of progres) {
+  J.answers = {};
+  J.notes = {};
+  for (const r of progressRows) {
     if (r.chosen) {
-      J.raspunsuri[r.itemId] = {
-        ales: r.chosen, corect: r.correct, cheie: r.answerKey,
-        obs: r.observation || "", istoric: null,
+      J.answers[r.itemId] = {
+        chosen: r.chosen, isRight: r.correct, key: r.answerKey,
+        explanation: r.observation || "", historical: null,
       };
     }
-    if (r.note) J.note[r.itemId] = r.note;
+    if (r.note) J.notes[r.itemId] = r.note;
   }
-  J.leveluri = new Map(leveluri.map((l) => [l.level, { tries: l.tries, passed: l.passed }]));
-  J.insigne = new Set(insigne.map((b) => b.code));
+  J.levelLog = new Map(levelLog.map((l) => [l.level, { tries: l.tries, passed: l.passed }]));
+  J.badges = new Set(badges.map((b) => b.code));
 
   /* Pot propune explicații? Se întreabă baza, nu se ghicește din rol: e o
      îngăduință pe care profesorul o aprinde și o stinge cât lucrează cu elevul.
      Dacă întrebarea cade, răspunsul e „nu": mai bine lipsește un câmp decât să
      scrie elevul într-un loc care oricum îl refuză. */
-  J.potPropune = await potPropune().catch(() => false);
-  J.propuneri = J.potPropune ? await propunerileMele(J.exam).catch(() => ({})) : {};
+  J.canPropose = await canPropose().catch(() => false);
+  J.proposals = J.canPropose ? await myProposals(J.exam).catch(() => ({})) : {};
 }
 
 /* Cel mai înalt level trecut se AFLĂ din leveluri, nu se ține de mână într-un
    contor: un contor s-ar putea desincroniza de listă, iar lista e adevărul. */
-const levelMax = () => {
+const maxLevel = () => {
   let m = 0;
-  for (const [n, l] of J.leveluri) if (l.passed && n > m) m = n;
+  for (const [n, l] of J.levelLog) if (l.passed && n > m) m = n;
   return m;
 };
 
-async function incarcaItemii() {
-  const itemi = await fetchTestItems({ exam: J.exam });
-  J.itemi = itemi;
-  J.peId = new Map(itemi.map((it) => [it.id, it]));
+async function loadItems() {
+  const items = await fetchTestItems({ exam: J.exam });
+  J.items = items;
+  J.byId = new Map(items.map((it) => [it.id, it]));
   /* HÂRTIILE. O hârtie = o sesiune de admitere, adică o pereche an+sesiune.
      Ordinea LOR e alfabetică pe nume, nu pe calendar — și e voit: aici nu
      citești o arhivă, ci alegi dintr-o listă scurtă „pe care o rezolv?", iar o
      listă de ales se așază după eticheta pe care o citești. Calendarul e treaba
      paginii de descărcări, unde subiectele chiar sunt o cronologie. */
   const pe = new Map();
-  for (const it of itemi) {
-    const cheie = `${it.year}|${it.session}`;
-    if (!pe.has(cheie)) pe.set(cheie, { cheie, an: it.year, sesiune: it.session, itemi: [] });
-    pe.get(cheie).itemi.push(it);
+  for (const it of items) {
+    const key = `${it.year}|${it.session}`;
+    if (!pe.has(key)) pe.set(key, { key, year: it.year, sessionId: it.session, items: [] });
+    pe.get(key).items.push(it);
   }
-  J.hartii = [...pe.values()].sort((a, b) => a.an - b.an || a.sesiune.localeCompare(b.sesiune, "ro"));
-  J.hartii.forEach((h) => h.itemi.sort((a, b) => (a.itemNo ?? 0) - (b.itemNo ?? 0)));
+  J.papers = [...pe.values()].sort((a, b) => a.year - b.year || a.sessionId.localeCompare(b.sessionId, "ro"));
+  J.papers.forEach((h) => h.items.sort((a, b) => (a.itemNo ?? 0) - (b.itemNo ?? 0)));
   /* NUMĂRUL GLOBAL, 1..N peste toată banca. Un item poartă pe hârtia lui un
      număr de la 1 la 60, iar acela se repetă la fiecare sesiune: în Level-up,
      unde treci prin toată banca în ordine, „itemul 7" n-ar spune nimic. Așa,
@@ -197,75 +197,75 @@ async function incarcaItemii() {
      muta pe toate de după ea; atunci s-ar muta și levelurile, deci problema ar
      fi oricum mai adâncă decât numerotarea, iar răspunsul ei ar fi un număr
      păstrat în bază. Până acolo, ordinea firească e și cea așteptată. */
-  J.numarGlobal = new Map();
+  J.globalNo = new Map();
   let n = 0;
-  for (const h of J.hartii) for (const it of h.itemi) J.numarGlobal.set(it.id, ++n);
+  for (const h of J.papers) for (const it of h.items) J.globalNo.set(it.id, ++n);
 
-  J.ani = [...new Set(J.hartii.map((h) => h.an))].sort((a, b) => a - b);
-  J.anAles = J.ani[J.ani.length - 1] ?? null;
-  J.hartieAleasa = hartiileAnului(J.anAles)[0]?.cheie ?? null;
-  J.cfg.ani = new Set();
-  J.cfg.tipuri = new Set();
-  J.incarcat = true;
+  J.years = [...new Set(J.papers.map((h) => h.year))].sort((a, b) => a - b);
+  J.pickedYear = J.years[J.years.length - 1] ?? null;
+  J.pickedPaper = papersOfYear(J.pickedYear)[0]?.key ?? null;
+  J.cfg.years = new Set();
+  J.cfg.types = new Set();
+  J.loaded = true;
 }
 
-const hartiileAnului = (an) => J.hartii.filter((h) => h.an === an);
-const hartia = (cheie) => J.hartii.find((h) => h.cheie === cheie) || null;
+const papersOfYear = (year) => J.papers.filter((h) => h.year === year);
+const paper = (key) => J.papers.find((h) => h.key === key) || null;
 /* Numele scurt al unei hârtii: „V1 - ianuarie (Câmpina)" → „V1 · ianuarie".
    Școala e deja scrisă alături, ca etichetă; scrisă de două ori, n-ar spune
    nimic în plus și ar lungi fiecare pastilă. */
-const numeScurt = (s) => String(s || "").replace(/\s*\([^()]+\)\s*$/, "").replace(/\s+-\s+/, " · ").trim();
-const scoalaDin = (s) => (String(s || "").match(/\(([^()]+)\)\s*$/) || [])[1] || "";
+const shortName = (s) => String(s || "").replace(/\s*\([^()]+\)\s*$/, "").replace(/\s+-\s+/, " · ").trim();
+const wakeFrom = (s) => (String(s || "").match(/\(([^()]+)\)\s*$/) || [])[1] || "";
 
 // ---------- bucăți folosite de toate modurile ----------
 
-function deseneazaAsteptarea() {
-  radacina.className = "cmp";
-  radacina.innerHTML = `<p class="cmp-wait">Se aduc itemii…</p>`;
+function renderLoading() {
+  root.className = "cmp";
+  root.innerHTML = `<p class="cmp-wait">Se aduc itemii…</p>`;
 }
 
 /* Cele patru sloturi sunt MEREU desenate: un item cu trei variante păstrează al
    patrulea gol, ca blocul să nu-și schimbe înălțimea de la un item la altul și
    ochiul să nu sară. */
-const varianteHtml = (it, cum) =>
+const optionsHtml = (it, cum) =>
   OPTS.map((k) => ((it.options?.[k] != null && it.options[k] !== "")
     ? cum(k)
     : `<span class="tgame-opt tgame-opt--void" aria-hidden="true"></span>`)).join("");
 
-function etichetele(it) {
-  const l = (it.types || []).map((c) => `<span class="tgame-typelab">${esc(NUME_TIP[c] || c)}</span>`).join("");
+function typeLabels(it) {
+  const l = (it.types || []).map((c) => `<span class="tgame-typelab">${esc(TYPE_LABEL[c] || c)}</span>`).join("");
   return l ? `<span class="tgame-types">${l}</span>` : "";
 }
 
-function capulItemului(it) {
+function itemHead(it) {
   return `<div class="tgame-cardmeta">
-      ${etichetele(it)}
-      <span class="tgame-cardmeta__id">${it.year ?? ""}${it.session ? ` · ${esc(numeScurt(it.session))}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}</span>
+      ${typeLabels(it)}
+      <span class="tgame-cardmeta__id">${it.year ?? ""}${it.session ? ` · ${esc(shortName(it.session))}` : ""}${it.itemNo != null ? ` · itemul ${it.itemNo}` : ""}</span>
       <span class="tgame-cardmeta__acts">
-        ${J.semnalate.has(it.id)
+        ${J.reported.has(it.id)
           ? `<button type="button" class="tgame-report" disabled>⚑ semnalat</button>`
-          : `<button type="button" class="tgame-report" data-act="semnaleaza" data-id="${it.id}" title="Semnalează o eroare de conținut">⚑ eroare</button>`}
+          : `<button type="button" class="tgame-report" data-act="report" data-id="${it.id}" title="Semnalează o eroare de conținut">⚑ eroare</button>`}
       </span>
     </div>`;
 }
 
-/* Verdictul, spus la fel peste tot. `istoric` apare doar când răspunsul de azi
+/* Verdictul, spus la fel peste tot. `historical` apare doar când răspunsul de azi
    diferă de cel de pe hârtie — și atunci merită spus, fiindcă elevul are baremul
    tipărit în față și ar crede că greșim noi. */
 function verdictHtml(r) {
   if (!r) return "";
-  return `<div class="tgame-verdict ${r.corect ? "ok" : "no"}">${r.corect
+  return `<div class="tgame-verdict ${r.isRight ? "ok" : "no"}">${r.isRight
     ? "✓ Corect"
-    : `✗ Greșit — corect era <b>${esc(r.cheie)}</b>`}</div>
-    ${r.istoric ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(r.istoric)}</b>.</div>` : ""}
-    ${r.obs ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(r.obs)}</div>` : ""}`;
+    : `✗ Greșit — corect era <b>${esc(r.key)}</b>`}</div>
+    ${r.historical ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(r.historical)}</b>.</div>` : ""}
+    ${r.explanation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(r.explanation)}</div>` : ""}`;
 }
 
 // ---------- ecranul de alegere a modului ----------
 
-const MODURI = [
+const MODES = [
   {
-    id: "relaxat", nume: "Relaxed", semn: "🫖",
+    id: "relaxed", label: "Relaxed", sign: "🫖",
     scurt: "Tot subiectul, dintr-o privire",
     lung: `Alegi un an și o sesiune, iar subiectul întreg ți se așterne în față.
            Apeși o variantă: se face verde ori roșie pe loc. Lângă fiecare item
@@ -273,7 +273,7 @@ const MODURI = [
            Fără lives, fără ceas, fără puncte.`,
   },
   {
-    id: "clasic", nume: "Classic", semn: "🎯",
+    id: "classic", label: "Classic", sign: "🎯",
     scurt: "3 lives, 30 de itemi",
     lung: `Câte un item pe ecran. Pornești cu trei inimi și poți ajunge la șase:
            printre itemi sunt câțiva <b>extra life</b>, însemnați, care îți dau o
@@ -281,14 +281,14 @@ const MODURI = [
            până la 30 de itemi sau până rămâi fără lives.`,
   },
   {
-    id: "aventura", nume: "Adventure", semn: "🧭",
+    id: "adventure", label: "Adventure", sign: "🧭",
     scurt: "Tot, până iese",
     lung: `Toți itemii aleși, unul câte unul, numerotați. Cel greșit nu se pierde:
            se duce la coada rândului și revine mai târziu, până îl nimerești.
            Vezi mereu câți ai bun, câți greșit și câți ți-au mai rămas.`,
   },
   {
-    id: "levelup", nume: "Level-up", semn: "🔥",
+    id: "levelup", label: "Level-up", sign: "🔥",
     scurt: "5 itemi pe level, 3 greșeli pe capitol",
     lung: `Cinci itemi pe level, iar o greșeală îl închide. Ai voie la trei
            greșeli într-un capitol; a patra îl ia de la început, cu tot cu
@@ -299,35 +299,35 @@ const MODURI = [
   },
 ];
 
-function deseneazaAlegerea() {
-  const n = J.itemi.length;
-  const carduri = MODURI.map((m) => {
-    const insigna = m.id === "levelup" && levelMax() > 0
-      ? `<span class="cmp-mode__badge">Level ${levelMax()}</span>` : "";
-    return `<button type="button" class="cmp-mode" data-act="mod" data-mod="${m.id}">
-        <span class="cmp-mode__sign" aria-hidden="true">${m.semn}</span>
+function renderModePicker() {
+  const n = J.items.length;
+  const cards = MODES.map((m) => {
+    const badge = m.id === "levelup" && maxLevel() > 0
+      ? `<span class="cmp-mode__badge">Level ${maxLevel()}</span>` : "";
+    return `<button type="button" class="cmp-mode" data-act="mode" data-mode="${m.id}">
+        <span class="cmp-mode__sign" aria-hidden="true">${m.sign}</span>
         <span class="cmp-mode__body">
-          <span class="cmp-mode__name">${esc(m.nume)}${insigna}</span>
+          <span class="cmp-mode__name">${esc(m.label)}${badge}</span>
           <span class="cmp-mode__short">${esc(m.scurt)}</span>
           <span class="cmp-mode__long">${m.lung}</span>
         </span>
       </button>`;
   }).join("");
-  const faraCont = isLoggedIn() ? "" : `
+  const noAccount = isLoggedIn() ? "" : `
     <p class="cmp-guest"><i class="cmp-guest__s" aria-hidden="true">🔓</i>
       Joci ca vizitator: totul merge, dar nimic nu se ține minte după ce închizi fila.
       Cu un cont, îți rămân bifele, explicațiile scrise de tine, levelurile și badges.</p>`;
-  radacina.className = "cmp";
-  radacina.innerHTML = `
+  root.className = "cmp";
+  root.innerHTML = `
     <section class="cmp-pick">
       <header class="cmp-pick__head">
         <h2 class="cmp-pick__title">Cum vrei să lucrezi azi?</h2>
-        <p class="cmp-pick__sub">${n} de itemi din ${J.hartii.length} sesiuni de admitere,
+        <p class="cmp-pick__sub">${n} de itemi din ${J.papers.length} sesiuni de admitere,
           de la Câmpina, Cluj-Napoca, Fălticeni, Drăgășani și Oradea.
           Patru feluri de a-i lua în piept.</p>
       </header>
-      ${faraCont}
-      <div class="cmp-modes">${carduri}</div>
+      ${noAccount}
+      <div class="cmp-modes">${cards}</div>
     </section>`;
 }
 
@@ -336,80 +336,80 @@ function deseneazaAlegerea() {
 /* O SINGURĂ CALE DE SALVARE pentru un item, ca să nu existe două care se pot
    despărți. Trimite tot rândul, și bifa, și explicația: masa are cheie primară
    pe (elev, item), deci scrierea e o suprapunere, nu o adăugare. */
-async function salveazaItem(id) {
+async function saveItem(id) {
   if (!isLoggedIn()) return;
-  const r = J.raspunsuri[id];
+  const r = J.answers[id];
   if (!r) return;
   await saveMyProgress({
     exam: J.exam, itemId: id,
-    chosen: r.ales, correct: r.corect, answerKey: r.cheie,
-    observation: r.obs, note: J.note[id] || "",
+    chosen: r.chosen, correct: r.isRight, answerKey: r.key,
+    observation: r.explanation, note: J.notes[id] || "",
   });
 
   /* NOTA PLEACĂ ȘI CA PROPUNERE, dar numai dacă sunt toate trei la un loc:
      profesorul m-a pornit, itemul n-are încă explicație, iar ce-am scris e o
      explicație, nu un început de frază. Nota rămâne oricum a mea, mai sus:
      propunerea e o copie trimisă, nu o mutare. */
-  if (!J.potPropune) return;
-  if ((r.obs || "").trim()) return;             // itemul are deja explicație
-  const text = (J.note[id] || "").trim();
+  if (!J.canPropose) return;
+  if ((r.explanation || "").trim()) return;             // itemul are deja explicație
+  const text = (J.notes[id] || "").trim();
   if (text.length < 10) return;
-  const bine = await propuneExplicatia({ exam: J.exam, itemId: id, text });
-  if (bine) J.propuneri[id] = "in_asteptare";
+  const ok = await proposeExplanation({ exam: J.exam, itemId: id, text });
+  if (ok) J.proposals[id] = "in_asteptare";
 }
 
 /* Cât s-a lucrat dintr-o hârtie. Se numără din răspunsurile ținute minte, nu
    dintr-un contor de sine stătător: un contor s-ar putea desincroniza, lista de
    răspunsuri nu — ea E adevărul. */
-function socotealaHartiei(h) {
-  let raspunse = 0, bune = 0;
-  for (const it of h.itemi) {
-    const r = J.raspunsuri[it.id];
+function paperTally(h) {
+  let answered = 0, rightCount = 0;
+  for (const it of h.items) {
+    const r = J.answers[it.id];
     if (!r) continue;
-    raspunse++;
-    if (r.corect) bune++;
+    answered++;
+    if (r.isRight) rightCount++;
   }
-  return { raspunse, bune, total: h.itemi.length };
+  return { answered, rightCount, total: h.items.length };
 }
 
-function fileDeAni() {
-  return J.ani.map((an) => {
-    const hs = hartiileAnului(an);
-    const total = hs.reduce((a, h) => a + h.itemi.length, 0);
-    const raspunse = hs.reduce((a, h) => a + socotealaHartiei(h).raspunse, 0);
-    const gata = raspunse >= total && total > 0;
-    return `<button type="button" class="cmp-tab${an === J.anAles ? " is-on" : ""}${gata ? " is-done" : ""}"
-        role="tab" aria-selected="${an === J.anAles}" data-act="an" data-an="${an}"
-        title="${an}: ${hs.length === 1 ? "o sesiune" : hs.length + " sesiuni"}, ${total} de itemi">
-        <span class="cmp-tab__nr">${an}</span>
+function yearTabs() {
+  return J.years.map((year) => {
+    const hs = papersOfYear(year);
+    const total = hs.reduce((a, h) => a + h.items.length, 0);
+    const answered = hs.reduce((a, h) => a + paperTally(h).answered, 0);
+    const done = answered >= total && total > 0;
+    return `<button type="button" class="cmp-tab${year === J.pickedYear ? " is-on" : ""}${done ? " is-done" : ""}"
+        role="tab" aria-selected="${year === J.pickedYear}" data-act="year" data-year="${year}"
+        title="${year}: ${hs.length === 1 ? "o sesiune" : hs.length + " sesiuni"}, ${total} de itemi">
+        <span class="cmp-tab__nr">${year}</span>
         <span class="cmp-tab__dots">${hs.map(() => "<i></i>").join("")}</span>
       </button>`;
   }).join("");
 }
 
-function pastileleHartiilor() {
-  return hartiileAnului(J.anAles).map((h) => {
-    const s = socotealaHartiei(h);
-    const scoala = scoalaDin(h.sesiune);
-    return `<button type="button" class="cmp-paper${h.cheie === J.hartieAleasa ? " is-on" : ""}"
-        data-act="hartie" data-cheie="${esc(h.cheie)}">
-        <b>${esc(numeScurt(h.sesiune))}</b>
-        ${scoala ? `<span class="cmp-paper__school">${esc(scoala)}</span>` : ""}
-        <span class="cmp-paper__n">${s.raspunse}/${s.total}</span>
+function paperChips() {
+  return papersOfYear(J.pickedYear).map((h) => {
+    const s = paperTally(h);
+    const wake = wakeFrom(h.sessionId);
+    return `<button type="button" class="cmp-paper${h.key === J.pickedPaper ? " is-on" : ""}"
+        data-act="paper" data-key="${esc(h.key)}">
+        <b>${esc(shortName(h.sessionId))}</b>
+        ${wake ? `<span class="cmp-paper__school">${esc(wake)}</span>` : ""}
+        <span class="cmp-paper__n">${s.answered}/${s.total}</span>
       </button>`;
   }).join("");
 }
 
-function itemRelaxat(it, i) {
-  const r = J.raspunsuri[it.id];
-  const nota = J.note[it.id] || "";
-  const variante = varianteHtml(it, (k) => {
+function relaxedItem(it, i) {
+  const r = J.answers[it.id];
+  const noteText = J.notes[it.id] || "";
+  const options = optionsHtml(it, (k) => {
     let cls = "";
     if (r) {
-      if (k === r.cheie) cls = " opt-correct";
-      else if (k === r.ales) cls = " opt-wrong";
+      if (k === r.key) cls = " opt-correct";
+      else if (k === r.chosen) cls = " opt-wrong";
     }
-    return `<button type="button" class="tgame-opt${cls}" data-act="raspunde-relax"
+    return `<button type="button" class="tgame-opt${cls}" data-act="answer-relaxed"
         data-id="${it.id}" data-k="${k}"${r ? " disabled" : ""}>
         <span class="tgame-opt__k">${k}</span>
         <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
@@ -421,58 +421,58 @@ function itemRelaxat(it, i) {
   /* Când elevul e pornit de profesor ȘI itemul n-are explicație, nota lui e și o
      propunere. I se spune limpede: altfel ar scrie pentru el și ar afla abia
      mai târziu că textul a plecat mai departe. */
-  const propune = r && J.potPropune && !(r.obs || "").trim();
-  const stareaPropunerii = { in_asteptare: "trimisă profesorului", aprobata: "publicată la toți", respinsa: "nefolosită de data asta" }[J.propuneri[it.id]] || "";
+  const propune = r && J.canPropose && !(r.explanation || "").trim();
+  const proposalState = { in_asteptare: "trimisă profesorului", aprobata: "publicată la toți", respinsa: "nefolosită de data asta" }[J.proposals[it.id]] || "";
   const alTau = r ? `
     <div class="cmp-note${propune ? " e-propune" : ""}">
       <label class="cmp-note__lab" for="nota-${it.id}">Explicația ta${propune
         ? ` <span class="cmp-note__catre">ajunge și la profesor</span>` : ""}</label>
-      <textarea class="cmp-note__in" id="nota-${it.id}" data-act="nota" data-id="${it.id}"
+      <textarea class="cmp-note__in" id="nota-${it.id}" data-act="note" data-id="${it.id}"
         rows="2" maxlength="800"
         placeholder="${propune
           ? "Itemul ăsta n-are explicație. Scrie-o tu, cu vorbele tale; dacă profesorul o aprobă, o vor citi toți."
-          : "De ce e corect așa? Scrie cu vorbele tale, te ajută la recitire."}">${esc(nota)}</textarea>
-      <span class="cmp-note__state" data-nota-stare="${it.id}">${nota ? "✓ salvat" : ""}</span>
-      ${stareaPropunerii ? `<span class="cmp-note__prop">${esc(stareaPropunerii)}</span>` : ""}
+          : "De ce e corect așa? Scrie cu vorbele tale, te ajută la recitire."}">${esc(noteText)}</textarea>
+      <span class="cmp-note__state" data-nota-stare="${it.id}">${noteText ? "✓ salvat" : ""}</span>
+      ${proposalState ? `<span class="cmp-note__prop">${esc(proposalState)}</span>` : ""}
     </div>` : "";
-  return `<article class="tgame-card cmp-item${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
+  return `<article class="tgame-card cmp-item${r ? (r.isRight ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
       <div class="cmp-item__nr" aria-hidden="true">${i + 1}</div>
-      ${capulItemului(it)}
+      ${itemHead(it)}
       <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
-      <div class="tgame-opts">${variante}</div>
+      <div class="tgame-opts">${options}</div>
       ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>` : ""}
       ${alTau}
     </article>`;
 }
 
-function deseneazaRelaxat() {
-  const h = hartia(J.hartieAleasa) || hartiileAnului(J.anAles)[0];
-  if (!h) { radacina.innerHTML = `<p class="cmp-wait">Nu sunt itemi aici.</p>`; return; }
-  J.hartieAleasa = h.cheie;
-  const s = socotealaHartiei(h);
-  const procent = s.total ? Math.round((s.raspunse / s.total) * 100) : 0;
-  radacina.className = "cmp cmp--relax";
-  radacina.innerHTML = `
+function renderRelaxed() {
+  const h = paper(J.pickedPaper) || papersOfYear(J.pickedYear)[0];
+  if (!h) { root.innerHTML = `<p class="cmp-wait">Nu sunt itemi aici.</p>`; return; }
+  J.pickedPaper = h.key;
+  const s = paperTally(h);
+  const percent = s.total ? Math.round((s.answered / s.total) * 100) : 0;
+  root.className = "cmp cmp--relax";
+  root.innerHTML = `
     <section class="cmp-relax">
-      ${baraDeSus("Relaxed", "🫖")}
-      <div class="cmp-tabs" role="tablist" aria-label="Anii cu subiecte">${fileDeAni()}</div>
-      <div class="cmp-papers">${pastileleHartiilor()}</div>
+      ${topBar("Relaxed", "🫖")}
+      <div class="cmp-tabs" role="tablist" aria-label="Anii cu subiecte">${yearTabs()}</div>
+      <div class="cmp-papers">${paperChips()}</div>
       <div class="cmp-progress">
-        <div class="cmp-progress__bar"><i style="width:${procent}%"></i></div>
+        <div class="cmp-progress__bar"><i style="width:${percent}%"></i></div>
         <p class="cmp-progress__txt">
-          <b>${s.raspunse}</b> din ${s.total} rezolvați${s.raspunse ? ` · <b class="is-ok">${s.bune}</b> corecți` : ""}
-          ${s.raspunse ? `<button type="button" class="cmp-link" data-act="sterge-hartia">șterge răspunsurile de aici</button>` : ""}
+          <b>${s.answered}</b> din ${s.total} rezolvați${s.answered ? ` · <b class="is-ok">${s.rightCount}</b> corecți` : ""}
+          ${s.answered ? `<button type="button" class="cmp-link" data-act="clear-paper">șterge răspunsurile de aici</button>` : ""}
         </p>
       </div>
-      <div class="cmp-list">${h.itemi.map((it, i) => itemRelaxat(it, i)).join("")}</div>
+      <div class="cmp-list">${h.items.map((it, i) => relaxedItem(it, i)).join("")}</div>
     </section>`;
 }
 
-async function raspundeRelax(buton) {
-  const id = buton.dataset.id;
-  const k = buton.dataset.k;
-  const card = buton.closest(".cmp-item");
-  if (!id || !k || J.raspunsuri[id]) return;
+async function answerRelaxed(btnEl) {
+  const id = btnEl.dataset.id;
+  const k = btnEl.dataset.k;
+  const card = btnEl.closest(".cmp-item");
+  if (!id || !k || J.answers[id]) return;
   card?.classList.add("is-checking");
   /* FĂRĂ PUNCTE aici, dinadins: cu tot subiectul deschis, ai putea apăsa toate
      cele patru variante și le-ai aduna oricum. Punctele stau în modurile unde
@@ -480,64 +480,64 @@ async function raspundeRelax(buton) {
   const r = await checkTestItem(id, k);
   card?.classList.remove("is-checking");
   if (!r) { showToast("N-am putut verifica acum. Mai încearcă."); return; }
-  J.raspunsuri[id] = {
-    ales: k, corect: r.correct, cheie: r.correctAnswer,
-    obs: r.observation || "", istoric: r.historical || null,
+  J.answers[id] = {
+    chosen: k, isRight: r.correct, key: r.correctAnswer,
+    explanation: r.observation || "", historical: r.historical || null,
   };
-  salveazaItem(id);
+  saveItem(id);
   /* Se redesenează DOAR cardul acesta, nu toată lista: pe o sesiune de 60 de
      itemi, un redesen întreg ar arunca pagina înapoi sus și ai pierde locul. */
-  const proaspat = document.createElement("div");
-  const it = J.peId.get(id);
-  const i = (hartia(J.hartieAleasa)?.itemi || []).findIndex((x) => x.id === id);
-  proaspat.innerHTML = itemRelaxat(it, i < 0 ? 0 : i);
-  card?.replaceWith(proaspat.firstElementChild);
-  actualizeazaSocoteala();
+  const fresh = document.createElement("div");
+  const it = J.byId.get(id);
+  const i = (paper(J.pickedPaper)?.items || []).findIndex((x) => x.id === id);
+  fresh.innerHTML = relaxedItem(it, i < 0 ? 0 : i);
+  card?.replaceWith(fresh.firstElementChild);
+  refreshTally();
 }
 
 /* Numai cifrele de sus, nu toată pagina — vezi motivul de mai sus. */
-function actualizeazaSocoteala() {
-  const h = hartia(J.hartieAleasa);
+function refreshTally() {
+  const h = paper(J.pickedPaper);
   if (!h) return;
-  const s = socotealaHartiei(h);
-  const procent = s.total ? Math.round((s.raspunse / s.total) * 100) : 0;
-  const bara = radacina.querySelector(".cmp-progress__bar i");
-  if (bara) bara.style.width = `${procent}%`;
-  const txt = radacina.querySelector(".cmp-progress__txt");
+  const s = paperTally(h);
+  const percent = s.total ? Math.round((s.answered / s.total) * 100) : 0;
+  const bara = root.querySelector(".cmp-progress__bar i");
+  if (bara) bara.style.width = `${percent}%`;
+  const txt = root.querySelector(".cmp-progress__txt");
   if (txt) {
-    txt.innerHTML = `<b>${s.raspunse}</b> din ${s.total} rezolvați${s.raspunse ? ` · <b class="is-ok">${s.bune}</b> corecți` : ""}
-      ${s.raspunse ? `<button type="button" class="cmp-link" data-act="sterge-hartia">șterge răspunsurile de aici</button>` : ""}`;
+    txt.innerHTML = `<b>${s.answered}</b> din ${s.total} rezolvați${s.answered ? ` · <b class="is-ok">${s.rightCount}</b> corecți` : ""}
+      ${s.answered ? `<button type="button" class="cmp-link" data-act="clear-paper">șterge răspunsurile de aici</button>` : ""}`;
   }
-  const pastile = radacina.querySelector(".cmp-papers");
-  if (pastile) pastile.innerHTML = pastileleHartiilor();
-  const file = radacina.querySelector(".cmp-tabs");
-  if (file) file.innerHTML = fileDeAni();
+  const chips = root.querySelector(".cmp-papers");
+  if (chips) chips.innerHTML = paperChips();
+  const file = root.querySelector(".cmp-tabs");
+  if (file) file.innerHTML = yearTabs();
 }
 
-let ceasNota = null;
-function scrieNota(camp) {
-  const id = camp.dataset.id;
+let noteTimer = null;
+function writeNote(field) {
+  const id = field.dataset.id;
   if (!id) return;
-  J.note[id] = camp.value;
-  const stare = radacina.querySelector(`[data-nota-stare="${id}"]`);
+  J.notes[id] = field.value;
+  const stare = root.querySelector(`[data-nota-stare="${id}"]`);
   if (stare) stare.textContent = "se scrie…";
-  clearTimeout(ceasNota);
+  clearTimeout(noteTimer);
   /* Se scrie la o secundă după ce te-ai oprit din tastat, nu la fiecare literă:
      altfel am bate drumul la server de zeci de ori pe rând, degeaba. */
-  ceasNota = setTimeout(async () => {
+  noteTimer = setTimeout(async () => {
     if (!isLoggedIn()) { if (stare) stare.textContent = "nesalvat (n-ai cont)"; return; }
     if (stare) stare.textContent = "se salvează…";
-    await salveazaItem(id);
-    if (stare) stare.textContent = J.note[id] ? "✓ salvat" : "";
+    await saveItem(id);
+    if (stare) stare.textContent = J.notes[id] ? "✓ salvat" : "";
   }, 1000);
 }
 
-async function stergeHartia() {
-  const h = hartia(J.hartieAleasa);
+async function clearPaper() {
+  const h = paper(J.pickedPaper);
   if (!h) return;
-  const ids = h.itemi.map((it) => it.id).filter((id) => J.raspunsuri[id]);
-  for (const id of ids) delete J.raspunsuri[id];
-  deseneazaRelaxat();
+  const ids = h.items.map((it) => it.id).filter((id) => J.answers[id]);
+  for (const id of ids) delete J.answers[id];
+  renderRelaxed();
   /* Ștergerea locală se vede pe loc, iar cea de pe server vine din urmă. Dacă
      serverul refuză, spun; nu prefac că s-a întâmplat. */
   if (isLoggedIn() && ids.length) {
@@ -554,20 +554,20 @@ async function stergeHartia() {
    altul. Abia de pe hartă se iese din Level-up. Un singur buton care sărea de la
    item drept la alegerea modului te scotea din tot ce făceai, iar drumul înapoi
    trebuia refăcut de fiecare dată. */
-function baraDeSus(nume, semn, dreapta = "", inapoiLa = "inapoi") {
-  const spreHarta = inapoiLa === "harta";
+function topBar(label, sign, dreapta = "", backTo = "back") {
+  const toMap = backTo === "map";
   return `<header class="cmp-top">
-      <button type="button" class="cmp-back" data-act="${spreHarta ? "harta" : "inapoi"}"
-        title="${spreHarta ? "Înapoi la harta levelurilor" : "Înapoi la alegerea modului"}">‹ ${spreHarta ? "map" : "modes"}</button>
-      <span class="cmp-top__mode"><span aria-hidden="true">${semn}</span> ${esc(nume)}</span>
+      <button type="button" class="cmp-back" data-act="${toMap ? "map" : "back"}"
+        title="${toMap ? "Înapoi la harta levelurilor" : "Înapoi la alegerea modului"}">‹ ${toMap ? "map" : "modes"}</button>
+      <span class="cmp-top__mode"><span aria-hidden="true">${sign}</span> ${esc(label)}</span>
       <span class="cmp-top__right">${dreapta}</span>
     </header>`;
 }
 
 // ---------- semnalarea unei erori ----------
 
-function cereSemnalare(id) {
-  const it = J.peId.get(id);
+function askReport(id) {
+  const it = J.byId.get(id);
   if (!it) return;
   const dlg = document.createElement("dialog");
   dlg.className = "cmp-dlg";
@@ -588,14 +588,14 @@ function cereSemnalare(id) {
     const text = dlg.querySelector(".cmp-dlg__txt")?.value?.trim() || "";
     dlg.remove();
     if (dlg.returnValue !== "da" || !text) return;
-    const ales = J.raspunsuri[id]?.ales || J.raspunsCurent?.ales || null;
-    const bun = await reportTestItem(id, text, ales);
+    const chosen = J.answers[id]?.chosen || J.currentAnswer?.chosen || null;
+    const bun = await reportTestItem(id, text, chosen);
     if (!bun) { showToast("N-am putut trimite semnalarea."); return; }
-    J.semnalate.add(id);
+    J.reported.add(id);
     showToast("Trimis. Mulțumesc — profesorul se uită.");
     /* Se schimbă DOAR butonul acelui item, nu tot ecranul: în Relaxed, un
        redesen ar arunca pagina înapoi sus, iar tu tocmai citeai itemul 47. */
-    for (const b of radacina.querySelectorAll(`[data-act="semnaleaza"][data-id="${id}"]`)) {
+    for (const b of root.querySelectorAll(`[data-act="report"][data-id="${id}"]`)) {
       b.outerHTML = `<button type="button" class="tgame-report" disabled>⚑ semnalat</button>`;
     }
   });
@@ -604,21 +604,21 @@ function cereSemnalare(id) {
 
 // ---------- 2+3. CLASIC și AVENTURA: configuratorul ----------
 
-const LIMITA_CLASIC = 30; // cel mult atâția itemi într-o rundă de Classic
-const VIETI_START = 3;
-const VIETI_MAX = 6;
+const CLASSIC_LIMIT = 30; // cel mult atâția itemi într-o rundă de Classic
+const START_LIVES = 3;
+const MAX_LIVES = 6;
 /* Cam unul din șase itemi e „de viață". Nu un număr fix: pe o rundă scurtă,
    fix-ul ar fi ori prea generos, ori inexistent. */
-const RARITATE_VIATA = 6;
+const LIFE_RARITY = 6;
 
-const areTipuri = () => J.itemi.some((it) => (it.types || []).length);
+const hasTypes = () => J.items.some((it) => (it.types || []).length);
 
-function itemiPotriviti() {
-  return J.itemi.filter((it) => {
-    if (!J.cfg.totiAnii && !J.cfg.ani.has(it.year)) return false;
-    if (!J.cfg.toateTipurile) {
+function matchingItems() {
+  return J.items.filter((it) => {
+    if (!J.cfg.allYears && !J.cfg.years.has(it.year)) return false;
+    if (!J.cfg.allTypes) {
       const t = it.types || [];
-      if (!t.some((x) => J.cfg.tipuri.has(x))) return false;
+      if (!t.some((x) => J.cfg.types.has(x))) return false;
     }
     return true;
   });
@@ -627,7 +627,7 @@ function itemiPotriviti() {
 /* Amestecul lui Fisher–Yates, cu perechi schimbate de la coadă spre cap: e
    singurul care dă fiecărei ordini aceeași șansă. Sortarea cu `Math.random()`
    în comparator pare că face același lucru, dar nu-i adevărat. */
-function amesteca(a) {
+function shuffle(a) {
   const v = a.slice();
   for (let i = v.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -636,69 +636,69 @@ function amesteca(a) {
   return v;
 }
 
-function pastilaAn(an, pornit) {
-  const cati = J.itemi.filter((it) => it.year === an).length;
+function yearChip(year, pornit) {
+  const cati = J.items.filter((it) => it.year === year).length;
   return `<button type="button" class="cmp-chip${pornit ? " is-on" : ""}"
-      data-act="cfg-an" data-an="${an}">${an}<span class="cmp-chip__n">${cati}</span></button>`;
+      data-act="cfg-year" data-year="${year}">${year}<span class="cmp-chip__n">${cati}</span></button>`;
 }
 
-function numaratoareTipuri() {
+function typeCounts() {
   const n = {};
-  for (const it of itemiPotriviti()) for (const t of (it.types || [])) n[t] = (n[t] || 0) + 1;
+  for (const it of matchingItems()) for (const t of (it.types || [])) n[t] = (n[t] || 0) + 1;
   return n;
 }
 
-function deseneazaConfig() {
-  const potriviti = itemiPotriviti();
-  const eClasic = J.ecran === "clasic";
-  const cati = eClasic ? Math.min(potriviti.length, LIMITA_CLASIC) : potriviti.length;
-  const nT = numaratoareTipuri();
-  const blocTipuri = areTipuri() ? `
+function renderConfig() {
+  const matching = matchingItems();
+  const isClassic = J.screen === "classic";
+  const cati = isClassic ? Math.min(matching.length, CLASSIC_LIMIT) : matching.length;
+  const nT = typeCounts();
+  const typeBlock = hasTypes() ? `
     <div class="cmp-cfg__block">
       <p class="cmp-cfg__lab">Ce fel de itemi</p>
       <div class="cmp-chips">
-        <button type="button" class="cmp-chip${J.cfg.toateTipurile ? " is-on" : ""}" data-act="cfg-toate-tipurile">Toate</button>
-        ${TEST_ITEM_TYPES.filter((t) => nT[t.code] || J.cfg.tipuri.has(t.code)).map((t) => `
-          <button type="button" class="cmp-chip${J.cfg.tipuri.has(t.code) ? " is-on" : ""}"
-            data-act="cfg-tip" data-tip="${t.code}">${esc(t.label)}<span class="cmp-chip__n">${nT[t.code] || 0}</span></button>`).join("")}
+        <button type="button" class="cmp-chip${J.cfg.allTypes ? " is-on" : ""}" data-act="cfg-all-types">Toate</button>
+        ${TEST_ITEM_TYPES.filter((t) => nT[t.code] || J.cfg.types.has(t.code)).map((t) => `
+          <button type="button" class="cmp-chip${J.cfg.types.has(t.code) ? " is-on" : ""}"
+            data-act="cfg-type" data-type="${t.code}">${esc(t.label)}<span class="cmp-chip__n">${nT[t.code] || 0}</span></button>`).join("")}
       </div>
     </div>` : `
     <p class="cmp-cfg__note">Etichetele pe tipuri (sintaxa frazei, morfologie, fonetică…)
       încă se pun, item cu item. Când apar, vei putea alege și după ele.</p>`;
-  const regula = eClasic
+  const regula = isClassic
     ? `<ul class="cmp-rules">
-        <li><b>${VIETI_START} lives</b> la pornire, cel mult ${VIETI_MAX}.</li>
+        <li><b>${START_LIVES} lives</b> la pornire, cel mult ${MAX_LIVES}.</li>
         <li>Itemii însemnați <b>extra life</b> îți dau o inimă dacă-i nimerești și nu-ți iau niciuna dacă greșești.</li>
-        <li>Runda ține până la <b>${LIMITA_CLASIC} de itemi</b> sau până rămâi fără <b>lives</b>.</li>
+        <li>Runda ține până la <b>${CLASSIC_LIMIT} de itemi</b> sau până rămâi fără <b>lives</b>.</li>
       </ul>`
     : `<ul class="cmp-rules">
         <li>Toți itemii aleși, unul câte unul, <b>numerotați</b>.</li>
         <li>Itemul greșit se duce <b>la coada rândului</b> și revine până îl nimerești.</li>
         <li>Se termină când n-a mai rămas niciunul nerezolvat.</li>
       </ul>`;
-  const m = MODURI.find((x) => x.id === J.ecran);
-  radacina.className = "cmp cmp--cfg";
-  radacina.innerHTML = `
+  const m = MODES.find((x) => x.id === J.screen);
+  root.className = "cmp cmp--cfg";
+  root.innerHTML = `
     <section class="cmp-cfg">
-      ${baraDeSus(m.nume, m.semn)}
+      ${topBar(m.label, m.sign)}
       <div class="cmp-cfg__grid">
         <div class="cmp-cfg__left">
           <div class="cmp-cfg__block">
             <p class="cmp-cfg__lab">Din ce ani</p>
             <div class="cmp-chips">
-              <button type="button" class="cmp-chip${J.cfg.totiAnii ? " is-on" : ""}" data-act="cfg-toti-anii">Toți anii</button>
-              ${J.ani.map((an) => pastilaAn(an, J.cfg.ani.has(an))).join("")}
+              <button type="button" class="cmp-chip${J.cfg.allYears ? " is-on" : ""}" data-act="cfg-all-years">Toți anii</button>
+              ${J.years.map((year) => yearChip(year, J.cfg.years.has(year))).join("")}
             </div>
           </div>
-          ${blocTipuri}
+          ${typeBlock}
         </div>
         <aside class="cmp-cfg__right">
           <p class="cmp-cfg__count"><b>${cati}</b> ${cati === 1 ? "item" : "de itemi"}</p>
-          ${eClasic && potriviti.length > LIMITA_CLASIC
-            ? `<p class="cmp-cfg__sub">aleși la întâmplare din ${potriviti.length}</p>` : ""}
+          ${isClassic && matching.length > CLASSIC_LIMIT
+            ? `<p class="cmp-cfg__sub">aleși la întâmplare din ${matching.length}</p>` : ""}
           ${regula}
           <button type="button" class="tgame-btn tgame-btn--primary cmp-go"
-            data-act="porneste"${cati ? "" : " disabled"}>Start ▸</button>
+            data-act="start"${cati ? "" : " disabled"}>Start ▸</button>
           ${cati ? "" : `<p class="cmp-cfg__sub">Nicio potrivire — mai lasă un an ori un tip.</p>`}
         </aside>
       </div>
@@ -707,156 +707,156 @@ function deseneazaConfig() {
 
 // ---------- 2+3. runda propriu-zisă ----------
 
-function porneste() {
-  const potriviti = itemiPotriviti();
-  if (!potriviti.length) return;
-  const eClasic = J.ecran === "clasic";
-  let rand = amesteca(potriviti.map((it) => it.id));
-  if (eClasic) rand = rand.slice(0, LIMITA_CLASIC);
-  J.rand = rand;
-  J.pozitie = 0;
-  J.bune = 0; J.rele = 0; J.puncte = 0;
-  J.raspunsCurent = null;
-  J.gata = false;
-  J.vieti = eClasic ? VIETI_START : 0;
-  J.sesiune = uuid();
+function startRun() {
+  const matching = matchingItems();
+  if (!matching.length) return;
+  const isClassic = J.screen === "classic";
+  let queue = shuffle(matching.map((it) => it.id));
+  if (isClassic) queue = queue.slice(0, CLASSIC_LIMIT);
+  J.queue = queue;
+  J.position = 0;
+  J.rightCount = 0; J.wrongCount = 0; J.points = 0;
+  J.currentAnswer = null;
+  J.done = false;
+  J.lives = isClassic ? START_LIVES : 0;
+  J.sessionId = uuid();
   /* Itemii „de viață" se aleg ACUM, o dată pe rundă, nu la desenarea fiecărui
      item: altfel s-ar reașeza la orice redesen și ai vedea inima apărând și
      dispărând pe același item. */
-  J.deViata = new Set();
-  if (eClasic) {
-    const cate = Math.max(1, Math.round(rand.length / RARITATE_VIATA));
-    amesteca(rand).slice(0, cate).forEach((id) => J.deViata.add(id));
+  J.lifeItems = new Set();
+  if (isClassic) {
+    const cate = Math.max(1, Math.round(queue.length / LIFE_RARITY));
+    shuffle(queue).slice(0, cate).forEach((id) => J.lifeItems.add(id));
   }
-  J.faza = "joc";
-  deseneaza();
+  J.phase = "play";
+  render();
 }
 
-const itemCurent = () => J.peId.get(J.rand[J.pozitie]) || null;
-const inimi = () => Array.from({ length: VIETI_MAX }, (_, i) =>
-  `<i class="cmp-heart${i < J.vieti ? " is-on" : ""}" aria-hidden="true">${i < J.vieti ? "❤" : "♡"}</i>`).join("");
+const currentItem = () => J.byId.get(J.queue[J.position]) || null;
+const inimi = () => Array.from({ length: MAX_LIVES }, (_, i) =>
+  `<i class="cmp-heart${i < J.lives ? " is-on" : ""}" aria-hidden="true">${i < J.lives ? "❤" : "♡"}</i>`).join("");
 
-function hudRunda() {
-  if (J.ecran === "clasic") {
+function roundHud() {
+  if (J.screen === "classic") {
     return `<div class="cmp-hud">
-        <span class="cmp-hud__lives" aria-label="${J.vieti} lives din ${VIETI_MAX}">${inimi()}</span>
-        <span class="cmp-hud__pos">${Math.min(J.pozitie + 1, J.rand.length)} / ${J.rand.length}</span>
-        <span class="cmp-hud__sc"><b class="is-ok">${J.bune}</b> · <b class="is-no">${J.rele}</b></span>
+        <span class="cmp-hud__lives" aria-label="${J.lives} lives din ${MAX_LIVES}">${inimi()}</span>
+        <span class="cmp-hud__pos">${Math.min(J.position + 1, J.queue.length)} / ${J.queue.length}</span>
+        <span class="cmp-hud__sc"><b class="is-ok">${J.rightCount}</b> · <b class="is-no">${J.wrongCount}</b></span>
       </div>`;
   }
-  const ramase = J.rand.length - J.pozitie;
+  const left = J.queue.length - J.position;
   return `<div class="cmp-hud">
-      <span class="cmp-hud__pos">Item ${Math.min(J.pozitie + 1, J.rand.length)}</span>
-      <span class="cmp-hud__sc"><b class="is-ok">${J.bune}</b> corecte · <b class="is-no">${J.rele}</b> greșite</span>
-      <span class="cmp-hud__left">${ramase} ${ramase === 1 ? "rămas" : "rămași"}</span>
+      <span class="cmp-hud__pos">Item ${Math.min(J.position + 1, J.queue.length)}</span>
+      <span class="cmp-hud__sc"><b class="is-ok">${J.rightCount}</b> corecte · <b class="is-no">${J.wrongCount}</b> greșite</span>
+      <span class="cmp-hud__left">${left} ${left === 1 ? "rămas" : "rămași"}</span>
     </div>`;
 }
 
-function deseneazaRunda() {
-  if (J.faza !== "joc") return deseneazaConfig();
-  if (J.gata) return deseneazaFinal();
-  const it = itemCurent();
-  if (!it) return deseneazaFinal();
-  const r = J.raspunsCurent;
-  const viata = J.deViata.has(it.id);
-  const variante = varianteHtml(it, (k) => {
+function renderRound() {
+  if (J.phase !== "play") return renderConfig();
+  if (J.done) return renderFinal();
+  const it = currentItem();
+  if (!it) return renderFinal();
+  const r = J.currentAnswer;
+  const viata = J.lifeItems.has(it.id);
+  const options = optionsHtml(it, (k) => {
     let cls = "";
     if (r) {
-      if (k === r.cheie) cls = " opt-correct";
-      else if (k === r.ales) cls = " opt-wrong";
+      if (k === r.key) cls = " opt-correct";
+      else if (k === r.chosen) cls = " opt-wrong";
     }
-    return `<button type="button" class="tgame-opt${cls}" data-act="raspunde"
+    return `<button type="button" class="tgame-opt${cls}" data-act="answer"
         data-k="${k}"${r ? " disabled" : ""}>
         <span class="tgame-opt__k">${k}</span>
         <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
       </button>`;
   });
-  const m = MODURI.find((x) => x.id === J.ecran);
-  radacina.className = "cmp cmp--play";
-  radacina.innerHTML = `
+  const m = MODES.find((x) => x.id === J.screen);
+  root.className = "cmp cmp--play";
+  root.innerHTML = `
     <section class="cmp-play">
-      ${baraDeSus(m.nume, m.semn, hudRunda())}
-      <article class="tgame-card cmp-card${viata ? " is-life" : ""}${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
+      ${topBar(m.label, m.sign, roundHud())}
+      <article class="tgame-card cmp-card${viata ? " is-life" : ""}${r ? (r.isRight ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
         ${viata ? `<span class="cmp-lifetag" title="Extra life: nimerit, îți dă o inimă; greșit, nu-ți ia niciuna">❤ extra life</span>` : ""}
-        ${capulItemului(it)}
+        ${itemHead(it)}
         <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
-        <div class="tgame-opts">${variante}</div>
+        <div class="tgame-opts">${options}</div>
         ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}
-            ${r.puncte ? `<p class="cmp-pts">+${r.puncte} puncte</p>` : ""}</div>
-          <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="mai-departe">Continue ▸</button></div>` : ""}
+            ${r.points ? `<p class="cmp-pts">+${r.points} puncte</p>` : ""}</div>
+          <div class="cmp-next"><button type="button" class="tgame-btn tgame-btn--primary" data-act="next">Continue ▸</button></div>` : ""}
       </article>
     </section>`;
 }
 
-async function raspunde(buton) {
-  const it = itemCurent();
-  if (!it || J.raspunsCurent) return;
-  const k = buton.dataset.k;
-  const card = radacina.querySelector(".cmp-card");
+async function answer(btnEl) {
+  const it = currentItem();
+  if (!it || J.currentAnswer) return;
+  const k = btnEl.dataset.k;
+  const card = root.querySelector(".cmp-card");
   card?.classList.add("is-checking");
-  const r = await answerTestItem(it.id, k, J.sesiune);
+  const r = await answerTestItem(it.id, k, J.sessionId);
   card?.classList.remove("is-checking");
   if (!r) { showToast("N-am putut verifica acum. Mai încearcă."); return; }
-  J.raspunsCurent = {
-    ales: k, corect: r.correct, cheie: r.correctAnswer,
-    obs: r.observation || "", istoric: r.historical || null,
-    puncte: r.awarded ? r.points : 0,
+  J.currentAnswer = {
+    chosen: k, isRight: r.correct, key: r.correctAnswer,
+    explanation: r.observation || "", historical: r.historical || null,
+    points: r.awarded ? r.points : 0,
   };
-  if (r.correct) { J.bune++; J.puncte += J.raspunsCurent.puncte; } else J.rele++;
-  if (J.ecran === "clasic") {
-    if (r.correct && J.deViata.has(it.id) && J.vieti < VIETI_MAX) J.vieti++;
-    else if (!r.correct && !J.deViata.has(it.id)) J.vieti--;
+  if (r.correct) { J.rightCount++; J.points += J.currentAnswer.points; } else J.wrongCount++;
+  if (J.screen === "classic") {
+    if (r.correct && J.lifeItems.has(it.id) && J.lives < MAX_LIVES) J.lives++;
+    else if (!r.correct && !J.lifeItems.has(it.id)) J.lives--;
   }
-  deseneaza();
+  render();
 }
 
-function maiDeparte() {
-  const r = J.raspunsCurent;
-  const it = itemCurent();
-  J.raspunsCurent = null;
-  if (J.ecran === "clasic") {
-    if (J.vieti <= 0) { J.gata = true; return deseneaza(); }
-    J.pozitie++;
-    if (J.pozitie >= J.rand.length) J.gata = true;
-    return deseneaza();
+function goOn() {
+  const r = J.currentAnswer;
+  const it = currentItem();
+  J.currentAnswer = null;
+  if (J.screen === "classic") {
+    if (J.lives <= 0) { J.done = true; return render(); }
+    J.position++;
+    if (J.position >= J.queue.length) J.done = true;
+    return render();
   }
   /* AVENTURA: greșitul nu se pierde, se mută la coada rândului. Se scoate din
      locul lui ȘI se pune la capăt — altfel ar rămâne și acolo, iar rândul ar
      crește la nesfârșit. Poziția nu înaintează, fiindcă itemul de după el a
      luat exact locul pe care-l părăsește. */
-  if (r && !r.corect && it) {
-    J.rand.splice(J.pozitie, 1);
-    J.rand.push(it.id);
+  if (r && !r.isRight && it) {
+    J.queue.splice(J.position, 1);
+    J.queue.push(it.id);
   } else {
-    J.pozitie++;
+    J.position++;
   }
-  if (J.pozitie >= J.rand.length) J.gata = true;
-  deseneaza();
+  if (J.position >= J.queue.length) J.done = true;
+  render();
 }
 
-function deseneazaFinal() {
-  const eClasic = J.ecran === "clasic";
-  const total = J.bune + J.rele;
-  const procent = total ? Math.round((J.bune / total) * 100) : 0;
-  const faraInimi = eClasic && J.vieti <= 0;
-  const titlu = faraInimi ? "Game Over" : eClasic ? "Run complete" : "All clear";
-  const m = MODURI.find((x) => x.id === J.ecran);
-  radacina.className = "cmp cmp--done";
-  radacina.innerHTML = `
+function renderFinal() {
+  const isClassic = J.screen === "classic";
+  const total = J.rightCount + J.wrongCount;
+  const percent = total ? Math.round((J.rightCount / total) * 100) : 0;
+  const noLives = isClassic && J.lives <= 0;
+  const title = noLives ? "Game Over" : isClassic ? "Run complete" : "All clear";
+  const m = MODES.find((x) => x.id === J.screen);
+  root.className = "cmp cmp--done";
+  root.innerHTML = `
     <section class="cmp-done">
-      ${baraDeSus(m.nume, m.semn)}
+      ${topBar(m.label, m.sign)}
       <div class="cmp-done__in">
-        <p class="cmp-done__sign" aria-hidden="true">${faraInimi ? "💔" : procent >= 80 ? "🏆" : "🫡"}</p>
-        <h2 class="cmp-done__title">${esc(titlu)}</h2>
+        <p class="cmp-done__sign" aria-hidden="true">${noLives ? "💔" : percent >= 80 ? "🏆" : "🫡"}</p>
+        <h2 class="cmp-done__title">${esc(title)}</h2>
         <p class="cmp-done__stats">
-          <b class="is-ok">${J.bune}</b> corecte · <b class="is-no">${J.rele}</b> greșite
-          ${total ? ` · <b>${procent}%</b>` : ""}
-          ${J.puncte ? ` · <b class="is-pts">+${J.puncte}</b> puncte` : ""}
+          <b class="is-ok">${J.rightCount}</b> corecte · <b class="is-no">${J.wrongCount}</b> greșite
+          ${total ? ` · <b>${percent}%</b>` : ""}
+          ${J.points ? ` · <b class="is-pts">+${J.points}</b> puncte` : ""}
         </p>
         ${!isLoggedIn() ? `<p class="cmp-done__hint">Punctele se strâng doar dacă ai cont. Fără el, exersezi liniștit, dar nu urci în clasament.</p>` : ""}
         <div class="cmp-done__acts">
-          <button type="button" class="tgame-btn tgame-btn--primary" data-act="din-nou">Play again</button>
-          <button type="button" class="tgame-btn" data-act="inapoi">Alt mod</button>
+          <button type="button" class="tgame-btn tgame-btn--primary" data-act="again">Play again</button>
+          <button type="button" class="tgame-btn" data-act="back">Alt mod</button>
         </div>
       </div>
     </section>`;
@@ -864,14 +864,13 @@ function deseneazaFinal() {
 
 // ---------- 4. LEVEL-UP ----------
 
-const ITEMI_PE_NIVEL = 5;
+const ITEMS_PER_LEVEL = 5;
 /* CAPITOLELE vin din `campina-poveste.js`: acolo e text, aici e joc. Un capitol
    ține zece levels, iar fiecare level trecut descoperă un fragment din caz.
 
    De ce zece, și nu douăzeci și doi ca la început: la 22 de levels, capătul
    unui capitol venea o dată la o oră bună de joc, iar povestea se târa. La
    zece, fiecare seară de învățat mută dosarul mai departe. */
-const NIVELE_PE_LUME = LEVELS_PE_CAPITOL;
 
 /* BADGES. Trei feluri, și niciunul nu se dă pentru simplă înaintare:
    · faptele (First Step, Hot Streak, On Fire, Comeback, Halfway) se câștigă
@@ -880,12 +879,12 @@ const NIVELE_PE_LUME = LEVELS_PE_CAPITOL;
    „Perfect" ar fi fost o insignă goală: în Level-up, un level trecut e ORICUM 5
    din 5, fiindcă o greșeală îl închide. O insignă care se dă mereu nu spune
    nimic, așa că n-am pus-o. */
-const INSIGNE = {
-  "first-step": { nume: "First Step", semn: "🐣", de_ce: "primul level trecut" },
-  "hot-streak": { nume: "Hot Streak", semn: "✨", de_ce: "3 levels la rând, fără cădere" },
-  "on-fire":    { nume: "On Fire",    semn: "🔥", de_ce: "10 levels la rând, fără cădere" },
-  "comeback":   { nume: "Comeback",   semn: "💪", de_ce: "ai trecut un level pe care picaseși" },
-  "halfway":    { nume: "Halfway",    semn: "🧭", de_ce: "jumătate din drum" },
+const BADGE_INFO = {
+  "first-step": { label: "First Step", sign: "🐣", de_ce: "primul level trecut" },
+  "hot-streak": { label: "Hot Streak", sign: "✨", de_ce: "3 levels la rând, fără cădere" },
+  "on-fire":    { label: "On Fire",    sign: "🔥", de_ce: "10 levels la rând, fără cădere" },
+  "comeback":   { label: "Comeback",   sign: "💪", de_ce: "ai trecut un level pe care picaseși" },
+  "halfway":    { label: "Halfway",    sign: "🧭", de_ce: "jumătate din drum" },
 };
 /* PREFIXUL SE SCRIE O SINGURĂ DATĂ, iar tăierea se măsoară din el. Prima formă
    avea prefixul într-un loc și lungimea lui scrisă cu mâna în altul: la
@@ -893,8 +892,8 @@ const INSIGNE = {
    iar `"cap-1".slice(6)` a dat gol. De acolo ieșea capitolul −1 și tot ecranul
    hărții crăpa. Nu se vedea decât după ce câștigai o insignă de capitol.
    Acum lungimea nu mai poate rămâne în urmă: se socotește din prefix. */
-const PREFIX_CAPITOL = "cap-";
-const codCapitol = (i) => `${PREFIX_CAPITOL}${i + 1}`;
+const CHAPTER_PREFIX = "cap-";
+const chapterCode = (i) => `${CHAPTER_PREFIX}${i + 1}`;
 
 /* Insigna unui capitol poartă numele pasului din dosar, nu „X Cleared": lipit
    după un nume românesc, cuvântul englezesc suna a traducere neterminată, iar
@@ -902,36 +901,36 @@ const codCapitol = (i) => `${PREFIX_CAPITOL}${i + 1}`;
 
    Întoarce `null` pentru un capitol care nu există. O insignă rămasă de la o
    numerotare veche n-are voie să golească ecranul: e o podoabă, nu un stâlp. */
-const insignaCapitolului = (i) => {
-  const c = CAPITOLE[i];
-  return c ? { nume: c.insigna, semn: c.semn, de_ce: `ai încheiat capitolul „${c.titlu}”` } : null;
+const chapterBadge = (i) => {
+  const c = CHAPTERS[i];
+  return c ? { label: c.badge, sign: c.sign, de_ce: `ai încheiat capitolul „${c.title}”` } : null;
 };
-const despreInsigna = (cod) => INSIGNE[cod]
-  || (cod.startsWith(PREFIX_CAPITOL) ? insignaCapitolului(Number(cod.slice(PREFIX_CAPITOL.length)) - 1) : null);
+const badgeInfo = (cod) => BADGE_INFO[cod]
+  || (cod.startsWith(CHAPTER_PREFIX) ? chapterBadge(Number(cod.slice(CHAPTER_PREFIX.length)) - 1) : null);
 
 /* Toți itemii, în ordinea lor firească (an, sesiune, numărul de pe hârtie),
    tăiați în felii de câte cinci. Ordinea e AȘEZATĂ, nu amestecată: un level
    trebuie să fie de fiecare dată același, altfel „am trecut de 37" n-ar
    însemna nimic. Și, fiindcă felia urmează hârtia, un level e chiar o bucată
    dintr-un subiect adevărat. */
-function nivelele() {
-  const toti = J.hartii.flatMap((h) => h.itemi.map((it) => it.id));
-  const felii = [];
-  for (let i = 0; i < toti.length; i += ITEMI_PE_NIVEL) felii.push(toti.slice(i, i + ITEMI_PE_NIVEL));
-  return felii;
+function levelNumbers() {
+  const toti = J.papers.flatMap((h) => h.items.map((it) => it.id));
+  const chapterList = [];
+  for (let i = 0; i < toti.length; i += ITEMS_PER_LEVEL) chapterList.push(toti.slice(i, i + ITEMS_PER_LEVEL));
+  return chapterList;
 }
 
-const cateNivele = () => nivelele().length;
+const levelCount = () => levelNumbers().length;
 
 /* HOTARELE UNUI CAPITOL. Ultimul capitol înghite ce prisosește peste socoteala
    rotundă, la fel ca pe hartă: dacă banca mai crește, levelurile în plus au
    unde sta. */
-function hotarele(cap) {
-  const deLa = cap * NIVELE_PE_LUME + 1;
-  const panaLa = cap === CAPITOLE.length - 1
-    ? Math.max(cateNivele(), deLa)
-    : Math.min(deLa + NIVELE_PE_LUME - 1, cateNivele());
-  return { deLa, panaLa };
+function chapterBounds(cap) {
+  const firstLevel = cap * LEVELS_PER_CHAPTER + 1;
+  const lastLevel = cap === CHAPTERS.length - 1
+    ? Math.max(levelCount(), firstLevel)
+    : Math.min(firstLevel + LEVELS_PER_CHAPTER - 1, levelCount());
+  return { firstLevel, lastLevel };
 }
 
 /* GREȘELILE DINTR-UN CAPITOL nu se țin într-un contor aparte: se socotesc din
@@ -943,44 +942,44 @@ function hotarele(cap) {
    De ce așa: un contor de sine stătător ar trebui ținut la zi în trei locuri
    (la cădere, la trecere, la resetare) și s-ar desincroniza de restul la prima
    scăpare. Așa, nu poate minți: dacă levelurile sunt adevărul, și numărul e. */
-const GRESELI_PE_CAPITOL = 3;
-function greseliIn(cap) {
-  const { deLa, panaLa } = hotarele(cap);
-  let incercari = 0, trecute = 0;
-  for (let n = deLa; n <= panaLa; n++) {
-    const l = J.leveluri.get(n);
+const MISTAKES_PER_CHAPTER = 3;
+function mistakesIn(cap) {
+  const { firstLevel, lastLevel } = chapterBounds(cap);
+  let tries = 0, cleared = 0;
+  for (let n = firstLevel; n <= lastLevel; n++) {
+    const l = J.levelLog.get(n);
     if (!l) continue;
-    incercari += l.tries;
-    if (l.passed) trecute++;
+    tries += l.tries;
+    if (l.passed) cleared++;
   }
-  return Math.max(0, incercari - trecute);
+  return Math.max(0, tries - cleared);
 }
-const greseliRamase = (cap) => Math.max(0, GRESELI_PE_CAPITOL - greseliIn(cap));
-const capitolulLevelului = (n) => Math.min(CAPITOLE.length - 1, Math.floor((n - 1) / NIVELE_PE_LUME));
+const mistakesLeft = (cap) => Math.max(0, MISTAKES_PER_CHAPTER - mistakesIn(cap));
+const chapterOfLevel = (n) => Math.min(CHAPTERS.length - 1, Math.floor((n - 1) / LEVELS_PER_CHAPTER));
 /* Cât de încins e levelul ÎN world-ul lui: 0 la primul, 1 la al 22-lea. Din el
    iese și tăria fundalului, ca lumina să crească pe măsură ce urci, nu doar
    când sari dintr-un world în altul. */
-const incinsul = (n) => {
-  const inauntru = (n - 1) % NIVELE_PE_LUME;
-  return NIVELE_PE_LUME > 1 ? inauntru / (NIVELE_PE_LUME - 1) : 0;
+const heat = (n) => {
+  const inner = (n - 1) % LEVELS_PER_CHAPTER;
+  return LEVELS_PER_CHAPTER > 1 ? inner / (LEVELS_PER_CHAPTER - 1) : 0;
 };
-const eUltimulCapitol = (i) => i === CAPITOLE.length - 1;  // Sentința: fundal viu
+const isLastChapter = (i) => i === CHAPTERS.length - 1;  // Sentința: fundal viu
 
 /* Fundalul unui level. Tăria se socotește AICI, în JavaScript, și pleacă spre
    CSS ca număr gata făcut: `color-mix` cu procent calculat merge în browserele
    noi, dar nu în toate, iar un fundal care lipsește pe unele ecrane ar fi fost
    un preț prea mare pentru o linie mai scurtă. */
-function hainaCapitolului(n) {
-  const i = capitolulLevelului(n);
-  const L = CAPITOLE[i];
-  const tarie = (7 + Math.round(incinsul(n) * 15)) + "%";
-  return `--cap:${L.culoare}; --tarie:${tarie}; --zbor:${ZBOR_MS}ms; --pompa:${POMPA_MS}ms; --pompe:${POMPE}`;
+function chapterSkin(n) {
+  const i = chapterOfLevel(n);
+  const L = CHAPTERS[i];
+  const strength = (7 + Math.round(heat(n) * 15)) + "%";
+  return `--cap:${L.color}; --tarie:${strength}; --zbor:${FLY_MS}ms; --pompa:${PUMP_MS}ms; --pompe:${PUMPS}`;
 }
 
-function deseneazaLevelUp() {
-  if (J.faza === "joc") return deseneazaNivel();
-  if (J.faza === "gata") return deseneazaSfarsitNivel();
-  return deseneazaHarta();
+function renderLevelUp() {
+  if (J.phase === "play") return renderLevel();
+  if (J.phase === "done") return renderLevelEnd();
+  return renderMap();
 }
 
 /* INSIGNELE, TOATE ÎNTR-UN LOC, deasupra cardului. Prima formă le punea pe o
@@ -988,24 +987,24 @@ function deseneazaLevelUp() {
    două, dar la opt se împrăștiau pe toată lățimea, iar ochiul le căuta una câte
    una în loc să le vadă dintr-o privire. Un rând strâns le ține împreună și le
    lasă să curgă pe al doilea rând când se înmulțesc, fără nicio socoteală. */
-function insigneleHtml() {
-  const coduri = [...J.insigne];
-  if (!coduri.length) return "";
-  const bucati = coduri.map((cod) => {
-    const d = despreInsigna(cod);
+function badgesHtml() {
+  const codes = [...J.badges];
+  if (!codes.length) return "";
+  const parts = codes.map((cod) => {
+    const d = badgeInfo(cod);
     if (!d) return "";
-    const noua = J.proaspete.has(cod) ? " e-noua" : "";
-    return `<span class="cmp-badge${noua}" title="${esc(d.nume)}: ${esc(d.de_ce)}">
-        <i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b>
+    const noua = J.freshBadges.has(cod) ? " e-noua" : "";
+    return `<span class="cmp-badge${noua}" title="${esc(d.label)}: ${esc(d.de_ce)}">
+        <i aria-hidden="true">${d.sign}</i><b>${esc(d.label)}</b>
       </span>`;
   }).join("");
-  return `<div class="cmp-badges" aria-label="Badges câștigate">${bucati}</div>`;
+  return `<div class="cmp-badges" aria-label="Badges câștigate">${parts}</div>`;
 }
 
-function deseneazaHarta() {
-  const felii = nivelele();
-  const trecut = levelMax();
-  const desfacut = trecut + 1; // levelul următor celui atins e deschis
+function renderMap() {
+  const chapterList = levelNumbers();
+  const cleared = maxLevel();
+  const unfolded = cleared + 1; // levelul următor celui atins e deschis
   /* CÂTE WORLDS SE VĂD. Doar cele la care ai ajuns, plus UNA închisă, fără nume.
      Nu-i o toană: un drum al cărui capăt îl vezi din prima nu mai e un drum, e o
      listă. Ținând worlds-urile acoperite, fiecare capăt de world descoperă o
@@ -1018,12 +1017,12 @@ function deseneazaHarta() {
      Regula se sprijină pe cea a levelurilor, nu se bate cu ea: levelurile se
      deschid unul câte unul, deci ca să ajungi la primul level al unui capitol
      trebuie oricum să le fi trecut pe toate ale celui dinainte. */
-  const ultimaDeschisa = CAPITOLE.findIndex((_, li) => trecut < li * NIVELE_PE_LUME);
-  const cateSeVad = ultimaDeschisa === -1 ? CAPITOLE.length : ultimaDeschisa; // câte sunt DESCHISE
-  const lumi = CAPITOLE.map((L, li) => {
-    if (li > cateSeVad) return "";          // dincolo de ușa închisă: nimic
-    if (li === cateSeVad) {                  // chiar ușa închisă
-      const cerut = CAPITOLE[li - 1]?.titlu || "";
+  const lastOpen = CHAPTERS.findIndex((_, li) => cleared < li * LEVELS_PER_CHAPTER);
+  const visibleCount = lastOpen === -1 ? CHAPTERS.length : lastOpen; // câte sunt DESCHISE
+  const lumi = CHAPTERS.map((L, li) => {
+    if (li > visibleCount) return "";          // dincolo de ușa închisă: nimic
+    if (li === visibleCount) {                  // chiar ușa închisă
+      const cerut = CHAPTERS[li - 1]?.title || "";
       return `<section class="cmp-cap cmp-cap--inchis" aria-label="Chapter ${li + 1}, încă închis">
           <header class="cmp-cap__head">
             <span class="cmp-cap__sign" aria-hidden="true">🔒</span>
@@ -1032,152 +1031,152 @@ function deseneazaHarta() {
           </header>
         </section>`;
     }
-    const de_la = li * NIVELE_PE_LUME + 1;
+    const firstLevel = li * LEVELS_PER_CHAPTER + 1;
     /* ULTIMUL CAPITOL ÎNGHITE TOT CE PRISOSEȘTE. Cele 18 capitole a câte zece
        acoperă 180 de levels, iar banca de azi are 176. Prima sesiune adăugată
        strică socoteala, iar `capitolulLevelului` retează oricum la ultimul
        capitol. Dacă harta ar tăia și ea la zece, levelurile de peste capătul
        socotelii n-ar mai apărea nicăieri: ar exista, s-ar putea juca prin
        adresa lor, dar n-ar avea buton. Ultimul capitol crește, nu ascunde. */
-    const pana = li === CAPITOLE.length - 1
-      ? felii.length
-      : Math.min(de_la + NIVELE_PE_LUME - 1, felii.length);
-    if (de_la > felii.length) return "";
-    const patrate = [];
-    for (let n = de_la; n <= pana; n++) {
-      const l = J.leveluri.get(n);
-      const gata = !!(l && l.passed);
-      const deschis = n <= desfacut;
-      const cazut = !gata && l && l.tries > 0;
+    const lastLevel = li === CHAPTERS.length - 1
+      ? chapterList.length
+      : Math.min(firstLevel + LEVELS_PER_CHAPTER - 1, chapterList.length);
+    if (firstLevel > chapterList.length) return "";
+    const squares = [];
+    for (let n = firstLevel; n <= lastLevel; n++) {
+      const l = J.levelLog.get(n);
+      const done = !!(l && l.passed);
+      const deschis = n <= unfolded;
+      const fallen = !done && l && l.tries > 0;
       /* Ce itemi ține levelul, scris în tooltip: numerele ies din aceeași
          ordine, deci levelul n ține exact (n-1)*5+1 … n*5. */
-      const de_la_it = (n - 1) * ITEMI_PE_NIVEL + 1;
-      const pana_it = Math.min(n * ITEMI_PE_NIVEL, J.numarGlobal.size);
-      patrate.push(`<button type="button" class="cmp-lvl${gata ? " is-done" : ""}${cazut ? " is-tried" : ""}${deschis ? "" : " is-locked"}"
-          data-act="nivel" data-n="${n}"${deschis ? "" : " disabled"}
-          title="${deschis ? `Level ${n} · itemii #${de_la_it}-${pana_it}${l ? ` · ${l.tries} ${l.tries === 1 ? "încercare" : "încercări"}` : ""}` : "Se deschide după levelul dinainte"}">${n}</button>`);
+      const firstItemNo = (n - 1) * ITEMS_PER_LEVEL + 1;
+      const lastItemNo = Math.min(n * ITEMS_PER_LEVEL, J.globalNo.size);
+      squares.push(`<button type="button" class="cmp-lvl${done ? " is-done" : ""}${fallen ? " is-tried" : ""}${deschis ? "" : " is-locked"}"
+          data-act="level" data-n="${n}"${deschis ? "" : " disabled"}
+          title="${deschis ? `Level ${n} · itemii #${firstItemNo}-${lastItemNo}${l ? ` · ${l.tries} ${l.tries === 1 ? "încercare" : "încercări"}` : ""}` : "Se deschide după levelul dinainte"}">${n}</button>`);
     }
-    const treuteAici = [...J.leveluri].filter(([n, l]) => l.passed && n >= de_la && n <= pana).length;
+    const clearedHere = [...J.levelLog].filter(([n, l]) => l.passed && n >= firstLevel && n <= lastLevel).length;
     /* POVESTEA STRÂNSĂ. Fragmentele levelurilor trecute din capitolul ăsta, în
        ordine. Ele nu se pierd după ce le-ai văzut o dată: harta e și locul unde
        reciteşti ce-ai aflat până acum, ca la o carte pe care o iei de pe raft. */
     const povestea = [];
-    for (let n = de_la; n <= pana; n++) {
-      if (!J.leveluri.get(n)?.passed) continue;
-      const f = fragmentul(n);
+    for (let n = firstLevel; n <= lastLevel; n++) {
+      if (!J.levelLog.get(n)?.passed) continue;
+      const f = storyFragment(n);
       if (f) povestea.push(`<li class="cmp-frag"><b>${n}</b><span>${esc(f)}</span></li>`);
     }
-    return `<section class="cmp-cap${eUltimulCapitol(li) ? " e-final" : ""}" style="--cap:${L.culoare}">
+    return `<section class="cmp-cap${isLastChapter(li) ? " e-final" : ""}" style="--cap:${L.color}">
         <header class="cmp-cap__head">
-          <span class="cmp-cap__sign" aria-hidden="true">${L.semn}</span>
-          <b class="cmp-cap__name">Chapter ${li + 1} · ${esc(L.titlu)}</b>
-          <span class="cmp-cap__n">${treuteAici} / ${pana - de_la + 1}</span>
+          <span class="cmp-cap__sign" aria-hidden="true">${L.sign}</span>
+          <b class="cmp-cap__name">Chapter ${li + 1} · ${esc(L.title)}</b>
+          <span class="cmp-cap__n">${clearedHere} / ${lastLevel - firstLevel + 1}</span>
         </header>
-        ${trecut >= de_la - 1 && trecut <= pana ? `<p class="cmp-cap__vieti"
+        ${cleared >= firstLevel - 1 && cleared <= lastLevel ? `<p class="cmp-cap__vieti"
           title="A patra greșeală ia capitolul de la capăt">Greșeli rămase în capitol:
-          <b>${greseliRamase(li)}</b> din ${GRESELI_PE_CAPITOL}</p>` : ""}
-        <div class="cmp-lvls">${patrate.join("")}</div>
+          <b>${mistakesLeft(li)}</b> din ${MISTAKES_PER_CHAPTER}</p>` : ""}
+        <div class="cmp-lvls">${squares.join("")}</div>
         ${povestea.length ? `<ol class="cmp-frags">${povestea.join("")}</ol>` : ""}
       </section>`;
   }).join("");
-  const galerie = [...J.insigne].map((cod) => {
-    const d = despreInsigna(cod);
-    return d ? `<span class="cmp-chip is-on" title="${esc(d.de_ce)}"><i aria-hidden="true">${d.semn}</i> ${esc(d.nume)}</span>` : "";
+  const gallery = [...J.badges].map((cod) => {
+    const d = badgeInfo(cod);
+    return d ? `<span class="cmp-chip is-on" title="${esc(d.de_ce)}"><i aria-hidden="true">${d.sign}</i> ${esc(d.label)}</span>` : "";
   }).join("");
-  radacina.className = "cmp cmp--map";
-  radacina.innerHTML = `
+  root.className = "cmp cmp--map";
+  root.innerHTML = `
     <section class="cmp-map">
-      ${baraDeSus("Level-up", "🔥", `<span class="cmp-hud__pos">Level ${trecut} / ${felii.length}</span>`)}
+      ${topBar("Level-up", "🔥", `<span class="cmp-hud__pos">Level ${cleared} / ${chapterList.length}</span>`)}
       <p class="cmp-map__intro">Cinci itemi pe level. O greșeală îl închide, iar
         <b>trei greșeli îți sunt îngăduite pe capitol</b>: a patra ia capitolul de la
         început. Levelurile sunt aceleași de fiecare dată, deci a doua oară le știi,
         iar fiecare level trecut descoperă un fragment din dosar.</p>
-      ${galerie ? `<div class="cmp-gallery"><span class="cmp-gallery__lab">Badges</span>${galerie}</div>` : ""}
+      ${gallery ? `<div class="cmp-gallery"><span class="cmp-gallery__lab">Badges</span>${gallery}</div>` : ""}
       ${lumi}
-      ${cateSeVad + 1 < CAPITOLE.length
-        ? `<p class="cmp-map__rest">Mai sunt <b>${CAPITOLE.length - cateSeVad - 1}</b> chapters dincolo de acesta.
+      ${visibleCount + 1 < CHAPTERS.length
+        ? `<p class="cmp-map__rest">Mai sunt <b>${CHAPTERS.length - visibleCount - 1}</b> chapters dincolo de acesta.
              Se deschid pe rând, pe măsură ce dosarul înaintează.</p>`
         : ""}
     </section>`;
 }
 
-function incepeNivelul(n) {
-  const felii = nivelele();
-  if (n < 1 || n > felii.length || n > levelMax() + 1) return;
-  J.nivel = n;
-  J.capitol = capitolulLevelului(n);
-  J.rand = felii[n - 1].slice();
-  J.pozitie = 0;
-  J.bune = 0; J.rele = 0; J.puncte = 0;
-  J.raspunsCurent = null;
-  J.proaspete = new Set();
-  J.sesiune = uuid();
-  J.faza = "joc";
-  opresteCeasurile();
-  deseneaza();
+function startLevel(n) {
+  const chapterList = levelNumbers();
+  if (n < 1 || n > chapterList.length || n > maxLevel() + 1) return;
+  J.level = n;
+  J.chapter = chapterOfLevel(n);
+  J.queue = chapterList[n - 1].slice();
+  J.position = 0;
+  J.rightCount = 0; J.wrongCount = 0; J.points = 0;
+  J.currentAnswer = null;
+  J.freshBadges = new Set();
+  J.sessionId = uuid();
+  J.phase = "play";
+  stopTimers();
+  render();
 }
 
-function deseneazaNivel() {
-  const it = itemCurent();
-  if (!it) { J.faza = "gata"; return deseneaza(); }
-  const L = CAPITOLE[J.capitol];
-  const r = J.raspunsCurent;
-  const variante = varianteHtml(it, (k) => {
+function renderLevel() {
+  const it = currentItem();
+  if (!it) { J.phase = "done"; return render(); }
+  const L = CHAPTERS[J.chapter];
+  const r = J.currentAnswer;
+  const options = optionsHtml(it, (k) => {
     let cls = "";
     if (r) {
-      if (k === r.cheie) cls = " opt-correct";
-      else if (k === r.ales) cls = " opt-wrong";
+      if (k === r.key) cls = " opt-correct";
+      else if (k === r.chosen) cls = " opt-wrong";
     }
-    return `<button type="button" class="tgame-opt${cls}" data-act="raspunde-levelup"
+    return `<button type="button" class="tgame-opt${cls}" data-act="answer-levelup"
         data-k="${k}"${r ? " disabled" : ""}>
         <span class="tgame-opt__k">${k}</span>
         <span class="tgame-opt__t">${sanitizeRich(it.options[k])}</span>
       </button>`;
   });
-  const pasi = Array.from({ length: ITEMI_PE_NIVEL }, (_, i) =>
-    `<i class="cmp-step${i < J.pozitie ? " is-done" : i === J.pozitie ? " is-now" : ""}" aria-hidden="true"></i>`).join("");
-  const numar = J.numarGlobal.get(it.id) || 0;
-  radacina.className = "cmp cmp--play cmp--levelup";
-  radacina.innerHTML = `
-    <section class="cmp-play cmp-cap-scena${eUltimulCapitol(J.capitol) ? " e-final" : ""}" style="${hainaCapitolului(J.nivel)}">
-      ${baraDeSus(`${L.titlu} · Level ${J.nivel}`, L.semn,
-        `<span class="cmp-hud__lives" title="Greșeli rămase în capitol">${Array.from({ length: GRESELI_PE_CAPITOL }, (_, i) => `<i class="cmp-heart${i < greseliRamase(J.capitol) ? " is-on" : ""}">${i < greseliRamase(J.capitol) ? "❤" : "♡"}</i>`).join("")}</span><span class="cmp-steps">${pasi}</span>`, "harta")}
+  const pasi = Array.from({ length: ITEMS_PER_LEVEL }, (_, i) =>
+    `<i class="cmp-step${i < J.position ? " is-done" : i === J.position ? " is-now" : ""}" aria-hidden="true"></i>`).join("");
+  const numar = J.globalNo.get(it.id) || 0;
+  root.className = "cmp cmp--play cmp--levelup";
+  root.innerHTML = `
+    <section class="cmp-play cmp-cap-scena${isLastChapter(J.chapter) ? " e-final" : ""}" style="${chapterSkin(J.level)}">
+      ${topBar(`${L.title} · Level ${J.level}`, L.sign,
+        `<span class="cmp-hud__lives" title="Greșeli rămase în capitol">${Array.from({ length: MISTAKES_PER_CHAPTER }, (_, i) => `<i class="cmp-heart${i < mistakesLeft(J.chapter) ? " is-on" : ""}">${i < mistakesLeft(J.chapter) ? "❤" : "♡"}</i>`).join("")}</span><span class="cmp-steps">${pasi}</span>`, "map")}
       <div class="cmp-veil" aria-hidden="true"></div>
       <p class="cmp-bignum">
         <b>#${numar}</b>
-        <i>din ${J.numarGlobal.size}</i>
-        <em class="cmp-bignum__go">Game Over${r && !r.corect && r.cheie
-          ? `<span class="cmp-bignum__cheie">era <b>${esc(r.cheie)}</b></span>` : ""}</em>
+        <i>din ${J.globalNo.size}</i>
+        <em class="cmp-bignum__go">Game Over${r && !r.isRight && r.key
+          ? `<span class="cmp-bignum__cheie">era <b>${esc(r.key)}</b></span>` : ""}</em>
       </p>
       <div class="cmp-orbit">
-        ${insigneleHtml()}
-        <article class="tgame-card cmp-card${r ? (r.corect ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
-          ${capulItemului(it)}
+        ${badgesHtml()}
+        <article class="tgame-card cmp-card${r ? (r.isRight ? " is-correct" : " is-wrong") : ""}" data-id="${it.id}">
+          ${itemHead(it)}
           <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
-          <div class="tgame-opts">${variante}</div>
+          <div class="tgame-opts">${options}</div>
           ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>` : ""}
         </article>
       </div>
     </section>`;
-  J.proaspete = new Set(); // pâlpâie o dată, la desenul de după câștig
+  J.freshBadges = new Set(); // pâlpâie o dată, la desenul de după câștig
 }
 
-async function raspundeLevelUp(buton) {
-  const it = itemCurent();
-  if (!it || J.raspunsCurent) return;
-  const card = radacina.querySelector(".cmp-card");
+async function answerLevelUp(btnEl) {
+  const it = currentItem();
+  if (!it || J.currentAnswer) return;
+  const card = root.querySelector(".cmp-card");
   card?.classList.add("is-checking");
-  const r = await answerTestItem(it.id, buton.dataset.k, J.sesiune);
+  const r = await answerTestItem(it.id, btnEl.dataset.k, J.sessionId);
   card?.classList.remove("is-checking");
   if (!r) { showToast("N-am putut verifica acum. Mai încearcă."); return; }
-  J.raspunsCurent = {
-    ales: buton.dataset.k, corect: r.correct, cheie: r.correctAnswer,
-    obs: r.observation || "", istoric: r.historical || null,
-    puncte: r.awarded ? r.points : 0,
+  J.currentAnswer = {
+    chosen: btnEl.dataset.k, isRight: r.correct, key: r.correctAnswer,
+    explanation: r.observation || "", historical: r.historical || null,
+    points: r.awarded ? r.points : 0,
   };
-  if (r.correct) { J.bune++; J.puncte += J.raspunsCurent.puncte; } else J.rele++;
-  deseneaza();
-  mergeSingur(r.correct);
+  if (r.correct) { J.rightCount++; J.points += J.currentAnswer.points; } else J.wrongCount++;
+  render();
+  autoAdvance(r.correct);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1194,88 +1193,88 @@ async function raspundeLevelUp(buton) {
    Ordinea la cădere e, deci: citești, PE URMĂ se întunecă. Invers, ceața ar
    acoperi exact lucrul pentru care merita să pierzi levelul.
    ═══════════════════════════════════════════════════════════════════════════ */
-/* DURATELE, toate aici. Cele două de mișcare (`ZBOR_MS`, `POMPA_MS`) pleacă și
+/* DURATELE, toate aici. Cele două de mișcare (`FLY_MS`, `PUMP_MS`) pleacă și
    spre CSS, ca variabile puse pe secțiune: altfel aceeași durată ar fi scrisă
    în două fișiere și s-ar despărți la prima ajustare, iar pomparea ar porni
    ori peste zbor, ori după o pauză. */
-const ZBOR_MS = 450;          // cât ține drumul numărului spre mijloc
-const POMPA_MS = 280;         // o bătaie din pompare
-const POMPE = 3;              // câte bătăi la rând, ca semn de izbândă
-const CITIRE_BUN_MS = 350;    // cât stai cu bifa verde înainte de zbor
+const FLY_MS = 450;          // cât ține drumul numărului spre mijloc
+const PUMP_MS = 280;         // o bătaie din pompare
+const PUMPS = 3;              // câte bătăi la rând, ca semn de izbândă
+const READ_RIGHT_MS = 350;    // cât stai cu bifa verde înainte de zbor
 /* La greșeală, numărul pleacă aproape la fel de repede ca la reușită. Litera
    corectă NU se pierde din pricina asta: ea urcă în ecranul de cădere, sub
    „Game Over", deci se citește prin ceață, nu pe sub ea. Explicația întreagă
    rămâne pe card, iar cine o vrea o are în Relaxed ori la reluarea levelului. */
-const CITIRE_GRESIT_MS = 700;
-const REUSITA_MS = ZBOR_MS + POMPA_MS * POMPE;
+const READ_WRONG_MS = 700;
+const SUCCESS_MS = FLY_MS + PUMP_MS * PUMPS;
 /* Trei secunde cu numărul în mijloc: destul cât să citești litera corectă și
    să iei greșeala în piept, nu atât cât să te plictisești așteptând harta. */
-const STAT_LA_MIJLOC_MS = 3000;
-const CADEREA_MS = ZBOR_MS + STAT_LA_MIJLOC_MS;
+const HOLD_CENTER_MS = 3000;
+const FALL_MS = FLY_MS + HOLD_CENTER_MS;
 
 /* Ceasurile pornite de aici se opresc la orice plecare din level (harta,
    modurile, alt level). Fără asta, un ceas rămas în urmă ar redesena peste
    ecranul în care tocmai ai intrat. */
-function opresteCeasurile() {
-  (J.ceasuri || []).forEach(clearTimeout);
-  J.ceasuri = [];
+function stopTimers() {
+  (J.timers || []).forEach(clearTimeout);
+  J.timers = [];
 }
 function pesteo(ms, ce) {
-  (J.ceasuri ||= []).push(setTimeout(ce, ms));
+  (J.timers ||= []).push(setTimeout(ce, ms));
 }
 
-function mergeSingur(corect) {
+function autoAdvance(isRight) {
   const potolit = !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-  opresteCeasurile();
-  pesteo(corect ? CITIRE_BUN_MS : CITIRE_GRESIT_MS, () => {
-    const sectiune = radacina.querySelector(".cmp-play");
+  stopTimers();
+  pesteo(isRight ? READ_RIGHT_MS : READ_WRONG_MS, () => {
+    const sectiune = root.querySelector(".cmp-play");
     if (!sectiune) return;
-    sectiune.classList.add(corect ? "e-reusit" : "e-cade");
-    pesteo(potolit ? 400 : (corect ? REUSITA_MS : CADEREA_MS), () => void dupaItem(corect));
+    sectiune.classList.add(isRight ? "e-reusit" : "e-cade");
+    pesteo(potolit ? 400 : (isRight ? SUCCESS_MS : FALL_MS), () => void dupaItem(isRight));
   });
 }
 
-async function dupaItem(corect) {
-  J.raspunsCurent = null;
+async function dupaItem(isRight) {
+  J.currentAnswer = null;
   /* La greșeală se oprește pe ECRANUL DE SFÂRȘIT, nu pe hartă. Înainte mergea
      drept la hartă, și era bine cât timp singurul lucru de spus era „ai pierdut
      levelul". De când a patra greșeală ia capitolul de la capăt, tăcerea nu mai
      merge: elevul s-ar întoarce pe o hartă golită fără să afle de ce. Zborul
      numărului rămâne automat; doar capătul lui e un ecran care spune ceva. */
-  if (!corect) { await inchideNivelul(false); return deseneaza(); }
-  J.pozitie++;
-  if (J.pozitie >= J.rand.length) { await inchideNivelul(true); }
-  deseneaza();
+  if (!isRight) { await finishLevel(false); return render(); }
+  J.position++;
+  if (J.position >= J.queue.length) { await finishLevel(true); }
+  render();
 }
 
 /* ÎNCHIDEREA UNUI LEVEL, într-un singur loc: numărul de încercări, trecerea,
    seria și badges-urile se hotărăsc împreună, fiindcă depind unele de altele. */
-async function inchideNivelul(trecut) {
-  const n = J.nivel;
-  const cap = capitolulLevelului(n);
-  const vechi = J.leveluri.get(n) || { tries: 0, passed: false };
-  const eraCazut = !vechi.passed && vechi.tries > 0;   // pentru „Comeback"
-  const acum = { tries: vechi.tries + 1, passed: vechi.passed || trecut };
-  J.leveluri.set(n, acum);
-  J.serie = trecut ? J.serie + 1 : 0;
-  J.faza = "gata";
-  J.capitolCazut = false;
-  J.capitolIncheiat = false;
+async function finishLevel(cleared) {
+  const n = J.level;
+  const cap = chapterOfLevel(n);
+  const vechi = J.levelLog.get(n) || { tries: 0, passed: false };
+  const wasFallen = !vechi.passed && vechi.tries > 0;   // pentru „Comeback"
+  const acum = { tries: vechi.tries + 1, passed: vechi.passed || cleared };
+  J.levelLog.set(n, acum);
+  J.streak = cleared ? J.streak + 1 : 0;
+  J.phase = "done";
+  J.chapterReset = false;
+  J.chapterDone = false;
 
-  if (trecut) {
-    const castigate = [];
-    const da = (cod) => { if (!J.insigne.has(cod)) { J.insigne.add(cod); J.proaspete.add(cod); castigate.push(cod); } };
-    if (levelMax() >= 1) da("first-step");
-    if (J.serie >= 3) da("hot-streak");
-    if (J.serie >= 10) da("on-fire");
-    if (eraCazut) da("comeback");
-    if (levelMax() >= Math.ceil(cateNivele() / 2)) da("halfway");
+  if (cleared) {
+    const earned = [];
+    const da = (cod) => { if (!J.badges.has(cod)) { J.badges.add(cod); J.freshBadges.add(cod); earned.push(cod); } };
+    if (maxLevel() >= 1) da("first-step");
+    if (J.streak >= 3) da("hot-streak");
+    if (J.streak >= 10) da("on-fire");
+    if (wasFallen) da("comeback");
+    if (maxLevel() >= Math.ceil(levelCount() / 2)) da("halfway");
     // Capitol încheiat: toate levelurile lui sunt trecute.
-    const { deLa, panaLa } = hotarele(cap);
+    const { firstLevel, lastLevel } = chapterBounds(cap);
     let tot = true;
-    for (let x = deLa; x <= panaLa; x++) if (!J.leveluri.get(x)?.passed) { tot = false; break; }
-    if (tot) { da(codCapitol(cap)); J.capitolIncheiat = true; }
-    if (isLoggedIn()) await Promise.all(castigate.map((cod) => awardBadge(J.exam, cod)));
+    for (let x = firstLevel; x <= lastLevel; x++) if (!J.levelLog.get(x)?.passed) { tot = false; break; }
+    if (tot) { da(chapterCode(cap)); J.chapterDone = true; }
+    if (isLoggedIn()) await Promise.all(earned.map((cod) => awardBadge(J.exam, cod)));
   }
   if (isLoggedIn()) await saveMyLevel({ exam: J.exam, level: n, tries: acum.tries, passed: acum.passed });
 
@@ -1288,29 +1287,29 @@ async function inchideNivelul(trecut) {
      Prețul trebuie să fie mai mare decât itemul greșit, dar mai mic decât tot
      drumul; capitolul e chiar măsura potrivită. */
   // `>` nu `>=`: trei greșeli sunt ÎNGĂDUITE, a patra e cea care închide.
-  if (!trecut && greseliIn(cap) > GRESELI_PE_CAPITOL) await reseteazaCapitolul(cap);
+  if (!cleared && mistakesIn(cap) > MISTAKES_PER_CHAPTER) await resetChapter(cap);
 }
 
-async function reseteazaCapitolul(cap) {
-  const { deLa, panaLa } = hotarele(cap);
-  for (let n = deLa; n <= panaLa; n++) J.leveluri.delete(n);
-  J.capitolCazut = true;
-  J.serie = 0;
+async function resetChapter(cap) {
+  const { firstLevel, lastLevel } = chapterBounds(cap);
+  for (let n = firstLevel; n <= lastLevel; n++) J.levelLog.delete(n);
+  J.chapterReset = true;
+  J.streak = 0;
   /* Insigna capitolului, dacă o câștigase cumva, NU se ia înapoi: e a lui, a
      fost câștigată cinstit. Se ia doar drumul, nu și amintirea lui. */
-  if (isLoggedIn()) await clearMyLevels({ exam: J.exam, deLa, panaLa });
+  if (isLoggedIn()) await clearMyLevels({ exam: J.exam, firstLevel, lastLevel });
 }
 
-function deseneazaSfarsitNivel() {
-  const l = J.leveluri.get(J.nivel);
-  const trecut = J.rele === 0 && J.pozitie >= J.rand.length;
-  const L = CAPITOLE[J.capitol];
-  const felii = cateNivele();
-  const urmator = J.nivel + 1;
-  const { deLa } = hotarele(J.capitol);
-  const noi = [...J.proaspete].map((cod) => {
-    const d = despreInsigna(cod);
-    return d ? `<span class="cmp-badge e-noua"><i aria-hidden="true">${d.semn}</i><b>${esc(d.nume)}</b></span>` : "";
+function renderLevelEnd() {
+  const l = J.levelLog.get(J.level);
+  const cleared = J.wrongCount === 0 && J.position >= J.queue.length;
+  const L = CHAPTERS[J.chapter];
+  const chapterList = levelCount();
+  const nextLevel = J.level + 1;
+  const { firstLevel } = chapterBounds(J.chapter);
+  const noi = [...J.freshBadges].map((cod) => {
+    const d = badgeInfo(cod);
+    return d ? `<span class="cmp-badge e-noua"><i aria-hidden="true">${d.sign}</i><b>${esc(d.label)}</b></span>` : "";
   }).join("");
 
   /* PATRU SFÂRȘITURI, nu două. Levelul trecut, capitolul încheiat, levelul
@@ -1318,63 +1317,63 @@ function deseneazaSfarsitNivel() {
      vadă din prima privire care dintre ele i s-a întâmplat. Un singur ecran
      care spune „Game Over" și la a doua greșeală, și la a patra, ar ascunde
      tocmai lucrul care contează: că de data asta a pierdut capitolul. */
-  const ramase = greseliRamase(J.capitol);
-  let semn, titlu, spune, butonul;
-  if (J.capitolCazut) {
-    semn = "🗂️";
-    titlu = "Capitolul o ia de la capăt";
-    spune = `A patra greșeală în „${esc(L.titlu)}". Capitolul se închide și se
+  const left = mistakesLeft(J.chapter);
+  let sign, title, line, buttonHtml;
+  if (J.chapterReset) {
+    sign = "🗂️";
+    title = "Capitolul o ia de la capăt";
+    line = `A patra greșeală în „${esc(L.title)}". Capitolul se închide și se
       deschide iar de la primul level. Ce ai citit rămâne citit, iar badge-urile
       rămân ale tale; se pierde doar drumul, nu și amintirea lui.`;
-    butonul = `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${deLa}">De la început ▸</button>`;
-  } else if (J.capitolIncheiat) {
-    semn = L.semn;
-    titlu = `Chapter ${J.capitol + 1} complete`;
-    spune = `Ai închis „${esc(L.titlu)}", cu toate cele ${NIVELE_PE_LUME} levels ale lui.
-      ${urmator <= felii ? "Dosarul merge mai departe." : "Aici se termină dosarul."}`;
+    buttonHtml = `<button type="button" class="tgame-btn tgame-btn--primary" data-act="level" data-n="${firstLevel}">De la început ▸</button>`;
+  } else if (J.chapterDone) {
+    sign = L.sign;
+    title = `Chapter ${J.chapter + 1} complete`;
+    line = `Ai închis „${esc(L.title)}", cu toate cele ${LEVELS_PER_CHAPTER} levels ale lui.
+      ${nextLevel <= chapterList ? "Dosarul merge mai departe." : "Aici se termină dosarul."}`;
     /* Două butoane, nu unul: la capătul unui capitol vrei ori să mergi mai
        departe, ori să te uiți pe hartă la ce-ai strâns - iar cel de continuare
        spune și ÎNCOTRO, cu titlul capitolului următor, nu doar „mai departe". */
-    const urmatorulCap = CAPITOLE[J.capitol + 1];
-    butonul = urmator <= felii
-      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">
-           Chapter ${J.capitol + 2}${urmatorulCap ? ` · ${esc(urmatorulCap.titlu)}` : ""} ▸
+    const nextChapter = CHAPTERS[J.chapter + 1];
+    buttonHtml = nextLevel <= chapterList
+      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="level" data-n="${nextLevel}">
+           Chapter ${J.chapter + 2}${nextChapter ? ` · ${esc(nextChapter.title)}` : ""} ▸
          </button>`
       : "";
-  } else if (trecut) {
-    semn = L.semn;
-    titlu = `Level ${J.nivel} complete`;
-    spune = `Cinci din cinci${J.puncte ? ` · <b class="is-pts">+${J.puncte}</b> puncte` : ""}${J.serie > 1 ? ` · streak ${J.serie}` : ""}`;
-    butonul = urmator <= felii
-      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${urmator}">Level ${urmator} ▸</button>`
+  } else if (cleared) {
+    sign = L.sign;
+    title = `Level ${J.level} complete`;
+    line = `Cinci din cinci${J.points ? ` · <b class="is-pts">+${J.points}</b> puncte` : ""}${J.streak > 1 ? ` · streak ${J.streak}` : ""}`;
+    buttonHtml = nextLevel <= chapterList
+      ? `<button type="button" class="tgame-btn tgame-btn--primary" data-act="level" data-n="${nextLevel}">Level ${nextLevel} ▸</button>`
       : "";
   } else {
-    semn = "💥";
-    titlu = "Game Over";
-    spune = `Ai ținut <b>${J.bune}</b> ${J.bune === 1 ? "item" : "itemi"} din ${ITEMI_PE_NIVEL}.
-      ${ramase === 1
+    sign = "💥";
+    title = "Game Over";
+    line = `Ai ținut <b>${J.rightCount}</b> ${J.rightCount === 1 ? "item" : "itemi"} din ${ITEMS_PER_LEVEL}.
+      ${left === 1
         ? "<b>Mai ai o singură greșeală</b> în capitolul ăsta; a patra îl ia de la capăt."
-        : `Îți mai sunt îngăduite <b>${ramase} greșeli</b> în capitolul ăsta.`}${l && l.tries > 1 ? ` A ${l.tries}-a încercare la levelul ăsta.` : ""}`;
-    butonul = `<button type="button" class="tgame-btn tgame-btn--primary" data-act="nivel" data-n="${J.nivel}">Retry</button>`;
+        : `Îți mai sunt îngăduite <b>${left} greșeli</b> în capitolul ăsta.`}${l && l.tries > 1 ? ` A ${l.tries}-a încercare la levelul ăsta.` : ""}`;
+    buttonHtml = `<button type="button" class="tgame-btn tgame-btn--primary" data-act="level" data-n="${J.level}">Retry</button>`;
   }
 
-  radacina.className = "cmp cmp--done";
-  radacina.innerHTML = `
-    <section class="cmp-done cmp-cap-scena${eUltimulCapitol(J.capitol) ? " e-final" : ""}" style="${hainaCapitolului(J.nivel)}">
-      ${baraDeSus("Level-up", "🔥", "", "harta")}
+  root.className = "cmp cmp--done";
+  root.innerHTML = `
+    <section class="cmp-done cmp-cap-scena${isLastChapter(J.chapter) ? " e-final" : ""}" style="${chapterSkin(J.level)}">
+      ${topBar("Level-up", "🔥", "", "map")}
       <div class="cmp-done__in">
-        <p class="cmp-done__sign" aria-hidden="true">${semn}</p>
-        <h2 class="cmp-done__title">${esc(titlu)}</h2>
-        <p class="cmp-done__stats">${spune}</p>
-        ${trecut && fragmentul(J.nivel) ? `
+        <p class="cmp-done__sign" aria-hidden="true">${sign}</p>
+        <h2 class="cmp-done__title">${esc(title)}</h2>
+        <p class="cmp-done__stats">${line}</p>
+        ${cleared && storyFragment(J.level) ? `
           <blockquote class="cmp-descoperit">
             <span class="cmp-descoperit__lab">Din dosar</span>
-            <p>${esc(fragmentul(J.nivel))}</p>
+            <p>${esc(storyFragment(J.level))}</p>
           </blockquote>` : ""}
         ${noi ? `<div class="cmp-newbadges"><span class="cmp-gallery__lab">Badge nou</span>${noi}</div>` : ""}
         <div class="cmp-done__acts">
-          ${butonul}
-          <button type="button" class="tgame-btn" data-act="harta">Level map</button>
+          ${buttonHtml}
+          <button type="button" class="tgame-btn" data-act="map">Level map</button>
         </div>
       </div>
     </section>`;
@@ -1389,78 +1388,78 @@ function deseneazaSfarsitNivel() {
    Nu-i o cârpeală care ascunde greșeala, ci una care o arată: fără ea, singurul
    loc unde se vedea era consola browserului, adică nicăieri pentru cine nu știe
    s-o deschidă. */
-function deseneaza() {
+function render() {
   try {
-    return deseneazaDeAdevarat();
+    return renderNow();
   } catch (e) {
     console.error("Level-up / Câmpina:", e);
-    radacina.className = "cmp";
-    radacina.innerHTML = `<div class="cmp-crapat">
+    root.className = "cmp";
+    root.innerHTML = `<div class="cmp-crapat">
         <p><b>S-a rupt ceva la desenarea ecranului.</b></p>
         <p class="cmp-crapat__ce">${esc(e && e.message ? e.message : String(e))}</p>
         <p class="cmp-crapat__unde">${esc((e && e.stack ? e.stack : "").split("\\n").slice(1, 3).join(" · "))}</p>
-        <button type="button" class="tgame-btn" data-act="inapoi">‹ înapoi la moduri</button>
+        <button type="button" class="tgame-btn" data-act="back">‹ înapoi la moduri</button>
       </div>`;
   }
 }
 
-function deseneazaDeAdevarat() {
-  if (!J.incarcat) return deseneazaAsteptarea();
-  if (!J.itemi.length) {
-    radacina.className = "cmp";
-    radacina.innerHTML = `<p class="cmp-wait">Banca de itemi e goală deocamdată.</p>`;
+function renderNow() {
+  if (!J.loaded) return renderLoading();
+  if (!J.items.length) {
+    root.className = "cmp";
+    root.innerHTML = `<p class="cmp-wait">Banca de itemi e goală deocamdată.</p>`;
     return;
   }
-  if (J.ecran === "relaxat") return deseneazaRelaxat();
-  if (J.ecran === "clasic" || J.ecran === "aventura") return deseneazaRunda();
-  if (J.ecran === "levelup") return deseneazaLevelUp();
-  return deseneazaAlegerea();
+  if (J.screen === "relaxed") return renderRelaxed();
+  if (J.screen === "classic" || J.screen === "adventure") return renderRound();
+  if (J.screen === "levelup") return renderLevelUp();
+  return renderModePicker();
 }
 
 // ---------- ascultători ----------
 
-let ascultatorPus = false;
-function puneAscultatorii() {
-  document.addEventListener("click", laApasare);
-  document.addEventListener("input", laScris);
+let eventsBound = false;
+function bindEvents() {
+  document.addEventListener("click", onClick);
+  document.addEventListener("input", onInput);
 }
 
-function laApasare(e) {
-  if (!radacina || !radacina.isConnected || !radacina.contains(e.target)) return;
+function onClick(e) {
+  if (!root || !root.isConnected || !root.contains(e.target)) return;
   const b = e.target.closest("[data-act]");
   if (!b) return;
   const act = b.dataset.act;
   switch (act) {
     // — de peste tot —
-    case "mod": return alegeModul(b.dataset.mod);
-    case "inapoi": opresteCeasurile(); J.ecran = "alege"; J.faza = "config"; return deseneaza();
-    case "semnaleaza": return cereSemnalare(b.dataset.id);
+    case "mode": return pickMode(b.dataset.mode);
+    case "back": stopTimers(); J.screen = "pick"; J.phase = "config"; return render();
+    case "report": return askReport(b.dataset.id);
 
     // — Relaxed —
-    case "an":
-      J.anAles = Number(b.dataset.an);
-      J.hartieAleasa = hartiileAnului(J.anAles)[0]?.cheie ?? null;
-      return deseneazaRelaxat();
-    case "hartie": J.hartieAleasa = b.dataset.cheie; return deseneazaRelaxat();
-    case "raspunde-relax": return void raspundeRelax(b);
-    case "sterge-hartia": return void stergeHartia();
+    case "year":
+      J.pickedYear = Number(b.dataset.year);
+      J.pickedPaper = papersOfYear(J.pickedYear)[0]?.key ?? null;
+      return renderRelaxed();
+    case "paper": J.pickedPaper = b.dataset.key; return renderRelaxed();
+    case "answer-relaxed": return void answerRelaxed(b);
+    case "clear-paper": return void clearPaper();
 
     // — configuratorul (Clasic / Aventura) —
-    case "cfg-toti-anii": J.cfg.totiAnii = true; J.cfg.ani.clear(); return deseneazaConfig();
-    case "cfg-an": return comutaAn(Number(b.dataset.an));
-    case "cfg-toate-tipurile": J.cfg.toateTipurile = true; J.cfg.tipuri.clear(); return deseneazaConfig();
-    case "cfg-tip": return comutaTip(b.dataset.tip);
-    case "porneste": return porneste();
+    case "cfg-all-years": J.cfg.allYears = true; J.cfg.years.clear(); return renderConfig();
+    case "cfg-year": return toggleYear(Number(b.dataset.year));
+    case "cfg-all-types": J.cfg.allTypes = true; J.cfg.types.clear(); return renderConfig();
+    case "cfg-type": return toggleType(b.dataset.type);
+    case "start": return startRun();
 
     // — runda —
-    case "raspunde": return void raspunde(b);
-    case "mai-departe": return maiDeparte();
-    case "din-nou": J.faza = "config"; J.gata = false; return deseneaza();
+    case "answer": return void answer(b);
+    case "next": return goOn();
+    case "again": J.phase = "config"; J.done = false; return render();
 
     // — Level-up —
-    case "nivel": opresteCeasurile(); return incepeNivelul(Number(b.dataset.n));
-    case "harta": opresteCeasurile(); J.faza = "harta"; return deseneaza();
-    case "raspunde-levelup": return void raspundeLevelUp(b);
+    case "level": stopTimers(); return startLevel(Number(b.dataset.n));
+    case "map": stopTimers(); J.phase = "map"; return render();
+    case "answer-levelup": return void answerLevelUp(b);
     default: return;
   }
 }
@@ -1469,30 +1468,30 @@ function laApasare(e) {
    de îndată ce alegi un an anume, scurtătura se stinge. Iar dacă scoți și
    ultimul an bifat, n-ai rămas cu nimic ales — te întorci la „toți", fiindcă o
    listă goală n-ar avea ce arăta. */
-function comutaAn(an) {
-  if (J.cfg.ani.has(an)) J.cfg.ani.delete(an); else J.cfg.ani.add(an);
-  J.cfg.totiAnii = J.cfg.ani.size === 0;
-  deseneazaConfig();
+function toggleYear(year) {
+  if (J.cfg.years.has(year)) J.cfg.years.delete(year); else J.cfg.years.add(year);
+  J.cfg.allYears = J.cfg.years.size === 0;
+  renderConfig();
 }
 
-function comutaTip(cod) {
+function toggleType(cod) {
   if (!cod) return;
-  if (J.cfg.tipuri.has(cod)) J.cfg.tipuri.delete(cod); else J.cfg.tipuri.add(cod);
-  J.cfg.toateTipurile = J.cfg.tipuri.size === 0;
-  deseneazaConfig();
+  if (J.cfg.types.has(cod)) J.cfg.types.delete(cod); else J.cfg.types.add(cod);
+  J.cfg.allTypes = J.cfg.types.size === 0;
+  renderConfig();
 }
 
-function laScris(e) {
-  if (!radacina || !radacina.isConnected || !radacina.contains(e.target)) return;
-  if (e.target.dataset?.act === "nota") scrieNota(e.target);
+function onInput(e) {
+  if (!root || !root.isConnected || !root.contains(e.target)) return;
+  if (e.target.dataset?.act === "note") writeNote(e.target);
 }
 
-function alegeModul(mod) {
-  if (!MODURI.some((m) => m.id === mod)) return;
-  J.ecran = mod;
+function pickMode(mode) {
+  if (!MODES.some((m) => m.id === mode)) return;
+  J.screen = mode;
   // Level-up se deschide pe hartă, celelalte pe configurator; Relaxatul n-are faze.
-  J.faza = mod === "levelup" ? "harta" : "config";
-  J.gata = false;
-  J.raspunsCurent = null;
-  deseneaza();
+  J.phase = mode === "levelup" ? "map" : "config";
+  J.done = false;
+  J.currentAnswer = null;
+  render();
 }

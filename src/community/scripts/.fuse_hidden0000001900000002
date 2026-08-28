@@ -30,7 +30,7 @@ import {
 } from "../../shared/scripts/moderation.js";
 import {
   adminFetchTestItem, adminFetchBonusQuestions, saveBonusQuestion, deleteBonusQuestion,
-  pendingExplanations, approveExplanation, rejectExplanation,
+  propuneriDeAprobat, aprobaExplicatia, respingeExplicatia,
   adminFetchTestDownloads, setTestDownloadSolved, directDownloadUrl,
   listDriveFolder, driveFileId, fetchAppSettings, saveAppSetting,
   addTestDownloads, updateTestDownloads, deleteTestDownloads, guessFromFileName,
@@ -295,7 +295,7 @@ export function renderCommunity(basePath = "") {
     bankCounts: {},  // slug de lecție → câte intrări are în bancă
     // Panoul „Tablă": tot ce e nesalvat stă AICI, nu în pagină, fiindcă panoul
     // se redesenează întreg la fiecare bifă.
-    bk: { lectie: null, kind: null, text: "", staged: [], banca: [], incarc: false,
+    bk: { lectie: null, kind: null, text: "", masa: [], banca: [], incarc: false,
           nota: "", notaBuna: false,
           // Filtrele tabelului băncii de acum (cel de sub „Importă").
           q: "", fFel: null, fEt: "", fNiv: "", sort: { key: "nou", dir: "desc" } },
@@ -307,7 +307,7 @@ export function renderCommunity(basePath = "") {
     adminUsers: [], // REAL members (Supabase) for the admin „Utilizatori" list
     contentReports: [], // REAL open reports (posts/comments/test items/exercises)
     reportItems: {},    // id → full test item behind a flagged-item report
-    explanationQueue: [],  // explicații propuse de elevii de la meditații, în așteptare
+    propuneriExpl: [],  // explicații propuse de elevii de la meditații, în așteptare
     bonusQs: [],        // flying bonus questions (teacher-authored)
     downloads: [],      // downloadable tests (files on the teacher's Drive)
     settings: {},       // private settings: Drive key + folder per category
@@ -3289,8 +3289,8 @@ export function renderCommunity(basePath = "") {
 
        Nu scrie cine a propus pe explicația publicată - așa a ales Marius - dar
        AICI scrie, fiindcă tu trebuie să știi cu cine lucrezi. */
-    const explanations = state.explanationQueue.filter((pr) => !cat || pr.item.exam === cat.slug);
-    const explanationCard = (pr) => {
+    const propuneri = state.propuneriExpl.filter((pr) => !cat || pr.item.exam === cat.slug);
+    const cardPropunere = (pr) => {
       const it = pr.item;
       const opts = ["A", "B", "C", "D"].filter((k) => it.options?.[k]).map((k) => `
         <li class="cx-repopt${it.correct === k ? " is-key" : ""}">
@@ -3304,7 +3304,7 @@ export function renderCommunity(basePath = "") {
             <ul class="cx-repopts">${opts}</ul>
           </div>
           <div class="cx-repcard__say">
-            <span class="cx-repcard__lab">Explicația propusă de ${escapeHtml(pr.pupil)}</span>
+            <span class="cx-repcard__lab">Explicația propusă de ${escapeHtml(pr.elev)}</span>
             <textarea class="cx-input cx-explan__text" data-prop="${pr.id}" rows="4"
               maxlength="2000">${escapeHtml(pr.text)}</textarea>
             <p class="cx-muted">O poți rescrie înainte s-o aprobi. Publicată, se vede la toți, după ce răspund la item.</p>
@@ -3315,10 +3315,10 @@ export function renderCommunity(basePath = "") {
           </div>
         </div>`;
     };
-    const explanationsBlock = `<div class="cx-box">
-        <div class="cx-admin__head"><h3>✍️ Explicații propuse de elevi · ${explanations.length}</h3></div>
-        ${explanations.length
-          ? explanations.map(explanationCard).join("")
+    const bloculPropunerilor = `<div class="cx-box">
+        <div class="cx-admin__head"><h3>✍️ Explicații propuse de elevi · ${propuneri.length}</h3></div>
+        ${propuneri.length
+          ? propuneri.map(cardPropunere).join("")
           : `<p class="cx-muted">Nicio propunere în așteptare. Elevii de la meditații pot scrie explicații
               doar la itemii care n-au încă una, și numai cât îi ții porniți din butonul
               „Propuneri de explicații" din colțul de jos.</p>`}
@@ -3339,7 +3339,7 @@ export function renderCommunity(basePath = "") {
         ])}
       </div>` : ""}
       ${spreGrila}
-      ${explanationsBlock}
+      ${bloculPropunerilor}
       <div class="cx-box">
         <div class="cx-admin__head"><h3>🔑 Legătura cu Drive</h3></div>
         <p class="cx-muted">Cheia se citește DOAR din contul tău de profesor — elevii n-o primesc niciodată. Folderele trebuie partajate în Drive ca „oricine are linkul".</p>
@@ -3444,7 +3444,7 @@ export function renderCommunity(basePath = "") {
      să rămână la locul lor. Textele sunt aceleași cu cele din `admin-board.js`;
      dacă se schimbă acolo, se schimbă și aici. */
   function improspateazaJosul() {
-    const s = socoteala(state.bk.staged);
+    const s = socoteala(state.bk.masa);
     const vorbe = [cuDe(s.pleaca, "de trimis", "de trimis")];
     if (s.gata) vorbe.push(`${s.gata} deja în bancă`);
     if (s.fara) vorbe.push(cuDe(s.fara, "fără bifă", "fără bifă"));
@@ -3457,7 +3457,7 @@ export function renderCommunity(basePath = "") {
 
     const cols = (felulMaterialului(state.adminLesson, state.bk.kind)
       || materialulLectiei(state.adminLesson)?.feluri[0])?.etichete || [];
-    const deTrimis = state.bk.staged.filter((r) => !r.gata);
+    const deTrimis = state.bk.masa.filter((r) => !r.gata);
     const totBifat = deTrimis.length > 0
       && deTrimis.every((r) => cols.every((c) => r.tags.includes(c.slug)));
     const tot = mount.querySelector('[data-action="bk-tot"]');
@@ -3471,7 +3471,7 @@ export function renderCommunity(basePath = "") {
     if (!slug) return;
     state.bk.banca = await bankListAll(slug);
     const inBanca = new Set(state.bk.banca.map((x) => bankCheia(x.body)));
-    state.bk.staged = state.bk.staged.map((r) => ({ ...r, gata: inBanca.has(bankCheia(r.body)) }));
+    state.bk.masa = state.bk.masa.map((r) => ({ ...r, gata: inBanca.has(bankCheia(r.body)) }));
     state.bankCounts = { ...state.bankCounts, [slug]: state.bk.banca.length };
   }
 
@@ -3485,7 +3485,7 @@ export function renderCommunity(basePath = "") {
       const felDintai = materialulLectiei(slug)?.feluri[0].kind || null;
       state.bk = {
         lectie: slug, kind: felDintai,
-        text: "", staged: [], banca: [], incarc: true, nota: "", notaBuna: false,
+        text: "", masa: [], banca: [], incarc: true, nota: "", notaBuna: false,
         q: "", fFel: felDintai, fEt: "", fNiv: "", sort: { key: "nou", dir: "desc" },
       };
     }
@@ -3820,7 +3820,7 @@ export function renderCommunity(basePath = "") {
         // Explicațiile propuse de elevi vin ÎMPREUNĂ cu itemul lor (RPC definer):
         // ca să judeci o explicație îți trebuie enunțul și litera corectă, iar
         // pe aceea clientul n-o poate citi singur.
-        state.explanationQueue = await pendingExplanations();
+        state.propuneriExpl = await propuneriDeAprobat();
         state.downloads = await adminFetchTestDownloads(); // all categories
         state.settings = await fetchAppSettings();         // Drive key + folders
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
@@ -4819,10 +4819,10 @@ export function renderCommunity(basePath = "") {
         const text = camp ? camp.value : state.bk.text;
         const kind = state.bk.kind || materialulLectiei(state.adminLesson)?.feluri[0].kind;
         const inBanca = new Set((state.bk.banca || []).map((x) => bankCheia(x.body)));
-        const { randuri, sarite } = randuriDinLista(text, { kind, inTabel: state.bk.staged, inBanca });
+        const { randuri, sarite } = randuriDinLista(text, { kind, inTabel: state.bk.masa, inBanca });
         state.bk.notaBuna = false;
         if (!randuri.length && !sarite) { state.bk.nota = "Scrie măcar un cuvânt."; return render(); }
-        state.bk.staged = [...state.bk.staged, ...randuri];
+        state.bk.masa = [...state.bk.masa, ...randuri];
         state.bk.text = "";
         state.bk.nota = sarite
           ? `Am lăsat deoparte ${cuDe(sarite, "rând scris de două ori", "rânduri scrise de două ori")}.`
@@ -4831,9 +4831,9 @@ export function renderCommunity(basePath = "") {
       }
       case "bk-coloana": {
         const et = btn.dataset.et;
-        const deTrimis = state.bk.staged.filter((r) => !r.gata);
+        const deTrimis = state.bk.masa.filter((r) => !r.gata);
         const scoatem = deTrimis.length > 0 && deTrimis.every((r) => r.tags.includes(et));
-        state.bk.staged = state.bk.staged.map((r) => r.gata ? r : {
+        state.bk.masa = state.bk.masa.map((r) => r.gata ? r : {
           ...r, tags: scoatem ? r.tags.filter((t) => t !== et) : [...new Set([...r.tags, et])],
         });
         return render();
@@ -4844,15 +4844,15 @@ export function renderCommunity(basePath = "") {
         const cols = (felulMaterialului(state.adminLesson, state.bk.kind)
           || materialulLectiei(state.adminLesson)?.feluri[0])?.etichete || [];
         const toate = cols.map((c) => c.slug);
-        const deTrimis = state.bk.staged.filter((r) => !r.gata);
+        const deTrimis = state.bk.masa.filter((r) => !r.gata);
         const scoatem = deTrimis.length > 0
           && deTrimis.every((r) => toate.every((t) => r.tags.includes(t)));
-        state.bk.staged = state.bk.staged.map((r) => r.gata ? r
+        state.bk.masa = state.bk.masa.map((r) => r.gata ? r
           : { ...r, tags: scoatem ? [] : [...toate] });
         return render();
       }
       case "bk-scoate":
-        state.bk.staged = state.bk.staged.filter((_, i) => i !== Number(btn.dataset.i));
+        state.bk.masa = state.bk.masa.filter((_, i) => i !== Number(btn.dataset.i));
         return render();
 
       /* ---- Tabelul băncii de acum: filtre, sortare ---- */
@@ -4879,11 +4879,11 @@ export function renderCommunity(basePath = "") {
         state.bk.q = ""; state.bk.fEt = ""; state.bk.fNiv = "";
         return render();
       case "bk-goleste":
-        state.bk.staged = [];
+        state.bk.masa = [];
         state.bk.nota = "";
         return render();
       case "bk-importa": {
-        const deTrimis = state.bk.staged.filter((r) => !r.gata && r.tags.length);
+        const deTrimis = state.bk.masa.filter((r) => !r.gata && r.tags.length);
         state.bk.notaBuna = false;
         if (!deTrimis.length) { state.bk.nota = "Bifează întâi la ce exerciții se potrivesc."; return render(); }
         state.bk.nota = "Se salvează…";
@@ -4893,9 +4893,9 @@ export function renderCommunity(basePath = "") {
         }))).then(async ({ puse, sarite, motiv }) => {
           if (motiv) { state.bk.nota = motiv; return render(); }
           const intrate = new Set(puse.map((p) => bankCheia(p.body)));
-          state.bk.staged = state.bk.staged.filter((r) => !intrate.has(bankCheia(r.body)));
+          state.bk.masa = state.bk.masa.filter((r) => !intrate.has(bankCheia(r.body)));
           await incarcaBanca(state.adminLesson);
-          const faraBifa = state.bk.staged.filter((r) => !r.gata && !r.tags.length).length;
+          const faraBifa = state.bk.masa.filter((r) => !r.gata && !r.tags.length).length;
           const vorbe = [`Am pus în bancă ${cuDe(puse.length, "intrare", "intrări")}.`];
           if (sarite) vorbe.push(`${cuDe(sarite, "era deja acolo", "erau deja acolo")}.`);
           if (faraBifa) vorbe.push(`În tabel au rămas ${cuDe(faraBifa, "rând fără bifă", "rânduri fără bifă")}.`);
@@ -5016,9 +5016,9 @@ export function renderCommunity(basePath = "") {
         const id = btn.dataset.id;
         const text = (mount.querySelector(`.cx-explan__text[data-prop="${id}"]`)?.value || "").trim();
         btn.disabled = true;
-        approveExplanation(id, text).then((r) => {
+        aprobaExplicatia(id, text).then((r) => {
           if (r && r.error) { btn.disabled = false; showToast(`N-am publicat: ${r.error}`); return; }
-          state.pendingExplanations = state.explanationQueue.filter((pr) => pr.id !== id);
+          state.propuneriExpl = state.propuneriExpl.filter((pr) => pr.id !== id);
           showToast("✓ Publicată. O văd toți, după ce răspund la item.");
           render();
         });
@@ -5027,8 +5027,8 @@ export function renderCommunity(basePath = "") {
       case "explan-reject": {
         const id = btn.dataset.id;
         btn.disabled = true;
-        rejectExplanation(id).then(() => {
-          state.pendingExplanations = state.explanationQueue.filter((pr) => pr.id !== id);
+        respingeExplicatia(id).then(() => {
+          state.propuneriExpl = state.propuneriExpl.filter((pr) => pr.id !== id);
           showToast("Respinsă. Itemul rămâne fără explicație.");
           render();
         });
@@ -5751,10 +5751,10 @@ export function renderCommunity(basePath = "") {
     if (ce === "bk-bifa") {
       const i = Number(el.dataset.i);
       const et = el.dataset.et;
-      state.bk.staged = state.bk.staged.map((r, k) => k !== i ? r : {
+      state.bk.masa = state.bk.masa.map((r, k) => k !== i ? r : {
         ...r, tags: el.checked ? [...new Set([...r.tags, et])] : r.tags.filter((t) => t !== et),
       });
-      const deTrimis = state.bk.staged.filter((x) => !x.gata);
+      const deTrimis = state.bk.masa.filter((x) => !x.gata);
       const capul = mount.querySelector(`.cxbk__cap[data-et="${et}"]`);
       if (capul) capul.classList.toggle("e-plina",
         deTrimis.length > 0 && deTrimis.every((x) => x.tags.includes(et)));
@@ -5765,7 +5765,7 @@ export function renderCommunity(basePath = "") {
     if (ce === "bk-nivel") {
       const i = Number(el.dataset.i);
       const n = Number(el.value) || 2;
-      state.bk.staged = state.bk.staged.map((r, k) => k === i ? { ...r, level: n } : r);
+      state.bk.masa = state.bk.masa.map((r, k) => k === i ? { ...r, level: n } : r);
       return;
     }
     /* ---- Tabelul băncii: fiecare bifă e o SCRIERE, nu o intenție ----
@@ -5808,13 +5808,13 @@ export function renderCommunity(basePath = "") {
     if (ce === "bk-nivel-tot") {
       const n = Number(el.value);
       if (!n) return;
-      state.bk.staged = state.bk.staged.map((r) => r.gata ? r : { ...r, level: n });
+      state.bk.masa = state.bk.masa.map((r) => r.gata ? r : { ...r, level: n });
       return render();
     }
     if (ce === "bk-fel") {
       // Selectorul e blocat cât timp tabelul are rânduri, deci aici ajungem
       // doar pe tabel gol. Verificarea rămâne: blocarea e podoabă, nu pază.
-      if (state.bk.staged.length) return render();
+      if (state.bk.masa.length) return render();
       state.bk.kind = el.value;
       return render();
     }

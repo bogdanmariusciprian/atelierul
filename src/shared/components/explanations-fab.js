@@ -19,24 +19,24 @@
 // pe paginile care n-au foaia sitului.
 // =========================================================
 import { isAdmin } from "../scripts/session.js";
-import { elevilMeditatii, pornesteElevul } from "../scripts/test-repo.js";
+import { tutoringPupils, setPupilCanPropose } from "../scripts/test-repo.js";
 
-let radacina = null;
-let buton = null;
-let lista = null;
-let deschis = false;   // e desfăcută lista?
-let elevi = [];
-let ocupat = new Set(); // elevii pentru care așteptăm răspunsul serverului
+let root = null;
+let btn = null;
+let listEl = null;
+let open = false;   // e desfăcută lista?
+let pupils = [];
+let busy = new Set(); // elevii pentru care așteptăm răspunsul serverului
 /* De ce n-a venit lista, dacă n-a venit. „N-ai elevi" și „n-am putut întreba"
    arată la fel pe un ecran gol, dar înseamnă lucruri opuse: primul e o stare
    normală, al doilea e o defecțiune. Ținute la un loc, panoul minte cu
    încredere, iar tu cauți vina în altă parte. */
-let eroare = "";
+let problem = "";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-function aduStilurile(basePath) {
+function loadStyles(basePath) {
   if (document.querySelector("link[data-explan-css]")) return;
   const l = document.createElement("link");
   l.rel = "stylesheet";
@@ -45,97 +45,97 @@ function aduStilurile(basePath) {
   document.head.appendChild(l);
 }
 
-const catiPorniti = () => elevi.filter((e) => e.potPropune).length;
+const enabledCount = () => pupils.filter((e) => e.canPropose).length;
 
-function deseneaza() {
-  if (!buton) return;
-  const n = catiPorniti();
-  buton.classList.toggle("e-deschis", n > 0);
-  buton.setAttribute("aria-expanded", deschis ? "true" : "false");
-  buton.innerHTML =
+function render() {
+  if (!btn) return;
+  const n = enabledCount();
+  btn.classList.toggle("e-deschis", n > 0);
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+  btn.innerHTML =
     '<span class="explan-fab__lucru">Propuneri de explicații</span>' +
     '<span class="explan-fab__stare">' +
       '<span class="explan-fab__semn" aria-hidden="true">' + (n > 0 ? "●" : "○") + "</span>" +
       (n > 0 ? `${n} ${n === 1 ? "elev pornit" : "elevi porniți"}` : "Niciun elev pornit") +
     "</span>";
-  buton.title = eroare
+  btn.title = problem
     ? "N-am putut citi lista de la meditații. Apasă ca să vezi de ce."
     : n > 0
       ? "Elevii porniți pot propune explicații la itemii fără explicație. Apasă ca să vezi lista."
       : "Niciun elev nu poate propune acum. Apasă ca să pornești pe cine lucrează cu tine.";
 
-  lista.hidden = !deschis;
-  if (!deschis) return;
-  if (eroare) {
-    lista.innerHTML = `<li class="explan-fab__gol explan-fab__rau">
-      N-am putut citi lista de la meditații.<br><code>${esc(eroare)}</code>
+  listEl.hidden = !open;
+  if (!open) return;
+  if (problem) {
+    listEl.innerHTML = `<li class="explan-fab__gol explan-fab__rau">
+      N-am putut citi lista de la meditații.<br><code>${esc(problem)}</code>
     </li>`;
     return;
   }
-  lista.innerHTML = elevi.length
-    ? elevi.map((e) => `
+  listEl.innerHTML = pupils.length
+    ? pupils.map((e) => `
         <li class="explan-fab__rand">
-          <span class="explan-fab__nume">${esc(e.nume)}</span>
-          <button type="button" class="explan-fab__sw${e.potPropune ? " e-on" : ""}"
-            data-elev="${esc(e.userId)}" role="switch"
-            aria-checked="${e.potPropune ? "true" : "false"}"
-            ${ocupat.has(e.userId) ? "disabled" : ""}
-            aria-label="${esc(e.nume)}: ${e.potPropune ? "poate propune" : "nu poate propune"}">
+          <span class="explan-fab__nume">${esc(e.name)}</span>
+          <button type="button" class="explan-fab__sw${e.canPropose ? " e-on" : ""}"
+            data-pupil="${esc(e.userId)}" role="switch"
+            aria-checked="${e.canPropose ? "true" : "false"}"
+            ${busy.has(e.userId) ? "disabled" : ""}
+            aria-label="${esc(e.name)}: ${e.canPropose ? "poate propune" : "nu poate propune"}">
             <i aria-hidden="true"></i>
           </button>
         </li>`).join("")
     : `<li class="explan-fab__gol">N-ai încă elevi la meditații. Îi adaugi din planificator.</li>`;
 }
 
-async function comuta(userId) {
-  const el = elevi.find((e) => e.userId === userId);
-  if (!el || ocupat.has(userId)) return;
-  ocupat.add(userId); deseneaza();
-  const vrut = !el.potPropune;
-  const bine = await pornesteElevul(userId, vrut);
+async function toggle(userId) {
+  const el = pupils.find((e) => e.userId === userId);
+  if (!el || busy.has(userId)) return;
+  busy.add(userId); render();
+  const wanted = !el.canPropose;
+  const ok = await setPupilCanPropose(userId, wanted);
   /* Dacă serverul n-a primit, comutatorul NU se mișcă. Unul care arată „pornit"
      fără să fie e mai rău decât unul care nu merge: te-ai bizui pe el și l-ai
      lăsa pe elev să scrie în gol. Aceeași regulă ca la etichetare. */
-  if (bine) el.potPropune = vrut;
-  ocupat.delete(userId); deseneaza();
+  if (ok) el.canPropose = wanted;
+  busy.delete(userId); render();
 }
 
-export async function initPropuneriExplicatii(basePath = "") {
+export async function initExplanationProposals(basePath = "") {
   if (!isAdmin()) return;
   if (document.querySelector(".explan-fab-wrap")) return;
-  aduStilurile(basePath);
+  loadStyles(basePath);
 
   /* Mănunchi propriu, nu al vecinilor. Aceeași lecție ca la etichetare: cine
      își rescrie tot cuprinsul la fiecare redesenare îți șterge butonul din
      mână, fără nicio urmă de greșeală nicăieri. Așezarea alături se face din
      foaia de stil, unde coordonatele se văd una lângă alta. */
-  radacina = document.createElement("div");
-  radacina.className = "explan-fab-wrap";
-  document.body.appendChild(radacina);
+  root = document.createElement("div");
+  root.className = "explan-fab-wrap";
+  document.body.appendChild(root);
 
-  buton = document.createElement("button");
-  buton.type = "button";
-  buton.className = "explan-fab";
-  buton.addEventListener("click", () => { deschis = !deschis; deseneaza(); });
-  radacina.appendChild(buton);
+  btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "explan-fab";
+  btn.addEventListener("click", () => { open = !open; render(); });
+  root.appendChild(btn);
 
-  lista = document.createElement("ul");
-  lista.className = "explan-fab__lista";
-  lista.hidden = true;
-  lista.addEventListener("click", (e) => {
+  listEl = document.createElement("ul");
+  listEl.className = "explan-fab__lista";
+  listEl.hidden = true;
+  listEl.addEventListener("click", (e) => {
     const sw = e.target.closest(".explan-fab__sw");
-    if (sw) comuta(sw.dataset.elev);
+    if (sw) toggle(sw.dataset.pupil);
   });
-  radacina.appendChild(lista);
+  root.appendChild(listEl);
 
-  deseneaza();                    // întâi butonul, ca să nu clipească
+  render();                    // întâi butonul, ca să nu clipească
   try {
-    elevi = await elevilMeditatii();
+    pupils = await tutoringPupils();
   } catch (e) {
     /* Motivul se arată pe ecran, nu doar în consolă: butonul stă pe toate
        paginile, iar cine îl apasă trebuie să afle din el de ce e gol. */
-    eroare = e?.message || String(e);
-    console.warn("elevilMeditatii:", eroare);
+    problem = e?.message || String(e);
+    console.warn("tutoringPupils:", problem);
   }
-  deseneaza();
+  render();
 }

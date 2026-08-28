@@ -252,7 +252,7 @@ export async function deleteTestSession(id) {
 
 // ---- Progresul elevului, ținut pe CONT (migrarea 0085) ----
 //
-// Trei mese, toate cu RLS „doar rândurile mele": ce a bifat și ce și-a scris la
+// Trei tabele, toate cu RLS „doar rândurile mele": ce a bifat și ce și-a scris la
 // Relaxed (`tests_progress`), levelurile încercate și trecute la Crazy
 // (`tests_levels`), insignele (`tests_badges`).
 //
@@ -265,7 +265,7 @@ export async function deleteTestSession(id) {
 // Vizitatorul (fără cont) primește listă goală și scrierile trec pe lângă. Jocul
 // merge mai departe din memoria paginii; nu-l oprim, doar nu-i ținem minte nimic.
 
-function cerExamenul(unde, exam) {
+function requireExam(unde, exam) {
   if (exam) return true;
   console.warn(`${unde}: examenul lipsește. Nu scriu nimic, ca să nu nimeresc alt sertar.`);
   return false;
@@ -273,7 +273,7 @@ function cerExamenul(unde, exam) {
 
 /** Tot ce a lucrat elevul la un examen: bifa, verdictul, explicația lui. */
 export async function fetchMyProgress(exam) {
-  if (!CURRENT_USER.authId || !cerExamenul("fetchMyProgress", exam)) return [];
+  if (!CURRENT_USER.authId || !requireExam("fetchMyProgress", exam)) return [];
   const { data, error } = await supabase
     .from("tests_progress")
     .select("item_id, chosen, correct, answer_key, observation, note")
@@ -292,7 +292,7 @@ export async function fetchMyProgress(exam) {
 /** Un item lucrat. `note` lipsă înseamnă „n-o atinge", ca salvarea răspunsului
  *  să nu șteargă explicația scrisă mai devreme. */
 export async function saveMyProgress({ exam, itemId, chosen, correct, answerKey, observation, note } = {}) {
-  if (!CURRENT_USER.authId || !cerExamenul("saveMyProgress", exam) || !itemId) return false;
+  if (!CURRENT_USER.authId || !requireExam("saveMyProgress", exam) || !itemId) return false;
   const rand = {
     user_id: CURRENT_USER.authId, item_id: itemId, exam,
     chosen: chosen || null,
@@ -316,7 +316,7 @@ export async function clearMyProgress(itemIds = []) {
 
 /** Levelurile atinse la Crazy. `passedAt` gol = încercat, nu trecut. */
 export async function fetchMyLevels(exam) {
-  if (!CURRENT_USER.authId || !cerExamenul("fetchMyLevels", exam)) return [];
+  if (!CURRENT_USER.authId || !requireExam("fetchMyLevels", exam)) return [];
   const { data, error } = await supabase
     .from("tests_levels").select("level, tries, passed_at").eq("exam", exam);
   if (error) { console.warn("fetchMyLevels:", error.message); return []; }
@@ -326,7 +326,7 @@ export async function fetchMyLevels(exam) {
 /** Scrie un level. `tries` se socotește în client din lista adusă la pornire:
  *  o singură persoană joacă un cont, deci n-are cu cine se bate pe rând. */
 export async function saveMyLevel({ exam, level, tries, passed } = {}) {
-  if (!CURRENT_USER.authId || !cerExamenul("saveMyLevel", exam) || !level) return false;
+  if (!CURRENT_USER.authId || !requireExam("saveMyLevel", exam) || !level) return false;
   const { error } = await supabase.from("tests_levels").upsert({
     user_id: CURRENT_USER.authId, exam, level,
     tries: Math.max(1, tries || 1),
@@ -338,17 +338,17 @@ export async function saveMyLevel({ exam, level, tries, passed } = {}) {
 
 /** Șterge levelurile dintr-un interval: capitolul o ia de la capăt.
  *  Numai ale mele; RLS n-ar lăsa oricum altceva. */
-export async function clearMyLevels({ exam, deLa, panaLa } = {}) {
-  if (!CURRENT_USER.authId || !cerExamenul("clearMyLevels", exam)) return false;
+export async function clearMyLevels({ exam, firstLevel, lastLevel } = {}) {
+  if (!CURRENT_USER.authId || !requireExam("clearMyLevels", exam)) return false;
   const { error } = await supabase.from("tests_levels").delete()
-    .eq("exam", exam).gte("level", deLa).lte("level", panaLa);
+    .eq("exam", exam).gte("level", firstLevel).lte("level", lastLevel);
   if (error) { console.warn("clearMyLevels:", error.message); return false; }
   return true;
 }
 
 /** Insignele mele la un examen. */
 export async function fetchMyBadges(exam) {
-  if (!CURRENT_USER.authId || !cerExamenul("fetchMyBadges", exam)) return [];
+  if (!CURRENT_USER.authId || !requireExam("fetchMyBadges", exam)) return [];
   const { data, error } = await supabase
     .from("tests_badges").select("code, earned_at").eq("exam", exam).eq("user_id", CURRENT_USER.authId);
   if (error) { console.warn("fetchMyBadges:", error.message); return []; }
@@ -358,7 +358,7 @@ export async function fetchMyBadges(exam) {
 /** Dă o insignă. A doua oară nu strică nimic: cheia primară o oprește, iar noi
  *  nu socotim asta eroare, fiindcă „o are deja" e chiar răspunsul dorit. */
 export async function awardBadge(exam, code) {
-  if (!CURRENT_USER.authId || !cerExamenul("awardBadge", exam) || !code) return false;
+  if (!CURRENT_USER.authId || !requireExam("awardBadge", exam) || !code) return false;
   const { error } = await supabase.from("tests_badges")
     .insert({ user_id: CURRENT_USER.authId, exam, code });
   if (error && error.code !== "23505") { console.warn("awardBadge:", error.message); return false; }
@@ -376,33 +376,33 @@ export async function awardBadge(exam, code) {
 // se face doar ca elevul să nu vadă un câmp care oricum n-ar merge.
 
 /** Are elevul de acum voie să propună? Întreabă baza, nu ghicește. */
-export async function potPropune() {
+export async function canPropose() {
   if (!CURRENT_USER.authId) return false;
   const { data, error } = await supabase
     .from("planner_pupils").select("can_propose").eq("user_id", CURRENT_USER.authId).maybeSingle();
-  if (error) { console.warn("potPropune:", error.message); return false; }
+  if (error) { console.warn("canPropose:", error.message); return false; }
   return !!(data && data.can_propose);
 }
 
 /** Trimite (ori rescrie) propunerea mea pentru un item. */
-export async function propuneExplicatia({ exam, itemId, text } = {}) {
-  if (!CURRENT_USER.authId || !cerExamenul("propuneExplicatia", exam) || !itemId) return false;
-  const curat = String(text || "").trim();
-  if (curat.length < 10) return false; // sub atât nu e o explicație, e un început
+export async function proposeExplanation({ exam, itemId, text } = {}) {
+  if (!CURRENT_USER.authId || !requireExam("proposeExplanation", exam) || !itemId) return false;
+  const clean = String(text || "").trim();
+  if (clean.length < 10) return false; // sub atât nu e o explicație, e un început
   const { error } = await supabase.from("tests_explanations").upsert({
-    user_id: CURRENT_USER.authId, item_id: itemId, exam, text: curat, status: "in_asteptare",
+    user_id: CURRENT_USER.authId, item_id: itemId, exam, text: clean, status: "in_asteptare",
   }, { onConflict: "user_id,item_id" });
-  if (error) { console.warn("propuneExplicatia:", error.message); return false; }
+  if (error) { console.warn("proposeExplanation:", error.message); return false; }
   return true;
 }
 
 /** Starea propunerilor mele la un examen: id item → „in_asteptare"/„aprobata"/… */
-export async function propunerileMele(exam) {
-  if (!CURRENT_USER.authId || !cerExamenul("propunerileMele", exam)) return {};
+export async function myProposals(exam) {
+  if (!CURRENT_USER.authId || !requireExam("myProposals", exam)) return {};
   const { data, error } = await supabase
     .from("tests_explanations").select("item_id, status").eq("exam", exam)
     .eq("user_id", CURRENT_USER.authId);
-  if (error) { console.warn("propunerileMele:", error.message); return {}; }
+  if (error) { console.warn("myProposals:", error.message); return {}; }
   return Object.fromEntries((data || []).map((r) => [r.item_id, r.status]));
 }
 
@@ -421,17 +421,17 @@ export async function propunerileMele(exam) {
       scrise lipit; a mea nu era, și numai ea nu mergea.
 
    Forma de mai jos e copiată după `fetchMarkedPupils` din `planner-repo.js`,
-   care cere ACELAȘI lucru de la ACEEAȘI masă și merge de luni de zile. Nu e
+   care cere ACELAȘI lucru din ACELAȘI tabel și merge de luni de zile. Nu e
    împrumutată prin import: plannerul stă izolat dinadins, iar o funcție
    împărțită l-ar lega de teste. Se copiază forma, nu codul. */
-const LEGATURA_PROFIL = "profiles!planner_pupils_user_id_fkey(display_name, username)";
+const PROFILE_JOIN = "profiles!planner_pupils_user_id_fkey(display_name, username)";
 
 /** Elevii de la meditații, cu starea comutatorului. Numai profesorul îi vede pe toți.
  *  ARUNCĂ dacă serverul refuză, ca cel care întreabă să poată spune de ce. */
-export async function elevilMeditatii() {
+export async function tutoringPupils() {
   const { data, error } = await supabase
     .from("planner_pupils")
-    .select(`user_id, planner_name, can_propose, ${LEGATURA_PROFIL}`);
+    .select(`user_id, planner_name, can_propose, ${PROFILE_JOIN}`);
   /* Nu întorc o listă goală la eroare. „Goală" și „n-am putut întreba" arată la
      fel pe ecran, dar înseamnă lucruri opuse, iar prima dată chiar ne-a costat:
      panoul i-a spus lui Marius că n-are elevi la meditații, în timp ce în bază
@@ -439,26 +439,26 @@ export async function elevilMeditatii() {
   if (error) throw new Error(error.message || "nu s-a putut citi lista de la meditații");
   return (data || []).map((r) => ({
     userId: r.user_id,
-    nume: (r.planner_name || "").trim()
+    name: (r.planner_name || "").trim()
       || (r.profiles?.display_name || "").trim() || r.profiles?.username || "elev",
-    potPropune: !!r.can_propose,
-  })).sort((a, b) => a.nume.localeCompare(b.nume, "ro"));
+    canPropose: !!r.can_propose,
+  })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
 }
 
 /** Pornește ori oprește un elev. Baza verifică cine cere, nu noi. */
-export async function pornesteElevul(userId, pornit) {
+export async function setPupilCanPropose(userId, pornit) {
   const { error } = await supabase.from("planner_pupils")
     .update({ can_propose: !!pornit }).eq("user_id", userId);
-  if (error) { console.warn("pornesteElevul:", error.message); return false; }
+  if (error) { console.warn("setPupilCanPropose:", error.message); return false; }
   return true;
 }
 
 /** Coada de aprobat: propunerea ÎMPREUNĂ cu itemul ei și cu numele elevului. */
-export async function propuneriDeAprobat() {
+export async function pendingExplanations() {
   const { data, error } = await supabase.rpc("admin_pending_explanations");
-  if (error) { console.warn("propuneriDeAprobat:", error.message); return []; }
+  if (error) { console.warn("pendingExplanations:", error.message); return []; }
   return (data || []).map((r) => ({
-    id: r.id, text: r.text, elev: r.pupil, cand: r.created_at,
+    id: r.id, text: r.text, pupil: r.pupil, at: r.created_at,
     item: {
       id: r.item_id, exam: r.exam, year: r.year, session: r.session || "", itemNo: r.item_no,
       question: r.question || "",
@@ -469,15 +469,15 @@ export async function propuneriDeAprobat() {
 }
 
 /** Aprobă, cu textul eventual îndreptat de profesor. */
-export async function aprobaExplicatia(id, text = null) {
+export async function approveExplanation(id, text = null) {
   const { data, error } = await supabase.rpc("approve_explanation", { p_id: id, p_text: text });
-  if (error) { console.warn("aprobaExplicatia:", error.message); return { error: error.message }; }
+  if (error) { console.warn("approveExplanation:", error.message); return { error: error.message }; }
   return data || {};
 }
 
-export async function respingeExplicatia(id) {
+export async function rejectExplanation(id) {
   const { data, error } = await supabase.rpc("reject_explanation", { p_id: id });
-  if (error) { console.warn("respingeExplicatia:", error.message); return { error: error.message }; }
+  if (error) { console.warn("rejectExplanation:", error.message); return { error: error.message }; }
   return data || {};
 }
 

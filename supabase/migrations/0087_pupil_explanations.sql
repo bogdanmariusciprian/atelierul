@@ -10,7 +10,7 @@
 -- CINE POATE. Nu oricine: doar elevii de la meditații, și dintre ei doar cei pe
 -- care profesorul îi pornește, unul câte unul, cât stă cu ei. De aceea
 -- comutatorul stă pe `planner_pupils`, care E chiar lista de la meditații; o
--- masă nouă pentru „cine" ar fi fost o a doua listă de ținut la zi.
+-- tabel nou pentru „cine" ar fi fost o a doua listă de ținut la zi.
 --
 -- NUMAI ITEMII FĂRĂ EXPLICAȚIE. Elevii umplu golurile, nu rescriu ce e scris.
 -- Regula e ținută în bază, nu doar în pagină: o pază care trăiește în browser

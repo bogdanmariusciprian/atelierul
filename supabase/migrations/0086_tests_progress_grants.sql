@@ -4,12 +4,12 @@
 -- CE S-A ÎNTÂMPLAT. În 0085 am scris politicile RLS („doar rândurile mele") și
 -- am crezut că e de-ajuns. Nu e. În Postgres sunt DOUĂ porți, una după alta:
 --
---   1. DREPTUL pe masă (`grant select, insert…`): ai voie să te apropii?
+--   1. DREPTUL pe tabel (`grant select, insert…`): ai voie să te apropii?
 --   2. POLITICA RLS: dintre rândurile de acolo, pe care le poți vedea sau scrie?
 --
 -- Politica fără drept e ca un paznic care sortează atent oamenii dintr-o sală în
 -- care nu intră nimeni. Mesele vechi (`tests_sessions`) aveau drepturile puse
--- demult, de-aia jocul de la Drept salva; cele patru mese noi s-au născut fără
+-- demult, de-aia jocul de la Drept salva; cele patru tabele noi s-au născut fără
 -- ele, iar fiecare scriere a fost refuzată în tăcere.
 --
 -- SE VEDEA. `points_ledger` avea 94 de rânduri de la Câmpina (punctele se dau
@@ -19,7 +19,7 @@
 --
 -- CE FACE. Dă drepturile care lipsesc. RLS rămâne singurul paznic al rândurilor,
 -- deci nimeni nu capătă acces la ce nu-i al lui: `authenticated` poate scrie în
--- masă, dar politica îl lasă doar pe rândul cu `user_id = auth.uid()`.
+-- tabel, dar politica îl lasă doar pe rândul cu `user_id = auth.uid()`.
 --
 -- Sigur la re-rulare.
 -- =========================================================
@@ -41,7 +41,7 @@ grant insert, delete on public.tests_badges to authenticated;
 
 -- Plasa pentru viitor: mesele care se vor naște de acum în `public` primesc
 -- drepturile din start, ca să nu se mai repete tăcerea de azi. RLS rămâne
--- oricum poarta a doua, deci o masă nouă fără politici nu se deschide nimănui.
+-- oricum poarta a doua, deci un tabel nou fără politici nu se deschide nimănui.
 alter default privileges in schema public
   grant select, insert, update, delete on tables to authenticated;
 alter default privileges in schema public

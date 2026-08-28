@@ -7,7 +7,7 @@
 --  se vadă în istorie de ce.)
 --
 -- DE CE, PARTEA ÎNTÂI. Numele examenului (`admitere-drept`, `admitere-campina`)
--- e azi text liber, scris de mână în trei mese, cu implicitul `admitere-drept`
+-- e azi text liber, scris de mână în trei tabele, cu implicitul `admitere-drept`
 -- atât în bază, cât și în opt funcții din client. Două feluri de a greși fără
 -- niciun semn:
 --
@@ -28,7 +28,7 @@
 -- DE CE, PARTEA A DOUA. Jocul de la Câmpina ține progresul în browser: ce a
 -- bifat elevul, explicația scrisă de el, levelurile trecute. Adică se pierde la
 -- schimbarea calculatorului și, pe un calculator împărțit, poate ajunge sub
--- ochii altuia. Trei mese noi îl mută în cont, cu RLS „doar rândurile mele".
+-- ochii altuia. Trei tabele noi îl mută în cont, cu RLS „doar rândurile mele".
 --
 -- PARTEA CARE-MI PLACE. `tests_progress` poartă și itemul, și examenul, legate
 -- ÎMPREUNĂ de banca de itemi (cheie străină compusă, sprijinită pe unicitatea
@@ -68,7 +68,7 @@ insert into public.tests_exams (slug, title, sort) values
   ('admitere-campina', 'Admitere Câmpina', 60)
 on conflict (slug) do nothing;
 
--- Plasa: orice examen care EXISTĂ deja în mese, dar n-ar fi pe listă, intră
+-- Plasa: orice examen care EXISTĂ deja în tabele, dar n-ar fi pe listă, intră
 -- acum. Fără asta, cheile străine de mai jos ar putea cădea pe un nume pe care
 -- l-am uitat, iar migrarea ar muri la jumătate.
 insert into public.tests_exams (slug, title, sort)
@@ -124,12 +124,12 @@ end $$;
 
 -- Cheia străină de pe sesiuni n-avea index care să înceapă cu `exam`; celelalte
 -- două aveau. Fără el, ștergerea unui rând din registru ar trebui să citească
--- toată masa ca să se convingă că n-o folosește nimeni.
+-- tot tabelul ca să se convingă că n-o folosește nimeni.
 create index if not exists tests_sessions_exam_idx
   on public.tests_sessions (exam, user_id);
 
 -- ---------------------------------------------------------
--- 3. Ceasul comun al meselor noi
+-- 3. Ceasul comun al tabelelor noi
 -- ---------------------------------------------------------
 create or replace function public.tests_touch_updated_at()
 returns trigger
@@ -249,7 +249,7 @@ create policy tests_badges_drop on public.tests_badges
 -- ---------------------------------------------------------
 -- 7. Întrebările bonus își află examenul
 -- ---------------------------------------------------------
--- Masa e goală azi și o folosește numai Clasicul de la Drept, deci implicitul
+-- Tabelul e gol azi și o folosește numai Clasicul de la Drept, deci implicitul
 -- nu strică nimic. Clientul NU se leagă acum de coloana asta: ar însemna să
 -- ating jocul care merge, iar aceea se face separat.
 alter table public.tests_bonus_questions

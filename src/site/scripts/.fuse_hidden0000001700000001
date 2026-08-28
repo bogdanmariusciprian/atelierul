@@ -23,11 +23,11 @@
 /* Culorile merg de la albastrul nopții spre auriu: lumina crește pe măsură ce
    dosarul înaintează. Nu-s alese una câte una, ci ca un drum, ca să nu sară
    ochiul de la un capitol la altul. */
-export const CHAPTERS = [
+export const CAPITOLE = [
   {
-    title: "Alarma de la 3:14",
-    sign: "🚨", color: "#1e293b", badge: "Dosar deschis",
-    fragments: [
+    titlu: "Alarma de la 3:14",
+    semn: "🚨", culoare: "#1e293b", insigna: "Dosar deschis",
+    fragmente: [
       "La 3:14, senzorul de la vitrina 7 a trimis un semnal de trei secunde, apoi a tăcut. Dispecerul l-a trecut în registru ca „eroare de sistem” și a mai băut o gură de cafea.",
       "La 6:20, femeia care șterge praful în sala tezaurului a văzut că suportul de catifea e gol. A rămas cu cârpa în mână, fără să strige.",
       "Primul echipaj a ajuns în opt minute pe Calea Victoriei, cu girofarul stins. Nu se spărsese nicio ușă și nicio fereastră.",
@@ -41,9 +41,9 @@ export const CHAPTERS = [
     ],
   },
   {
-    title: "Vitrina goală",
-    sign: "🖼️", color: "#22334a", badge: "Vitrina fotografiată",
-    fragments: [
+    titlu: "Vitrina goală",
+    semn: "🖼️", culoare: "#22334a", insigna: "Vitrina fotografiată",
+    fragmente: [
       "Vitrina 7 nu era spartă. Fusese deschisă cu cheia ei și închisă la loc, ca și cum nimic nu s-ar fi întâmplat.",
       "Cheile vitrinelor stau într-un fișet, în biroul de la etajul întâi. Fișetul are o singură cheie, iar aceea stă la șefa de tură.",
       "Pe geamul vitrinei, praful de amprente a scos o urmă foarte bună. Era a femeii care șterge praful, lăsată dimineața, când a văzut golul.",
@@ -57,9 +57,9 @@ export const CHAPTERS = [
     ],
   },
   {
-    title: "Ce-au văzut camerele",
-    sign: "📹", color: "#263e59", badge: "Înregistrarea salvată",
-    fragments: [
+    titlu: "Ce-au văzut camerele",
+    semn: "📹", culoare: "#263e59", insigna: "Înregistrarea salvată",
+    fragmente: [
       "Cele 63 de camere scriu pe un singur server, în subsol. Serverul ține 30 de zile, apoi scrie peste ce a fost.",
       "Camera 12, cea cu rateuri, dă spre coridorul de la sala tezaurului. În noaptea aceea a mers fără cusur, până la 3:11.",
       "Între 3:11 și 3:19 nu există imagine. Nu e negru, nu e zăpadă: sunt opt minute care lipsesc din fișier.",
@@ -76,30 +76,30 @@ export const CHAPTERS = [
   /* De aici încolo, capitolele își au titlul, culoarea și insigna, dar
      fragmentele se scriu pe rând. Un level fără fragment nu se plânge: pur și
      simplu nu descoperă nimic, iar restul jocului merge neatins. */
-  { title: "Un fir de nailon albastru", sign: "🧵", color: "#2a4a67", badge: "Prima urmă", fragments: [] },
-  { title: "Paznicul care nu dormea", sign: "🗣️", color: "#2d5674", badge: "Declarații luate", fragments: [] },
-  { title: "Anticariatul de pe Lipscani", sign: "🏺", color: "#2f6377", badge: "Tăinuitorul găsit", fragments: [] },
-  { title: "Trenul de 6:40 spre Cluj", sign: "🚂", color: "#307074", badge: "Biletul găsit", fragments: [] },
-  { title: "Casa de licitații", sign: "🏷️", color: "#327c6c", badge: "Catalogul confiscat", fragments: [] },
-  { title: "Omul cu două nume", sign: "🪪", color: "#37855f", badge: "Identitate stabilită", fragments: [] },
-  { title: "Percheziția din Mănăștur", sign: "🚪", color: "#438c51", badge: "Percheziție încheiată", fragments: [] },
-  { title: "Praf de aur sub unghii", sign: "🔬", color: "#559143", badge: "Expertiză gata", fragments: [] },
-  { title: "Cârtița de la muzeu", sign: "🗝️", color: "#6b9438", badge: "Cârtița descoperită", fragments: [] },
-  { title: "Drumul spre Nădlac", sign: "🛂", color: "#839531", badge: "Alertă la frontieră", fragments: [] },
-  { title: "Ascunzătoarea de la Grădiștea", sign: "⛰️", color: "#9b942d", badge: "Ascunzătoarea găsită", fragments: [] },
-  { title: "Noaptea din pădure", sign: "🌲", color: "#b0902b", badge: "Filaj încheiat", fragments: [] },
-  { title: "Cătușele la kilometrul 42", sign: "⛓️", color: "#c08c2a", badge: "Suspect reținut", fragments: [] },
-  { title: "Dosarul de 400 de pagini", sign: "📜", color: "#ca9a2a", badge: "Rechizitoriu întocmit", fragments: [] },
-  { title: "Colanul se întoarce acasă", sign: "🏛️", color: "#d4af37", badge: "Caz închis", fragments: [] },
+  { titlu: "Un fir de nailon albastru", semn: "🧵", culoare: "#2a4a67", insigna: "Prima urmă", fragmente: [] },
+  { titlu: "Paznicul care nu dormea", semn: "🗣️", culoare: "#2d5674", insigna: "Declarații luate", fragmente: [] },
+  { titlu: "Anticariatul de pe Lipscani", semn: "🏺", culoare: "#2f6377", insigna: "Tăinuitorul găsit", fragmente: [] },
+  { titlu: "Trenul de 6:40 spre Cluj", semn: "🚂", culoare: "#307074", insigna: "Biletul găsit", fragmente: [] },
+  { titlu: "Casa de licitații", semn: "🏷️", culoare: "#327c6c", insigna: "Catalogul confiscat", fragmente: [] },
+  { titlu: "Omul cu două nume", semn: "🪪", culoare: "#37855f", insigna: "Identitate stabilită", fragmente: [] },
+  { titlu: "Percheziția din Mănăștur", semn: "🚪", culoare: "#438c51", insigna: "Percheziție încheiată", fragmente: [] },
+  { titlu: "Praf de aur sub unghii", semn: "🔬", culoare: "#559143", insigna: "Expertiză gata", fragmente: [] },
+  { titlu: "Cârtița de la muzeu", semn: "🗝️", culoare: "#6b9438", insigna: "Cârtița descoperită", fragmente: [] },
+  { titlu: "Drumul spre Nădlac", semn: "🛂", culoare: "#839531", insigna: "Alertă la frontieră", fragmente: [] },
+  { titlu: "Ascunzătoarea de la Grădiștea", semn: "⛰️", culoare: "#9b942d", insigna: "Ascunzătoarea găsită", fragmente: [] },
+  { titlu: "Noaptea din pădure", semn: "🌲", culoare: "#b0902b", insigna: "Filaj încheiat", fragmente: [] },
+  { titlu: "Cătușele la kilometrul 42", semn: "⛓️", culoare: "#c08c2a", insigna: "Suspect reținut", fragmente: [] },
+  { titlu: "Dosarul de 400 de pagini", semn: "📜", culoare: "#ca9a2a", insigna: "Rechizitoriu întocmit", fragmente: [] },
+  { titlu: "Colanul se întoarce acasă", semn: "🏛️", culoare: "#d4af37", insigna: "Caz închis", fragmente: [] },
 ];
 
-export const LEVELS_PER_CHAPTER = 10;
+export const LEVELS_PE_CAPITOL = 10;
 
 /* Fragmentul descoperit de un level anume, ori gol dacă încă nu-i scris.
    Levelurile se numără de la 1, capitolele la fel; împărțirea o face aici, o
    singură dată, ca nimeni altcineva să nu mai socotească pe cont propriu. */
-export function storyFragment(level) {
-  const chapter = Math.floor((level - 1) / LEVELS_PER_CHAPTER);
-  const row = (level - 1) % LEVELS_PER_CHAPTER;
-  return CHAPTERS[chapter]?.fragments?.[row] || "";
+export function fragmentul(level) {
+  const cap = Math.floor((level - 1) / LEVELS_PE_CAPITOL);
+  const rand = (level - 1) % LEVELS_PE_CAPITOL;
+  return CAPITOLE[cap]?.fragmente?.[rand] || "";
 }
