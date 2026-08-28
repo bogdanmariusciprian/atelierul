@@ -12,14 +12,15 @@
 // trăiește în browser se ocolește cu unealta de dezvoltare. Ce se face aici e
 // numai ca elevul să nu vadă un buton care oricum n-ar merge.
 //
-// COMUTATORUL STĂ ÎN `app_flags`, nu în `app_settings`: elevul trebuie să-l
-// poată CITI ca să știe dacă are ce arăta, iar `app_settings` e închis la
-// citire pentru toți în afară de profesor.
+// ÎNGĂDUINȚA E A ELEVULUI, NU A SITULUI (din 28 august 2026, migrarea 0088).
+// Stătea într-un singur da/nu pentru toată lumea (`app_flags['pupil_tagging']`):
+// îl ridicai, și puteau eticheta toți elevii de la meditații deodată. Numai că
+// Marius lucrează cu câte un elev, deci acum fiecare are comutatorul lui, în
+// `planner_pupils.can_tag`. Rândul vechi din `app_flags` a rămas în bază, dar
+// nu-l mai citește nimeni.
 // =========================================================
 import { supabase } from "./supabase-client.js";
-import { iaLocal, punLocal } from "./session.js";
-
-const CHEIA = "pupil_tagging";
+import { iaLocal, punLocal, CURRENT_USER } from "./session.js";
 
 /* Ce știam ultima dată. Nu e o memorie de dragul vitezei: fără ea, tabla s-ar
    desena o clipă fără semnele de etichetare și ar sări pe urmă, la sosirea
@@ -39,41 +40,48 @@ function tineMinte(val) {
 /** Ce știam despre comutator, fără să întrebăm serverul. */
 export const eDeschisDupaMemorie = () => deschisAcum;
 
-/** Comutatorul, întrebat la sursă. */
+/** Am EU voie să etichetez acum? Întrebat la sursă.
+ *
+ *  Se cere prin funcția din bază, nu citind `planner_pupils`: elevul n-are voie
+ *  să vadă lista de la meditații, iar funcția întoarce doar da sau nu, despre
+ *  el. Aceeași funcție pe care o cheamă și `eticheteaza_cuvantul` ca să
+ *  hotărască – deci pagina și paza nu pot ajunge să spună lucruri diferite. */
 export async function eDeschis() {
-  const { data, error } = await supabase
-    .from("app_flags").select("value").eq("key", CHEIA).maybeSingle();
+  const { data, error } = await supabase.rpc("poate_eticheta");
   if (error) { console.warn("eDeschis:", error.message); return deschisAcum; }
-  const val = !!(data && data.value);
+  const val = !!data;
   tineMinte(val);
   return val;
 }
 
-/** Îl deschide sau îl închide. Numai profesorul; baza o verifică, nu noi. */
-export async function pune(val) {
-  const { error } = await supabase
-    .from("app_flags").update({ value: !!val }).eq("key", CHEIA);
-  if (error) { console.warn("pune:", error.message); return false; }
-  tineMinte(val);
-  return true;
-}
-
 /**
- * Ascultă schimbarea comutatorului, în timp real.
+ * Ascultă schimbarea comutatorului MEU, în timp real.
  *
- * Trebuie: profesorul îl închide TOCMAI ca elevul să se oprească acum, nu la
- * următoarea reîncărcare. Fără asta, „închis" ar fi însemnat „închis pentru
- * cine deschide pagina de-acum încolo", adică nu pentru cei cu care lucrezi.
+ * Trebuie: profesorul îl stinge TOCMAI ca elevul să se oprească acum, nu la
+ * următoarea deschidere a paginii. Fără asta, „am stins" ar însemna „am stins
+ * pentru cine deschide pagina de-acum încolo", adică nu pentru cel cu care
+ * lucrezi chiar atunci.
+ *
+ * ASCULTAREA ASTA N-A MERS NICIODATĂ, până la 0088. Stătea pe `app_flags`, un
+ * tabel care nu fusese publicat pentru ascultare, deci nu s-a declanșat nici
+ * măcar o dată; se vedea doar că „nu se întâmplă nimic", ceea ce e greu de
+ * deosebit de „încă n-a apăsat". Migrarea 0088 publică `planner_pupils`.
+ *
+ * Filtrul cere chiar rândul elevului. Chiar și fără el, RLS-ul de pe tabel n-ar
+ * lăsa să treacă rândul altuia; filtrul e ca să nu se trezească pagina la
+ * fiecare schimbare din tabel.
  *
  * Întoarce o funcție care taie ascultarea.
  */
 export function ascultaComutatorul(cand) {
+  const eu = CURRENT_USER.authId;
+  if (!eu) return () => {};
   const canal = supabase
     .channel("pupil-tagging")
     .on("postgres_changes",
-        { event: "UPDATE", schema: "public", table: "app_flags", filter: `key=eq.${CHEIA}` },
+        { event: "UPDATE", schema: "public", table: "planner_pupils", filter: `user_id=eq.${eu}` },
         (m) => {
-          const val = !!(m && m.new && m.new.value);
+          const val = !!(m && m.new && m.new.can_tag);
           tineMinte(val);
           try { cand(val); } catch (e) { console.warn("ascultaComutatorul:", e && e.message); }
         })

@@ -1,5 +1,5 @@
 /* =========================================================
-   Comutatorul „Etichetare" al profesorului și semnele de pe tablă.
+   Semnele de etichetare de pe tabla de fonetică.
 
    STILURILE ÎȘI POARTĂ SINGURE CULORILE, ca și la TO-DO: widgetul trebuie să
    meargă și pe paginile care nu încarcă foaia sitului (cele două table, unde
@@ -7,80 +7,15 @@
    fără culoare, iar greșeala s-ar fi văzut abia peste săptămâni.
    ========================================================= */
 
-/* ---------- comutatorul, în rând cu frații lui ----------
+/* BUTONUL PLUTITOR NU MAI E AICI. Stăteau în locul ăsta regulile lui
+   (`.tagging-fab-wrap`, `.tagging-fab`, cele două rânduri de text). S-au mutat
+   în `pupil-switch-fab.css`, foaia împărțită de amândouă butoanele cu
+   comutatoare pe elev: al doilea buton ar fi însemnat a doua copie a acelorași
+   reguli, care pe urmă se despart una de alta fără să bage nimeni de seamă.
 
-   MĂNUNCHI PROPRIU, nu al lui TO-DO. Pus înăuntrul lui, butonul pierea: TO-DO
-   își rescrie tot cuprinsul la fiecare redesenare, iar el se redesenează îndată
-   ce răspunde serverul. Deci stau alături, nu unul în altul.
+   Aici rămân semnele de pe tablă (`.et-*`), care sunt chiar ale lecției. Foaia
+   asta e legată de-a dreptul din pagina tablei, nu adusă de vreun widget. */
 
-   AȘEZAREA NU MAI E AICI. Toate trei butoanele intră în suportul comun
-   (`fab-dock.css`), care le pune într-un rând și le împarte locul singur.
-   Înainte, fiecare își socotea `bottom` din înălțimea vecinului, iar socoteala
-   era ținută în trei foi de stil deodată. */
-.tagging-fab-wrap {
-  position: relative;   /* reper pentru ce s-ar deschide deasupra */
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* DOUĂ RÂNDURI: sus LUCRUL, jos STAREA. Scria mai devreme doar „Etichetare:
-   DESCHISĂ", și era prea puțin: peste o lună, „etichetare" singur nu-ți mai
-   spune nici ce se etichetează, nici unde, nici cine. Un buton apăsat o dată pe
-   săptămână trebuie citit fără să-ți amintești nimic. */
-.tagging-fab {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  height: 56px;
-  padding: 0 16px;
-  border: 2px solid #3d4457;
-  border-radius: 16px;
-  background: #1f2430;
-  color: #cbd2e0;
-  font: inherit;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 12px 28px -12px rgba(31, 36, 48, 0.6);
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
-  justify-content: center;
-}
-.tagging-fab:hover { transform: translateY(-1px); }
-.tagging-fab:active { transform: translateY(0); }
-
-/* DESCHIS se vede de la o poștă, și trebuie: o etichetare lăsată deschisă din
-   greșeală înseamnă elevi care schimbă banca în timpul lor liber. Închis e
-   starea liniștită, deci arată liniștit. */
-.tagging-fab.e-deschis {
-  background: #16794a;
-  border-color: #34d399;
-  color: #fff;
-}
-.tagging-fab.e-ocupat { opacity: 0.6; pointer-events: none; }
-
-/* Lucrul, mărunt și potolit: se citește o dată și pe urmă știi ce buton e. */
-.tagging-fab__lucru {
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  opacity: 0.75;
-  white-space: nowrap;
-}
-/* Starea, spusă din punctul de vedere al ELEVULUI, fiindcă despre îngăduința
-   lui e vorba. Ea e ce se citește dintr-o privire, deci e mai mare și mai grea
-   decât lucrul de deasupra. */
-.tagging-fab__stare {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-}
-.tagging-fab__semn { font-size: 0.6rem; line-height: 1; }
 
 /* ---------- semnul de pe tablă ---------- */
 /* Stă lângă cuvântul din rând, mic și tăcut: apare numai cât e deschisă

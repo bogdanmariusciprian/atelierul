@@ -408,58 +408,11 @@ export async function myProposals(exam) {
 
 // ---- Partea profesorului ----
 
-/* Numele elevului stă în `profiles`, nu în `planner_pupils`, deci trebuie adus
-   printr-o legătură. Două lucruri de care depinde cererea asta, amândouă
-   învățate pe pielea noastră:
-
-   1. LEGĂTURA SE CERE PE NUMELE CONSTRÂNGERII. `planner_pupils` arată de două
-      ori spre `profiles` (`user_id` și `granted_by`), iar o cerere care nu spune
-      pe care o vrea e refuzată ca ambiguă.
-   2. FĂRĂ SPAȚIU înainte de paranteză. Serverul citește tot ce e până la
-      paranteză ca nume de legătură, iar un spațiu lipit la coadă îl face să nu
-      mai recunoască nimic. Toate celelalte optsprezece cereri din sit sunt
-      scrise lipit; a mea nu era, și numai ea nu mergea.
-
-   3. NUMAI COLOANELE PUBLICE. `profiles` n-are drept de citire pe tot tabelul:
-      migrarea 0009 l-a retras și l-a dat pe coloane anume, ca datele minorilor
-      să nu plece în browser. `username` NU e printre ele, iar o singură coloană
-      nepermisă face serverul să refuze TOATĂ cererea, cu „permission denied for
-      table profiles". Lista publică e în 0009 și 0012.
-
-   Forma de mai jos e copiată după `fetchMarkedPupils` din `planner-repo.js`,
-   care cere ACELAȘI lucru din ACELAȘI tabel și merge de luni de zile. Nu e
-   împrumutată prin import: plannerul stă izolat dinadins, iar o funcție
-   împărțită l-ar lega de teste. Se copiază forma, nu codul – și, cum am aflat
-   pe pielea noastră, se copiază și ce NU cere: eu adăugasem `username` de la
-   mine, iar asta a fost de ajuns ca să cadă tot. */
-const PROFILE_JOIN = "profiles!planner_pupils_user_id_fkey(display_name)";
-
-/** Elevii de la meditații, cu starea comutatorului. Numai profesorul îi vede pe toți.
- *  ARUNCĂ dacă serverul refuză, ca cel care întreabă să poată spune de ce. */
-export async function tutoringPupils() {
-  const { data, error } = await supabase
-    .from("planner_pupils")
-    .select(`user_id, planner_name, can_propose, ${PROFILE_JOIN}`);
-  /* Nu întorc o listă goală la eroare. „Goală" și „n-am putut întreba" arată la
-     fel pe ecran, dar înseamnă lucruri opuse, iar prima dată chiar ne-a costat:
-     panoul i-a spus lui Marius că n-are elevi la meditații, în timp ce în bază
-     erau opt. Cine cheamă hotărăște ce scrie pe ecran. */
-  if (error) throw new Error(error.message || "nu s-a putut citi lista de la meditații");
-  return (data || []).map((r) => ({
-    userId: r.user_id,
-    name: (r.planner_name || "").trim()
-      || (r.profiles?.display_name || "").trim() || "elev",
-    canPropose: !!r.can_propose,
-  })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
-}
-
-/** Pornește ori oprește un elev. Baza verifică cine cere, nu noi. */
-export async function setPupilCanPropose(userId, pornit) {
-  const { error } = await supabase.from("planner_pupils")
-    .update({ can_propose: !!pornit }).eq("user_id", userId);
-  if (error) { console.warn("setPupilCanPropose:", error.message); return false; }
-  return true;
-}
+/* Lista elevilor de la meditații și îngăduințele lor S-AU MUTAT în
+   `pupils-repo.js`. De ce: două butoane plutitoare cer același lucru, iar
+   cererea aceea are trei capcane (legătura pe numele constrângerii, fără spațiu
+   înainte de paranteză, numai coloanele publice din `profiles`). Scrisă în două
+   locuri, ar fi trebuit nimerite de două ori. */
 
 /** Coada de aprobat: propunerea ÎMPREUNĂ cu itemul ei și cu numele elevului. */
 export async function pendingExplanations() {

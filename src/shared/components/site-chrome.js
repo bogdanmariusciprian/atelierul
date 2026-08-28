@@ -90,13 +90,10 @@ export async function renderChrome(basePath = "") {
   safe(() => initAdminQuickPanel(basePath), "adminQuickPanel"); // floating 🛡️ toolbox (admin)
   safe(() => initMessenger(basePath), "messenger"); // floating 💬 Messenger + guest contact
   safe(() => initTodo(basePath), "todo"); // floating „TO-DO" bottom-left (admin only)
-  /* Comutatorul de etichetare stă în același mănunchi cu TO-DO-ul, deci se
-     pornește DUPĂ el: dacă ar veni primul, s-ar face un al doilea mănunchi, iar
-     cele două butoane ar ajunge unul peste altul. */
+  /* Cele două butoane cu comutatoare pe elev. Ordinea de pornire nu mai
+     contează pentru așezare: intră toate în suportul comun, iar locul în rând
+     îl dă `order` din `fab-dock.css`. */
   safe(() => initTagging(basePath), "tagging");
-  /* Al treilea din mănunchiul profesorului, deasupra celorlalte două.
-     Înălțimea la care se așază e socotită în `explanations-fab.css`, unde
-     stau și cifrele din care iese. */
   safe(() => initExplanationProposals(basePath), "explanationProposals");
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
