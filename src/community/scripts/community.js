@@ -3321,7 +3321,7 @@ export function renderCommunity(basePath = "") {
           ? explanations.map(explanationCard).join("")
           : `<p class="cx-muted">Nicio propunere în așteptare. Elevii de la meditații pot scrie explicații
               doar la itemii care n-au încă una, și numai cât îi ții porniți din butonul
-              „Propuneri de explicații" din colțul de jos.</p>`}
+              „EleviMED îmi transmit explicații Câmpina" din colțul de jos.</p>`}
       </div>`;
 
     const spreGrila = !cat ? "" : `<div class="cx-box">

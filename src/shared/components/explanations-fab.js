@@ -1,5 +1,11 @@
 // =========================================================
-// „Propuneri de explicații" — comutatoarele profesorului, pe elev.
+// „EleviMED îmi transmit explicații Câmpina" — comutatoarele profesorului, pe elev.
+//
+// TEXTUL E ALES DE MARIUS, cuvânt cu cuvânt: „EleviMED" sunt elevii lui de
+// la meditații, „îmi transmit" spune limpede în ce sens curge lucrul (de la
+// ei către el), iar „Câmpina" leagă butonul de banca de itemi la care se
+// scriu explicațiile. Nu-l prescurta și nu-l „îmbunătăți": rostul lui e ca
+// peste șase luni să știe din prima ce face butonul.
 //
 // LA CE E BUN. Elevii de la meditații scriu explicații la itemii care n-au
 // niciuna, dar numai cât stai cu ei. Butonul ăsta îi pornește și îi oprește unul
@@ -54,16 +60,19 @@ function render() {
   btn.classList.toggle("e-deschis", n > 0);
   btn.setAttribute("aria-expanded", open ? "true" : "false");
   btn.innerHTML =
-    '<span class="explan-fab__lucru">Propuneri de explicații</span>' +
+    '<span class="explan-fab__lucru">EleviMED îmi transmit explicații Câmpina</span>' +
     '<span class="explan-fab__stare">' +
       '<span class="explan-fab__semn" aria-hidden="true">' + (n > 0 ? "●" : "○") + "</span>" +
       (n > 0 ? `${n} ${n === 1 ? "elev pornit" : "elevi porniți"}` : "Niciun elev pornit") +
     "</span>";
+  /* Sfatul spune același lucru ca butonul, cu aceleași cuvinte: „transmit", nu
+     „propun". Două vorbe pentru aceeași faptă te pun să te întrebi dacă nu-s
+     cumva două lucruri diferite. */
   btn.title = problem
     ? "N-am putut citi lista de la meditații. Apasă ca să vezi de ce."
     : n > 0
-      ? "Elevii porniți pot propune explicații la itemii fără explicație. Apasă ca să vezi lista."
-      : "Niciun elev nu poate propune acum. Apasă ca să pornești pe cine lucrează cu tine.";
+      ? "Elevii porniți îți transmit explicații la itemii de la Câmpina care n-au încă una. Apasă ca să vezi lista."
+      : "Niciun elev nu-ți transmite explicații acum. Apasă ca să pornești pe cine lucrează cu tine.";
 
   listEl.hidden = !open;
   if (!open) return;
