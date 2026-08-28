@@ -86,6 +86,10 @@ const J = {
   streak: 0,            // leveluri trecute la rând, fără cădere
   chapterReset: false, // a patra greșeală a luat capitolul de la capăt
   chapterDone: false, // levelul ăsta a fost ultimul din capitol
+  /* A cerut elevul explicația la itemul de acum? Numai la Level-up: acolo
+     ecranul pleacă singur, iar cererea îl oprește până citește. Se stinge la
+     fiecare item nou, ca butonul să se ceară din nou. */
+  explanationAsked: false,
   timers: [],         // ceasurile mersului singur, oprite la orice plecare
   // — configurator (Classic / Adventure) —
   cfg: { years: new Set(), types: new Set(), allYears: true, allTypes: true },
@@ -252,13 +256,37 @@ function itemHead(it) {
 /* Verdictul, spus la fel peste tot. `historical` apare doar când răspunsul de azi
    diferă de cel de pe hârtie — și atunci merită spus, fiindcă elevul are baremul
    tipărit în față și ar crede că greșim noi. */
-function verdictHtml(r) {
+function verdictHtml(r, laCerere = false) {
   if (!r) return "";
+  const are = !!(r.explanation || "").trim();
+  /* LA CERERE, NUMAI LA LEVEL-UP. Acolo ecranul pleacă singur după 350 ms (ori
+     700 la greșeală), deci o explicație pusă de-a dreptul abia ar clipi: n-ar
+     apuca s-o citească nimeni, dar ar încărca ecranul la fiecare item. Iar
+     Level-up e cursa cu poveste – acolo citești fragmentul, nu gramatica. Deci
+     apare un buton, iar apăsarea lui OPREȘTE plecarea; altfel butonul ar fi o
+     glumă: îl apeși și ecranul fuge de sub el.
+
+     Butonul apare numai dacă itemul CHIAR are explicație: unul care se apasă și
+     nu face nimic e mai rău decât unul care lipsește. */
+  const explicatia = are
+    ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(r.explanation)}</div>`
+    : "";
+  const laLevelUp = !laCerere ? explicatia
+    : !are ? ""
+      : J.explanationAsked
+        ? `${explicatia}
+           <button type="button" class="tgame-btn tgame-btn--primary cmp-resume" data-act="resume">Mai departe ▸</button>`
+        /* ACEEAȘI ÎNFĂȚIȘARE ȘI ACELAȘI TEXT CA LA ADMITERE DREPT, unde butonul
+           ăsta există de mult (`.tgame-obsbtn`, „Vezi explicația"). N-am inventat
+           altul: două butoane care fac același lucru în două jocuri ale
+           aceluiași sit n-au de ce arăta diferit. Dreptul nu e atins, doar i se
+           împrumută clasa din foaia împărțită. */
+        : `<button type="button" class="tgame-obsbtn" data-act="explain">Vezi explicația</button>`;
   return `<div class="tgame-verdict ${r.isRight ? "ok" : "no"}">${r.isRight
     ? "✓ Corect"
     : `✗ Greșit — corect era <b>${esc(r.key)}</b>`}</div>
     ${r.historical ? `<div class="tgame-hist">Pe gramatica veche, răspunsul era <b>${esc(r.historical)}</b>.</div>` : ""}
-    ${r.explanation ? `<div class="tgame-obs"><span class="tgame-obs__lab">Observație</span>${sanitizeRich(r.explanation)}</div>` : ""}`;
+    ${laLevelUp}`;
 }
 
 // ---------- ecranul de alegere a modului ----------
@@ -1154,7 +1182,7 @@ function renderLevel() {
           ${itemHead(it)}
           <p class="tgame-q">${it.question ? sanitizeRich(it.question) : "<em>(enunț indisponibil)</em>"}</p>
           <div class="tgame-opts">${options}</div>
-          ${r ? `<div class="cmp-item__fb">${verdictHtml(r)}</div>` : ""}
+          ${r ? `<div class="cmp-item__fb">${verdictHtml(r, true)}</div>` : ""}
         </article>
       </div>
     </section>`;
@@ -1224,18 +1252,27 @@ function pesteo(ms, ce) {
 }
 
 function autoAdvance(isRight) {
+  stopTimers();
+  pesteo(isRight ? READ_RIGHT_MS : READ_WRONG_MS, () => flyAndGo(isRight));
+}
+
+/* ZBORUL NUMĂRULUI, despărțit de pauza de citire dinaintea lui.
+   De ce despărțit: cine cere explicația a citit deja, iar dacă „Mai departe" ar
+   chema tot `autoAdvance`, l-ar pune să aștepte încă o dată aceleași 350 (ori
+   700) de milisecunde, după ce tocmai terminase de citit. Așa, butonul reia de
+   unde s-ar fi dus singur, cu tot cu efect. */
+function flyAndGo(isRight) {
   const potolit = !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   stopTimers();
-  pesteo(isRight ? READ_RIGHT_MS : READ_WRONG_MS, () => {
-    const sectiune = root.querySelector(".cmp-play");
-    if (!sectiune) return;
-    sectiune.classList.add(isRight ? "e-reusit" : "e-cade");
-    pesteo(potolit ? 400 : (isRight ? SUCCESS_MS : FALL_MS), () => void dupaItem(isRight));
-  });
+  const sectiune = root.querySelector(".cmp-play");
+  if (!sectiune) return;
+  sectiune.classList.add(isRight ? "e-reusit" : "e-cade");
+  pesteo(potolit ? 400 : (isRight ? SUCCESS_MS : FALL_MS), () => void dupaItem(isRight));
 }
 
 async function dupaItem(isRight) {
   J.currentAnswer = null;
+  J.explanationAsked = false;   // butonul se cere din nou, la fiecare item
   /* La greșeală se oprește pe ECRANUL DE SFÂRȘIT, nu pe hartă. Înainte mergea
      drept la hartă, și era bine cât timp singurul lucru de spus era „ai pierdut
      levelul". De când a patra greșeală ia capitolul de la capăt, tăcerea nu mai
@@ -1460,6 +1497,18 @@ function onClick(e) {
     case "level": stopTimers(); return startLevel(Number(b.dataset.n));
     case "map": stopTimers(); J.phase = "map"; return render();
     case "answer-levelup": return void answerLevelUp(b);
+    /* CERUTĂ EXPLICAȚIA: se opresc ceasurile ÎNTÂI, apoi se desenează. Invers,
+       ecranul ar pleca în mijlocul citirii, iar elevul ar crede că butonul e
+       stricat. */
+    case "explain":
+      stopTimers();
+      J.explanationAsked = true;
+      return render();
+    /* Reluarea sare peste pauza de citire: tocmai a citit. Zborul numărului
+       rămâne, fiindcă el e capătul firesc al răspunsului. */
+    case "resume":
+      if (!J.currentAnswer) return;
+      return flyAndGo(J.currentAnswer.isRight);
     default: return;
   }
 }

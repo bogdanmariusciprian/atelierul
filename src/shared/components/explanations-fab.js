@@ -23,10 +23,15 @@ export const initExplanationProposals = pupilSwitchFab({
   /* Sfaturile spun același lucru ca butonul, cu aceleași cuvinte: „transmit",
      nu „propun". Două vorbe pentru aceeași faptă te pun să te întrebi dacă nu-s
      cumva două lucruri diferite. */
+  /* SFATUL SPUNE ȘI UNDE SE SCRIU. Fără asta, butonul spune ce se întâmplă, dar
+     nu unde: „îmi transmit explicații" – de acolo, din ce loc? Explicațiile se
+     scriu numai în modul Relaxed (Teste → Admitere Câmpina), fiindcă doar acolo
+     stă tot subiectul deschis, cu câmpul de notă sub fiecare item. Peste o lună,
+     asta e chiar lucrul pe care nu ți-l mai amintești. */
   titles: {
     problem: "N-am putut citi lista de la meditații. Apasă ca să vezi de ce.",
-    some: () => "Elevii porniți îți transmit explicații la itemii de la Câmpina care n-au încă una. Apasă ca să vezi lista.",
-    none: "Niciun elev nu-ți transmite explicații acum. Apasă ca să pornești pe cine lucrează cu tine.",
+    some: () => "Elevii porniți îți transmit explicații din modul RELAXED (Teste → Admitere Câmpina), la itemii care n-au încă una. Apasă ca să vezi lista.",
+    none: "Niciun elev nu-ți transmite explicații acum. Le scriu din modul RELAXED (Teste → Admitere Câmpina). Apasă ca să pornești pe cine lucrează cu tine.",
   },
   empty: "N-ai încă elevi la meditații. Îi adaugi din planificator.",
 });

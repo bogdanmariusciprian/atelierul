@@ -724,3 +724,8 @@
   display: flex; gap: 0.6rem; justify-content: flex-end;
   margin: var(--space-md) 0 0; padding: 0;
 }
+
+/* Butonul de reluare, după ce ai citit explicația cerută la Level-up. Stă puțin
+   depărtat de text: e o hotărâre („am terminat de citit"), nu o urmare a frazei
+   de deasupra. */
+.cmp-resume { margin-top: 0.6rem; }
