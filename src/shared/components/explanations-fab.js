@@ -20,6 +20,7 @@
 // =========================================================
 import { isAdmin } from "../scripts/session.js";
 import { tutoringPupils, setPupilCanPropose } from "../scripts/test-repo.js";
+import { fabDock } from "./fab-dock.js";
 
 let root = null;
 let btn = null;
@@ -111,7 +112,7 @@ export async function initExplanationProposals(basePath = "") {
      foaia de stil, unde coordonatele se văd una lângă alta. */
   root = document.createElement("div");
   root.className = "explan-fab-wrap";
-  document.body.appendChild(root);
+  fabDock(basePath).appendChild(root);   // rândul comun, nu direct în pagină
 
   btn = document.createElement("button");
   btn.type = "button";

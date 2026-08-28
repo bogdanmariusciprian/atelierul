@@ -1,0 +1,37 @@
+/* =========================================================
+   Suportul butoanelor plutitoare: un singur rând, jos-stânga.
+
+   ÎȘI POARTĂ SINGUR CULORILE ȘI MĂRIMILE, ca și butoanele din el: trebuie să
+   meargă și pe paginile care nu încarcă foaia sitului.
+   ========================================================= */
+
+.fab-dock {
+  position: fixed;
+  left: 22px;
+  bottom: 26px;
+  /* Sub toasturi, dar peste rama de admin și peste conținut. Aceeași treaptă cu
+     trusa 🛡️ din colțul celălalt: sunt frați, n-au de ce se acoperi. */
+  z-index: 2147482100;
+
+  display: flex;
+  /* La bază, nu la mijloc: butoanele au înălțimi diferite (42 și 56), iar dacă
+     se aliniau la mijloc, marginea lor de jos ieșea în zigzag. */
+  align-items: flex-end;
+  gap: 10px;
+  /* Când nu mai încap, trec pe rândul următor în loc să iasă din ecran. Nu e o
+     așezare gândită pentru telefon (aia n-o cere nimeni încă), ci doar plasa
+     care ține butoanele vizibile pe un ecran îngust. */
+  flex-wrap: wrap;
+  max-width: calc(100vw - 44px);
+
+  /* GOLUL DINTRE BUTOANE NU FURĂ CLICURI. Suportul se întinde cât tot rândul;
+     fără asta, banda lui invizibilă ar sta peste conținutul paginii, iar
+     apăsările din dreptul ei s-ar pierde fără nicio urmă. */
+  pointer-events: none;
+}
+.fab-dock > * { pointer-events: auto; }
+
+/* Șirul lor, hotărât aici, nu de cine apucă să pornească întâi. */
+.todo-fab-wrap   { order: 1; }
+.tagging-fab-wrap { order: 2; }
+.explan-fab-wrap { order: 3; }

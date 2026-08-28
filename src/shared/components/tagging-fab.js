@@ -24,6 +24,7 @@
 // =========================================================
 import { isAdmin } from "../scripts/session.js";
 import { eDeschis, pune, ascultaComutatorul, eDeschisDupaMemorie } from "../scripts/tagging-repo.js";
+import { fabDock } from "./fab-dock.js";
 
 let radacina = null;
 let buton = null;
@@ -85,7 +86,7 @@ export async function initTagging(basePath = "") {
      amândouă coordonatele se văd una lângă alta. */
   radacina = document.createElement("div");
   radacina.className = "tagging-fab-wrap";
-  document.body.appendChild(radacina);
+  fabDock(basePath).appendChild(radacina);   // rândul comun, nu direct în pagină
 
   buton = document.createElement("button");
   buton.type = "button";

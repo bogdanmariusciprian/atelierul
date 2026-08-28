@@ -420,11 +420,19 @@ export async function myProposals(exam) {
       mai recunoască nimic. Toate celelalte optsprezece cereri din sit sunt
       scrise lipit; a mea nu era, și numai ea nu mergea.
 
+   3. NUMAI COLOANELE PUBLICE. `profiles` n-are drept de citire pe tot tabelul:
+      migrarea 0009 l-a retras și l-a dat pe coloane anume, ca datele minorilor
+      să nu plece în browser. `username` NU e printre ele, iar o singură coloană
+      nepermisă face serverul să refuze TOATĂ cererea, cu „permission denied for
+      table profiles". Lista publică e în 0009 și 0012.
+
    Forma de mai jos e copiată după `fetchMarkedPupils` din `planner-repo.js`,
    care cere ACELAȘI lucru din ACELAȘI tabel și merge de luni de zile. Nu e
    împrumutată prin import: plannerul stă izolat dinadins, iar o funcție
-   împărțită l-ar lega de teste. Se copiază forma, nu codul. */
-const PROFILE_JOIN = "profiles!planner_pupils_user_id_fkey(display_name, username)";
+   împărțită l-ar lega de teste. Se copiază forma, nu codul – și, cum am aflat
+   pe pielea noastră, se copiază și ce NU cere: eu adăugasem `username` de la
+   mine, iar asta a fost de ajuns ca să cadă tot. */
+const PROFILE_JOIN = "profiles!planner_pupils_user_id_fkey(display_name)";
 
 /** Elevii de la meditații, cu starea comutatorului. Numai profesorul îi vede pe toți.
  *  ARUNCĂ dacă serverul refuză, ca cel care întreabă să poată spune de ce. */
@@ -440,7 +448,7 @@ export async function tutoringPupils() {
   return (data || []).map((r) => ({
     userId: r.user_id,
     name: (r.planner_name || "").trim()
-      || (r.profiles?.display_name || "").trim() || r.profiles?.username || "elev",
+      || (r.profiles?.display_name || "").trim() || "elev",
     canPropose: !!r.can_propose,
   })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
 }

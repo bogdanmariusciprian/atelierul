@@ -12,20 +12,17 @@
    `initTodo()` primește și stilurile odată cu el, fără să știe de ele.
    ========================================================= */
 
+/* AȘEZAREA NU MAI E AICI: butonul intră în suportul comun (`fab-dock.css`),
+   care ține toate trei butoanele plutitoare într-un rând. Aici a stat o vreme
+   `bottom: 92px`, adică 26 + 56 + 10, socotit din înălțimea comutatorului de
+   etichetare, de dedesubt. O socoteală ținută în două foi de stil deodată se
+   strică în ziua în care unul dintre butoane se face mai înalt. */
 .todo-fab-wrap {
-  position: fixed;
-  left: 22px;
-  /* Deasupra comutatorului de etichetare, care stă jos de tot (vezi
-     `tagging.css`). Amândouă se arată numai profesorului, deci ridicarea asta
-     nu se vede la nimeni care n-are și comutatorul. 26 + 56 + 10 = 92. */
-  bottom: 92px;
-  /* Sub toasturi, dar peste rama de admin și peste conținut. Aceeași treaptă cu
-     trusa 🛡️ din colțul celălalt: sunt frați, n-au de ce se acoperi. */
-  z-index: 2147482100;
+  /* Reper pentru panou, care se deschide DEASUPRA butonului. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.5rem;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   user-select: none;
   -webkit-user-select: none;
@@ -64,7 +61,13 @@
   font-weight: 800;
 }
 
+/* PANOUL STĂ DEASUPRA BUTONULUI, scos din curgere. Dacă rămânea în rând cu el,
+   ar fi umflat suportul comun pe verticală și ar fi împins butoanele vecine în
+   sus la fiecare deschidere. */
 .todo-panel {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
   width: 340px;
   max-width: calc(100vw - 44px);
   max-height: min(560px, calc(100vh - 130px));
@@ -176,6 +179,10 @@
 }
 
 @media (max-width: 640px) {
-  .todo-fab-wrap { left: 12px; bottom: 12px; }
+  /* Locul îl dă suportul comun; aici a mai rămas doar cât e butonul de înalt.
+     Stăteau aici și `left: 12px; bottom: 12px`, dar acum mănunchiul e
+     `position: relative`, iar pe el aceleași două rânduri nu-l MUTĂ în colț, ci
+     îl împing 12px din locul lui, afară din rând. O regulă rămasă în urmă nu e
+     nevinovată: aici ar fi tras butonul deoparte, tăcut. */
   .todo-fab { height: 38px; padding: 0 13px; }
 }

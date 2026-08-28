@@ -21,6 +21,7 @@
 // pe ea. Vezi `todo.css`. Content Romanian, identifiers English.
 // =========================================================
 import { isAdmin, iaLocal, punLocal } from "../scripts/session.js";
+import { fabDock } from "./fab-dock.js";
 import {
   cheiaPaginii, numelePaginii, listTodos, addTodo,
   setTodoDone, setTodoBody, removeTodo, pePagini,
@@ -278,7 +279,7 @@ export async function initTodo(basePath = "") {
 
   radacina = document.createElement("div");
   radacina.className = "todo-fab-wrap";
-  document.body.appendChild(radacina);
+  fabDock(basePath).appendChild(radacina);   // rândul comun, nu direct în pagină
   leagaEvenimente();
 
   /* Desenăm ÎNTÂI cu ce știam de data trecută, ca numărul să fie acolo din

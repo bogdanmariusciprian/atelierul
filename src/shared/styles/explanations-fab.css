@@ -7,22 +7,18 @@
    abia peste săptămâni.
    ========================================================= */
 
-/* ÎNĂLȚIMEA, SOCOTITĂ, NU GHICITĂ. În colțul din stânga-jos stau, de jos în sus:
-     · comutatorul de etichetare: bottom 26, înalt 56  →  ține 26…82
-     · TO-DO:                     bottom 92, înalt 42  →  ține 92…134
-   Deci al treilea începe la 134 + 10 = 144. Cifra e scrisă aici, lângă
-   socoteala din care iese, ca următorul care mai adaugă un buton să n-o mai
-   caute prin trei fișiere. */
+/* AȘEZAREA NU MAI E AICI. Butonul intră în suportul comun (`fab-dock.css`),
+   care ține toate trei butoanele plutitoare într-un rând.
+
+   A stat o vreme la `bottom: 144px`, adică 26 + 56 + 10 + 42 + 10, socotit din
+   înălțimile celorlalte două. Socoteala era corectă, dar trăia în trei foi de
+   stil deodată: ajungea ca unul dintre butoane să se facă mai înalt, și se
+   acopereau. Rândul își împarte locul singur, deci nu mai are nimeni ce socoti. */
 .explan-fab-wrap {
-  position: fixed;
-  left: 22px;
-  bottom: 144px;
-  /* Aceeași treaptă cu frații lui: n-au de ce se acoperi între ei. */
-  z-index: 2147482100;
+  position: relative;   /* reper pentru lista care se deschide deasupra */
   display: flex;
-  flex-direction: column-reverse;  /* lista se deschide ÎN SUS, peste conținut */
+  flex-direction: column;
   align-items: flex-start;
-  gap: 0.5rem;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   user-select: none;
   -webkit-user-select: none;
@@ -72,9 +68,15 @@
 .explan-fab__semn { font-size: 0.6rem; line-height: 1; }
 
 /* ---------- lista elevilor ---------- */
+/* Lista se deschide DEASUPRA butonului, scoasă din curgere, ca să nu umfle
+   suportul comun și să nu împingă butoanele vecine. */
 .explan-fab__lista {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
   margin: 0; padding: 8px; list-style: none;
-  min-width: 250px; max-height: 46vh; overflow-y: auto;
+  min-width: 250px; max-width: min(340px, calc(100vw - 44px));
+  max-height: 46vh; overflow-y: auto;
   border: 1px solid #3d4457; border-radius: 14px;
   background: #1f2430; color: #cbd2e0;
   box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.55);
@@ -115,9 +117,8 @@
 .explan-fab__sw:disabled { opacity: 0.5; cursor: default; }
 
 @media (max-width: 640px) {
-  /* Pe telefon, TO-DO coboară la 12 iar etichetarea rămâne la 26, deci cele
-     două se calcă deja între ele (o scăpare mai veche, nu de aici). Al treilea
-     se așază peste amândouă, la 90, ca să nu adauge o a treia suprapunere. */
-  .explan-fab-wrap { left: 12px; bottom: 90px; }
+  /* Locul îl dă suportul comun. Stătea aici `left: 12px; bottom: 90px`, socotit
+     pe vremea când fiecare buton se așeza singur; pe `position: relative` cele
+     două rânduri nu-l mai duc în colț, ci îl împing din rând. */
   .explan-fab__lista { min-width: 210px; }
 }
