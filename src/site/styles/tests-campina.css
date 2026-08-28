@@ -565,9 +565,26 @@
   50% { transform: scale(1.07); }
 }
 
+/* MARGINEA CARE-I ȚINE LOCUL. Numărul e așezat absolut, deci nu împinge nimic:
+   dacă nu i se lasă loc anume, cardul crește peste el. Așa s-a și întâmplat
+   când insignele au coborât de pe orbită și am scos, odată cu ea, marginea.
+
+   Socoteala, pe hârtie: cel mai lat număr e „#880", patru semne. La 3,1rem
+   (marginea de sus a lui `clamp`) o cifră groasă ține cam 0,6em, deci vreo
+   7,5rem cu totul. Fiind centrat pe `left`, se întinde 3,75rem în fiecare
+   parte. Ca stânga lui să nu iasă din pagină: `left` ≥ 4,25rem. Ca dreapta lui
+   să nu atingă cardul, cu un deget de spațiu: marginea ≥ 4,5 + 3,75 + 1 = 9,25.
+   Rotunjit în sus, 9,5rem.
+
+   Sub 900px nu există margine și nici nu trebuie: acolo numărul stă deasupra
+   cardului, în firul paginii. */
 @media (min-width: 900px) {
   .cmp-play { padding-top: 0; }
-  .cmp-bignum { left: 4.2rem; top: 50%; transform: translate(-50%, -50%); }
+  /* Numai `.cmp-orbit`, adică numai Level-up. Classic și Adventure n-au număr
+     mare, deci n-au ce loc să lase; iar pusă pe card, marginea ar fi împins
+     textul dinăuntru, nu cardul într-o parte. */
+  .cmp-play > .cmp-orbit { padding-left: 9.5rem; }
+  .cmp-bignum { left: 4.5rem; top: 50%; transform: translate(-50%, -50%); }
 }
 
 /* Vălul: întuneric plus încețoșare a ce e dedesubt. Culoarea singură ar fi fost
