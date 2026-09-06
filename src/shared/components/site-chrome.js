@@ -504,16 +504,42 @@ function initSmoothPageScroll() {
 
   let target = window.scrollY;
   let animating = false;
+  let ceAmCerut = -1; // ultima poziție pusă de noi, ca să știm când altcineva mută pagina
 
   function animate() {
     const cur = window.scrollY;
-    const diff = target - cur;
-    if (Math.abs(diff) < 0.5) {
-      window.scrollTo(0, target);
+
+    /* CINEVA A LUAT CÂRMA. Bara de derulare, autoscroll-ul cu rotița apăsată,
+       tastatura: niciunul nu trece prin `wheel`, deci nu ne dau de știre. Dacă
+       pagina nu mai e unde am lăsat-o noi, ne oprim și-l lăsăm pe om, altfel
+       îl tragem înapoi la ținta noastră de mai devreme. */
+    if (ceAmCerut >= 0 && Math.abs(cur - ceAmCerut) > 2) {
       animating = false;
       return;
     }
+
+    const diff = target - cur;
+    /* SUB UN PIXEL NU SE MAI POATE MIȘCA NIMIC, iar asta e chiar greșeala din
+       care venea totul (găsită pe 6 septembrie 2026, la testele de la Câmpina):
+       browserul ține poziția de derulare în pixeli întregi, deci un pas de
+       0,36px nu clintește pagina. `cur` rămâne același, `diff` rămâne același,
+       pragul vechi de 0,5 nu se atinge niciodată, iar bucla se învârtea la
+       nesfârșit, chemând `scrollTo` de 60 de ori pe secundă. Pe o pagină de
+       19.000px, rotița mergea (ea își pune de fiecare dată o țintă nouă), dar
+       bara și autoscroll-ul erau trase înapoi în trei zecimi de secundă:
+       „tremură pe loc, ar vrea să scrolleze, dar nu merge". */
+    if (Math.abs(diff) < 1) {
+      animating = false;
+      return;
+    }
+
     window.scrollTo(0, cur + diff * 0.18); // easing (snappier — closer to native feel)
+    /* N-a răspuns: capăt de document, ori pasul s-a pierdut la rotunjire. */
+    if (window.scrollY === cur) {
+      animating = false;
+      return;
+    }
+    ceAmCerut = window.scrollY;
     requestAnimationFrame(animate);
   }
 
@@ -544,6 +570,9 @@ function initSmoothPageScroll() {
       if (!animating) target = window.scrollY;
       target = Math.max(0, Math.min(max, target + e.deltaY));
       if (!animating) {
+        /* Pornim de unde e pagina ACUM: între două rotiri, omul poate s-o fi
+           mutat de la bară, iar noi n-avem de unde ști. */
+        ceAmCerut = window.scrollY;
         animating = true;
         requestAnimationFrame(animate);
       }
