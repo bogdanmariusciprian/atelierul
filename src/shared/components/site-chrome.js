@@ -84,6 +84,7 @@ export async function renderChrome(basePath = "") {
   safe(initUserMenu, "userMenu"); // right-click on any user name → copy/open
   // --- Visual flourishes + floating widgets (isolated) ---
   safe(initSmoothPageScroll, "smoothScroll");
+  safe(initBackToTop, "backToTop"); // săgeata „sus", dreapta jos, pe paginile lungi
   safe(initPointsFx, "pointsFx"); // cursor "points earned" flourish
   safe(() => initXpBar(basePath), "xpBar"); // permanent level/XP bar + identity
   safe(initAdminFrame, "adminFrame"); // pulsing page border in the admin role
@@ -579,6 +580,54 @@ function initSmoothPageScroll() {
     },
     { passive: false }
   );
+}
+
+/**
+ * Săgeata „înapoi sus", în colțul din dreapta jos.
+ *
+ * Se arată abia după ce ai coborât o bucată bună, ca să nu stea degeaba pe
+ * paginile scurte: pe un ecran obișnuit, două înălțimi de fereastră înseamnă
+ * că omul chiar a plecat departe de capul paginii.
+ *
+ * COLȚUL ARE DEJA LOCATARI, iar aici stă toată grija: la elev, butonul de
+ * mesaje; la profesor, trusa 🛡️ (mesagerul se mută atunci lângă ea). Săgeata
+ * se așază DEASUPRA celui de jos, iar cât timp panoul lui e deschis se stinge,
+ * altfel ar rămâne ascunsă sub el și ar părea stricată.
+ */
+function initBackToTop() {
+  if (document.getElementById("to-top")) return;
+
+  const b = document.createElement("button");
+  b.type = "button";
+  b.id = "to-top";
+  b.className = "to-top";
+  b.setAttribute("aria-label", "Înapoi sus");
+  b.title = "Înapoi sus";
+  /* Săgeata e desenată, nu scrisă cu un caracter: un „↑" se vede altfel de la
+     un font la altul, iar aici trebuie să stea drept în mijlocul cercului. */
+  b.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<path d="M12 19V6M12 6l-6 6M12 6l6 6" fill="none" stroke="currentColor"' +
+    ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  document.body.appendChild(b);
+
+  b.addEventListener("click", () => {
+    /* `smooth` doar dacă omul n-a cerut altfel din sistem. */
+    const domol = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: domol ? "smooth" : "auto" });
+  });
+
+  const prag = () => Math.max(600, window.innerHeight * 2);
+  let vazuta = null;
+  const cantareste = () => {
+    const acum = window.scrollY > prag();
+    if (acum === vazuta) return;      // nu atinge DOM-ul degeaba, la fiecare pixel
+    vazuta = acum;
+    b.classList.toggle("is-on", acum);
+  };
+  window.addEventListener("scroll", cantareste, { passive: true });
+  window.addEventListener("resize", cantareste);
+  cantareste();
 }
 
 /**

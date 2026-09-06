@@ -185,6 +185,11 @@ function panelHtml() {
   return conv ? convView(conv) : listView();
 }
 
+/* Butonul spune ce face, iar asta ține de cine se uită la el: elevul îi scrie
+   profesorului, profesorul își citește mesajele. Aceleași vorbe ca la butonul
+   din subsol, ca omul să vadă că e același lucru. */
+const numeleButonului = () => (isAdmin() ? "Mesaje" : "Scrie-i profesorului");
+
 function render() {
   // The teacher also has the 🛡️ quick-panel bottom-right → shift left to avoid it.
   el.classList.toggle("msgr--admin", isLoggedIn() && isAdmin());
@@ -196,8 +201,9 @@ function render() {
   const oldSc = el.querySelector('[data-role="scroll"]');
   const wasAtBottom = oldSc ? oldSc.scrollHeight - oldSc.scrollTop - oldSc.clientHeight < 48 : true;
   el.innerHTML = `
-    <button type="button" class="msgr-fab" data-act="toggle" aria-expanded="${st.open}" aria-label="Mesaje" title="Mesaje">
-      💬${unread ? `<b class="msgr-fabbadge">${unread}</b>` : ""}
+    <button type="button" class="msgr-fab" data-act="toggle" aria-expanded="${st.open}"
+      aria-label="${numeleButonului()}" title="${numeleButonului()}">
+      ✉️${unread ? `<b class="msgr-fabbadge">${unread}</b>` : ""}
     </button>
     <div class="msgr-panel" ${st.open ? "" : "hidden"} role="dialog" aria-label="Mesaje">${panelHtml()}</div>`;
   if (st.open) {

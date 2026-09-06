@@ -594,9 +594,68 @@
 .msgr { position: fixed; right: 22px; bottom: 26px; z-index: 2147482100; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 0.5rem; }
 /* Teacher has the 🛡️ toolbox bottom-right too → move the Messenger left of it. */
 .msgr--admin { right: 90px; }
-.msgr-fab { position: relative; width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer; font-size: 1.5rem; color: #fff; background: linear-gradient(135deg, #7c3aed, #2563eb); box-shadow: 0 12px 28px -8px rgba(124, 58, 237, 0.7); align-self: flex-end; }
-.msgr-fab:hover { transform: scale(1.07); }
+/* DOMOL CÂT STAI LINIȘTIT (cerut de Marius, 6 sept 2026: „poate să se afișeze
+   mai mic, mai discret, cu un alt icon"). Era un cerc de 56px cu degrade
+   violet-albastru și umbră mare, care trăgea ochiul de la conținut pe fiecare
+   pagină. Acum e de 40px, aproape stins, și se aprinde la atingere.
+   Bulina cu mesajele necitite rămâne la vedere ORICUM: ea nu e podoabă, e o
+   veste, iar dacă s-ar stinge și ea butonul n-ar mai avea niciun rost. */
+.msgr-fab {
+  position: relative; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--color-border); cursor: pointer;
+  font-size: 1.05rem; line-height: 1; color: var(--color-text-muted);
+  background: var(--color-surface);
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.35);
+  opacity: 0.45; align-self: flex-end;
+  transition: opacity 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+.msgr-fab:hover, .msgr-fab:focus-visible {
+  opacity: 1; transform: scale(1.08); border-color: var(--color-primary);
+}
+/* Cât panoul e deschis, butonul nu mai are de ce să se ascundă. */
+.msgr:has(.msgr-panel:not([hidden])) .msgr-fab { opacity: 1; }
+/* Mesaje necitite: butonul iese din umbră singur, fără să aștepte mouse-ul. */
+.msgr-fab:has(.msgr-fabbadge) { opacity: 1; border-color: var(--color-primary); }
 .msgr-fabbadge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: var(--color-danger); color: #fff; font-size: 0.7rem; line-height: 18px; font-weight: 700; }
+
+/* =========================================================
+   SĂGEATA „ÎNAPOI SUS" (site-chrome.js): dreapta jos, pe paginile lungi.
+   Cerută pe 6 septembrie 2026, la testele de la Câmpina, unde pagina trece
+   de 19.000px.
+
+   AȘEZAREA E TOATĂ GRIJA. Colțul din dreapta jos are deja locatari, și nu
+   aceiași pentru toți: la elev, butonul de mesaje (40px); la profesor, trusa
+   🛡️ (3,1rem), iar mesagerul se mută atunci lângă ea. Săgeata stă DEASUPRA
+   celui de jos, la o depărtare socotită din mărimea lui, nu dintr-o cifră
+   nimerită din ochi.
+   ========================================================= */
+.to-top {
+  position: fixed; right: 22px; bottom: calc(26px + 40px + 10px);
+  z-index: 2147482100; /* aceeași treaptă cu mesagerul și cu trusa */
+  width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text-muted); cursor: pointer;
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.35);
+  /* Ascunsă până când omul chiar a coborât: `visibility` (nu `display`) ca să
+     poată aluneca la locul ei, nu să apară dintr-o dată. */
+  opacity: 0; visibility: hidden; transform: translateY(6px);
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease,
+              border-color 0.18s ease, color 0.18s ease;
+}
+.to-top svg { width: 17px; height: 17px; display: block; }
+.to-top.is-on { opacity: 0.45; visibility: visible; transform: none; }
+.to-top.is-on:hover, .to-top.is-on:focus-visible {
+  opacity: 1; border-color: var(--color-primary); color: var(--color-primary);
+}
+/* La profesor, dedesubt stă trusa 🛡️ (3,1rem), nu butonul de mesaje. */
+body:has(.admin-quick) .to-top { bottom: calc(26px + 3.1rem + 10px); }
+/* CÂT UN PANOU E DESCHIS, săgeata ar rămâne ascunsă sub el și ar părea
+   stricată: se dă la o parte singură. */
+body:has(.msgr-panel:not([hidden])) .to-top,
+body:has(.admin-quick__panel:not([hidden])) .to-top {
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
 .msgr-panel { width: 340px; max-width: calc(100vw - 32px); height: 460px; max-height: calc(100vh - 120px); display: flex; flex-direction: column; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.35); overflow: hidden; }
 .msgr-panel[hidden] { display: none; } /* class display:flex would otherwise override the hidden attr */
 
