@@ -139,6 +139,19 @@ export const LESSONS = [
     summary: "Un text narativ cu întrebări de înțelegere.",
     ready: true,
   },
+  /* O PAGINĂ ÎNTREAGĂ, ADUSĂ DIN AFARĂ, ca tabla de la sintaxa frazei: poemul
+     cu adnotările lui Marius, cu tema și cu uneltele lui. Nu cheamă bara
+     sitului, dinadins („fără titlul paginii, fără navul paginii; pui doar o
+     săgeată discretă «Către site»"), deci în listă e singurul loc din care se
+     poate ajunge la ea. */
+  {
+    domain: "lectura",
+    slug: "lectura-luceafarul",
+    title: "Luceafărul: strofe și adnotări",
+    href: "lectii/lectura/luceafarul/",
+    summary: "Poemul întreg, pe tablouri, cu adnotări și zece imagini.",
+    ready: true,
+  },
   { domain: "lectura", title: "Textul liric" },
   { domain: "lectura", title: "Textul dramatic" },
   { domain: "lectura", title: "Textul nonliterar" },
