@@ -1656,13 +1656,19 @@
 .cx-admintable { display: flex; flex-direction: column; }
 .cx-adminrow {
   display: grid;
-  grid-template-columns: 2fr 0.8fr 1fr 1.4fr;
+  /* Coloana a treia ține acum DOUĂ drepturi („Meditații" și „Lecții", 0089),
+     nu unul: i s-a dat lățimea luată din coloana de acțiuni, care avea un
+     singur buton și aer de prisos. Suma rămâne aceeași, deci rândul nu crește
+     peste vecinii lui. */
+  grid-template-columns: 2fr 0.7fr 1.5fr 1fr;
   align-items: center;
   gap: 0.6rem;
   padding: 0.5rem 0.2rem;
   border-top: 1px solid var(--color-border);
   font-size: 0.9rem;
 }
+/* Cele două drepturi stau alături cât e loc, altfel unul sub altul. */
+.cx-adminrow__grants { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .cx-adminrow--head { border-top: none; font-weight: 800; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
 .cx-adminrow__u { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
 .cx-adminrow__u .cx-av { width: 1.8rem; height: 1.8rem; font-size: 0.65rem; }
@@ -1703,7 +1709,10 @@
 .cx-adminprofile__stats b { color: var(--color-primary); }
 
 @media (max-width: 720px) {
-  .cx-adminrow { grid-template-columns: 1.6fr 0.7fr 1fr; }
+  /* Pe ecran îngust pică coloana de acțiuni („Vezi profil" e la un click de
+     numele din stânga), iar drepturile primesc locul ei: ele sunt lucrul
+     pentru care se deschide pagina asta. */
+  .cx-adminrow { grid-template-columns: 1.5fr 0.6fr 1.2fr; }
   .cx-adminrow > :nth-child(4) { display: none; }
 }
 

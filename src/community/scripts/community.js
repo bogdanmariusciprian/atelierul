@@ -43,6 +43,13 @@ import {
 } from "../../shared/scripts/discover-data.js";
 import { grantEventAccess, revokeEventAccess } from "../../shared/scripts/events-repo.js";
 import { cancelFutureSlotsFor } from "../../shared/scripts/planner-repo.js";
+/* Lecțiile scrise de elevi (0089): deocamdată dreptul și aducerea cozii.
+   Hotărârile profesorului (`publishLesson`, `rejectLesson`) se aduc aici când
+   se face ecranul cozii; aduse mai devreme, ar fi importuri care nu cheamă
+   nimic, iar paznicul de arhitectură le numără drept fișiere uitate. */
+import {
+  fetchLessonAuthors, setLessonAccess, pendingLessons,
+} from "../../shared/scripts/lesson-proposals-repo.js";
 import {
   // aliased: a LOCAL function createGroup() (the composer handler) already
   // exists below — without the alias it would shadow this import and recurse.
@@ -338,6 +345,12 @@ export function renderCommunity(basePath = "") {
     pendingPostUuid: null, // #post/<uuid> deep link → open that post after the feed loads
     convLabels: {}, // admin inbox: member UUID → 'curent'|'incheiat'|'amanat'
     eventAccessUuids: new Set(), // members the teacher marked for the PLANNER
+    /* Cine are voie să scrie lecții (0089). Mulțime adusă SEPARAT de lista de
+       conturi, ca pagina să meargă și înainte ca migrarea să fie aplicată: pe
+       o bază veche, cererea cade singură și mulțimea rămâne goală, adică doar
+       butoanele sunt stinse. */
+    lessonAuthorUuids: new Set(),
+    lessonQueue: [],       // propunerile de lecții în așteptare
     msgLabelFilter: "all", // admin inbox filter
   };
   const MSG_MAX_PARTS = 5;
@@ -2789,13 +2802,22 @@ export function renderCommunity(basePath = "") {
   }
 
   // ---------- Section: admin dashboard (admin role only) ----------
-  function adminUserRow(u, hasAccess, isMe) {
+  /* DOUĂ DREPTURI, DOUĂ BUTOANE, pe același rând. „Meditații" îl trece pe elev
+     în planificator; „Lecții" îi dă voie să scrie lecții, pe care profesorul le
+     citește și le publică (migrarea 0089). Sunt drepturi de sine stătătoare:
+     un elev poate scrie lecții fără să vină la meditații, iar unul de la
+     meditații nu capătă dreptul de la sine. */
+  function adminUserRow(u, hasAccess, isMe, canLesson) {
     const li = levelInfo(u.points || 0);
     return `<div class="cx-adminrow">
       <span class="cx-adminrow__u">${avatarLink(u.id)} ${userNameLink(u.id, u.name)}${u.email ? `<br><small class="cx-muted cx-adminrow__email">${escapeHtml(u.email)}</small>` : ""}${isMe ? ' <span class="cx-adminchip">tu</span>' : ""}</span>
       <span>${(u.points || 0).toLocaleString("ro-RO")} <span class="cx-levelchip">Nv ${li.level}${li.prestige ? ` ⭐${li.prestige}` : ""}</span></span>
-      <span><button type="button" class="cx-toggle${hasAccess ? " on" : ""}" data-action="grant-events" data-uid="${u.id}"
-        title="${hasAccess ? "Are acces la planificatorul de meditații" : "Deschide-i planificatorul de meditații"}">${hasAccess ? "Meditații ✓" : "Acordă meditații"}</button></span>
+      <span class="cx-adminrow__grants">
+        <button type="button" class="cx-toggle${hasAccess ? " on" : ""}" data-action="grant-events" data-uid="${u.id}"
+          title="${hasAccess ? "Are acces la planificatorul de meditații" : "Deschide-i planificatorul de meditații"}">${hasAccess ? "Meditații ✓" : "Acordă meditații"}</button>
+        <button type="button" class="cx-toggle${canLesson ? " on" : ""}" data-action="grant-lessons" data-uid="${u.id}"
+          title="${canLesson ? "Poate scrie lecții; le publici tu, din coada de propuneri" : "Îi dai voie să scrie lecții, pe care le publici tu"}">${canLesson ? "Lecții ✓" : "Acordă lecții"}</button>
+      </span>
       <span class="cx-crudbtns"><button type="button" class="btn-mini" data-action="admin-view" data-uid="${u.id}">Vezi profil</button></span>
     </div>`;
   }
@@ -3071,7 +3093,11 @@ export function renderCommunity(basePath = "") {
     const pages = Math.max(1, Math.ceil(users.length / PER_PAGE));
     const page = Math.min(state.adminUserPage, pages);
     const slice = users.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-    const rows = slice.map((u) => adminUserRow(u, state.eventAccessUuids.has(uuidForSurrogate(u.id)), false)).join("");
+    const rows = slice.map((u) => {
+      const uuid = uuidForSurrogate(u.id);
+      return adminUserRow(u, state.eventAccessUuids.has(uuid), false,
+                          state.lessonAuthorUuids.has(uuid));
+    }).join("");
     const pager = pages > 1
       ? `<div class="cx-pager">
            <button type="button" class="btn-mini" data-action="admin-user-page" data-dir="-1" ${page === 1 ? "disabled" : ""}>‹</button>
@@ -3091,7 +3117,7 @@ export function renderCommunity(basePath = "") {
           <span>${sortBtn("points", "După puncte")}${sortBtn("name", "După nume")}</span>
         </div>
         <div class="cx-admintable">
-          <div class="cx-adminrow cx-adminrow--head"><span>Utilizator</span><span>Puncte</span><span>Meditații</span><span>Acțiuni</span></div>
+          <div class="cx-adminrow cx-adminrow--head"><span>Utilizator</span><span>Puncte</span><span>Drepturi</span><span>Acțiuni</span></div>
           ${rows}
         </div>
         ${pager}
@@ -3826,6 +3852,10 @@ export function renderCommunity(basePath = "") {
         state.gateOff = await getGateOff();         // pre-launch gate state for the toggle
         state.convLabels = await fetchConversationLabels();
         state.eventAccessUuids = await fetchEventAccessUsers();
+        /* Dreptul de a scrie lecții și coada lor (0089). Amândouă cad singure
+           pe o bază fără migrare, fără să oprească restul panoului. */
+        state.lessonAuthorUuids = await fetchLessonAuthors();
+        state.lessonQueue = await pendingLessons();
         // Numerele de material din bara laterală. O singură cerere pentru toate
         // lecțiile, nu una pe lecție: bara le arată pe toate deodată.
         state.bankCounts = await bankCountByLesson();
@@ -4771,6 +4801,34 @@ export function renderCommunity(basePath = "") {
             return;
           }
           if (had) state.eventAccessUuids.add(uuid); else state.eventAccessUuids.delete(uuid);
+          showToast(r.message);
+          render();
+        });
+        return;
+      }
+      /* DREPTUL DE A SCRIE LECȚII (0089). Aceeași purtare ca la marcarea de la
+         meditații, și din același motiv: butonul se aprinde pe loc, ca apăsarea
+         să se simtă, dar scrierea e AȘTEPTATĂ, iar un refuz îl stinge la loc și
+         spune de ce. Un buton aprins peste o scriere care n-a avut loc e felul
+         în care un elev rămâne fără dreptul pe care crezi că i l-ai dat. */
+      case "grant-lessons": {
+        if (!isAdmin()) return;
+        const uid = Number(btn.dataset.uid);
+        const uuid = uuidForSurrogate(uid);
+        if (!uuid) { showToast("Nu am găsit contul acestui membru. Reîncarcă pagina."); return; }
+        const avea = state.lessonAuthorUuids.has(uuid);
+        const cine = userById(uid)?.name || "membrul";
+        if (avea) state.lessonAuthorUuids.delete(uuid); else state.lessonAuthorUuids.add(uuid);
+        render();
+        setLessonAccess(uuid, !avea).then((r) => {
+          if (r.ok) {
+            showToast(avea
+              ? `${cine} nu mai poate scrie lecții.`
+              : `✓ ${cine} poate scrie lecții. Ți le trimite spre publicare.`,
+              { kind: avea ? "info" : "success" });
+            return;
+          }
+          if (avea) state.lessonAuthorUuids.add(uuid); else state.lessonAuthorUuids.delete(uuid);
           showToast(r.message);
           render();
         });
