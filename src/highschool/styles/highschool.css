@@ -616,6 +616,17 @@
   inline-size: auto; padding: 0.4rem 0.65rem;
 }
 
+/* PESTE O FIȘĂ, CARDUL TRECE ÎN STÂNGA JOS.
+   Fișele își au uneltele lor plutitoare tot în dreapta jos — Luceafărul acolo
+   are zoomul și ecranul plin — iar cardul se așeza peste ele. Se dă el la o
+   parte, nu ele: fișa e materialul de la oră, modulul e doar rama din jur.
+   Ridicat în sus ar fi fost o cârpeală: la o fișă cu panoul mai înalt s-ar fi
+   atins din nou. Mutat într-un colț pe care fișele nu-l folosesc, nu se mai
+   întâlnesc niciodată. */
+.lic-orcard:is([data-mod="prezentare"], [data-mod="fantoma"]) {
+  inset-inline: 16px auto;
+}
+
 /* Butonul de ascuns iese din colț și intră în rând: pe un card de un rând,
    colțul e chiar peste ceas. */
 .hc--scurt .hc__x { position: static; margin-inline-start: 0.1rem; }
@@ -650,7 +661,9 @@
    `showPopover()` a fost refuzat. */
 .lic-orcard:popover-open {
   position: fixed;
-  inset: auto 16px 16px auto;
+  /* sus, dreapta, jos, stânga — adică lipit de colțul din stânga jos, ca și
+     ceilalți doi „moduri de fișă" de mai sus */
+  inset: auto auto 16px 16px;
   margin: 0;
   padding: 0;
   border: 0;

@@ -569,6 +569,24 @@ function vedereDeClasa(c) {
  *  fișele au una (vezi `fise.js`); atunci vorbește titlul ei. */
 const vorbaFisei = (f) => FELUL_FISEI[f?.fel]?.ce || f?.titlu || "";
 
+/**
+ * Culoarea modulului, trimisă fișei odată cu `?in=liceu`.
+ *
+ * PE TOT ECRANUL, PAGINA FIȘEI E SINGURA CARE SE MAI VEDE. Sub orice element
+ * trecut pe tot ecranul, browserul așterne o pânză neagră; o fișă străvezie o
+ * lasă la iveală, și în loc de fundalul modulului iese negru cu litere abia
+ * citibile. Fișa își pune atunci culoarea asta și pânza rămâne acoperită.
+ *
+ * Se citește de pe `body`, de unde o pune `base.css`. Dacă iese străvezie, nu se
+ * trimite nimic: fișa rămâne pe fundalul ei deschis, niciodată pe negru.
+ */
+function culoareaModulului() {
+  try {
+    const c = getComputedStyle(document.body).backgroundColor || "";
+    return /^(transparent|rgba\(0,\s*0,\s*0,\s*0\))$/.test(c.trim()) ? "" : c;
+  } catch { return ""; }
+}
+
 /** Lista simplă de fișe, pentru clasele fără înșiruirea orelor. */
 function listaFiselor(fise) {
   return `<ul class="lic-ore">${fise.map((f) => `
@@ -596,6 +614,9 @@ function listaFiselor(fise) {
  * deschide fișa curată, așa cum e ea pe sit.
  */
 function vedereDeFisa(f) {
+  const adresa = adresaFisei(f, caleaSitului);
+  const bg = culoareaModulului();
+  const inCadru = `${adresa}?in=liceu${bg ? `&bg=${encodeURIComponent(bg)}` : ""}`;
   return `
     <div class="lic-fisa">
       <div class="lic-fisa__bar">
@@ -603,10 +624,10 @@ function vedereDeFisa(f) {
           <b>${esc(f.clasa)} · ${f.ore.length > 1 ? `Orele ${esc(f.ore.join(", "))}` : `Ora ${f.ora}`}</b>
           <small>${esc(f.titlu)}</small>
         </span>
-        <a class="lic-btn" href="${adresaFisei(f, caleaSitului)}" target="_blank" rel="noopener"
+        <a class="lic-btn" href="${adresa}" target="_blank" rel="noopener"
            title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>
       </div>
-      <iframe class="lic-fisa__cadru" src="${adresaFisei(f, caleaSitului)}?in=liceu"
+      <iframe class="lic-fisa__cadru" src="${inCadru}"
         allow="fullscreen" allowfullscreen
         title="${esc(f.titlu)}"></iframe>
     </div>`;

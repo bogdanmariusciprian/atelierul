@@ -13,10 +13,16 @@
        oricare ar fi el, ar fi arătat ca un dreptunghi lipit peste pagină.
        Tema deschisă se pune odată cu asta: fundalul modulului e deschis, iar
        literele scrise pentru tema închisă ar fi rămas albe pe alb. */
-    if (new URLSearchParams(location.search).get('in') === 'liceu') {
+    const cerere = new URLSearchParams(location.search);
+    if (cerere.get('in') === 'liceu') {
       document.documentElement.dataset.inModul = '';
       document.documentElement.dataset.theme = 'light';
       document.querySelector('meta[name="color-scheme"]').content = 'light';
+      /* Culoarea modulului, pentru ecranul întreg (vezi stilul de mai jos).
+         Se pune numai dacă a venit: fără ea, fundalul rămâne cel deschis al
+         paginii, nu negru. */
+      const bg = cerere.get('bg');
+      if (bg) document.documentElement.style.setProperty('--bg-modul', bg);
     } else {
       const t = localStorage.getItem('portofoliu:color-scheme');
       if (t) { document.documentElement.dataset.theme = t;
@@ -62,6 +68,15 @@
        Se ia și de pe `:root`, nu doar de pe `body`: fundalul rădăcinii se mută
        singur pe pânza paginii, iar cadrul ar fi rămas tot nestrăveziu. */
     :root[data-in-modul], :root[data-in-modul] body { background: transparent; }
+
+    /* PE TOT ECRANUL, STRĂVEZIU NU MAI MERGE. Sub orice element trecut pe tot
+       ecranul, browserul așterne o pânză neagră; prin pagina străvezie s-ar fi
+       văzut ea, iar literele scrise pentru fundal deschis ar fi rămas negru pe
+       negru. Aici pagina își pune înapoi un fundal, dar pe cel al modulului,
+       care vine în adresă. Dacă n-a venit, rămâne cel deschis al paginii.
+       Pânza e vopsită și ea, ca să nu se vadă pe la margini cât ține trecerea. */
+    :root[data-in-modul]:fullscreen { background: var(--bg-modul, var(--bg)); }
+    :root[data-in-modul]:fullscreen::backdrop { background: var(--bg-modul, var(--bg)); }
     .foaie { max-inline-size: 1180px; margin-inline: auto; padding: 30px 22px 80px;
       zoom: var(--zoom, 1); }
     button { font: inherit; color: inherit; }
@@ -143,10 +158,8 @@
 
 
 
-    /* ---- panoul plutitor de jos-dreapta ----
-       Ridicat de la 18px: în modulul Liceu, pagina se vede într-un cadru peste
-       care plutește ceasul orelor, tot în colțul ăsta. */
-    .panou { position: fixed; inset-block-end: 48px; inset-inline-end: 18px; z-index: 20;
+    /* ---- panoul plutitor de jos-dreapta ---- */
+    .panou { position: fixed; inset-block-end: 18px; inset-inline-end: 18px; z-index: 20;
       display: flex; flex-direction: column; gap: 2px; padding: 5px;
       border: 1px solid var(--line); border-radius: 13px;
       background: color-mix(in oklab, var(--surface) 90%, transparent);
