@@ -55,6 +55,11 @@ export const FISE = [
     titlu: "De la basmul popular la basmul cult",
     fisier: "10D. Ora 5. B. De la basmul popular la basmul cult.html",
   },
+  {
+    clasa: "11D", ora: 4, fel: "B",
+    titlu: "Originile și evoluția limbii române. Substrat, strat, adstrat",
+    fisier: "11D. Ora 4. B. Originile și evoluția limbii române. Substrat, strat, adstrat.html",
+  },
   /* Luceafărul ține orele 7, 8 și 9 la amândouă clasele a 12-a (migrarea 0093),
      deci se deschide de pe oricare dintre ele. */
   {
