@@ -26,6 +26,8 @@
 import { iaLocal, punLocal } from "../../shared/scripts/session.js";
 import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
+import { stareaDeAcum } from "./school-time.js";
+import { fetchZiua, fetchSaptamana, fetchConfig, ziuaISO } from "./liceu-repo.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -349,14 +351,43 @@ function faCardul() {
   card = hourCard(casa, oraDeArata);
 }
 
+/* Orarul, adus o dată la deschiderea paginii. Cardul îl întreabă de o sută de
+   ori pe minut (are un ceas care bate la secundă), deci n-are cum să ceară
+   serverul de fiecare dată: ce s-a adus stă aici, iar socoteala „ce oră e acum"
+   se face în browser, din datele astea. */
+const orarul = { zi: null, ore: [], saptamana: [], intervale: [], adus: false };
+
+async function aduOrarul() {
+  const azi = ziuaISO();
+  const [z, s, c] = await Promise.all([fetchZiua(azi), fetchSaptamana(), fetchConfig()]);
+  orarul.zi = azi;
+  orarul.ore = z.date || [];
+  orarul.saptamana = s.date || [];
+  orarul.intervale = (c.date || {}).intervale || [];
+  /* `strain` = nu e profesorul logat; atunci nu s-a cerut nimic, iar cardul
+     rămâne cu ceasul lui. */
+  orarul.adus = !z.strain;
+  if (card) card.improspateaza();
+}
+
 /**
- * Ce oră arată cardul. Deocamdată `null`: orarul nu e încă în bază, iar cardul
- * spune cinstit că nu-l are, în loc să inventeze o oră.
- * Când intră orarul, aici se schimbă o singură dată: se întoarce ora de acum
- * ori cea care urmează.
+ * Ce arată cardul. Se cheamă din secundă în secundă, deci nu atinge rețeaua:
+ * socotește din ce s-a adus la deschidere.
+ *
+ * ZIUA SE POATE SCHIMBA SUB NOI. Tabla din clasă stă aprinsă și peste noapte;
+ * dacă pagina rămâne deschisă, la miezul nopții orele de „azi" ar fi ale zilei
+ * de ieri. Când data nu se mai potrivește, se cere ziua nouă.
  */
 function oraDeArata() {
-  return null;
+  if (!orarul.adus) return null;
+  const azi = ziuaISO();
+  if (azi !== orarul.zi) { orarul.zi = azi; aduOrarul(); }
+  return stareaDeAcum({
+    acum: new Date(),
+    oreleZilei: orarul.ore,
+    saptamana: orarul.saptamana,
+    intervale: orarul.intervale,
+  });
 }
 
 /* ---------------- apăsările ---------------- */
@@ -416,4 +447,7 @@ export function renderHighschool(gazda, basePath = "") {
   /* Strângerea se pune DUPĂ primul desen: `strange` caută butonul în pagină. */
   strange(iaLocal(CHEIE_STRANS, false) === true);
   faCardul();
+  /* Orarul vine pe urmă, fără să țină pagina în loc: cardul se arată cu ceasul
+     lui, iar când datele ajung se împrospătează singur. */
+  aduOrarul().catch((e) => console.warn("[liceu] orarul:", e));
 }
