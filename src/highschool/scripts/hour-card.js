@@ -118,7 +118,11 @@ function fataHtml(s, acum) {
   if (s.fel === "gata") {
     return panglica({
       titluStang: "Gata", interval: "pe azi",
-      sub: s.ultima ? `ultima a fost <b>${esc(s.ultima.clasa)}</b>, la ${esc(ora2(s.ultima.sfarsit))}` : "",
+      /* Intervalul întreg, nu doar ceasul de sfârșit: „la 19:00" se citește ca
+         ora la care a ÎNCEPUT, adică pe dos. */
+      sub: s.ultima
+        ? `ultima a fost <b>${esc(s.ultima.clasa)}</b>, la ${esc(ora2(s.ultima.start))} – ${esc(ora2(s.ultima.sfarsit))}`
+        : "",
       cifra: "", unitate: "", ramas: 0, durata: 0, acum,
     });
   }
