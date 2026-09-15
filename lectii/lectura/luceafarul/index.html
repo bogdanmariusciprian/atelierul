@@ -127,8 +127,10 @@
 
 
 
-    /* ---- panoul plutitor de jos-dreapta ---- */
-    .panou { position: fixed; inset-block-end: 18px; inset-inline-end: 18px; z-index: 20;
+    /* ---- panoul plutitor de jos-dreapta ----
+       Ridicat de la 18px: în modulul Liceu, pagina se vede într-un cadru peste
+       care plutește ceasul orelor, tot în colțul ăsta. */
+    .panou { position: fixed; inset-block-end: 28px; inset-inline-end: 18px; z-index: 20;
       display: flex; flex-direction: column; gap: 2px; padding: 5px;
       border: 1px solid var(--line); border-radius: 13px;
       background: color-mix(in oklab, var(--surface) 90%, transparent);
@@ -293,38 +295,9 @@
      ========================================================= -->
 <style>
   html:not(.gate-ready) body { visibility: hidden; }
-
-  .catre-sit {
-    position: fixed; top: 14px; left: 14px; z-index: 50;
-    display: inline-flex; align-items: center; gap: 0.4rem;
-    padding: 0.34rem 0.7rem 0.34rem 0.55rem;
-    border: 1px solid var(--line); border-radius: 999px;
-    background: color-mix(in oklab, var(--surface) 88%, transparent);
-    backdrop-filter: blur(6px);
-    color: var(--muted); text-decoration: none;
-    font: inherit; font-size: 0.78rem; line-height: 1.2;
-    opacity: 0.55;
-    transition: opacity 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-  }
-  .catre-sit:hover, .catre-sit:focus-visible {
-    opacity: 1; color: var(--accent); border-color: var(--accent);
-  }
-  .catre-sit svg { width: 13px; height: 13px; flex: none; }
-  /* Pe ecran îngust rămâne doar săgeata: vorba ar acoperi din poem. */
-  @media (max-width: 560px) {
-    .catre-sit { padding: 0.34rem; }
-    .catre-sit span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  }
-  @media print { .catre-sit { display: none; } }
 </style>
 </head>
 <body>
-<a class="catre-sit" href="../../" title="Înapoi la lista de lecții">
-  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path d="M19 12H5M5 12l6-6M5 12l6 6" fill="none" stroke="currentColor"
-      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg><span>Către site</span>
-</a>
 <div class="foaie">
 
   <header class="cap">

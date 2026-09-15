@@ -615,6 +615,22 @@
   display: flex; align-items: center; gap: 0.55rem;
   inline-size: auto; padding: 0.4rem 0.65rem;
 }
+
+/* PESTE O FIȘĂ NU SE PUNE FUNDAL. Fișa își are fundalul ei, uneori închis la
+   culoare; un card alb peste el e o pată care fură ochiul de pe poem și se bate
+   cu panoul fișei, care stă în același colț.
+   Rămâne un halou în locul fundalului: un contur ștears care ține ceasul citibil
+   și pe pagină albă, și pe una neagră. Fără el, semnele ar fi fost scrise cu
+   culoarea modulului peste culoarea fișei, adică închis pe închis. */
+.lic-orcard:is([data-mod="prezentare"], [data-mod="fantoma"]) :is(.hc, .hc-mic) {
+  border-color: transparent;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  filter:
+    drop-shadow(0 0 2px var(--color-surface))
+    drop-shadow(0 1px 4px oklch(20% 0.02 260 / 0.55));
+}
 /* Butonul de ascuns iese din colț și intră în rând: pe un card de un rând,
    colțul e chiar peste ceas. */
 .hc--scurt .hc__x { position: static; margin-inline-start: 0.1rem; }
