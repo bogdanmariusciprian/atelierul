@@ -28,6 +28,7 @@ import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum } from "./school-time.js";
 import { fetchZiua, fetchSaptamana, fetchConfig, ziuaISO } from "./liceu-repo.js";
+import { fiseleClasei, fisaDupaId, adresaFisei, FELUL_FISEI } from "./fise.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -78,24 +79,30 @@ let card = null;          // cardul plutitor cu ora, făcut o singură dată
 
 /* ---------------- ruta ---------------- */
 
-const hashPentru = (id) => (id ? `#/v/${encodeURIComponent(id)}` : "#/");
+/** `ruta` e deja de forma „v/ceva" ori „f/ceva"; `null` = acasă. */
+const hashPentru = (ruta) => (ruta ? `#/${ruta}` : "#/");
 
+/* Ruta e ori o vedere („v/clasa-9b"), ori o fișă („f/9b-4-b"). Se ține ca text,
+   fiindcă teancul de pași al browserului o poartă înapoi așa cum e. */
 function citesteRuta() {
   const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
-  if (!h.startsWith("v/")) return null;
-  const id = h.slice(2);
-  return vedereaDupaId(id) ? id : null;
+  if (h.startsWith("v/")) { const id = h.slice(2); return vedereaDupaId(id) ? `v/${id}` : null; }
+  if (h.startsWith("f/")) { const id = h.slice(2); return fisaDupaId(id) ? `f/${id}` : null; }
+  return null;
 }
+
+const rutaE = (fel) => String(stare.vedere || "").startsWith(`${fel}/`);
+const rutaId = () => String(stare.vedere || "").slice(2);
 
 /**
  * Deschide o vedere. Pune un pas în istoria browserului, deci Back-ul lui și
  * săgeata noastră ajung în același loc.
  */
-function navigheaza(id) {
-  if (id === stare.vedere) return;
+function navigheaza(ruta) {
+  if (ruta === stare.vedere) return;
   stare.adancime += 1;
-  history.pushState({ liceu: stare.adancime }, "", hashPentru(id));
-  stare.vedere = id;
+  history.pushState({ liceu: stare.adancime }, "", hashPentru(ruta));
+  stare.vedere = ruta;
   deseneaza();
 }
 
@@ -279,31 +286,78 @@ function cartonaseHtml() {
     </div>`;
 }
 
-/** Vederea unei clase. Deocamdată doar capul ei: cuprinsul vine când spui ce
- *  pui în el. */
+/** Vederea unei clase: fișele ei de lecție, în ordinea orelor. */
 function vedereDeClasa(c) {
+  const fise = fiseleClasei(c.cod);
   return `
     <div class="lic-clasa" style="--h:${c.hue}">
       <p class="lic-clasa__cod">${esc(c.cod)}</p>
       <h1 class="lic-clasa__nume">${esc(c.nume)}</h1>
-      <p class="lic-clasa__gol">Aici vine ce ține de clasa asta.</p>
+      ${fise.length ? `
+        <ul class="lic-fise">
+          ${fise.map((f) => `
+            <li>
+              <a class="lic-fisa-it" href="#/f/${esc(f.id)}">
+                <span class="lic-fisa-it__ora">Ora ${f.ora}</span>
+                <span class="lic-fisa-it__ce">
+                  <b>${esc(f.titlu)}</b>
+                  <small>${esc(FELUL_FISEI[f.fel]?.ce || `Fișa ${f.fel}`)}</small>
+                </span>
+                <span class="lic-fisa-it__fel">${esc(f.fel)}</span>
+              </a>
+            </li>`).join("")}
+        </ul>`
+        : `<p class="lic-clasa__gol">Clasa asta n-are încă fișe de lecție.</p>`}
+    </div>`;
+}
+
+/**
+ * O fișă, arătată NEATINSĂ.
+ *
+ * Într-un `<iframe>`, nu desfăcută și pusă la loc de mine: fișierele lui Marius
+ * își poartă singure stilurile și scripturile. Lipite de-a dreptul în pagină,
+ * stilurile lor s-ar fi bătut cu ale modulului în amândouă sensurile — ale lui
+ * ar fi stricat cardul, iar ale mele i-ar fi schimbat fișa pe care o arată la
+ * clasă. Cadrul le ține fiecare la ea acasă.
+ */
+function vedereDeFisa(f) {
+  return `
+    <div class="lic-fisa">
+      <div class="lic-fisa__bar">
+        <span class="lic-fisa__titlu">
+          <b>${esc(f.clasa)} · Ora ${f.ora}</b>
+          <small>${esc(f.titlu)}</small>
+        </span>
+        <a class="lic-btn" href="${adresaFisei(f, caleaSitului)}" target="_blank" rel="noopener"
+           title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>
+      </div>
+      <iframe class="lic-fisa__cadru" src="${adresaFisei(f, caleaSitului)}"
+        title="${esc(f.titlu)}"></iframe>
     </div>`;
 }
 
 function cuprinsHtml() {
-  const v = vedereaDupaId(stare.vedere);
-  if (v) {
-    try { return v.desen(); }
-    catch (err) {
-      console.error("[liceu]", err);
-      return `<div class="lic-gol"><p>Ecranul ăsta n-a putut fi afișat.</p></div>`;
+  try {
+    if (rutaE("f")) {
+      const f = fisaDupaId(rutaId());
+      if (f) return vedereDeFisa(f);
     }
+    if (rutaE("v")) {
+      const v = vedereaDupaId(rutaId());
+      if (v) return v.desen();
+    }
+    return cartonaseHtml();
+  } catch (err) {
+    console.error("[liceu]", err);
+    return `<div class="lic-gol"><p>Ecranul ăsta n-a putut fi afișat.</p></div>`;
   }
-  return cartonaseHtml();
 }
 
 function deseneaza() {
   const acasa = stare.adancime === 0;
+  /* O fișă umple cuprinsul până la margini: fără marginile lui interioare și
+     fără derularea lui, fiindcă fișa își are derularea ei, în cadru. */
+  radacina.classList.toggle("lic--fisa", rutaE("f"));
   radacina.innerHTML = `
     <div class="lic-sus">
       <button type="button" class="lic-inapoi" data-act="inapoi"
@@ -394,12 +448,23 @@ function oraDeArata() {
 /* ---------------- apăsările ---------------- */
 
 function apasa(e) {
+  /* LEGĂTURILE DINĂUNTRU TREC TOT PRIN `navigheaza`. O legătură `#/...` apăsată
+     de-a dreptul ar schimba adresa fără să treacă pe la noi: pagina nu s-ar
+     redesena, iar adâncimea n-ar crește, deci săgeata „Înapoi" ar minți. Le
+     prindem aici și le trimitem pe același drum ca butoanele. */
+  const a = e.target.closest('a[href^="#/"]');
+  if (a && radacina.contains(a)) {
+    e.preventDefault();
+    navigheaza(a.getAttribute("href").slice(2));
+    return;
+  }
+
   const b = e.target.closest("[data-act]");
   if (!b || !radacina.contains(b)) return;
   const act = b.dataset.act;
   if (act === "inapoi") { inapoi(); return; }
   if (act === "burger") { strange(!stare.strans); return; }
-  if (act === "vedere") { navigheaza(b.dataset.id); }
+  if (act === "vedere") { navigheaza(`v/${b.dataset.id}`); }
 }
 
 /* ---------------- pornirea ---------------- */

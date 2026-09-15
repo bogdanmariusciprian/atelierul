@@ -613,6 +613,88 @@
   color: var(--color-text-muted);
 }
 
+/* ---------- lista fișelor unei clase ---------- */
+.lic-fise { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+
+.lic-fisa-it {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-block-size: 64px;            /* de deget: se apasă pe tablă */
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: inherit;
+  text-decoration: none;
+}
+.lic-fisa-it:hover {
+  border-color: oklch(62% 0.14 var(--h));
+  box-shadow: var(--shadow-sm);
+}
+.lic-fisa-it__ora {
+  flex: none;
+  inline-size: 4.2rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: oklch(48% 0.13 var(--h));
+}
+.lic-fisa-it__ce { flex: 1; min-inline-size: 0; }
+.lic-fisa-it__ce b { display: block; }
+.lic-fisa-it__ce small { color: var(--color-text-muted); font-size: 0.8rem; }
+.lic-fisa-it__fel {
+  flex: none;
+  inline-size: 30px; block-size: 30px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: oklch(92% 0.05 var(--h));
+  color: oklch(42% 0.14 var(--h));
+  font-weight: 800; font-size: 0.85rem;
+}
+
+/* ---------- o fișă, arătată neatinsă ---------- */
+/* Cuprinsul își lasă marginile și derularea: fișa umple tot, iar derularea e a
+   ei, în cadru. */
+.lic--fisa .lic-cuprins {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.lic-fisa { display: flex; flex-direction: column; flex: 1; min-block-size: 0; }
+.lic-fisa__bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.5rem 0.9rem;
+  border-block-end: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.lic-fisa__titlu { min-inline-size: 0; }
+.lic-fisa__titlu b { display: block; font-size: 0.9rem; }
+.lic-fisa__titlu small { color: var(--color-text-muted); font-size: 0.8rem; }
+.lic-btn {
+  flex: none;
+  font: inherit; font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+  min-block-size: 44px;
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.lic-btn:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
+/* Cadrul fișei: fără chenar, cât tot locul rămas. `min-block-size: 0` e ce-l
+   lasă să se micșoreze într-un părinte de tip flex; fără el, ar împinge bara de
+   sus afară din ecran. */
+.lic-fisa__cadru {
+  flex: 1;
+  min-block-size: 0;
+  inline-size: 100%;
+  border: 0;
+  background: #fff;
+}
+
 /* Pe ecran îngust NU se schimbă nimic la panou: nici strângere de la sine, nici
    plafon de lățime. Lățimea e a ta, oriunde. Se subțiază doar marginile
    cuprinsului, ca să nu se piardă text pe degeaba. */
