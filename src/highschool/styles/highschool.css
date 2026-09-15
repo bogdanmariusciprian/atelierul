@@ -1,0 +1,237 @@
+/* =========================================================
+   MODULUL „LICEU".
+
+   Culorile vin din `variables.css`, ca să se recunoască familia, dar restul e
+   al lui: fără antet, fără subsol, fără lățimea strânsă a sitului. Modulul
+   umple ecranul și se derulează pe dinăuntru, nu pe pagină.
+
+   AȘEZAREA E O GRILĂ DE TREI COLOANE: panoul, mânerul, cuprinsul. Lățimea
+   panoului stă într-o singură variabilă, `--panou`, scrisă de JS. Așa tragerea
+   mută o singură valoare, iar browserul își face singur restul socotelii: fără
+   lățimi puse de mână pe trei elemente, care s-ar fi dezacordat la prima
+   schimbare.
+   ========================================================= */
+
+.lic-body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  /* Modulul are derularea lui; pagina n-are de ce să se miște sub el. */
+  overflow: hidden;
+  /* `dvh`, nu `vh`: pe telefon bara de adresă se ascunde la derulare, iar `vh`
+     rămâne la înălțimea de dinainte, deci modulul ieșea din ecran cu câțiva
+     zeci de pixeli. (`base.css` pune pe body `display:flex` și `min-height:100vh`
+     pentru subsolul lipit de jos; aici n-avem subsol, deci îl întoarcem la
+     înălțimea adevărată a ecranului.) */
+  min-block-size: 100dvh;
+}
+
+.lic {
+  --panou: 264px;
+  --maner: 6px;
+
+  /* Crește cât îi lasă body-ul, în loc să-și pună singur o înălțime: body e
+     `display:flex` din `base.css`, iar o înălțime pusă de mână s-ar fi adunat
+     peste a lui și ar fi ieșit din ecran. */
+  flex: 1;
+  /* CAPCANA DE FLEX: un copil de flex are `min-height: auto`, deci nu se lasă
+     mai mic decât cuprinsul lui. Fără rândul ăsta, `overflow-y: auto` de mai
+     jos n-ar fi derulat niciodată: panoul ar fi împins pagina în jos. */
+  min-block-size: 0;
+
+  display: grid;
+  grid-template-columns: var(--panou) var(--maner) 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "sus    sus    sus"
+    "panou  maner  cuprins";
+}
+
+/* Strâns: panoul și mânerul rămân în pagină, dar nu mai ocupă nicio coloană.
+   Regula e scrisă cu DOUĂ clase (`.lic.lic--strans`) dinadins: așa bate regula
+   de la ecran îngust de mai jos, oricare ar veni a doua în fișier. Cu o singură
+   clasă, pe telefon panoul strâns s-ar fi deschis singur. */
+.lic.lic--strans {
+  grid-template-columns: 0 0 1fr;
+}
+.lic--strans .lic-panou,
+.lic--strans .lic-maner { visibility: hidden; }
+
+/* ---------- rândul de sus ---------- */
+.lic-sus {
+  grid-area: sus;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.4rem 0.5rem;
+  border-block-end: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* SĂGEATA, DISCRETĂ. Stinsă până la hover: e o ieșire, nu o invitație. Vorba ei
+   se schimbă singură („Înapoi" / „Înapoi la site"), scrisă de JS. */
+.lic-inapoi,
+.lic-burger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.lic-inapoi:hover,
+.lic-burger:hover,
+.lic-inapoi:focus-visible,
+.lic-burger:focus-visible {
+  opacity: 1;
+  color: var(--color-primary-dark);
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+.lic-burger { padding-inline: 0.45rem; }
+
+/* Numele butonului, pentru cititoarele de ecran: în pagină, dar nevăzut. */
+.sr-only {
+  position: absolute;
+  inline-size: 1px; block-size: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+/* ---------- panoul ---------- */
+.lic-panou {
+  grid-area: panou;
+  min-inline-size: 0;          /* fără asta, un nume lung ar umfla coloana */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.7rem 0.5rem;
+  background: var(--color-surface);
+  border-inline-end: 1px solid var(--color-border);
+}
+
+.lic-panou__gol {
+  margin: 0;
+  padding: 1.2rem 0.7rem;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+.lic-grup + .lic-grup { margin-block-start: 1rem; }
+.lic-grup__titlu {
+  margin: 0 0 0.3rem;
+  padding-inline: 0.55rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.lic-buton {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.55rem;
+  margin-block-end: 0.12rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+  /* Un nume lung nu rupe panoul: se taie cu trei puncte. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lic-buton:hover { background: var(--color-bg); }
+.lic-buton.on {
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+/* ---------- mânerul ---------- */
+/* Are 6px lățime, dar zona de prins e mai largă (`::before`, ±5px): un mâner de
+   șase pixeli se nimerește greu cu mausul și aproape deloc cu degetul. */
+.lic-maner {
+  grid-area: maner;
+  position: relative;
+  cursor: col-resize;
+  background: transparent;
+  touch-action: none;          /* altfel degetul derulează pagina în loc să tragă */
+}
+.lic-maner::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: -5px;
+}
+/* Dunga se vede abia la apropiere: cât stai departe, e doar o despărțire. */
+.lic-maner::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  inline-size: 2px;
+  background: var(--color-primary);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.lic-maner:hover::after,
+.lic-maner:focus-visible::after,
+.lic--trage .lic-maner::after { opacity: 1; }
+.lic-maner:focus-visible { outline: none; }
+
+/* Cât se trage, nimic nu se selectează și nimic nu prinde mausul: fără regula
+   asta, tragerea peste cuprins începea să selecteze text. */
+.lic--trage { user-select: none; }
+.lic--trage .lic-cuprins { pointer-events: none; }
+
+/* ---------- cuprinsul ---------- */
+.lic-cuprins {
+  grid-area: cuprins;
+  min-inline-size: 0;
+  overflow-y: auto;
+  padding: 1.4rem 1.6rem 3rem;
+  /* Regula casei: pe sit nimic nu se selectează, afară de text. Aici e chiar
+     textul, deci se selectează. Panoul și rândul de sus rămân neselectabile,
+     cum moștenesc din `base.css`: sunt unelte, nu cuvinte de copiat. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.lic-gol {
+  max-inline-size: 34rem;
+  margin: 12vh auto 0;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.lic-gol h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+/* Pe ecran îngust panoul NU se strânge singur (așa a cerut Marius): rămâne, dar
+   nu i se îngăduie să treacă de 44% din lățime, ca să rămână loc de citit.
+   Marginea se pune pe COLOANĂ, nu pe `--panou`: o variabilă care se cere pe ea
+   însăși (`--panou: min(var(--panou), …)`) e un ciclu, iar browserul o aruncă
+   de tot. */
+@media (max-width: 720px) {
+  .lic { grid-template-columns: min(var(--panou), 44vw) var(--maner) 1fr; }
+  .lic-cuprins { padding: 1rem 0.9rem 3rem; }
+}

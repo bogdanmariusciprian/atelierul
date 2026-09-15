@@ -163,6 +163,76 @@
   padding: 0; /* anulează pastila de pagină-activă a linkurilor normale */
 }
 
+/* =========================================================
+   „LICEU" = un „L" plutitor pe marginea din dreapta, pe mijlocul ECRANULUI.
+
+   Același chip ca „M"-ul de la Meditații, cu inelul rotitor, dar cu NUANȚA MAI
+   STINSĂ (Marius): stă pe toate paginile, deci n-are voie să tragă ochiul cât
+   trage un buton din nav, unde ajungi doar dacă te uiți acolo.
+
+   `position: fixed` + `top: 50%`, deci mijlocul FERESTREI, nu al paginii: nu se
+   mișcă la derulare. Ține minte că un `transform` pe un părinte ar fi rupt
+   `fixed`; de-aia butonul se lipește de `<body>` (vezi `addLiceuFab`).
+   ========================================================= */
+.liceu-fab {
+  position: fixed;
+  inset-inline-end: 14px;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+  z-index: 40;
+
+  inline-size: 2.1rem; block-size: 2.1rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--color-bg);
+  font-weight: 800; font-size: 0.95rem; line-height: 1;
+  color: #7c3aed;
+  text-decoration: none;
+
+  /* Stins în repaus, întreg la apropiere. */
+  opacity: 0.42;
+  transition: opacity 0.18s ease;
+}
+.liceu-fab:hover,
+.liceu-fab:focus-visible { opacity: 1; }
+
+/* Inelul: aceleași forme și aceeași paletă ca la „M", dar trecut prin `opacity`
+   și cu culorile mai potolite, ca să fie o șoaptă, nu o chemare. */
+.liceu-fab::before {
+  content: "";
+  position: absolute; inset: -3.5px;
+  border-radius: 70% 30% 46% 54% / 38% 62% 38% 62%;
+  background: conic-gradient(from 0deg,
+    #a78bfa, #a5b4fc, #c4b5fd, #e9d5ff, #b4a5f7, #a78bfa);
+  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 60%);
+  mask: radial-gradient(farthest-side, transparent 52%, #000 60%);
+  animation: nav-med-morph 8.5s ease-in-out infinite,
+             nav-med-squish 11s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liceu-fab::before { animation: none; }
+}
+
+/* Cât un panou plutitor e deschis, „L"-ul se dă la o parte: altfel ar sta
+   peste el, pe jumătate acoperit, și ar părea stricat. Aceeași purtare ca
+   săgeata „sus", câteva rânduri mai jos. */
+body:has(.msgr-panel:not([hidden])) .liceu-fab,
+body:has(.admin-quick__panel:not([hidden])) .liceu-fab {
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+
+/* Pe ecran îngust se trage mai aproape de margine: acolo fiecare pixel de
+   lățime e citit. */
+@media (max-width: 720px) {
+  .liceu-fab { inset-inline-end: 6px; inline-size: 1.9rem; block-size: 1.9rem; }
+}
+
+/* La tipărire n-are ce căuta. */
+@media print {
+  .liceu-fab { display: none; }
+}
+
 .main-nav a {
   color: var(--color-text);
   font-weight: 500;

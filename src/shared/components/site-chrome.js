@@ -99,6 +99,7 @@ export async function renderChrome(basePath = "") {
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
   safe(addPlannerLink, "plannerLink"); // „Meditații" — added only if allowed
+  safe(addLiceuFab, "liceuFab"); // „L" plutitor, dreapta, pe mijlocul ecranului
   if (!window.__identityCacheOn) {
     window.__identityCacheOn = true;
     window.addEventListener("atelier:role", cacheIdentity);
@@ -237,6 +238,30 @@ async function addPlannerLink() {
   } catch (e) {
     console.warn("[chrome] planner link:", e);
   }
+}
+
+// „LICEU" = un „L" plutitor pe marginea din dreapta, pe mijlocul ECRANULUI.
+//
+// Spre deosebire de „M"-ul de la Meditații, ăsta e al TUTUROR: nu întreabă
+// nimic despre cont, fiindcă modulul e deschis oricui ajunge pe sit.
+//
+// SE LIPEȘTE DE `<body>`, nu într-un container al paginii, și asta nu e o
+// toană: un `transform` pe oricare părinte face din el noul reper pentru
+// `position: fixed`, iar butonul ar fi început să se plimbe cu pagina în loc să
+// stea pe mijlocul ecranului. E capcana care ne-a stricat odată un modal.
+function addLiceuFab() {
+  if (window.__liceuFabOn) return;
+  /* În modul nu-l punem: acolo ești deja, iar modulul n-are bara sitului. */
+  if (canonicalPath("/liceu/") === canonicalPath(window.location.pathname)) return;
+  window.__liceuFabOn = true;
+
+  const a = document.createElement("a");
+  a.href = "/liceu/";
+  a.className = "liceu-fab";
+  a.textContent = "L";
+  a.title = "Liceu";
+  a.setAttribute("aria-label", "Liceu");
+  document.body.appendChild(a);
 }
 
 // The "log out" glyph used by the header logout button (a door + arrow).

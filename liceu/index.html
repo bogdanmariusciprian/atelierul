@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/assets/logo/logo.png" />
+  <meta name="theme-color" content="#7c3aed" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <title>Liceu — Atelierul-LRO</title>
+  <meta name="description" content="Liceu: un spațiu de lucru cu panou lateral, pe Atelierul-LRO." />
+  <link rel="stylesheet" href="../src/shared/styles/main.css" />
+  <link rel="stylesheet" href="../src/highschool/styles/highschool.css" />
+</head>
+<!-- Modulul stă de sine stătător: fără antetul și fără subsolul sitului. De-aia
+     pagina NU cheamă `renderChrome()`, ci numai poarta de pre-lansare și
+     dezvelirea. Ieșirea spre sit e săgeata discretă din colțul de sus-stânga. -->
+<body class="lic-body">
+  <div id="liceu" class="lic"></div>
+
+  <script type="module">
+    import { enforceGate, revealGate } from "../src/shared/scripts/site-gate.js";
+    import { renderHighschool } from "../src/highschool/scripts/highschool.js";
+
+    /* Poarta întâi: un vizitator din afara echipei e trimis la /in-curand/, iar
+       pagina rămâne ascunsă (main.css o ține așa până la `gate-ready`). */
+    if (await enforceGate()) {
+      renderHighschool(document.getElementById("liceu"), "../");
+      revealGate();
+    }
+  </script>
+</body>
+</html>
