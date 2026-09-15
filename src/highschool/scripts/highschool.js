@@ -427,9 +427,12 @@ function cuprinsHtml() {
 
 function deseneaza() {
   const acasa = stare.adancime === 0;
-  /* O fișă umple cuprinsul până la margini: fără marginile lui interioare și
-     fără derularea lui, fiindcă fișa își are derularea ei, în cadru. */
+  /* Două ecrane umplu cuprinsul până la margini, fiecare din alt motiv:
+     fișa fiindcă își are derularea ei, în cadru; ecranul de pornire fiindcă
+     fundalul lui colorat trebuie să ajungă în toate colțurile, iar cartonașele
+     stau pe mijloc, și pe orizontală, și pe verticală. */
   radacina.classList.toggle("lic--fisa", rutaE("f"));
+  radacina.classList.toggle("lic--acasa", !stare.vedere);
   radacina.innerHTML = `
     <div class="lic-sus">
       <button type="button" class="lic-inapoi" data-act="inapoi"

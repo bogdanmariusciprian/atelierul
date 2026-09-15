@@ -283,14 +283,30 @@
    ar fi ieșit o casetă spălăcită, nu sticlă. De-aia dedesubt stau pete mari și
    neclare de culoare — `.lic-aurora` — luate chiar din nuanțele claselor.
    ========================================================= */
+/* ECRANUL DE PORNIRE UMPLE TOT CUPRINSUL, iar cartonașele stau pe mijloc.
+   Cuprinsul își lasă marginile interioare și se face o coloană de tip flex;
+   ecranul crește cât îi dă ea (`flex: 1`). Fără percentaje nicăieri: o sută la
+   sută din înălțimea unui părinte cu margini interioare dă mai mult decât
+   încape, și de-acolo venea bara de derulare de mai devreme. */
+.lic--acasa .lic-cuprins {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
 /* `isolation: isolate` face din ecran un teanc de straturi al lui. Fără el,
    petele cu `z-index: -1` ar fi putut aluneca în spatele fundalului unui
-   părinte și ar fi dispărut cu totul.
-
-   Nu i se pune `min-block-size: 100%`: cuprinsul are margini interioare, iar o
-   sută la sută din înălțimea LUI, plus marginile, dă mai mult decât încape.
-   Petele se întind singure, prin `inset`, deci n-au nevoie de înălțime. */
-.lic-acasa { position: relative; isolation: isolate; }
+   părinte și ar fi dispărut cu totul. */
+.lic-acasa {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
 
 /* Titlul se centrează și el: un titlu lipit de stânga peste un teanc de
    cartonașe centrate arată strâmb. Spune dacă-l vrei la stânga. */
@@ -314,29 +330,32 @@
   pointer-events: none;
 }
 
-/* MĂRIMEA PETELOR E ÎN `vmin`, nu în procente din părinte. Procentele se legau
-   de cuprins: pe un ecran lat, 46% însemnau aproape opt sute de pixeli, iar pe
-   unul îngust se făceau cât o nucă. În `vmin` rămân la fel oriunde, și — mai
-   important — nu mai cer nimic de la înălțimea părintelui. */
+/* MĂRIMEA E ÎN `vmin`, AȘEZAREA ÎN PROCENTE. Două unități, două treburi:
+   mărimea în `vmin` ține petele la fel de mari pe orice ecran (cu procente, pe
+   unul lat ajungeau de opt sute de pixeli, pe unul îngust cât o nucă), iar
+   așezarea în procente le împrăștie pe toată întinderea, oricât ar fi ea.
+   `translate: -50% -50%` mută socoteala pe CENTRUL petei, ca procentele de mai
+   jos să se citească drept „unde e mijlocul ei". */
 .lic-aurora span {
   position: absolute;
-  inline-size: 34vmin;
-  block-size: 34vmin;
+  inline-size: 42vmin;
+  block-size: 42vmin;
+  translate: -50% -50%;
   border-radius: 50%;
   background: oklch(72% 0.17 var(--h));
   opacity: 0.34;
-  filter: blur(60px);
+  filter: blur(70px);
 }
-/* Pozițiile, scrise una câte una și tot în `vmin`. Le-am pus împrăștiat, nu pe
-   un cerc: un cerc se vede că e cerc chiar și neclar, iar petele ar fi arătat
-   așezate la rând. Scrise așa, se pot muta cu ochiul, fără socoteală. */
-.lic-aurora span:nth-child(1) { inset-block-start: -8vmin; inset-inline-start:  -4vmin; }
-.lic-aurora span:nth-child(2) { inset-block-start: 14vmin; inset-inline-start:  38vmin; }
-.lic-aurora span:nth-child(3) { inset-block-start: -6vmin; inset-inline-start:  62vmin; }
-.lic-aurora span:nth-child(4) { inset-block-start: 26vmin; inset-inline-start:   4vmin; }
-.lic-aurora span:nth-child(5) { inset-block-start: 34vmin; inset-inline-start:  56vmin; }
-.lic-aurora span:nth-child(6) { inset-block-start: 10vmin; inset-inline-start:  20vmin; }
-.lic-aurora span:nth-child(7) { inset-block-start: 38vmin; inset-inline-start:  28vmin; }
+/* Împrăștiate, nu pe un cerc: un cerc se vede că e cerc chiar și neclar, iar
+   petele ar fi arătat așezate la rând. Scrise una câte una, se pot muta cu
+   ochiul, fără socoteală. */
+.lic-aurora span:nth-child(1) { inset-block-start: 14%; inset-inline-start:  8%; }
+.lic-aurora span:nth-child(2) { inset-block-start: 32%; inset-inline-start: 63%; }
+.lic-aurora span:nth-child(3) { inset-block-start: 78%; inset-inline-start: 24%; }
+.lic-aurora span:nth-child(4) { inset-block-start: 62%; inset-inline-start: 88%; }
+.lic-aurora span:nth-child(5) { inset-block-start: 88%; inset-inline-start: 66%; }
+.lic-aurora span:nth-child(6) { inset-block-start:  6%; inset-inline-start: 80%; }
+.lic-aurora span:nth-child(7) { inset-block-start: 52%; inset-inline-start: 40%; }
 
 /* CENTRAT PE LĂȚIMEA PAGINII, cu flex, nu cu grilă. O grilă ar fi ținut
    coloanele la locul lor, iar ultimul rând (trei cartonașe din șapte) ar fi
@@ -350,6 +369,10 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 1rem;
+  /* Lățimea se strânge cât să încapă cinci pe rând, nu cât ține ecranul: pe o
+     tablă lată, șapte cartonașe întinse pe un singur rând s-ar fi citit ca o
+     panglică, nu ca un grup. */
+  max-inline-size: 66rem;
 }
 /* Cartonașe de deget: pleacă de la 15rem și nu se lăbărțează ca să umple
    rândul; pe ecran îngust se strâng. */
