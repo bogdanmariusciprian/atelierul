@@ -105,6 +105,23 @@ export async function fetchSaptamana() {
   }, []);
 }
 
+/**
+ * Planificarea unei clase: toate orele anului, în ordine.
+ *
+ * NU se cere și coloana `blocuri`. Acolo stau noțiunile, activitățile și vorba
+ * „pentru fișa de bacalaureat" — sute de kilobiți pe clasă, dintre care lista
+ * n-are nevoie de nicio literă. Se aduc doar cele șase coloane care se văd.
+ */
+export async function fetchPlan(clasa) {
+  return cuPlasa(`plan:${clasa}`, async () => verifica(
+    await supabase.from("school_plan")
+      .select("nr, data, ora, fel, unitatea, titlu")
+      .eq("clasa", clasa)
+      .eq("an_scolar", "2026-2027")
+      .order("nr")
+  ) || [], []);
+}
+
 /** Ceasurile intervalelor și structura anului, din `school_config`. */
 export async function fetchConfig() {
   return cuPlasa("config", async () => {

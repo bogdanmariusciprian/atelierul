@@ -27,7 +27,7 @@ import { iaLocal, punLocal } from "../../shared/scripts/session.js";
 import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum } from "./school-time.js";
-import { fetchZiua, fetchSaptamana, fetchConfig, ziuaISO } from "./liceu-repo.js";
+import { fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, ziuaISO } from "./liceu-repo.js";
 import { fiseleClasei, fisaDupaId, adresaFisei, FELUL_FISEI } from "./fise.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
@@ -285,28 +285,102 @@ function cartonaseHtml() {
     </div>`;
 }
 
-/** Vederea unei clase: fișele ei de lecție, în ordinea orelor. */
+/* Planificările cerute pe parcurs, ținute ca să nu se ceară de două ori. */
+const planuri = {};
+
+async function aduPlanul(clasa) {
+  if (planuri[clasa]) return;
+  planuri[clasa] = { seAduce: true, ore: [] };
+  const r = await fetchPlan(clasa);
+  planuri[clasa] = { seAduce: false, ore: r.date || [] };
+  /* Dacă între timp ai plecat pe alt ecran, nu-l smulgem de sub tine. */
+  if (rutaE("v") && rutaId() === `clasa-${clasa.toLowerCase()}`) deseneaza();
+}
+
+const ziScurta = (iso) => {
+  try {
+    return new Date(`${iso}T00:00:00`).toLocaleDateString("ro-RO",
+      { weekday: "short", day: "numeric", month: "short" });
+  } catch { return iso; }
+};
+
+/**
+ * Vederea unei clase: TOATE orele din planificare, cu titlurile lor.
+ *
+ * Orele care au deja o fișă se deschid și se văd întregi; celelalte stau
+ * stinse, ca niște locuri pregătite. Așa se vede dintr-o privire cât e făcut
+ * din an și cât mai e de făcut, iar o fișă nouă „umple" rândul ei fără să umble
+ * nimeni prin cod: se potrivesc după numărul orei.
+ *
+ * La clasele a 12-a nu se înșiră nimic (cerut de Marius): rămân doar fișele,
+ * dacă are vreuna.
+ */
 function vedereDeClasa(c) {
   const fise = fiseleClasei(c.cod);
+  const peOra = new Map(fise.map((f) => [f.ora, f]));
+
+  const cap = `<h1 class="lic-clasa__cod">${esc(c.cod)}</h1>`;
+
+  if (c.faraOre) {
+    return `
+      <div class="lic-clasa" style="--h:${c.hue}">
+        ${cap}
+        ${fise.length ? listaFiselor(fise) : `<p class="lic-clasa__gol">Clasa asta n-are încă fișe.</p>`}
+      </div>`;
+  }
+
+  const p = planuri[c.cod];
+  if (!p) { aduPlanul(c.cod); }
+  if (!p || p.seAduce) {
+    return `<div class="lic-clasa" style="--h:${c.hue}">${cap}
+      <p class="lic-clasa__gol">Aduc planificarea…</p></div>`;
+  }
+  if (!p.ore.length) {
+    return `<div class="lic-clasa" style="--h:${c.hue}">${cap}
+      <p class="lic-clasa__gol">Planificarea clasei ăsteia n-a fost încă adusă în bază.</p></div>`;
+  }
+
+  /* Un titlu de unitate la fiecare unitate nouă: o sută de rânduri la rând se
+     citesc ca o listă fără capete. */
+  let unitateaDeSus = null;
+  const randuri = p.ore.map((o) => {
+    const f = peOra.get(o.nr);
+    const nouaUnitate = o.unitatea && o.unitatea !== unitateaDeSus;
+    if (nouaUnitate) unitateaDeSus = o.unitatea;
+    const cuprins = `
+      <span class="lic-ora__nr">Ora ${o.nr}</span>
+      <span class="lic-ora__ce">
+        <b>${o.titlu ? esc(o.titlu) : `<i>${esc(o.fel || "fără titlu")}</i>`}</b>
+        <small>${ziScurta(o.data)} · ${esc(o.ora)}</small>
+      </span>
+      <span class="lic-ora__semn">${f ? esc(f.fel) : ""}</span>`;
+    return `
+      ${nouaUnitate ? `<li class="lic-unit">${esc(o.unitatea)}</li>` : ""}
+      <li>${f
+        ? `<a class="lic-ora" href="#/f/${esc(f.id)}"
+             title="${esc(FELUL_FISEI[f.fel]?.ce || "")}">${cuprins}</a>`
+        : `<span class="lic-ora lic-ora--fara"
+             title="Ora asta n-are încă fișă">${cuprins}</span>`}</li>`;
+  }).join("");
+
+  const cuFisa = p.ore.filter((o) => peOra.has(o.nr)).length;
   return `
     <div class="lic-clasa" style="--h:${c.hue}">
-      <h1 class="lic-clasa__cod">${esc(c.cod)}</h1>
-      ${fise.length ? `
-        <ul class="lic-fise">
-          ${fise.map((f) => `
-            <li>
-              <a class="lic-fisa-it" href="#/f/${esc(f.id)}">
-                <span class="lic-fisa-it__ora">Ora ${f.ora}</span>
-                <span class="lic-fisa-it__ce">
-                  <b>${esc(f.titlu)}</b>
-                  <small>${esc(FELUL_FISEI[f.fel]?.ce || `Fișa ${f.fel}`)}</small>
-                </span>
-                <span class="lic-fisa-it__fel">${esc(f.fel)}</span>
-              </a>
-            </li>`).join("")}
-        </ul>`
-        : `<p class="lic-clasa__gol">Clasa asta n-are încă fișe de lecție.</p>`}
+      ${cap}
+      <p class="lic-clasa__cate">${cuFisa} din ${p.ore.length} ore au fișă</p>
+      <ul class="lic-ore">${randuri}</ul>
     </div>`;
+}
+
+/** Lista simplă de fișe, pentru clasele fără înșiruirea orelor. */
+function listaFiselor(fise) {
+  return `<ul class="lic-ore">${fise.map((f) => `
+    <li><a class="lic-ora" href="#/f/${esc(f.id)}">
+      <span class="lic-ora__nr">Ora ${f.ora}</span>
+      <span class="lic-ora__ce"><b>${esc(f.titlu)}</b>
+        <small>${esc(FELUL_FISEI[f.fel]?.ce || "")}</small></span>
+      <span class="lic-ora__semn">${esc(f.fel)}</span>
+    </a></li>`).join("")}</ul>`;
 }
 
 /**

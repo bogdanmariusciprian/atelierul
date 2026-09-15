@@ -16,14 +16,17 @@
 // Cuprins în română, nume în engleză.
 // =========================================================
 
+/* `faraOre` = la clasa asta nu se înșiră orele din planificare. Cerut de Marius
+   pentru clasele a 12-a; e scris ca însușire, nu ghicit din cifra clasei, ca să
+   se poată răzgândi pentru una singură fără să umble prin ecrane. */
 export const CLASE = [
   { cod: "9B",  hue: 250 },
   { cod: "10D", hue: 300 },
   { cod: "11B", hue: 350 },
   { cod: "11C", hue: 40 },
   { cod: "11D", hue: 95 },
-  { cod: "12C", hue: 155 },
-  { cod: "12D", hue: 205 },
+  { cod: "12C", hue: 155, faraOre: true },
+  { cod: "12D", hue: 205, faraOre: true },
 ];
 
 export const clasaDupaCod = (cod) =>

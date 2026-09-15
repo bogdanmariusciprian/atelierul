@@ -605,43 +605,77 @@
   color: var(--color-text-muted);
 }
 
-/* ---------- lista fișelor unei clase ---------- */
-.lic-fise { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+/* ---------- orele unei clase ---------- */
+.lic-clasa__cate {
+  margin: -0.8rem 0 1.1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
 
-.lic-fisa-it {
+.lic-ore { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+
+/* Titlul unității de învățare, ca un cap de capitol peste orele ei. */
+.lic-unit {
+  margin-block-start: 1.1rem;
+  padding: 0.3rem 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: oklch(48% 0.13 var(--h));
+  border-block-end: 1px solid var(--color-border);
+}
+.lic-unit:first-child { margin-block-start: 0; }
+
+.lic-ora {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  min-block-size: 64px;            /* de deget: se apasă pe tablă */
-  padding: 0.6rem 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-bg);
+  min-block-size: 56px;            /* de deget: se apasă pe tablă */
+  padding: 0.5rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
   color: inherit;
   text-decoration: none;
 }
-.lic-fisa-it:hover {
+/* Ora CU fișă: se apasă, are muchie și se aprinde la atingere. */
+a.lic-ora {
+  border-color: var(--color-border);
+  background: var(--color-bg);
+}
+a.lic-ora:hover {
   border-color: oklch(62% 0.14 var(--h));
   box-shadow: var(--shadow-sm);
 }
-.lic-fisa-it__ora {
+/* Ora FĂRĂ fișă: un loc pregătit. Stinsă, fără muchie, și nu se apasă.
+   `opacity` pe tot rândul, dinadins: se vede că e același fel de lucru, doar
+   că nu e încă gata. Se umple singură când fișa ei intră în `fise/`. */
+.lic-ora--fara {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.lic-ora__nr {
   flex: none;
-  inline-size: 4.2rem;
+  inline-size: 4rem;
   font-size: 0.8rem;
   font-weight: 700;
   color: oklch(48% 0.13 var(--h));
+  font-variant-numeric: tabular-nums;
 }
-.lic-fisa-it__ce { flex: 1; min-inline-size: 0; }
-.lic-fisa-it__ce b { display: block; }
-.lic-fisa-it__ce small { color: var(--color-text-muted); font-size: 0.8rem; }
-.lic-fisa-it__fel {
+.lic-ora__ce { flex: 1; min-inline-size: 0; }
+.lic-ora__ce b { display: block; font-weight: 500; }
+.lic-ora__ce small { color: var(--color-text-muted); font-size: 0.78rem; }
+.lic-ora__semn {
   flex: none;
-  inline-size: 30px; block-size: 30px;
+  inline-size: 28px; block-size: 28px;
   display: grid; place-items: center;
   border-radius: 8px;
+  font-weight: 800; font-size: 0.82rem;
+}
+a.lic-ora .lic-ora__semn {
   background: oklch(92% 0.05 var(--h));
   color: oklch(42% 0.14 var(--h));
-  font-weight: 800; font-size: 0.85rem;
 }
 
 /* ---------- o fișă, arătată neatinsă ---------- */
