@@ -506,7 +506,11 @@ const ziScurta = (iso) => {
  */
 function vedereDeClasa(c) {
   const fise = fiseleClasei(c.cod);
-  const peOra = new Map(fise.map((f) => [f.ora, f]));
+  /* O fișă poate ține mai multe ore (o lecție întinsă pe o săptămână), deci se
+     așază pe fiecare dintre ele: din oricare oră a Luceafărului se deschide
+     același poem. */
+  const peOra = new Map();
+  fise.forEach((f) => f.ore.forEach((o) => peOra.set(o, f)));
 
   const cap = `<h1 class="lic-clasa__cod">${esc(c.cod)}</h1>`;
 
@@ -542,12 +546,12 @@ function vedereDeClasa(c) {
         <b>${o.titlu ? esc(o.titlu) : `<i>${esc(o.fel || "fără titlu")}</i>`}</b>
         <small>${ziScurta(o.data)} · ${esc(o.ora)}</small>
       </span>
-      <span class="lic-ora__semn">${f ? esc(f.fel) : ""}</span>`;
+      <span class="lic-ora__semn">${esc(f?.fel)}</span>`;
     return `
       ${nouaUnitate ? `<li class="lic-unit">${esc(o.unitatea)}</li>` : ""}
       <li>${f
         ? `<a class="lic-ora" href="#/f/${esc(f.id)}"
-             title="${esc(FELUL_FISEI[f.fel]?.ce || "")}">${cuprins}</a>`
+             title="${esc(vorbaFisei(f))}">${cuprins}</a>`
         : `<span class="lic-ora lic-ora--fara"
              title="Ora asta n-are încă fișă">${cuprins}</span>`}</li>`;
   }).join("");
@@ -561,11 +565,15 @@ function vedereDeClasa(c) {
     </div>`;
 }
 
+/** Ce scrie pe fișă când treci peste ea. Litera spune cel mai mult, dar nu toate
+ *  fișele au una (vezi `fise.js`); atunci vorbește titlul ei. */
+const vorbaFisei = (f) => FELUL_FISEI[f?.fel]?.ce || f?.titlu || "";
+
 /** Lista simplă de fișe, pentru clasele fără înșiruirea orelor. */
 function listaFiselor(fise) {
   return `<ul class="lic-ore">${fise.map((f) => `
     <li><a class="lic-ora" href="#/f/${esc(f.id)}">
-      <span class="lic-ora__nr">Ora ${f.ora}</span>
+      <span class="lic-ora__nr">${f.ore.length > 1 ? `Orele ${f.ore.join(", ")}` : `Ora ${f.ora}`}</span>
       <span class="lic-ora__ce"><b>${esc(f.titlu)}</b>
         <small>${esc(FELUL_FISEI[f.fel]?.ce || "")}</small></span>
       <span class="lic-ora__semn">${esc(f.fel)}</span>
@@ -586,7 +594,7 @@ function vedereDeFisa(f) {
     <div class="lic-fisa">
       <div class="lic-fisa__bar">
         <span class="lic-fisa__titlu">
-          <b>${esc(f.clasa)} · Ora ${f.ora}</b>
+          <b>${esc(f.clasa)} · ${f.ore.length > 1 ? `Orele ${esc(f.ore.join(", "))}` : `Ora ${f.ora}`}</b>
           <small>${esc(f.titlu)}</small>
         </span>
         <a class="lic-btn" href="${adresaFisei(f, caleaSitului)}" target="_blank" rel="noopener"
