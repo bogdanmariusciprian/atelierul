@@ -588,6 +588,12 @@ function listaFiselor(fise) {
  * stilurile lor s-ar fi bătut cu ale modulului în amândouă sensurile — ale lui
  * ar fi stricat cardul, iar ale mele i-ar fi schimbat fișa pe care o arată la
  * clasă. Cadrul le ține fiecare la ea acasă.
+ *
+ * `?in=liceu` e singurul lucru pe care i-l spune modulul fișei: „ești arătată
+ * înăuntru". Fișa face ce vrea cu vorba asta ori o trece cu vederea — cele trei
+ * prezentări n-o bagă în seamă, Luceafărul se face străveziu ca să stea pe
+ * culoarea modulului, nu pe a lui. Semnul se pune NUMAI pe cadru; „Singură ↗"
+ * deschide fișa curată, așa cum e ea pe sit.
  */
 function vedereDeFisa(f) {
   return `
@@ -600,7 +606,7 @@ function vedereDeFisa(f) {
         <a class="lic-btn" href="${adresaFisei(f, caleaSitului)}" target="_blank" rel="noopener"
            title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>
       </div>
-      <iframe class="lic-fisa__cadru" src="${adresaFisei(f, caleaSitului)}"
+      <iframe class="lic-fisa__cadru" src="${adresaFisei(f, caleaSitului)}?in=liceu"
         allow="fullscreen" allowfullscreen
         title="${esc(f.titlu)}"></iframe>
     </div>`;

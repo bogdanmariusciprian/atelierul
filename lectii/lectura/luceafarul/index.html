@@ -8,9 +8,20 @@
 <script>
   /* tema se citește înainte de prima zugrăvire, ca să nu clipească pagina */
   try {
-    const t = localStorage.getItem('portofoliu:color-scheme');
-    if (t) { document.documentElement.dataset.theme = t;
-             document.querySelector('meta[name="color-scheme"]').content = t; }
+    /* ÎN MODULUL LICEU pagina se face străvezie și ia culoarea modulului.
+       Acolo poemul se vede într-un cadru, pe fundalul sitului; cu fundalul ei,
+       oricare ar fi el, ar fi arătat ca un dreptunghi lipit peste pagină.
+       Tema deschisă se pune odată cu asta: fundalul modulului e deschis, iar
+       literele scrise pentru tema închisă ar fi rămas albe pe alb. */
+    if (new URLSearchParams(location.search).get('in') === 'liceu') {
+      document.documentElement.dataset.inModul = '';
+      document.documentElement.dataset.theme = 'light';
+      document.querySelector('meta[name="color-scheme"]').content = 'light';
+    } else {
+      const t = localStorage.getItem('portofoliu:color-scheme');
+      if (t) { document.documentElement.dataset.theme = t;
+               document.querySelector('meta[name="color-scheme"]').content = t; }
+    }
   } catch {}
 </script>
 <style>
@@ -46,6 +57,11 @@
     body { margin: 0; background: var(--bg); color: var(--text);
       font: 15px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif; text-wrap: pretty;
       accent-color: var(--accent); }
+
+    /* În modul: fundalul se dă la o parte, ca să se vadă al modulului prin cadru.
+       Se ia și de pe `:root`, nu doar de pe `body`: fundalul rădăcinii se mută
+       singur pe pânza paginii, iar cadrul ar fi rămas tot nestrăveziu. */
+    :root[data-in-modul], :root[data-in-modul] body { background: transparent; }
     .foaie { max-inline-size: 1180px; margin-inline: auto; padding: 30px 22px 80px;
       zoom: var(--zoom, 1); }
     button { font: inherit; color: inherit; }

@@ -616,21 +616,6 @@
   inline-size: auto; padding: 0.4rem 0.65rem;
 }
 
-/* PESTE O FIȘĂ NU SE PUNE FUNDAL. Fișa își are fundalul ei, uneori închis la
-   culoare; un card alb peste el e o pată care fură ochiul de pe poem și se bate
-   cu panoul fișei, care stă în același colț.
-   Rămâne un halou în locul fundalului: un contur ștears care ține ceasul citibil
-   și pe pagină albă, și pe una neagră. Fără el, semnele ar fi fost scrise cu
-   culoarea modulului peste culoarea fișei, adică închis pe închis. */
-.lic-orcard:is([data-mod="prezentare"], [data-mod="fantoma"]) :is(.hc, .hc-mic) {
-  border-color: transparent;
-  background: none;
-  backdrop-filter: none;
-  box-shadow: none;
-  filter:
-    drop-shadow(0 0 2px var(--color-surface))
-    drop-shadow(0 1px 4px oklch(20% 0.02 260 / 0.55));
-}
 /* Butonul de ascuns iese din colț și intră în rând: pe un card de un rând,
    colțul e chiar peste ceas. */
 .hc--scurt .hc__x { position: static; margin-inline-start: 0.1rem; }
@@ -886,12 +871,16 @@ a.lic-ora .lic-ora__semn {
 /* Cadrul fișei: fără chenar, cât tot locul rămas. `min-block-size: 0` e ce-l
    lasă să se micșoreze într-un părinte de tip flex; fără el, ar împinge bara de
    sus afară din ecran. */
+/* CADRUL E STRĂVEZIU, nu alb. O fișă cu fundal propriu îl acoperă oricum, iar
+   una care se face străvezie în modul (`?in=liceu`) capătă chiar culoarea
+   modulului. Cu albul de dinainte, fișa aceea ar fi stat pe alb, nu pe fundalul
+   sitului, iar până se încărca orice fișă clipea o pânză albă. */
 .lic-fisa__cadru {
   flex: 1;
   min-block-size: 0;
   inline-size: 100%;
   border: 0;
-  background: #fff;
+  background: transparent;
 }
 
 /* Pe ecran îngust NU se schimbă nimic la panou: nici strângere de la sine, nici
