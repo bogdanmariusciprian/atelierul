@@ -1,0 +1,162 @@
+/* =========================================================
+   EDITORUL DE LECȚIE, cu file (`lesson-editor.js`).
+
+   Trei etaje, de sus în jos: filele, rândul filei deschise (numele ei și
+   mutările), bara de unelte, câmpul de scris. Cuprinsul câmpului poartă clasa
+   `lt`, deci arată EXACT ca lecția publicată: foaia lui e `lesson-text.css`,
+   una singură pentru amândouă locurile.
+   ========================================================= */
+
+.led {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+/* ---------- filele ---------- */
+.led-file {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem 0.5rem 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.led-fila {
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+.led-fila:hover { color: var(--color-text); background: var(--color-bg); }
+/* Fila deschisă se leagă de câmpul de dedesubt: marginea de jos lipsește, ca
+   fila și foaia să pară o singură bucată de hârtie. */
+.led-fila.on {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-weight: 700;
+  border-color: var(--color-border);
+  margin-bottom: -1px;
+  padding-bottom: calc(0.4rem + 1px);
+}
+.led-fila--plus { font-size: 1.1rem; line-height: 1; padding: 0.35rem 0.7rem; }
+
+/* ---------- rândul filei ---------- */
+.led-filabar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.led-nume { display: flex; flex-direction: column; gap: 0.2rem; flex: 1 1 12rem; min-width: 0; }
+.led-nume__lab { font-size: 0.72rem; color: var(--color-text-muted); }
+.led-input {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-width: 0;
+}
+.led-filabar__act { display: flex; gap: 0.25rem; }
+
+/* ---------- bara de unelte ---------- */
+.led-unelte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+/* Grupurile se despart printr-o dungă, nu prin gol: la lățime mică golul s-ar
+   pierde la rupere de rând, iar dunga rămâne lipită de grupul ei. */
+.led-grup { display: flex; gap: 0.15rem; padding-left: 0.4rem; border-left: 1px solid var(--color-border); }
+.led-grup:first-of-type { border-left: none; padding-left: 0; }
+
+.led-btn {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+/* Semnele desenate (alinierea) se așază pe mijloc ca literele de lângă ele. */
+.led-btn svg { display: block; margin: 0 auto; pointer-events: none; }
+.led-btn:hover:not(:disabled) { background: var(--color-bg); border-color: var(--color-border); }
+.led-btn:disabled { opacity: 0.35; cursor: default; }
+.led-btn.on {
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  color: var(--color-primary-dark);
+}
+.led-btn--rau:hover:not(:disabled) { color: var(--color-danger); }
+
+.led-select {
+  font: inherit;
+  font-size: 0.85rem;
+  height: 2rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* ---------- câmpul de scris ---------- */
+.led-camp {
+  min-height: 18rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 1rem 1.1rem;
+  background: var(--color-bg);
+  /* Textul de scris SE POATE SELECTA, oricât de mult ar fi oprită selecția în
+     rest: e singurul loc din pagină unde selecția e chiar unealta. */
+  user-select: text;
+}
+.led-camp:focus { outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent); outline-offset: -2px; }
+/* Câmpul gol își spune singur ce așteaptă. */
+.led-camp:empty::before {
+  content: "Scrie lecția aici…";
+  color: var(--color-text-muted);
+}
+
+.led-sfat {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Pe ecran îngust bara de unelte are nevoie de tot rândul, iar filele se rup
+   fără să strângă butoanele. */
+@media (max-width: 560px) {
+  .led-camp { min-height: 14rem; padding: 0.8rem; }
+  .led-fila { max-width: 9rem; }
+  .led-sfat { font-size: 0.74rem; }
+}

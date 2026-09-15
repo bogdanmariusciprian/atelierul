@@ -1,0 +1,93 @@
+/* =========================================================
+   TEXTUL UNEI LECȚII SCRISE DE ELEV (0089 + 0090).
+
+   O singură foaie pentru AMÂNDOUĂ locurile în care se vede același text: în
+   editorul elevului și pe pagina lecției publicate. Scrisă de două ori, s-ar
+   fi despărțit la prima schimbare, iar elevul ar fi scris ceva care arată
+   altfel după publicare - adică tocmai lucrul pe care un editor trebuie să-l
+   făgăduiască.
+
+   Clasa `lt` se pune pe vasul textului. Înăuntru sunt numai etichetele și
+   clasele din listele albe ale lui `lesson-rich.js`.
+   ========================================================= */
+
+.lt {
+  /* JUSTIFIED DIN OFICIU (cerut de Marius, 12 septembrie 2026). Nu se scrie în
+     text: vine de aici, iar în text se însemnează doar abaterile. Așa, o lecție
+     veche își schimbă singură înfățișarea dacă ne răzgândim, fără să umblăm
+     prin ce-au scris elevii. */
+  text-align: justify;
+  /* Despărțirea în silabe, ca justificarea să nu lase râuri albe printre
+     cuvinte: fără ea, rândurile lungi se întind urât pe ecran îngust. */
+  hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
+  line-height: 1.75;
+  color: var(--color-text);
+}
+
+.lt > :first-child { margin-top: 0; }
+.lt > :last-child { margin-bottom: 0; }
+
+.lt p { margin: 0 0 0.9rem; }
+/* Textul mărunt: a patra treaptă de mărime, pentru note și lămuriri. */
+.lt p.mic { font-size: 0.86rem; color: var(--color-text-muted); }
+
+/* TITLURILE nu se justifică: un titlu întins pe toată lățimea arată ca o
+   greșeală de tipar. */
+.lt h2, .lt h3 { text-align: left; hyphens: manual; line-height: 1.3; }
+.lt h2 {
+  margin: 1.6rem 0 0.7rem; font-size: 1.35rem; font-weight: 800;
+  letter-spacing: -0.01em; color: var(--color-text);
+}
+.lt h3 { margin: 1.2rem 0 0.5rem; font-size: 1.08rem; font-weight: 700; }
+
+/* ---------- ABATERILE DE LA ALINIERE ---------- */
+.lt .al-stanga { text-align: left; }
+.lt .al-centru { text-align: center; }
+.lt .al-dreapta { text-align: right; }
+/* Un rând scurt centrat n-are nevoie de despărțire în silabe. */
+.lt .al-centru, .lt .al-dreapta { hyphens: manual; }
+
+/* ---------- LISTELE ---------- */
+/* Elementele de listă NU se justifică: sunt rânduri scurte, iar justificarea
+   le-ar rări cuvintele fără niciun câștig. */
+.lt ul, .lt ol { margin: 0 0 0.9rem; padding-left: 1.5rem; }
+.lt li { margin: 0.25rem 0; text-align: left; hyphens: manual; }
+
+/* BULINA E CHIAR SEMNUL CERUT: „•", nu bulina din oficiu a browserului, care
+   se schimbă de la unul la altul (disc, cerc, pătrat pe nivelurile de jos).
+   Scris ca șir, e același semn pe toate nivelurile și în toate browserele. */
+.lt ul { list-style-type: "•  "; }
+
+/* RETRAGEREA PE NIVEL, adică legătura părinte-copil cerută. Fiecare nivel
+   intră cu aceeași măsură, iar semnul rămâne același: ce arată adâncimea e
+   retragerea, nu forma bulinei. */
+.lt ul ul, .lt ul ol, .lt ol ul, .lt ol ol {
+  margin: 0.25rem 0 0.35rem;
+  padding-left: 1.35rem;
+}
+/* Numerele își schimbă felul pe nivel, ca într-un plan de idei: 1. → a. → i. */
+.lt ol { list-style-type: decimal; }
+.lt ol ol { list-style-type: lower-alpha; }
+.lt ol ol ol { list-style-type: lower-roman; }
+
+.lt blockquote {
+  margin: 1rem 0; padding: 0.6rem 0 0.6rem 0.9rem;
+  border-left: 3px solid var(--color-primary);
+  color: var(--color-text-muted); font-style: italic;
+}
+
+.lt mark { background: color-mix(in srgb, var(--color-primary) 22%, transparent); color: inherit; }
+.lt sup, .lt sub { font-size: 0.72em; line-height: 0; }
+
+/* Pe ecran îngust, justificarea face mai mult rău decât bine: rândurile sunt
+   scurte, iar golurile dintre cuvinte se văd de la o poștă. */
+@media (max-width: 560px) {
+  .lt { text-align: left; }
+}
+
+/* La tipărire, textul se întoarce la negru pe alb. */
+@media print {
+  .lt { color: #000; }
+  .lt p.mic, .lt blockquote { color: #333; }
+}

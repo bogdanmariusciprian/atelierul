@@ -12,6 +12,13 @@
 @import "./toast.css";
 @import "./auth.css";
 @import "./todo.css";
+/* Textul unei lecții scrise de elev, și editorul care-l naște. Stau AMÂNDOUĂ
+   aici, împreună: felul în care arată textul e același în editor și pe pagina
+   publicată, iar dacă foaia de text ar lipsi dintr-un loc, elevul ar scrie ceva
+   care arată altfel după publicare. Ambele sunt legate de o clasă a lor
+   (`.lt`, `.led`), deci nu ating paginile care n-au lecții scrise de elevi. */
+@import "./lesson-text.css";
+@import "./lesson-editor.css";
 
 /* Pre-launch gate: keep every page hidden until site-gate.js (run by
    renderChrome on each page) confirms an allowed team account and adds

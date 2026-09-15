@@ -62,29 +62,56 @@ export async function canProposeLesson() {
 
 /* ---------- propunerile elevului ---------- */
 
+/** Filele, aduse la forma cerută de bază (0090): vector de `{name, body}`, una
+ *  până la douăzeci, fiecare cu nume și cuprins. Se face aici, într-un loc, ca
+ *  fiecare ecran care scrie o lecție să trimită același lucru. */
+function fileCurate(pages) {
+  return (Array.isArray(pages) ? pages : [])
+    .map((f) => ({
+      name: String(f?.name || "").trim().slice(0, 40) || "Filă",
+      body: String(f?.body || "").trim(),
+    }))
+    .filter((f) => f.body !== "")
+    .slice(0, 20);
+}
+
 /** Lecțiile mele, cu tot cu cele hotărâte: elevul trebuie să vadă și ce i s-a
- *  respins, și de ce. */
+ *  respins, și de ce.
+ *
+ *  FILTRUL PE AUTOR NU E DE PRISOS, deși există RLS. Regula de citire spune
+ *  „publicată SAU a mea SAU sunt profesor", fiindcă tot ea slujește și pagina
+ *  publică a lecțiilor. Fără `eq`, „Lecțiile mele" ar fi arătat și lecțiile
+ *  publicate ale altor elevi. RLS păzește ce N-AI VOIE să vezi; ce vrei să
+ *  vezi ceri tu. */
 export async function myLessonProposals() {
+  const { data: sesiune } = await supabase.auth.getUser();
+  const authId = sesiune?.user?.id;
+  if (!authId) return [];
+
   const { data, error } = await supabase
     .from("learn_lesson_proposals")
-    .select("id, title, domain, body, status, slug, note, created_at, updated_at")
+    .select("id, title, domain, pages, status, slug, note, created_at, updated_at")
+    .eq("author_id", authId)
     .order("created_at", { ascending: false });
   if (error) {
     console.warn("myLessonProposals:", error.message);
-    throw new Error(error.message || "nu s-am putut citi propunerile tale");
+    throw new Error(error.message || "nu s-au putut citi propunerile tale");
   }
-  return data || [];
+  return (data || []).map((r) => ({ ...r, pages: Array.isArray(r.pages) ? r.pages : [] }));
 }
 
-export async function createLessonProposal({ title, domain, body } = {}) {
+export async function createLessonProposal({ title, domain, pages } = {}) {
   const { data: sesiune } = await supabase.auth.getUser();
   const authId = sesiune?.user?.id;
   if (!authId) return { ok: false, message: "Trebuie să fii autentificat." };
 
+  const file = fileCurate(pages);
+  if (!file.length) return { ok: false, message: "Lecția n-are nicio filă cu text." };
+
   const { data, error } = await supabase
     .from("learn_lesson_proposals")
     .insert({ author_id: authId, title: String(title || "").trim(),
-              domain: String(domain || "").trim(), body: String(body || "").trim() })
+              domain: String(domain || "").trim(), pages: file })
     .select("id").single();
   if (error) {
     console.warn("createLessonProposal:", error.message);
@@ -94,22 +121,29 @@ export async function createLessonProposal({ title, domain, body } = {}) {
       return { ok: false, message: "Nu ai (încă) dreptul de a propune lecții." };
     }
     if (error.code === "23514") {
-      return { ok: false, message: "Titlul ori textul nu se încadrează în măsuri." };
+      return { ok: false, message: "Titlul ori filele nu se încadrează în măsuri." };
     }
     return { ok: false, message: "N-am putut trimite propunerea. Încearcă din nou." };
   }
   return { ok: true, id: data?.id };
 }
 
-export async function updateLessonProposal(id, { title, domain, body } = {}) {
+export async function updateLessonProposal(id, { title, domain, pages } = {}) {
   const schimbari = {};
   if (title !== undefined) schimbari.title = String(title).trim();
   if (domain !== undefined) schimbari.domain = String(domain).trim();
-  if (body !== undefined) schimbari.body = String(body).trim();
+  if (pages !== undefined) {
+    const file = fileCurate(pages);
+    if (!file.length) return { ok: false, message: "Lecția n-are nicio filă cu text." };
+    schimbari.pages = file;
+  }
   const { error } = await supabase
     .from("learn_lesson_proposals").update(schimbari).eq("id", id);
   if (error) {
     console.warn("updateLessonProposal:", error.message);
+    if (error.code === "23514") {
+      return { ok: false, message: "Titlul ori filele nu se încadrează în măsuri." };
+    }
     return { ok: false, message: "N-am putut salva schimbarea." };
   }
   return { ok: true };
@@ -135,18 +169,21 @@ export async function pendingLessons() {
   if (error) { console.warn("pendingLessons:", error.message); return []; }
   return (data || []).map((r) => ({
     id: r.id, authorId: r.author_id, authorName: r.author_name,
-    title: r.title, domain: r.domain, body: r.body,
+    title: r.title, domain: r.domain,
+    pages: Array.isArray(r.pages) ? r.pages : [],
     createdAt: r.created_at, updatedAt: r.updated_at,
   }));
 }
 
-/** Publică lecția. Titlul și textul se pot îndrepta chiar aici: de cele mai
+/** Publică lecția. Titlul și filele se pot îndrepta chiar aici: de cele mai
  *  multe ori asta se și face, iar un drum în doi pași s-ar rupe la mijloc. */
-export async function publishLesson(id, { title, body, slug } = {}) {
+export async function publishLesson(id, { title, pages, slug } = {}) {
+  const file = pages === undefined ? null : fileCurate(pages);
+  if (file && !file.length) return { ok: false, message: "Lecția n-are nicio filă cu text." };
   const { data, error } = await supabase.rpc("publish_lesson", {
     p_id: id,
     p_title: title ?? null,
-    p_body: body ?? null,
+    p_pages: file,
     p_slug: slug ?? null,
   });
   if (error) {
@@ -201,8 +238,9 @@ export async function publishedLessonBySlug(slug) {
   if (!s) return null;
   const { data, error } = await supabase
     .from("learn_lesson_proposals")
-    .select("id, title, domain, body, slug, published_at, author_id")
+    .select("id, title, domain, pages, slug, published_at, author_id")
     .eq("slug", s).eq("status", "publicata").maybeSingle();
   if (error) { console.warn("publishedLessonBySlug:", error.message); return null; }
-  return data || null;
+  if (!data) return null;
+  return { ...data, pages: Array.isArray(data.pages) ? data.pages : [] };
 }

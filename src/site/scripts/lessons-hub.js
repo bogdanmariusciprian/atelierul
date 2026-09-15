@@ -9,8 +9,29 @@ import { LESSONS } from "../../shared/scripts/lessons-index.js";
 import { isLessonDone, mergeServerProgress } from "./lesson-progress.js";
 import { fetchMyLessonProgress } from "../../shared/scripts/forum-repo.js";
 import { isLoggedIn } from "../../shared/scripts/session.js";
+import { publishedLessons } from "../../shared/scripts/lesson-proposals-repo.js";
 
 let _progressSynced = false; // pull server completion state once per page
+
+/* LECȚIILE SCRISE DE ELEVI (0089) stau în bază, nu în catalogul din cod: se
+   publică din panou, fără commit, deci codul n-are de unde le ști. Se aduc o
+   dată pe pagină și se așază la coada domeniului lor, după lecțiile tale.
+   Până vin, hubul arată ce știe; când vin, se redesenează. */
+let _propuseAduse = false;
+let _propuse = [];
+
+/** Catalogul din cod plus lecțiile publicate de elevi, în aceeași formă. */
+function toateLectiile() {
+  return [...LESSONS, ..._propuse.map((l) => ({
+    domain: l.domain,
+    slug: `propusa-${l.slug}`,
+    title: l.title,
+    href: `lectii/propuse/#${l.slug}`,
+    summary: "Lecție scrisă de un elev.",
+    ready: true,
+    deElev: true,
+  }))];
+}
 
 /** Ring progress for a lesson: 100% once its page was marked finished.
  *  Keyed by the STABLE lesson slug (not the URL). */
@@ -51,6 +72,14 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
              data-tip="Lecția asta are tablă interactivă"></span>`
     : "";
 
+  /* Lecțiile scrise de elevi se văd de la o poștă că sunt ale lor. Nu ca să fie
+     puse mai jos, ci fiindcă cine citește are dreptul să știe cine a scris. */
+  const deElev = lesson.deElev
+    ? `<span class="track-node__pupil" role="img"
+             aria-label="Lecție scrisă de un elev"
+             data-tip="Lecție scrisă de un elev">elev</span>`
+    : "";
+
   // Planned title (no page yet): non-clickable, marked "în curând".
   if (!ready) {
     return `
@@ -70,7 +99,7 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
     <li class="track-node">
       <a class="node" href="${href}" aria-label="${lesson.title}">${ring}</a>
       <a class="track-node__label" href="${href}">
-        <span class="track-node__title">${lesson.title}${tabla}</span>
+        <span class="track-node__title">${lesson.title}${tabla}${deElev}</span>
         ${summary}
       </a>
     </li>`;
@@ -103,7 +132,7 @@ function initLessonsSearch(mount, basePath) {
       results.innerHTML = "";
       return;
     }
-    const hits = LESSONS.filter((l) => fold(`${l.title} ${l.summary || ""}`).includes(fq)).slice(0, 8);
+    const hits = toateLectiile().filter((l) => fold(`${l.title} ${l.summary || ""}`).includes(fq)).slice(0, 8);
     results.innerHTML = hits.length
       ? hits
           .map((l) => {
@@ -165,8 +194,10 @@ export function renderLessonsHub(basePath = "") {
       ? `<span class="${cls}" aria-hidden="true" style="${maskStyle(domain)}"></span>`
       : `<span class="${cls}" aria-hidden="true">${domain.icon}</span>`;
 
+  const catalog = toateLectiile();
+
   const tabs = LESSON_DOMAINS.map((domain) => {
-    const count = LESSONS.filter((l) => l.domain === domain.slug).length;
+    const count = catalog.filter((l) => l.domain === domain.slug).length;
     return `
       <button class="domain-tab" type="button" data-target="${domain.slug}"
               style="--card-color: ${domain.color}">
@@ -177,7 +208,7 @@ export function renderLessonsHub(basePath = "") {
   }).join("");
 
   const panels = LESSON_DOMAINS.map((domain) => {
-    const lessons = LESSONS.filter((l) => l.domain === domain.slug);
+    const lessons = catalog.filter((l) => l.domain === domain.slug);
     const track = lessons.length
       ? `<ol class="lesson-track">${lessons
           .map((l, i) => nodeMarkup(l, i + 1, basePath, lessonProgress(l)))
@@ -295,6 +326,17 @@ export function renderLessonsHub(basePath = "") {
     ? fromHash
     : LESSON_DOMAINS[0].slug;
   activate(initial);
+
+  /* Lecțiile publicate de elevi, aduse O DATĂ pe pagină. Se cer și pentru un
+     vizitator nelogat: sunt conținut de sit, ca oricare altă lecție. */
+  if (!_propuseAduse) {
+    _propuseAduse = true;
+    publishedLessons().then((l) => {
+      if (!l.length) return;
+      _propuse = l;
+      renderLessonsHub(basePath);
+    });
+  }
 
   // Cross-device: pull real completion state ONCE, then re-render so the rings
   // reflect lessons finished on other devices too.

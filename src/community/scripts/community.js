@@ -48,8 +48,14 @@ import { cancelFutureSlotsFor } from "../../shared/scripts/planner-repo.js";
    se face ecranul cozii; aduse mai devreme, ar fi importuri care nu cheamă
    nimic, iar paznicul de arhitectură le numără drept fișiere uitate. */
 import {
-  fetchLessonAuthors, setLessonAccess, pendingLessons,
+  fetchLessonAuthors, setLessonAccess, pendingLessons, canProposeLesson,
 } from "../../shared/scripts/lesson-proposals-repo.js";
+/* Cele două ecrane de lecții propuse sunt COMPONENTE DE SINE STĂTĂTOARE, nu
+   bucăți din hub: au un câmp editabil, iar hubul se redesenează întreg la orice
+   apăsare, ceea ce ar fi șters ce scria omul în clipa aceea. Hubul le lasă un
+   loc gol și le așază acolo după desen. Vezi `lesson-writer.js`. */
+import { mountLessonWriter, lessonWriterSlot } from "./lesson-writer.js";
+import { mountLessonQueue, lessonQueueSlot } from "./lesson-queue.js";
 import {
   // aliased: a LOCAL function createGroup() (the composer handler) already
   // exists below — without the alias it would shadow this import and recurse.
@@ -107,6 +113,8 @@ const NAV_ICONS = {
   activitate: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`,
   exercitii: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h6v4a2 2 0 1 0 4 0V7h2a2 2 0 1 1 0 4h-1v6H5a1 1 0 0 1-1-1v-3a2 2 0 1 0 0-4z"/></svg>`,
   lectii: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/></svg>`,
+  // „Scriu o lecție": creionul peste o foaie – scrisul, nu citirea.
+  "scrie-lectie": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L13 14l-4 1 1-4z"/></svg>`,
   caiet: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v18M13 8h3M13 12h3"/></svg>`,
   salvate: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg>`,
   mesaje: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>`,
@@ -148,6 +156,9 @@ const NAV_GROUPS = [
     title: "Spațiul meu",
     items: [
       { id: "lectii", label: "Lecțiile mele" },
+      /* Se vede NUMAI la elevii cu dreptul „Lecții" (0089). Un buton pe care
+         scrie ceva ce n-ai voie să faci e mai rău decât niciun buton. */
+      { id: "scrie-lectie", label: "Scriu o lecție" },
       { id: "salvate", label: "Salvate" },
       { id: "caiet", label: "Caietul meu" },
       { id: "puncte", label: "Puncte" },
@@ -167,6 +178,9 @@ const ALL_SECTIONS = [...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id)), "a
    Elevii le văd pe toate mai departe: lista de față e numai a profesorului. */
 const ADMIN_HIDDEN_SECTIONS = new Set([
   "pagina-mea", "puncte", "insigne", "provocare", "lectii", "exercitii", "membri",
+  /* Profesorul nu propune lecții, le publică: pentru el e „Lecții propuse", în
+     panoul de administrare. */
+  "scrie-lectie",
 ]);
 // Every lesson in the "morfologie" domain — the "all of morphology" badge is
 // earned only when ALL of them are really completed (lesson_progress).
@@ -351,6 +365,7 @@ export function renderCommunity(basePath = "") {
        butoanele sunt stinse. */
     lessonAuthorUuids: new Set(),
     lessonQueue: [],       // propunerile de lecții în așteptare
+    canLesson: false,      // am eu dreptul de a propune lecții? (întrebat de bază)
     msgLabelFilter: "all", // admin inbox filter
   };
   const MSG_MAX_PARTS = 5;
@@ -804,6 +819,10 @@ export function renderCommunity(basePath = "") {
         // The teacher's sidebar hides the member-only, gamified sections;
         // a guest's shows only what guests may open.
         items: g.items.filter((i) => {
+          /* Dreptul de a scrie lecții se dă pe cont, deci intrarea lui apare
+             numai la cine îl are. Îl spune baza (`poate_propune_lectie`), nu
+             ghicim din profil. */
+          if (i.id === "scrie-lectie" && !state.canLesson) return false;
           return guest ? GUEST_SECTIONS.has(i.id) && i.id !== "profil" : !isAdmin() || !ADMIN_HIDDEN_SECTIONS.has(i.id);
         }),
       })).filter((g) => g.items.length),
@@ -891,6 +910,7 @@ export function renderCommunity(basePath = "") {
     for (const d of state.downloads) fisePeExamen[d.exam] = (fisePeExamen[d.exam] || 0) + 1;
     return {
       moderare: modCount, utilizatori: state.adminUsers.length,
+      lectiiPropuse: state.lessonQueue.length,
       propuneriPeLectie, materialPeLectie: state.bankCounts, fisePeExamen,
     };
   }
@@ -3449,6 +3469,8 @@ export function renderCommunity(basePath = "") {
       gamification: adminTabGamification,
       bonus: adminTabBonus,
       lessons: adminTabLessons,
+      /* Numai locul gol: coada se așază după desen, ca ecranul elevului. */
+      lessonQueue: lessonQueueSlot,
       tests: adminTabTests,
     };
     /* Titlul spune unde ești ACUM, nu „Panou de administrare": panoul e locul
@@ -3462,7 +3484,8 @@ export function renderCommunity(basePath = "") {
   const NUME_PANOU = {
     overview: "Statistici", users: "Conturi", moderation: "Moderare",
     challenges: "Provocarea zilei", gamification: "Puncte și insigne",
-    bonus: "Întrebări bonus", lessons: "Lecții", tests: "Teste",
+    bonus: "Întrebări bonus", lessons: "Lecții", lessonQueue: "Lecții propuse",
+    tests: "Teste",
   };
 
   /* Rândul de jos al tabelului: socoteala, butonul „bifează tot" și importul.
@@ -3681,6 +3704,8 @@ export function renderCommunity(basePath = "") {
     grupuri: sectionGroups,
     insigne: sectionBadges,
     lectii: sectionLessons,
+    /* Numai locul gol: ecranul se așază după desen (vezi `lesson-writer.js`). */
+    "scrie-lectie": lessonWriterSlot,
     mesaje: sectionMessages,
     salvate: sectionSaved,
     caiet: sectionNotebook,
@@ -3824,6 +3849,9 @@ export function renderCommunity(basePath = "") {
         state.given = await fetchGivenActivity();
         state.myCounts = await fetchMyContributionCounts();
         state.myLessons = await fetchMyLessonSlugs(); // real progress → badges
+        /* Dreptul de a scrie lecții (0089). Cade singur pe o bază fără migrare
+           și atunci intrarea rămâne ascunsă, fără să oprească restul hubului. */
+        if (!isAdmin()) state.canLesson = await canProposeLesson();
       }
       // Real study groups + each group's wall (posts tagged with group_id).
       state.groups = await listGroups();
@@ -3990,6 +4018,19 @@ export function renderCommunity(basePath = "") {
       const sulAcum = mount.querySelector(".cxbk__sul");
       if (sulAcum) sulAcum.scrollTop = sulInainte;
     }
+
+    /* CELE DOUĂ ECRANE DE LECȚII PROPUSE se așază ACUM, după ce desenul a intrat
+       în pagină: ele își fac singure cuprinsul, ca să nu le șteargă redesenarea
+       hubului câmpul editabil de sub degetul omului. */
+    mountLessonWriter(mount.querySelector("#cx-lesson-writer"), basePath);
+    mountLessonQueue(mount.querySelector("#cx-lesson-queue"), {
+      lista: state.lessonQueue,
+      /* Doar ținem minte noua listă; NU redesenăm hubul de aici. Coada își
+         desenează singură lista, iar numărul din bara din stânga se potrivește
+         la următoarea redesenare. O redesenare chemată din mijlocul așezării
+         componentei ar fi fost un drum pe care nu-l pot proba acum. */
+      onSchimbare: (lista) => { state.lessonQueue = lista; },
+    });
 
     // The gamification simulator's local preview mirrors the current sim.
     if (state.section === "admin" && state.adminTab === "gamification") {

@@ -47,6 +47,9 @@ export const INTRARI = [
   { id: "users", grup: "useri", slug: "utilizatori", nume: "Conturi", icon: "👥" },
   { id: "moderation", grup: "useri", slug: "moderare", nume: "Moderare", icon: "⚖️" },
   { id: "lessons", grup: "profesor", slug: "lectii", nume: "Lecții", icon: "📚", creste: true },
+  /* Lecțiile scrise de elevii cu dreptul „Lecții" (0089). Stă lângă „Lecții",
+     nu la USERI: e material de predat, chiar dacă a fost scris de altcineva. */
+  { id: "lessonQueue", grup: "profesor", slug: "lectii-propuse", nume: "Lecții propuse", icon: "📝" },
   { id: "tests", grup: "profesor", slug: "teste", nume: "Teste", icon: "🎓", creste: true },
   { id: "bonus", grup: "profesor", slug: "bonus", nume: "Întrebări bonus", icon: "❓" },
   { id: "challenges", grup: "website", slug: "provocari", nume: "Provocarea zilei", icon: "🔥" },
@@ -117,8 +120,8 @@ export function lectiiPeDomenii() {
  * Bara întreagă, ca text HTML.
  *
  * `numere` ține ce se arată în dreapta fiecărei intrări:
- *   { moderare, utilizatori, propuneriPeLectie:{slug:n}, materialPeLectie:{slug:n},
- *     fisePeExamen:{slug:n}, itemiPeExamen:{slug:n} }
+ *   { moderare, utilizatori, lectiiPropuse, propuneriPeLectie:{slug:n},
+ *     materialPeLectie:{slug:n}, fisePeExamen:{slug:n}, itemiPeExamen:{slug:n} }
  * Se dau din afară, nu se socotesc aici: bara e desen, nu depozit.
  */
 export function adminNavHtml(stare, numere = {}) {
@@ -144,7 +147,8 @@ export function adminNavHtml(stare, numere = {}) {
 
   const intrareSimpla = (it) => {
     const nr = it.id === "moderation" ? fierbinte(numere.moderare)
-      : it.id === "users" ? n(numere.utilizatori) : "";
+      : it.id === "users" ? n(numere.utilizatori)
+      : it.id === "lessonQueue" ? fierbinte(numere.lectiiPropuse) : "";
     return nodul({
       tip: tab === it.id ? "on" : "", deschis: null, marca: it.icon,
       eticheta: it.nume, numar: nr,

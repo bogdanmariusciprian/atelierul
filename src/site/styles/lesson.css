@@ -930,6 +930,26 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
   transform: translateY(0);
 }
 
+/* SEMNUL „elev": o lecție scrisă de un elev și publicată de profesor (0089).
+   E un cuvânt, nu o iconiță: iconița ar fi cerut să fie învățată, iar cuvântul
+   se citește din prima. Stă lângă titlu, în culoarea domeniului, ca să se vadă
+   că e o însușire a lecției, nu o etichetă lipită peste ea. */
+.track-node__pupil {
+  display: inline-block;
+  vertical-align: 0.08em;
+  margin-left: 0.5em;
+  padding: 0.05em 0.45em;
+  border: 1px solid var(--card-color, var(--color-border));
+  border-radius: 999px;
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--card-color, var(--color-text-muted));
+  opacity: 0.75;
+}
+.track-node__label:hover .track-node__pupil { opacity: 1; }
+
 .track-node__label:hover .track-node__title {
   color: var(--card-color);
 }
