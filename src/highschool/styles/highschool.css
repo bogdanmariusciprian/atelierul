@@ -701,6 +701,66 @@ a.lic-ora .lic-ora__semn {
   color: oklch(42% 0.14 var(--h));
 }
 
+/* ---------- grila orarului ---------- */
+.lic-orar__titlu {
+  margin: 0 0 0.2rem;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  letter-spacing: -0.02em;
+}
+.lic-orar__sub { margin: 0 0 1.2rem; font-size: 0.88rem; color: var(--color-text-muted); }
+
+.lic-orar__vas { overflow-x: auto; }
+.lic-orar__t {
+  inline-size: 100%;
+  min-inline-size: 38rem;
+  border-collapse: separate;
+  border-spacing: 5px;
+}
+.lic-orar__t th, .lic-orar__t td { padding: 0; text-align: center; vertical-align: middle; }
+
+.lic-orar__colt { inline-size: 5rem; }
+.lic-orar__zi {
+  padding: 0.45rem 0.3rem;
+  border-radius: 9px;
+  background: var(--color-surface);
+  font-size: 0.9rem;
+}
+/* Ziua de azi și ora de acum, însemnate: pe tablă te uiți de la doi metri și
+   trebuie să găsești rândul dintr-o privire. */
+.lic-orar__zi.azi { outline: 2px solid var(--color-primary); }
+
+.lic-orar__ceas {
+  inline-size: 5rem;
+  padding: 0.3rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+.lic-orar__ceas b { display: block; font-size: 0.92rem; color: var(--color-text); }
+.lic-orar__ceas small { font-size: 0.75rem; }
+.lic-orar__t tr.acum .lic-orar__ceas b { color: var(--color-danger); }
+
+.lic-orar__gol { background: transparent; }
+
+.lic-orar__cel a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-block-size: 56px;            /* de deget */
+  padding: 0.35rem 0.4rem;
+  border: 1px solid oklch(86% 0.06 var(--h));
+  border-radius: 10px;
+  background: oklch(96% 0.025 var(--h));
+  color: oklch(40% 0.14 var(--h));
+  text-decoration: none;
+}
+.lic-orar__cel a:hover { border-color: oklch(62% 0.14 var(--h)); box-shadow: var(--shadow-sm); }
+.lic-orar__cel b { font-size: 1.05rem; }
+.lic-orar__cel small { font-size: 0.72rem; opacity: 0.75; }
+.lic-orar__t tr.acum .lic-orar__cel.azi a { outline: 2px solid var(--color-danger); }
+
 /* ---------- o fișă, arătată neatinsă ---------- */
 /* Cuprinsul își lasă marginile și derularea: fișa umple tot, iar derularea e a
    ei, în cadru. */

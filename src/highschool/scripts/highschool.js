@@ -26,7 +26,7 @@
 import { iaLocal, punLocal } from "../../shared/scripts/session.js";
 import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
-import { stareaDeAcum } from "./school-time.js";
+import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
 import { fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, ziuaISO } from "./liceu-repo.js";
 import { fiseleClasei, fisaDupaId, adresaFisei, FELUL_FISEI } from "./fise.js";
 
@@ -57,12 +57,17 @@ const CHEIE_STRANS = "liceu:panoul-strans";
  * Panoul din stânga rămâne gol dinadins, până spui ce butoane vrei acolo: dacă
  * le-aș fi pus și acolo, ar fi fost aceeași listă de două ori pe ecran.
  */
-const VEDERI = CLASE.map((c) => ({
-  id: `clasa-${c.cod.toLowerCase()}`,
-  nume: c.cod,
-  ascunsaInPanou: true,
-  desen: () => vedereDeClasa(c),
-}));
+const VEDERI = [
+  { id: "orar", nume: "Orar", desen: () => vedereDeOrar() },
+  /* Clasele au alt drum spre ele — cartonașele de pe ecranul de pornire — deci
+     nu se mai înșiră și în panou: ar fi fost aceeași listă de două ori. */
+  ...CLASE.map((c) => ({
+    id: `clasa-${c.cod.toLowerCase()}`,
+    nume: c.cod,
+    ascunsaInPanou: true,
+    desen: () => vedereDeClasa(c),
+  })),
+];
 
 const vedereaDupaId = (id) => VEDERI.find((v) => v.id === id) || null;
 
@@ -241,10 +246,15 @@ function panouHtml() {
   return grupuri.map((g) => `
     <div class="lic-grup">
       ${g.nume ? `<p class="lic-grup__titlu">${esc(g.nume)}</p>` : ""}
-      ${g.vederi.map((v) => `
-        <button type="button" class="lic-buton${v.id === stare.vedere ? " on" : ""}"
+      ${g.vederi.map((v) => {
+        /* Ruta e „v/orar", butonul poartă doar „orar": se compară partea de
+           după fel, nu textul întreg. */
+        const aici = rutaE("v") && rutaId() === v.id;
+        return `
+        <button type="button" class="lic-buton${aici ? " on" : ""}"
           data-act="vedere" data-id="${esc(v.id)}"
-          ${v.id === stare.vedere ? 'aria-current="page"' : ""}>${esc(v.nume)}</button>`).join("")}
+          ${aici ? 'aria-current="page"' : ""}>${esc(v.nume)}</button>`;
+      }).join("")}
     </div>`).join("");
 }
 
@@ -282,6 +292,68 @@ function cartonaseHtml() {
             </button>
           </li>`).join("")}
       </ul>
+    </div>`;
+}
+
+/* ---------------- ecranul: orarul săptămânii ---------------- */
+
+const ZI_LUNG = {
+  luni: "Luni", marti: "Marți", miercuri: "Miercuri", joi: "Joi", vineri: "Vineri",
+};
+
+/**
+ * Grila orarului: zilele pe orizontală, ceasurile pe verticală.
+ *
+ * Se arată NUMAI intervalele în care chiar ai ore. Școala are treisprezece, tu
+ * ai ore în șase; un tabel cu șapte rânduri goale nu spune nimic și împinge
+ * restul afară din ecran.
+ *
+ * Datele sunt cele aduse la deschiderea paginii, deci grila se desenează pe loc,
+ * fără altă cerere.
+ */
+function vedereDeOrar() {
+  const ore = orarul.saptamana;
+  const iv = orarul.intervale;
+  if (!ore.length || !iv.length) {
+    return `<div class="lic-orar"><h1 class="lic-orar__titlu">Orar</h1>
+      <p class="lic-clasa__gol">Orarul n-a fost adus.</p></div>`;
+  }
+
+  const folosite = iv
+    .filter((i) => ore.some((o) => String(o.period) === String(i.id)))
+    .sort((a, b) => minute(a.start) - minute(b.start));
+
+  const pe = new Map(ore.map((o) => [`${o.zi}|${o.period}`, o]));
+  const azi = numeZi(new Date());
+  const m = new Date().getHours() * 60 + new Date().getMinutes();
+  const culoarea = (cod) => CLASE.find((c) => c.cod === cod)?.hue ?? 250;
+
+  const cap = `<tr><th class="lic-orar__colt"></th>${
+    LUCRATOARE.map((z) => `<th class="lic-orar__zi${z === azi ? " azi" : ""}">${ZI_LUNG[z]}</th>`).join("")
+  }</tr>`;
+
+  const randuri = folosite.map((i) => {
+    const acum = m >= minute(i.start) && m < minute(i.end);
+    return `<tr class="${acum ? "acum" : ""}">
+      <th class="lic-orar__ceas"><b>${esc(ora2(i.start))}</b><small>${esc(ora2(i.end))}</small></th>
+      ${LUCRATOARE.map((z) => {
+        const o = pe.get(`${z}|${i.id}`);
+        if (!o) return `<td class="lic-orar__gol"></td>`;
+        return `<td class="lic-orar__cel${z === azi ? " azi" : ""}" style="--h:${culoarea(o.clasa)}">
+          <a href="#/v/clasa-${esc(o.clasa.toLowerCase())}">
+            <b>${esc(o.clasa)}</b>${o.sala ? `<small>${esc(String(o.sala).toUpperCase())}</small>` : ""}
+          </a></td>`;
+      }).join("")}
+    </tr>`;
+  }).join("");
+
+  return `
+    <div class="lic-orar">
+      <h1 class="lic-orar__titlu">Orar</h1>
+      <p class="lic-orar__sub">${ore.length} ore pe săptămână. Apeși o oră și intri la clasa ei.</p>
+      <div class="lic-orar__vas">
+        <table class="lic-orar__t"><thead>${cap}</thead><tbody>${randuri}</tbody></table>
+      </div>
     </div>`;
 }
 
@@ -498,6 +570,9 @@ async function aduOrarul() {
      cinstit că n-are orar, în loc să arate o zi goală ca și cum ar fi liber. */
   orarul.adus = orarul.intervale.length > 0;
   if (card) card.improspateaza();
+  /* Dacă tocmai te uitai la grila orarului cât se aduceau datele, se redesenează
+     ca s-o vezi plină, nu cu „orarul n-a fost adus". */
+  if (rutaE("v") && rutaId() === "orar") deseneaza();
 }
 
 /**
