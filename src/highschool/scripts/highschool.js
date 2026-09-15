@@ -416,9 +416,7 @@ function vedereDeOrar() {
 
   /* Planificările tuturor claselor din grilă: din ele iese numărul din colțul
      fiecărei celule. Se cer o dată și rămân ținute minte, iar până sosesc grila
-     se vede întreagă, doar fără numere — nu ține nimic în loc.
-     Și clasele a 12-a intră aici: `faraOre` spune că lor nu li se ÎNȘIRĂ orele
-     pe ecranul clasei, nu că n-ar avea planificare. */
+     se vede întreagă, doar fără numere — nu ține nimic în loc. */
   const zile = zileleSaptamanii();
   CLASE.forEach((c) => { if (!planuri[c.cod]) aduPlanul(c.cod); });
   const numere = numereleSaptamanii(zile);
@@ -503,8 +501,8 @@ const ziScurta = (iso) => {
  * din an și cât mai e de făcut, iar o fișă nouă „umple" rândul ei fără să umble
  * nimeni prin cod: se potrivesc după numărul orei.
  *
- * La clasele a 12-a nu se înșiră nimic (cerut de Marius): rămân doar fișele,
- * dacă are vreuna.
+ * Clasele cu `faraOre` nu înșiră nimic: rămân doar fișele, dacă au vreuna. Acum
+ * n-o poartă niciuna (vezi `classes.js`), dar ecranul știe s-o facă.
  */
 function vedereDeClasa(c) {
   const fise = fiseleClasei(c.cod);
