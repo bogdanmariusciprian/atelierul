@@ -24,6 +24,7 @@
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { iaLocal, punLocal } from "../../shared/scripts/session.js";
+import { CLASE } from "./classes.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -43,12 +44,21 @@ const CHEIE_LAT = "liceu:latimea-panoului";
 const CHEIE_STRANS = "liceu:panoul-strans";
 
 /**
- * VEDERILE. Deocamdată niciuna: Marius a spus „n-avem butoane încă".
- * Un buton nou = o intrare aici, și atât. Forma:
+ * VEDERILE. Un buton nou = o intrare aici, și atât. Forma:
  *   { id: "ceva", nume: "Ceva", grup: "Un titlu", desen: () => "<html>" }
  * `grup` e neobligatoriu; vederile fără grup stau primele.
+ *
+ * Deocamdată sunt numai cele șapte clase, născute din `CLASE`: ecranul de
+ * pornire le arată ca niște cartonașe, iar apăsarea uneia deschide vederea ei.
+ * Panoul din stânga rămâne gol dinadins, până spui ce butoane vrei acolo: dacă
+ * le-aș fi pus și acolo, ar fi fost aceeași listă de două ori pe ecran.
  */
-const VEDERI = [];
+const VEDERI = CLASE.map((c) => ({
+  id: `clasa-${c.cod.toLowerCase()}`,
+  nume: c.cod,
+  ascunsaInPanou: true,
+  desen: () => vedereDeClasa(c),
+}));
 
 const vedereaDupaId = (id) => VEDERI.find((v) => v.id === id) || null;
 
@@ -202,13 +212,16 @@ const BURGER = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stro
   stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`;
 
 function panouHtml() {
-  if (!VEDERI.length) {
+  /* Vederile cu `ascunsaInPanou` nu apar aici: au alt drum spre ele (acum,
+     cartonașele de pe ecranul de pornire). */
+  const ale = VEDERI.filter((v) => !v.ascunsaInPanou);
+  if (!ale.length) {
     return `<p class="lic-panou__gol">Aici vin butoanele.</p>`;
   }
   /* Vederile se strâng pe grupuri, în ordinea în care apar în `VEDERI`. Cele
      fără grup stau primele, fără titlu deasupra. */
   const grupuri = [];
-  for (const v of VEDERI) {
+  for (const v of ale) {
     const nume = v.grup || "";
     let g = grupuri.find((x) => x.nume === nume);
     if (!g) { g = { nume, vederi: [] }; grupuri.push(g); }
@@ -224,6 +237,55 @@ function panouHtml() {
     </div>`).join("");
 }
 
+/* ---------------- ecranul de pornire: clasele ---------------- */
+
+/**
+ * Cartonașele claselor, de sticlă.
+ *
+ * STICLA ARE NEVOIE DE CEVA DEDESUBT. `backdrop-filter` tulbură ce e ÎN SPATELE
+ * elementului; pe un fundal plat n-ar avea ce tulbura, iar cartonașul ar arăta
+ * ca o casetă spălăcită. De-aia sub ele stau câteva pete de culoare mari și
+ * neclare (`.lic-aurora`), luate chiar din nuanțele claselor: sticla capătă ce
+ * să frângă, iar culorile se văd prin ea.
+ *
+ * MĂRIMILE SUNT DE DEGET, NU DE MAUS: modulul se folosește pe tabla din clasă.
+ * Un cartonaș are cel puțin 170 de pixeli înălțime, iar codul clasei e scris
+ * mare, ca să se citească de la câțiva metri.
+ */
+function cartonaseHtml() {
+  return `
+    <div class="lic-acasa">
+      <div class="lic-aurora" aria-hidden="true">
+        ${CLASE.map((c) => `<span style="--h:${c.hue}"></span>`).join("")}
+      </div>
+
+      <h1 class="lic-acasa__titlu">Clasele mele</h1>
+
+      <ul class="lic-carduri">
+        ${CLASE.map((c) => `
+          <li>
+            <button type="button" class="lic-card" style="--h:${c.hue}"
+              data-act="vedere" data-id="clasa-${c.cod.toLowerCase()}">
+              <span class="lic-card__cod">${esc(c.cod)}</span>
+              <span class="lic-card__nume">${esc(c.nume)}</span>
+              <span class="lic-card__stralucire" aria-hidden="true"></span>
+            </button>
+          </li>`).join("")}
+      </ul>
+    </div>`;
+}
+
+/** Vederea unei clase. Deocamdată doar capul ei: cuprinsul vine când spui ce
+ *  pui în el. */
+function vedereDeClasa(c) {
+  return `
+    <div class="lic-clasa" style="--h:${c.hue}">
+      <p class="lic-clasa__cod">${esc(c.cod)}</p>
+      <h1 class="lic-clasa__nume">${esc(c.nume)}</h1>
+      <p class="lic-clasa__gol">Aici vine ce ține de clasa asta.</p>
+    </div>`;
+}
+
 function cuprinsHtml() {
   const v = vedereaDupaId(stare.vedere);
   if (v) {
@@ -233,12 +295,7 @@ function cuprinsHtml() {
       return `<div class="lic-gol"><p>Ecranul ăsta n-a putut fi afișat.</p></div>`;
     }
   }
-  return `
-    <div class="lic-gol">
-      <h1>Liceu</h1>
-      <p>Panoul din stânga e gol deocamdată. Când capătă butoane, ce alegi acolo
-         se deschide aici.</p>
-    </div>`;
+  return cartonaseHtml();
 }
 
 function deseneaza() {
@@ -262,7 +319,7 @@ function deseneaza() {
 
     <div class="lic-maner" data-rol="maner" role="separator" tabindex="0"
       aria-orientation="vertical" aria-label="Lățimea panoului"
-      aria-valuemin="0" aria-valuenow="${stare.latime}"></div>
+      aria-valuemin="0" aria-valuenow="${stare.latime}"><i aria-hidden="true"></i></div>
 
     <main class="lic-cuprins" id="lic-cuprins">${cuprinsHtml()}</main>`;
 

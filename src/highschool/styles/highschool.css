@@ -75,20 +75,24 @@
 
 /* SĂGEATA, DISCRETĂ. Stinsă până la hover: e o ieșire, nu o invitație. Vorba ei
    se schimbă singură („Înapoi" / „Înapoi la site"), scrisă de JS. */
+/* MĂRIMI DE DEGET. Modulul se folosește pe tabla din clasă, unde nu există
+   nici maus, nici tastatură: orice se apasă are cel puțin 44 de pixeli pe
+   ambele laturi, măsura de la care un deget nimerește fără să țintească. */
 .lic-inapoi,
 .lic-burger {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  min-block-size: 44px;
   font: inherit;
-  font-size: 0.85rem;
-  padding: 0.3rem 0.55rem;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.8rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   background: none;
   color: var(--color-text-muted);
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.8;
   transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 .lic-inapoi:hover,
@@ -100,7 +104,7 @@
   background: var(--color-bg);
   border-color: var(--color-border);
 }
-.lic-burger { padding-inline: 0.45rem; }
+.lic-burger { min-inline-size: 44px; justify-content: center; padding-inline: 0.6rem; }
 
 /* Numele butonului, pentru cititoarele de ecran: în pagină, dar nevăzut. */
 .sr-only {
@@ -143,15 +147,17 @@
 }
 
 .lic-buton {
-  display: block;
+  display: flex;
+  align-items: center;
   inline-size: 100%;
+  min-block-size: 44px;             /* de deget, ca tot ce se apasă în modul */
   text-align: start;
   font: inherit;
-  font-size: 0.9rem;
-  padding: 0.4rem 0.55rem;
-  margin-block-end: 0.12rem;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.7rem;
+  margin-block-end: 0.2rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: none;
   color: var(--color-text);
   cursor: pointer;
@@ -177,13 +183,18 @@
   background: transparent;
   touch-action: none;          /* altfel degetul derulează pagina în loc să tragă */
 }
+/* ZONA DE PRINS E CÂT UN DEGET, nu cât dunga: ±14px în jurul celor 6 vizibili,
+   adică vreo 34 de pixeli. Cu cinci, cum era la început, se nimerea greu chiar
+   și cu mausul, iar pe tablă n-ar fi fost de prins deloc. */
 .lic-maner::before {
   content: "";
   position: absolute;
   inset-block: 0;
-  inset-inline: -5px;
+  inset-inline: -14px;
 }
-/* Dunga se vede abia la apropiere: cât stai departe, e doar o despărțire. */
+/* DUNGA SE VEDE MEREU, nu doar la hover. Pe tabla din clasă nu există hover:
+   un semn care apare numai când treci cu mausul peste el pur și simplu nu
+   există acolo, iar mânerul ar fi fost invizibil. */
 .lic-maner::after {
   content: "";
   position: absolute;
@@ -191,14 +202,34 @@
   inset-inline-start: 50%;
   translate: -50% 0;
   inline-size: 2px;
-  background: var(--color-primary);
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  background: var(--color-border);
+  transition: background 0.15s ease, inline-size 0.15s ease;
 }
 .lic-maner:hover::after,
 .lic-maner:focus-visible::after,
-.lic--trage .lic-maner::after { opacity: 1; }
+.lic--trage .lic-maner::after {
+  background: var(--color-primary);
+  inline-size: 3px;
+}
 .lic-maner:focus-visible { outline: none; }
+
+/* Trei liniuțe pe mijlocul mânerului: semnul obișnuit pentru „de aici se
+   trage". Fără el, dunga poate fi luată drept o simplă despărțire. */
+.lic-maner { display: grid; place-items: center; }
+.lic-maner > i {
+  position: relative;
+  z-index: 1;
+  inline-size: 4px;
+  block-size: 34px;
+  border-radius: 999px;
+  background: var(--color-text-muted);
+  opacity: 0.35;
+  /* Apăsarea trebuie să ajungă la mâner, nu la liniuțe: altfel `e.target` ar fi
+     fost ele, iar prinderea degetului s-ar fi făcut pe elementul greșit. */
+  pointer-events: none;
+}
+.lic-maner:hover > i,
+.lic--trage .lic-maner > i { opacity: 0.8; }
 
 /* Cât se trage, nimic nu se selectează și nimic nu prinde mausul: fără regula
    asta, tragerea peste cuprins începea să selecteze text. */
@@ -229,6 +260,175 @@
   font-size: clamp(1.5rem, 4vw, 2.1rem);
   letter-spacing: -0.02em;
   color: var(--color-text);
+}
+
+/* =========================================================
+   ECRANUL DE PORNIRE: cartonașele claselor, de sticlă.
+
+   STICLA ARE NEVOIE DE CEVA DEDESUBT. `backdrop-filter` tulbură ce e ÎN SPATELE
+   elementului. Pe fundalul plat al sitului n-ar avea ce tulbura, iar cartonașul
+   ar fi ieșit o casetă spălăcită, nu sticlă. De-aia dedesubt stau pete mari și
+   neclare de culoare — `.lic-aurora` — luate chiar din nuanțele claselor.
+   ========================================================= */
+/* `isolation: isolate` face din ecran un teanc de straturi al lui. Fără el,
+   petele cu `z-index: -1` ar fi putut aluneca în spatele fundalului unui
+   părinte și ar fi dispărut cu totul. */
+.lic-acasa { position: relative; isolation: isolate; min-block-size: 100%; }
+
+.lic-acasa__titlu {
+  margin: 0 0 1.4rem;
+  font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+  letter-spacing: -0.02em;
+}
+
+/* Petele de culoare. Stau în spate (`z-index: -1`) și nu prind mausul. */
+.lic-aurora {
+  position: absolute;
+  inset: -12% -6%;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.lic-aurora span {
+  position: absolute;
+  inline-size: 46%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: oklch(72% 0.17 var(--h));
+  opacity: 0.34;
+  filter: blur(70px);
+}
+/* Pozițiile, scrise una câte una. Le-am pus împrăștiat, nu pe un cerc: un cerc
+   se vede că e cerc chiar și neclar, iar petele ar fi arătat așezate la rând.
+   Scrise așa, se pot și muta cu ochiul, fără socoteală. */
+.lic-aurora span:nth-child(1) { inset-block-start:  2%; inset-inline-start:  4%; }
+.lic-aurora span:nth-child(2) { inset-block-start: 30%; inset-inline-start: 56%; }
+.lic-aurora span:nth-child(3) { inset-block-start:  4%; inset-inline-start: 70%; }
+.lic-aurora span:nth-child(4) { inset-block-start: 54%; inset-inline-start: 10%; }
+.lic-aurora span:nth-child(5) { inset-block-start: 68%; inset-inline-start: 64%; }
+.lic-aurora span:nth-child(6) { inset-block-start: 36%; inset-inline-start: 32%; }
+.lic-aurora span:nth-child(7) { inset-block-start: 76%; inset-inline-start: 28%; }
+
+.lic-carduri {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* Cartonașe mari, de deget: minimum 15rem, iar rândul se umple singur. */
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.lic-card {
+  position: relative;
+  overflow: hidden;
+  inline-size: 100%;
+  min-block-size: 10.5rem;          /* ~170px: se apasă cu degetul, fără țintire */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.15rem;
+  padding: 1.1rem 1.2rem;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  color: var(--color-text);
+
+  border-radius: 20px;
+  /* STICLA: un strat aproape străveziu, cu nuanța clasei, peste ce se vede prin
+     el. Marginea de sus mai luminoasă, ca o muchie prinsă de lumină. */
+  background:
+    linear-gradient(160deg,
+      oklch(100% 0 0 / 0.55) 0%,
+      oklch(100% 0 0 / 0.16) 42%,
+      oklch(72% 0.14 var(--h) / 0.22) 100%);
+  border: 1px solid oklch(100% 0 0 / 0.5);
+  box-shadow:
+    0 10px 30px -12px oklch(45% 0.12 var(--h) / 0.5),
+    inset 0 1px 0 oklch(100% 0 0 / 0.6);
+  transition: translate 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+/* Tulburarea din spate se dă SEPARAT, sub `@supports`: unde nu e sprijinită,
+   cartonașul rămâne cel de sus, colorat și citibil, doar fără efectul de sticlă.
+   Așa nu iese un dreptunghi alb pe un browser mai vechi. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .lic-card {
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    background:
+      linear-gradient(160deg,
+        oklch(100% 0 0 / 0.42) 0%,
+        oklch(100% 0 0 / 0.08) 42%,
+        oklch(72% 0.14 var(--h) / 0.16) 100%);
+  }
+}
+
+.lic-card:hover,
+.lic-card:focus-visible {
+  translate: 0 -3px;
+  border-color: oklch(72% 0.15 var(--h) / 0.85);
+  box-shadow:
+    0 18px 40px -14px oklch(45% 0.14 var(--h) / 0.6),
+    inset 0 1px 0 oklch(100% 0 0 / 0.75);
+}
+.lic-card:active { translate: 0 0; }
+
+.lic-card__cod {
+  font-size: clamp(2.2rem, 3.4vw, 3rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: oklch(42% 0.15 var(--h));
+}
+.lic-card__nume {
+  font-size: 0.92rem;
+  color: oklch(45% 0.05 var(--h));
+}
+
+/* Sclipirea care trece peste sticlă la apropiere. Un singur `translate`, deci
+   se desenează pe placa video, fără să miște nimic din pagină. */
+.lic-card__stralucire {
+  position: absolute;
+  inset-block: -50%;
+  inline-size: 40%;
+  inset-inline-start: -60%;
+  background: linear-gradient(105deg, transparent, oklch(100% 0 0 / 0.55), transparent);
+  rotate: 8deg;
+  pointer-events: none;
+  transition: translate 0.55s ease;
+}
+.lic-card:hover .lic-card__stralucire,
+.lic-card:focus-visible .lic-card__stralucire { translate: 420% 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lic-card { transition: none; }
+  .lic-card:hover, .lic-card:focus-visible { translate: none; }
+  .lic-card__stralucire { display: none; }
+}
+
+/* ---------- vederea unei clase ---------- */
+.lic-clasa { max-inline-size: 48rem; }
+.lic-clasa__cod {
+  margin: 0;
+  font-size: clamp(3rem, 6vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: oklch(45% 0.15 var(--h));
+}
+.lic-clasa__nume {
+  margin: 0.2rem 0 1.2rem;
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.lic-clasa__gol {
+  padding: 1.4rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
 }
 
 /* Pe ecran îngust NU se schimbă nimic la panou: nici strângere de la sine, nici
