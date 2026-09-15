@@ -10,12 +10,14 @@
 // poartă numele contului (`cheiaMea`), ca două conturi de pe același calculator
 // să nu se vadă unul pe altul.
 //
-// NU SE CERE NIMIC DACĂ NU E PROFESORUL LOGAT. Altfel fiecare vizitator ar
-// suna la server ca să afle că n-are voie.
+// CITEȘTE ORICINE (migrarea 0092). Orarul și planificările sunt deschise, așa
+// cum a cerut Marius; scrierea rămâne a profesorului. Depozitul ăsta nu întreabă
+// pe nimeni cine e: dacă mâine citirea se strâmtează la loc, politica din bază
+// o face singură, iar aici nu se schimbă o literă.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { supabase } from "../../shared/scripts/supabase-client.js";
-import { cheiaMea, isAdmin } from "../../shared/scripts/session.js";
+import { cheiaMea } from "../../shared/scripts/session.js";
 
 const CHEIE = (nume) => cheiaMea(`liceu:${nume}`);
 
@@ -36,7 +38,6 @@ function scoate(nume) {
 /** Întoarce mereu `{ date, offline, la }`. `offline: true` = cererea n-a
  *  răspuns și astea sunt datele vechi. */
 async function cuPlasa(nume, cerere, gol) {
-  if (!isAdmin()) return { date: gol, offline: false, la: null, strain: true };
   try {
     const date = await cerere();
     pune(nume, date);

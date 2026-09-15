@@ -364,9 +364,10 @@ async function aduOrarul() {
   orarul.ore = z.date || [];
   orarul.saptamana = s.date || [];
   orarul.intervale = (c.date || {}).intervale || [];
-  /* `strain` = nu e profesorul logat; atunci nu s-a cerut nimic, iar cardul
-     rămâne cu ceasul lui. */
-  orarul.adus = !z.strain;
+  /* Fără intervale nu se poate socoti nimic: ceasurile orelor vin din ele. Dacă
+     lipsesc (baza încă nu e umplută), cardul rămâne cu ceasul lui și spune
+     cinstit că n-are orar, în loc să arate o zi goală ca și cum ar fi liber. */
+  orarul.adus = orarul.intervale.length > 0;
   if (card) card.improspateaza();
 }
 
