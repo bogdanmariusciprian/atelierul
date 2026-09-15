@@ -28,11 +28,15 @@ import { iaLocal, punLocal } from "../../shared/scripts/session.js";
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/* Măsurile panoului, în pixeli. Sub minim nu mai încape un nume de buton; peste
-   maxim, cuprinsul din dreapta ajunge o fâșie. */
-const LAT_MIN = 180;
-const LAT_MAX = 560;
-const LAT_START = 264;
+/* LĂȚIMEA PANOULUI N-ARE MARGINI PUSE DE NOI (cerut de Marius: „oricât vreau
+   eu"). Singura margine e cea fizică: mânerul nu poate ieși din ecran, fiindcă
+   atunci n-ar mai avea nimeni de ce trage înapoi. Deci zero la stânga, iar la
+   dreapta cât ține modulul, fără lățimea mânerului.
+
+   La zero, panoul dispare de tot; se întoarce trăgând mânerul de pe margine,
+   ori din burger. */
+const MANER = 6;                      // lățimea mânerului, aceeași ca în CSS
+const LAT_START = 264;                // de unde pleacă, prima dată și la dublu-click
 const PAS = 16;                       // cât mută o apăsare de săgeată
 
 const CHEIE_LAT = "liceu:latimea-panoului";
@@ -92,13 +96,40 @@ function inapoi() {
 
 /* ---------------- lățimea panoului ---------------- */
 
-const inMargini = (n) => Math.min(LAT_MAX, Math.max(LAT_MIN, Math.round(n)));
+/** Cât de lat poate fi panoul ACUM: tot modulul, fără mâner. Se socotește la
+ *  fiecare atingere, nu o dată la pornire: fereastra se poate schimba. */
+const latMax = () => Math.max(0, (radacina?.clientWidth || window.innerWidth) - MANER);
+
+/**
+ * DOUĂ LĂȚIMI, NU UNA, și e o deosebire care se simte:
+ *   · `stare.latime` e cea ALEASĂ de om, și numai el o schimbă;
+ *   · cea PUSĂ în pagină e aceea tăiată la cât încape acum.
+ * Dacă fereastra se micșorează, punem mai puțin, dar nu uităm alegerea; când
+ * fereastra se face la loc mare, panoul se întoarce singur la lățimea ta. Cu o
+ * singură valoare, o fereastră micșorată o dată ți-ar fi mâncat alegerea pentru
+ * totdeauna.
+ */
+function aplicaLatimea() {
+  const px = Math.min(stare.latime, latMax());
+  radacina.style.setProperty("--panou", `${px}px`);
+  /* LA ZERO, PANOUL SE SCOATE DE TOT din pagină. O coloană de zero pixeli tot
+     lasă marginile dinăuntru să se vadă, adică o fâșie de vreo șaisprezece
+     pixeli care arată ca o greșeală. Mânerul RĂMÂNE, ca să ai de ce trage
+     înapoi. */
+  radacina.classList.toggle("lic--zero", px === 0);
+  const m = radacina.querySelector("[data-rol='maner']");
+  if (m) {
+    m.setAttribute("aria-valuenow", String(px));
+    m.setAttribute("aria-valuemax", String(latMax()));
+  }
+}
 
 function puneLatimea(px, tineMinte = false) {
-  stare.latime = inMargini(px);
-  radacina.style.setProperty("--panou", `${stare.latime}px`);
-  const m = radacina.querySelector("[data-rol='maner']");
-  if (m) m.setAttribute("aria-valuenow", String(stare.latime));
+  /* Tăiat la marginea fizică: mânerul n-are voie să iasă din ecran, altfel n-ar
+     mai avea nimeni de ce trage înapoi. În rest, zero e o lățime la fel de bună
+     ca oricare alta. */
+  stare.latime = Math.min(latMax(), Math.max(0, Math.round(px)));
+  aplicaLatimea();
   if (tineMinte) punLocal(CHEIE_LAT, stare.latime);
 }
 
@@ -152,8 +183,8 @@ function legaManerul(maner) {
     const pas = e.shiftKey ? PAS * 4 : PAS;
     if (e.key === "ArrowLeft") puneLatimea(stare.latime - pas, true);
     else if (e.key === "ArrowRight") puneLatimea(stare.latime + pas, true);
-    else if (e.key === "Home") puneLatimea(LAT_MIN, true);
-    else if (e.key === "End") puneLatimea(LAT_MAX, true);
+    else if (e.key === "Home") puneLatimea(0, true);
+    else if (e.key === "End") puneLatimea(latMax(), true);
     else return;
     e.preventDefault();
   });
@@ -231,11 +262,11 @@ function deseneaza() {
 
     <div class="lic-maner" data-rol="maner" role="separator" tabindex="0"
       aria-orientation="vertical" aria-label="Lățimea panoului"
-      aria-valuemin="${LAT_MIN}" aria-valuemax="${LAT_MAX}" aria-valuenow="${stare.latime}"></div>
+      aria-valuemin="0" aria-valuenow="${stare.latime}"></div>
 
     <main class="lic-cuprins" id="lic-cuprins">${cuprinsHtml()}</main>`;
 
-  puneLatimea(stare.latime);
+  aplicaLatimea();
   legaManerul(radacina.querySelector("[data-rol='maner']"));
 }
 
@@ -261,7 +292,11 @@ export function renderHighschool(gazda, basePath = "") {
   caleaSitului = basePath;
   if (!radacina) return;
 
-  stare.latime = inMargini(Number(iaLocal(CHEIE_LAT, LAT_START)) || LAT_START);
+  /* Lățimea ținută minte. `?? LAT_START` și nu `|| LAT_START`: un zero salvat
+     E o lățime adevărată (panoul strâns de tot), iar `||` l-ar fi socotit lipsă
+     și ar fi deschis panoul la loc de fiecare dată. */
+  const salvata = Number(iaLocal(CHEIE_LAT, null));
+  stare.latime = Number.isFinite(salvata) && salvata >= 0 ? salvata : LAT_START;
   stare.vedere = citesteRuta();
 
   /* CINE INTRĂ DE-A DREPTUL pe adresa unei vederi (dintr-un mesaj, dintr-un
@@ -279,6 +314,9 @@ export function renderHighschool(gazda, basePath = "") {
     stare.vedere = citesteRuta();
     deseneaza();
   });
+
+  /* Fereastra s-a schimbat: punem cât încape acum, fără să atingem alegerea. */
+  window.addEventListener("resize", aplicaLatimea);
 
   deseneaza();
   /* Strângerea se pune DUPĂ primul desen: `strange` caută butonul în pagină. */

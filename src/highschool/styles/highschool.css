@@ -47,15 +47,20 @@
     "panou  maner  cuprins";
 }
 
-/* Strâns: panoul și mânerul rămân în pagină, dar nu mai ocupă nicio coloană.
-   Regula e scrisă cu DOUĂ clase (`.lic.lic--strans`) dinadins: așa bate regula
-   de la ecran îngust de mai jos, oricare ar veni a doua în fișier. Cu o singură
-   clasă, pe telefon panoul strâns s-ar fi deschis singur. */
+/* Strâns din burger: panoul și mânerul rămân în pagină, dar nu mai ocupă nicio
+   coloană. Deosebit de „tras la zero": acolo mânerul rămâne, ca să-l poți trage
+   înapoi; aici pleacă și el, fiindcă ai spus limpede că nu-l vrei. */
 .lic.lic--strans {
   grid-template-columns: 0 0 1fr;
 }
 .lic--strans .lic-panou,
 .lic--strans .lic-maner { visibility: hidden; }
+
+/* Tras la zero: panoul iese din pagină, mânerul rămâne lipit de marginea din
+   stânga, ca să-l poți apuca și trage înapoi. */
+.lic--zero .lic-panou { display: none; }
+/* La zero, dunga se vede mereu: altfel n-ai de unde ști că mai e ceva de tras. */
+.lic--zero .lic-maner::after { opacity: 0.5; }
 
 /* ---------- rândul de sus ---------- */
 .lic-sus {
@@ -226,12 +231,9 @@
   color: var(--color-text);
 }
 
-/* Pe ecran îngust panoul NU se strânge singur (așa a cerut Marius): rămâne, dar
-   nu i se îngăduie să treacă de 44% din lățime, ca să rămână loc de citit.
-   Marginea se pune pe COLOANĂ, nu pe `--panou`: o variabilă care se cere pe ea
-   însăși (`--panou: min(var(--panou), …)`) e un ciclu, iar browserul o aruncă
-   de tot. */
+/* Pe ecran îngust NU se schimbă nimic la panou: nici strângere de la sine, nici
+   plafon de lățime. Lățimea e a ta, oriunde. Se subțiază doar marginile
+   cuprinsului, ca să nu se piardă text pe degeaba. */
 @media (max-width: 720px) {
-  .lic { grid-template-columns: min(var(--panou), 44vw) var(--maner) 1fr; }
   .lic-cuprins { padding: 1rem 0.9rem 3rem; }
 }
