@@ -17,6 +17,8 @@
 //    prima apăsare pe Back, iar butonul ar fi dus în altă parte decât săgeata
 //    de sus a browserului. Adâncimea se ține în starea fiecărui pas, ca să
 //    știm când s-a golit: atunci săgeata scrie „Înapoi la site".
+//    O singură excepție, la vederile cu `inapoiAcasa` (deocamdată orarul): din
+//    ele săgeata duce la clase. Motivul e scris la `inapoi()`.
 //
 // 3. LĂȚIMEA PANOULUI E A CONTULUI, nu a browserului. Trece prin `punLocal`,
 //    care lipește numele contului la cheie: doi oameni pe același calculator
@@ -57,8 +59,11 @@ const CHEIE_STRANS = "liceu:panoul-strans";
  * Panoul din stânga rămâne gol dinadins, până spui ce butoane vrei acolo: dacă
  * le-aș fi pus și acolo, ar fi fost aceeași listă de două ori pe ecran.
  */
+/* `inapoiAcasa` = din vederea asta, săgeata duce la cartonașele claselor, nu la
+   ecranul de dinainte. E scris ca însușire a vederii, nu ghicit din `id`, ca
+   butoanele care vor veni în panou să aleagă fiecare pentru ea. */
 const VEDERI = [
-  { id: "orar", nume: "Orar", desen: () => vedereDeOrar() },
+  { id: "orar", nume: "Orar", desen: () => vedereDeOrar(), inapoiAcasa: true },
   /* Clasele au alt drum spre ele — cartonașele de pe ecranul de pornire — deci
      nu se mai înșiră și în panou: ar fi fost aceeași listă de două ori. */
   ...CLASE.map((c) => ({
@@ -111,11 +116,31 @@ function navigheaza(ruta) {
   deseneaza();
 }
 
+/** Vederea deschisă acum, dacă e o vedere (nu o fișă, nu ecranul de pornire). */
+const vedereaDeAcum = () => (rutaE("v") ? vedereaDupaId(rutaId()) : null);
+
 /**
  * Săgeata din colțul de sus-stânga. Cât timp am pași în urmă, scoate câte unul;
  * când s-a golit, iese din modul.
+ *
+ * ORARUL FACE EXCEPȚIE (`inapoiAcasa`). El se deschide dintr-un buton al
+ * panoului, deci se ajunge în el de oriunde: de pe cartonașe, dintr-o clasă,
+ * din mijlocul unei fișe. „Unde am fost" ar fi însemnat, de acolo, orice, iar
+ * săgeata ar fi dus de fiecare dată în altă parte. Din orar duce la clase.
+ *
+ * Pasul orarului se ÎNLOCUIEȘTE, nu se pune altul peste el. Cu un pas nou,
+ * Back-ul browserului te-ar fi întors în orar, de unde săgeata te-ar fi scos
+ * iarăși la clase: un du-te-vino fără capăt. Înlocuit, orarul iese din teanc,
+ * iar cele două săgeți — a noastră și a browserului — rămân de acord, cum spune
+ * regula 2 din capul fișierului.
  */
 function inapoi() {
+  if (vedereaDeAcum()?.inapoiAcasa) {
+    stare.vedere = null;
+    history.replaceState({ liceu: stare.adancime }, "", hashPentru(null));
+    deseneaza();
+    return;
+  }
   if (stare.adancime > 0) { history.back(); return; }
   location.href = caleaSitului || "/";
 }
@@ -499,7 +524,12 @@ function cuprinsHtml() {
 }
 
 function deseneaza() {
-  const acasa = stare.adancime === 0;
+  /* Săgeata spune unde duce, nu doar că duce undeva. Trei vorbe, în ordinea
+     asta: din orar scoate la clase; din restul scoate un pas; când teancul e
+     gol, scoate din modul. */
+  const vorbaInapoi = vedereaDeAcum()?.inapoiAcasa
+    ? "Înapoi la clase"
+    : (stare.adancime === 0 ? "Înapoi la site" : "Înapoi");
   /* Două ecrane umplu cuprinsul până la margini, fiecare din alt motiv:
      fișa fiindcă își are derularea ei, în cadru; ecranul de pornire fiindcă
      fundalul lui colorat trebuie să ajungă în toate colțurile, iar cartonașele
@@ -509,8 +539,8 @@ function deseneaza() {
   radacina.innerHTML = `
     <div class="lic-sus">
       <button type="button" class="lic-inapoi" data-act="inapoi"
-        title="${acasa ? "Înapoi la site" : "Înapoi"}">
-        ${SAGEATA}<span>${acasa ? "Înapoi la site" : "Înapoi"}</span>
+        title="${vorbaInapoi}">
+        ${SAGEATA}<span>${vorbaInapoi}</span>
       </button>
       <button type="button" class="lic-burger" data-act="burger"
         aria-expanded="${!stare.strans}" aria-controls="lic-panou"
