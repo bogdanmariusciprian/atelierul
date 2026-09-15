@@ -606,8 +606,62 @@
 .hc--ora { border-color: var(--color-primary); }
 .hc--pauza { border-color: #b45309; }
 
+/* =========================================================
+   PESTE O FIȘĂ. Fișa e o prezentare ținută la clasă, iar de pe ea nu-ți trebuie
+   decât ceasul și cât mai e până la pauză; restul cardului acoperă slide-ul
+   degeaba. Cardul se strânge la un rând.
+   ========================================================= */
+.hc--scurt {
+  display: flex; align-items: center; gap: 0.55rem;
+  inline-size: auto; padding: 0.4rem 0.65rem;
+}
+/* Butonul de ascuns iese din colț și intră în rând: pe un card de un rând,
+   colțul e chiar peste ceas. */
+.hc--scurt .hc__x { position: static; margin-inline-start: 0.1rem; }
+.hc-scurt__vorba {
+  font-size: 0.9rem; color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.hc-scurt__vorba b { font-size: 1.15rem; color: var(--color-text); }
+
+/* =========================================================
+   PE TOT ECRANUL: CARDUL SE FACE FANTOMĂ.
+   Se stinge, ca să nu tragă ochiul de pe slide, și lasă apăsările să treacă
+   prin el, ca să ajungi la ce e dedesubt.
+   NU se aprinde la trecerea peste el, oricât de firesc ar părea: un element cu
+   `pointer-events: none` nu primește apăsări, deci `:hover` nu se aprinde
+   niciodată pe el. Regula ar fi stat acolo fără să facă nimic.
+   ========================================================= */
+.lic-orcard[data-mod="fantoma"] {
+  opacity: 0.32;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+/* CARDUL, URCAT ÎN „TOP LAYER".
+   Un element trecut pe tot ecranul se desenează deasupra întregii pagini, într-un
+   strat unde `z-index` nu ajunge; cardul ar fi fost ascuns cu totul, nu estompat.
+   JS-ul îi pune atunci atributul `popover`, singura ușă către stratul acela.
+   Popover-ul vine însă din browser cu chenar, fundal alb și `inset: 0` cu
+   `margin: auto`, adică pe mijlocul ecranului. Se desfac toate, ca să rămână
+   unde a fost: jos-dreapta, cu forma lui.
+   `:popover-open` acoperă și starea, și cazul în care `popover` e pus dar
+   `showPopover()` a fost refuzat. */
+.lic-orcard:popover-open {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  color: inherit;
+}
+.lic-orcard::backdrop { background: transparent; }
+
 @media (max-width: 720px) {
   .lic-orcard { inset-inline: 10px; inset-block-end: 10px; }
+  .lic-orcard:popover-open { inset: auto 10px 10px 10px; }
   .hc { inline-size: auto; }
 }
 

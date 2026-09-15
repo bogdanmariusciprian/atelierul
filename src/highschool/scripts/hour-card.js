@@ -18,6 +18,12 @@
 //
 // ASCUNDEREA NU E ÎNCHIDERE. Rămâne un buton mic, ca să-l poți chema înapoi;
 // alegerea se ține pe cont, nu pe browser.
+//
+// TREI FELURI, după unde ești (i le spune pagina, cardul nu se uită singur):
+//   plin       – ecranele modulului: cardul întreg, cu tot ce scrie mai sus
+//   prezentare – o fișă deschisă în modul: numai ceasul și minutele până la pauză
+//   fantoma    – fișa pe tot ecranul: la fel, dar stins și fără să prindă
+//                apăsările, ca să ajungi la ce e pe slide sub el
 // Cuprins în română, nume în engleză.
 // =========================================================
 /* Cardul doar DESENEAZĂ starea; socoteala e în `school-time.js` și i se dă din
@@ -154,18 +160,76 @@ const timerHtml = (sec) => {
   return `<b>${val}</b> ${ultimul ? "s" : "min"}`;
 };
 
+/* CÂND CARDUL SE SCURTEAZĂ. Peste o prezentare deschisă la clasă, cardul întreg
+   e prea mult: acoperă slide-ul și spune lucruri pe care le știi deja (ești la
+   ora aceea, doar ce-ai deschis fișa ei). Rămân cele două care chiar se cer cu
+   coada ochiului: cât e ceasul și cât mai e până la pauză. */
+function vorbaScurta(s) {
+  if (!s) return "";
+  if (s.fel === "ora") return `<b>${s.ramas}</b> min până la pauză`;
+  if (s.fel === "pauza") return `pauză, încă <b>${s.pana}</b> min`;
+  if (s.fel === "inainte") return `peste <b>${s.pana}</b> min începe`;
+  if (s.fel === "gata") return "gata pe azi";
+  return "";
+}
+
+function scurtHtml(s, acum, cuX) {
+  const vorba = vorbaScurta(s);
+  return `
+    <div class="hc hc--scurt" role="status">
+      ${cuX ? `<button type="button" class="hc__x" data-act="hc-ascunde" aria-label="Ascunde">${X_SVG}</button>` : ""}
+      <span class="hc-pastila">${CEAS_SVG}<b data-rol="ceas">${ceasAcum(acum)}</b></span>
+      ${vorba ? `<span class="hc-scurt__vorba">${vorba}</span>` : ""}
+    </div>`;
+}
+
 /**
  * @param {HTMLElement} gazda
  * @param {() => (null | object)} stareaDeDat  ce arată cardul; `null` = n-avem orar
+ * @param {() => ("plin"|"prezentare"|"fantoma")} felulCardului
+ *        plin       – ecranele obișnuite ale modulului
+ *        prezentare – o fișă deschisă în modul: numai ceasul și minutele
+ *        fantoma    – fișa pe tot ecranul: la fel, dar stins și fără să prindă
+ *                     apăsările, ca să poți atinge slide-ul de dedesubt
  */
-export function hourCard(gazda, stareaDeDat = () => null) {
+export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => "plin") {
   if (!gazda) return { improspateaza() {}, opreste() {} };
 
-  let peMinut = null, peSecunda = null, potrivire = null, ultimFel = "";
+  let peMinut = null, peSecunda = null, potrivire = null;
+  let ultimFel = "", ultimulMod = "";
   let ascuns = iaLocal(CHEIE_ASCUNS, false) === true;
+
+  /* PE TOT ECRANUL, CARDUL TREBUIE SĂ URCE ÎN „TOP LAYER".
+     Un element trecut pe tot ecranul prin Fullscreen API se desenează într-un
+     strat de deasupra întregii pagini; acolo nu ajunge niciun `z-index`, oricât
+     de mare. Cardul ar fi fost ascuns cu totul, nu estompat. `popover` e
+     singura ușă către stratul acela.
+     Atributul se pune și se scoate din mers: un element cu `popover` e ascuns
+     până e arătat, deci lăsat pe el mereu ar fi făcut cardul să dispară pe
+     ecranele obișnuite. */
+  function potrivesteStratul(sus) {
+    const are = gazda.hasAttribute("popover");
+    if (sus === are) return;
+    if (sus) {
+      gazda.setAttribute("popover", "manual");
+      /* Dacă arătarea nu reușește (browser vechi, element scos din pagină),
+         atributul TREBUIE scos înapoi: un element cu `popover` nearătat e
+         `display: none`, adică s-ar fi ales cu un card dispărut cu totul în
+         locul unuia doar acoperit. */
+      try { gazda.showPopover(); }
+      catch { gazda.removeAttribute("popover"); }
+      return;
+    }
+    try { gazda.hidePopover(); } catch { /* nearătat: n-are ce ascunde */ }
+    gazda.removeAttribute("popover");
+  }
 
   function deseneaza() {
     const acum = new Date();
+    const mod = felulCardului();
+    ultimulMod = mod;
+    gazda.dataset.mod = mod;
+    potrivesteStratul(mod === "fantoma");
 
     if (ascuns) {
       gazda.innerHTML = `<button type="button" class="hc-mic" data-act="hc-arata"
@@ -174,6 +238,15 @@ export function hourCard(gazda, stareaDeDat = () => null) {
     }
 
     const s = stareaDeDat();
+
+    /* Peste o prezentare: numai ceasul și minutele. La fel și pe tot ecranul,
+       unde în plus se stinge și nu mai prinde apăsările (din CSS) — de aceea
+       acolo nu se mai pune nici butonul de ascuns: n-ar putea fi apăsat. */
+    if (mod !== "plin") {
+      gazda.innerHTML = scurtHtml(s, acum, mod === "prezentare");
+      ultimFel = s ? s.fel : "";
+      return;
+    }
     if (!s) {
       gazda.innerHTML = `
         <div class="hc" role="status">
@@ -233,11 +306,16 @@ export function hourCard(gazda, stareaDeDat = () => null) {
      stare în alta (care nu poate aștepta minutul rotund — la 12:15:00 ești deja
      în oră). */
   peSecunda = setInterval(() => {
+    /* Modul se verifică și aici, nu numai la `fullscreenchange`. Ecranul plin
+       cerut din interiorul cadrului nu ajunge la fel de sigur până în pagina
+       gazdă, iar o citire de proprietate pe secundă e mai ieftină decât un card
+       rămas larg peste un slide. */
+    if (felulCardului() !== ultimulMod) { deseneaza(); return; }
     if (ascuns) return;
     const s = stareaDeDat();
     if (s && s.fel !== ultimFel) { deseneaza(); return; }
     bateCeasul();
-    if (s && s.fel === "pauza") bateTimerul(s);
+    if (s && s.fel === "pauza" && ultimulMod === "plin") bateTimerul(s);
   }, 1000);
 
   /* Cardul întreg, pe minutul rotund: atunci se schimbă cifra mare și bara. */
@@ -251,6 +329,7 @@ export function hourCard(gazda, stareaDeDat = () => null) {
     opreste() {
       clearInterval(peSecunda); clearInterval(peMinut); clearTimeout(potrivire);
       gazda.removeEventListener("click", apasa);
+      potrivesteStratul(false);
       gazda.innerHTML = "";
     },
   };

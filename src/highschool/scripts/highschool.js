@@ -476,6 +476,7 @@ function vedereDeFisa(f) {
            title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>
       </div>
       <iframe class="lic-fisa__cadru" src="${adresaFisei(f, caleaSitului)}"
+        allow="fullscreen" allowfullscreen
         title="${esc(f.titlu)}"></iframe>
     </div>`;
 }
@@ -543,13 +544,37 @@ function deseneaza() {
  *   · e `position: fixed`, iar un `transform` pe orice părinte ar fi rupt
  *     fixarea și l-ar fi pus să se plimbe cu pagina.
  */
+/**
+ * CE FEL DE CARD SE CERE AICI.
+ *
+ * Peste o fișă, cardul întreg stă în drum: fișa e o prezentare ținută la clasă,
+ * iar de pe ea n-ai nevoie decât de ceas și de cât mai e până la pauză. Pe tot
+ * ecranul, chiar și atâta trebuie să se dea la o parte din calea degetului.
+ *
+ * `document.fullscreenElement` se uită în pagina GAZDĂ. Când fișa cere ecranul
+ * plin din interiorul cadrului, cel trecut pe tot ecranul e chiar `<iframe>`-ul,
+ * deci tot aici se vede. `webkitFullscreenElement` e pentru browserele mai
+ * vechi, care n-au prins încă numele fără prefix.
+ */
+function felulCardului() {
+  if (!rutaE("f")) return "plin";
+  const plin = document.fullscreenElement || document.webkitFullscreenElement || null;
+  return plin ? "fantoma" : "prezentare";
+}
+
 function faCardul() {
   if (card) return;
   const casa = document.createElement("div");
   casa.className = "lic-orcard";
   casa.id = "lic-orcard";
   document.body.appendChild(casa);
-  card = hourCard(casa, oraDeArata);
+  card = hourCard(casa, oraDeArata, felulCardului);
+  /* Intrarea și ieșirea din ecranul plin, prinse pe loc. Cardul își verifică
+     modul și singur, o dată pe secundă, dar o secundă de card larg peste un
+     slide se vede. */
+  const schimbat = () => card && card.improspateaza();
+  document.addEventListener("fullscreenchange", schimbat);
+  document.addEventListener("webkitfullscreenchange", schimbat);
 }
 
 /* Orarul, adus o dată la deschiderea paginii. Cardul îl întreabă de o sută de
