@@ -25,6 +25,7 @@
 // =========================================================
 import { iaLocal, punLocal } from "../../shared/scripts/session.js";
 import { CLASE } from "./classes.js";
+import { hourCard } from "./hour-card.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -327,6 +328,36 @@ function deseneaza() {
   legaManerul(radacina.querySelector("[data-rol='maner']"));
 }
 
+/**
+ * Casa cardului cu ora, făcută O SINGURĂ DATĂ și lipită de `<body>`, nu în
+ * modul.
+ *
+ * Două motive, amândouă pățite:
+ *   · `deseneaza()` rescrie tot ce e în modul; dacă locuia acolo, cardul ar fi
+ *     fost ucis la fiecare schimbare de ecran, iar ceasul lui ar fi rămas să
+ *     bată într-un nod rupt din pagină;
+ *   · e `position: fixed`, iar un `transform` pe orice părinte ar fi rupt
+ *     fixarea și l-ar fi pus să se plimbe cu pagina.
+ */
+function faCardul() {
+  if (card) return;
+  const casa = document.createElement("div");
+  casa.className = "lic-orcard";
+  casa.id = "lic-orcard";
+  document.body.appendChild(casa);
+  card = hourCard(casa, oraDeArata);
+}
+
+/**
+ * Ce oră arată cardul. Deocamdată `null`: orarul nu e încă în bază, iar cardul
+ * spune cinstit că nu-l are, în loc să inventeze o oră.
+ * Când intră orarul, aici se schimbă o singură dată: se întoarce ora de acum
+ * ori cea care urmează.
+ */
+function oraDeArata() {
+  return null;
+}
+
 /* ---------------- apăsările ---------------- */
 
 function apasa(e) {
@@ -378,4 +409,5 @@ export function renderHighschool(gazda, basePath = "") {
   deseneaza();
   /* Strângerea se pune DUPĂ primul desen: `strange` caută butonul în pagină. */
   strange(iaLocal(CHEIE_STRANS, false) === true);
+  faCardul();
 }

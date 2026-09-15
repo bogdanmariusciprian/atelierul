@@ -418,6 +418,110 @@
   .lic-card__stralucire { display: none; }
 }
 
+/* =========================================================
+   CARDUL PLUTITOR CU ORA, dreapta jos.
+
+   `position: fixed`, deci lipit de ECRAN: rămâne acolo oricât s-ar derula
+   cuprinsul. Stă peste tot în modul, ca ceasul din clasă.
+   ========================================================= */
+.lic-orcard {
+  position: fixed;
+  inset-block-end: 16px;
+  inset-inline-end: 16px;
+  z-index: 50;
+}
+
+.hc {
+  position: relative;
+  inline-size: 20rem;
+  padding: 0.85rem 1rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 14px 34px -14px oklch(30% 0.02 260 / 0.45);
+  color: var(--color-text);
+}
+/* Cât ora e în desfășurare, cardul capătă o muchie care se vede. */
+.hc--acum { border-color: var(--color-primary); }
+
+.hc__x {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  inline-size: 34px; block-size: 34px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 9px;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0.6;
+}
+.hc__x:hover { opacity: 1; background: var(--color-bg); }
+
+.hc__cap { margin: 0; display: flex; align-items: baseline; gap: 0.35rem; padding-inline-end: 2rem; }
+.hc__clasa { font-size: 1.25rem; letter-spacing: -0.01em; }
+.hc__sala { font-size: 0.9rem; color: var(--color-text-muted); }
+.hc__nr {
+  margin-inline-start: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.hc__rand {
+  margin: 0.15rem 0 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+}
+.hc__interval { font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+/* PASTILA CU ORA DE ACUM. Roșie, cu chenar subțire, ca în varianta de pe disc.
+   Pulsează la fiecare secundă: bătaia se vede, nu se citește. */
+.hc__pastila {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.16rem 0.5rem;
+  border: 1.5px solid var(--color-danger);
+  border-radius: 999px;
+  color: var(--color-danger);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+.hc__pastila.bate { animation: hc-bate 1s ease-out; }
+@keyframes hc-bate {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 38%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hc__pastila.bate { animation: none; }
+}
+
+.hc__vorba { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--color-text-muted); }
+.hc__gol { margin: 0 0 0.5rem; padding-inline-end: 2rem; font-size: 0.9rem; color: var(--color-text-muted); }
+.hc__ceas { margin: 0; }
+
+.hc__jos {
+  margin-block-start: 0.7rem;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 0.8rem;
+}
+/* Bara din bucățele, ca în varianta de pe disc: se citește dintr-o privire cât
+   a trecut, fără să fie un grafic. */
+.hc__bara { display: flex; gap: 2px; flex: 1; align-items: flex-end; }
+.hc__bara i {
+  flex: 1;
+  block-size: 9px;
+  border-radius: 2px;
+  background: var(--color-border);
+}
+.hc__bara i.on { background: var(--color-primary); }
+.hc--acum .hc__bara i.on { background: var(--color-danger); }
+
+.hc__min { font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hc__min small { font-size: 0.72rem; font-weight: 400; color: var(--color-text-muted); }
+
+@media (max-width: 720px) {
+  .lic-orcard { inset-inline: 10px; inset-block-end: 10px; }
+  .hc { inline-size: auto; }
+}
+
 /* ---------- vederea unei clase ---------- */
 .lic-clasa { max-inline-size: 48rem; }
 .lic-clasa__cod {
