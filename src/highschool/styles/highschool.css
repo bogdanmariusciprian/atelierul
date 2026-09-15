@@ -12,18 +12,31 @@
    schimbare.
    ========================================================= */
 
+/* PAGINA NU SE DERULEAZĂ NICIODATĂ. Modulul se folosește pe tabla din clasă și
+   trebuie să încapă întreg în ecran: o bară de derulare acolo înseamnă că o
+   bucată din el a rămas pe dinafară, iar cu degetul o cauți greu.
+
+   Se leagă AMÂNDOUĂ, și `<html>`, și `<body>`. `overflow: hidden` pus numai pe
+   body nu oprește elementul rădăcină să se deruleze, iar bara tot apare.
+   Și se pune `block-size`, nu `min-block-size`: cu un minim, cuprinsul îl poate
+   împinge mai jos; cu o înălțime fixă, nu.
+   `dvh`, nu `vh`: pe ecranele cu bară de adresă care se ascunde, `vh` rămâne la
+   înălțimea de dinainte și modulul iese din ecran cu câțiva zeci de pixeli. */
+.lic-html {
+  block-size: 100dvh;
+  overflow: hidden;
+}
+
 .lic-body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
-  /* Modulul are derularea lui; pagina n-are de ce să se miște sub el. */
+  block-size: 100%;
+  /* `base.css` pune pe body `min-height: 100vh` pentru subsolul lipit de jos.
+     Aici n-avem subsol, iar minimul acela s-ar aduna peste înălțimea fixă și ar
+     naște tocmai derularea pe care o scoatem. */
+  min-block-size: 0;
   overflow: hidden;
-  /* `dvh`, nu `vh`: pe telefon bara de adresă se ascunde la derulare, iar `vh`
-     rămâne la înălțimea de dinainte, deci modulul ieșea din ecran cu câțiva
-     zeci de pixeli. (`base.css` pune pe body `display:flex` și `min-height:100vh`
-     pentru subsolul lipit de jos; aici n-avem subsol, deci îl întoarcem la
-     înălțimea adevărată a ecranului.) */
-  min-block-size: 100dvh;
 }
 
 .lic {
@@ -272,8 +285,12 @@
    ========================================================= */
 /* `isolation: isolate` face din ecran un teanc de straturi al lui. Fără el,
    petele cu `z-index: -1` ar fi putut aluneca în spatele fundalului unui
-   părinte și ar fi dispărut cu totul. */
-.lic-acasa { position: relative; isolation: isolate; min-block-size: 100%; }
+   părinte și ar fi dispărut cu totul.
+
+   Nu i se pune `min-block-size: 100%`: cuprinsul are margini interioare, iar o
+   sută la sută din înălțimea LUI, plus marginile, dă mai mult decât încape.
+   Petele se întind singure, prin `inset`, deci n-au nevoie de înălțime. */
+.lic-acasa { position: relative; isolation: isolate; }
 
 /* Titlul se centrează și el: un titlu lipit de stânga peste un teanc de
    cartonașe centrate arată strâmb. Spune dacă-l vrei la stânga. */
@@ -284,33 +301,42 @@
   text-align: center;
 }
 
-/* Petele de culoare. Stau în spate (`z-index: -1`) și nu prind mausul. */
+/* Petele de culoare. Stau în spate (`z-index: -1`) și nu prind mausul.
+   `inset: 0`, adică EXACT cât părintele, niciun pixel peste: cu marginile
+   negative de dinainte (−12% sus și jos) stratul creștea cu un sfert peste
+   cuprins și năștea chiar bara de derulare pe care o scoteam din alte părți.
+   Un fundal n-are voie să hotărască mărimea paginii. */
 .lic-aurora {
   position: absolute;
-  inset: -12% -6%;
+  inset: 0;
   z-index: -1;
-  overflow: hidden;
+  overflow: hidden;     /* ce iese din pete se taie aici */
   pointer-events: none;
 }
+
+/* MĂRIMEA PETELOR E ÎN `vmin`, nu în procente din părinte. Procentele se legau
+   de cuprins: pe un ecran lat, 46% însemnau aproape opt sute de pixeli, iar pe
+   unul îngust se făceau cât o nucă. În `vmin` rămân la fel oriunde, și — mai
+   important — nu mai cer nimic de la înălțimea părintelui. */
 .lic-aurora span {
   position: absolute;
-  inline-size: 46%;
-  aspect-ratio: 1;
+  inline-size: 34vmin;
+  block-size: 34vmin;
   border-radius: 50%;
   background: oklch(72% 0.17 var(--h));
   opacity: 0.34;
-  filter: blur(70px);
+  filter: blur(60px);
 }
-/* Pozițiile, scrise una câte una. Le-am pus împrăștiat, nu pe un cerc: un cerc
-   se vede că e cerc chiar și neclar, iar petele ar fi arătat așezate la rând.
-   Scrise așa, se pot și muta cu ochiul, fără socoteală. */
-.lic-aurora span:nth-child(1) { inset-block-start:  2%; inset-inline-start:  4%; }
-.lic-aurora span:nth-child(2) { inset-block-start: 30%; inset-inline-start: 56%; }
-.lic-aurora span:nth-child(3) { inset-block-start:  4%; inset-inline-start: 70%; }
-.lic-aurora span:nth-child(4) { inset-block-start: 54%; inset-inline-start: 10%; }
-.lic-aurora span:nth-child(5) { inset-block-start: 68%; inset-inline-start: 64%; }
-.lic-aurora span:nth-child(6) { inset-block-start: 36%; inset-inline-start: 32%; }
-.lic-aurora span:nth-child(7) { inset-block-start: 76%; inset-inline-start: 28%; }
+/* Pozițiile, scrise una câte una și tot în `vmin`. Le-am pus împrăștiat, nu pe
+   un cerc: un cerc se vede că e cerc chiar și neclar, iar petele ar fi arătat
+   așezate la rând. Scrise așa, se pot muta cu ochiul, fără socoteală. */
+.lic-aurora span:nth-child(1) { inset-block-start: -8vmin; inset-inline-start:  -4vmin; }
+.lic-aurora span:nth-child(2) { inset-block-start: 14vmin; inset-inline-start:  38vmin; }
+.lic-aurora span:nth-child(3) { inset-block-start: -6vmin; inset-inline-start:  62vmin; }
+.lic-aurora span:nth-child(4) { inset-block-start: 26vmin; inset-inline-start:   4vmin; }
+.lic-aurora span:nth-child(5) { inset-block-start: 34vmin; inset-inline-start:  56vmin; }
+.lic-aurora span:nth-child(6) { inset-block-start: 10vmin; inset-inline-start:  20vmin; }
+.lic-aurora span:nth-child(7) { inset-block-start: 38vmin; inset-inline-start:  28vmin; }
 
 /* CENTRAT PE LĂȚIMEA PAGINII, cu flex, nu cu grilă. O grilă ar fi ținut
    coloanele la locul lor, iar ultimul rând (trei cartonașe din șapte) ar fi
@@ -484,8 +510,10 @@
 .hc-ramas b { font-size: 1.7rem; color: var(--color-text); }
 
 /* PASTILA CU ORA DE ACUM. Roșie, cu chenar subțire, ca în varianta de pe disc.
-   Pulsează la fiecare secundă: bătaia se vede, nu se citește. */
-.hc__pastila {
+   Pulsează la fiecare secundă: bătaia se vede, nu se citește.
+   Numele e cu o liniuță (`hc-pastila`), nu cu două: JS-ul scrie așa, iar o
+   vreme aici a rămas `hc__pastila` și pastila n-a avut niciun stil. */
+.hc-pastila {
   display: inline-flex; align-items: center; gap: 0.3rem;
   padding: 0.16rem 0.5rem;
   border: 1.5px solid var(--color-danger);
@@ -494,14 +522,14 @@
   font-variant-numeric: tabular-nums;
   font-size: 0.95rem;
 }
-.hc__pastila.bate { animation: hc-bate 1s ease-out; }
+.hc-pastila.bate { animation: hc-bate 1s ease-out; }
 @keyframes hc-bate {
   0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 38%, transparent); }
   70%  { box-shadow: 0 0 0 7px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hc__pastila.bate { animation: none; }
+  .hc-pastila.bate { animation: none; }
 }
 
 .hc-gol { margin: 0 0 0.5rem; padding-inline-end: 1.8rem; font-size: 0.9rem; color: var(--color-text-muted); }
