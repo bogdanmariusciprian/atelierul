@@ -72,6 +72,7 @@ const stare = {
 
 let radacina = null;
 let caleaSitului = "";
+let card = null;          // cardul plutitor cu ora, făcut o singură dată
 
 /* ---------------- ruta ---------------- */
 
@@ -380,11 +381,16 @@ export function renderHighschool(gazda, basePath = "") {
   caleaSitului = basePath;
   if (!radacina) return;
 
-  /* Lățimea ținută minte. `?? LAT_START` și nu `|| LAT_START`: un zero salvat
-     E o lățime adevărată (panoul strâns de tot), iar `||` l-ar fi socotit lipsă
-     și ar fi deschis panoul la loc de fiecare dată. */
-  const salvata = Number(iaLocal(CHEIE_LAT, null));
-  stare.latime = Number.isFinite(salvata) && salvata >= 0 ? salvata : LAT_START;
+  /* LĂȚIMEA ȚINUTĂ MINTE, cu grijă la amândouă capetele.
+       · un ZERO salvat e o lățime adevărată (ai tras panoul închis), deci nu se
+         poate folosi `|| LAT_START`: ar fi redeschis panoul la fiecare intrare;
+       · dar nici `Number(...)` de-a dreptul: la prima intrare nu e nimic salvat,
+         iar `Number(null)` dă tot zero, deci panoul s-ar fi născut închis.
+     Se întreabă întâi dacă E un număr, apoi cât e. */
+  const salvata = iaLocal(CHEIE_LAT, null);
+  stare.latime = typeof salvata === "number" && Number.isFinite(salvata) && salvata >= 0
+    ? salvata
+    : LAT_START;
   stare.vedere = citesteRuta();
 
   /* CINE INTRĂ DE-A DREPTUL pe adresa unei vederi (dintr-un mesaj, dintr-un

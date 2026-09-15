@@ -81,6 +81,19 @@ export function hourCard(gazda, date = () => null) {
     }
 
     const de = minute(o.start), pana = minute(o.sfarsit);
+    /* Un ceas pe care nu-l putem citi („8.00", gol, lipsă) ar fi dat `NaN`, iar
+       pe card ar fi scris „NaN min". Mai bine spunem că n-avem ora. */
+    if (de === null || pana === null) {
+      gazda.innerHTML = `
+        <div class="hc" role="status">
+          <button type="button" class="hc__x" data-act="hc-inchide" aria-label="Închide">${X_SVG}</button>
+          <p class="hc__cap"><b class="hc__clasa">${esc(o.clasa)}</b></p>
+          <p class="hc__gol">Ora asta n-are un ceas bun în orar.</p>
+          <p class="hc__ceas"><span class="hc__pastila">${CEAS_SVG}<b data-rol="ceas">${ceasAcum(acum)}</b></span></p>
+        </div>`;
+      return;
+    }
+
     const m = acum.getHours() * 60 + acum.getMinutes();
     /* În timpul orei numărăm cât a mai rămas din ea; în afara ei, cât mai e
        până începe. Același număr mare, două înțelesuri, deosebite de vorba de
