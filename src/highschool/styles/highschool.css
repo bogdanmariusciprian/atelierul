@@ -797,6 +797,7 @@ a.lic-ora .lic-ora__semn {
 .lic-orar__gol { background: transparent; }
 
 .lic-orar__cel a {
+  position: relative;              /* reazemul cifrei din colț */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -813,6 +814,25 @@ a.lic-ora .lic-ora__semn {
 .lic-orar__cel a:hover { border-color: oklch(62% 0.14 var(--h)); box-shadow: var(--shadow-sm); }
 .lic-orar__cel b { font-size: 1.05rem; }
 .lic-orar__cel small { font-size: 0.72rem; opacity: 0.75; }
+
+/* A CÂTA ORĂ DIN AN, în colțul de jos-dreapta al casetei.
+   Scoasă din curgerea celulei (`position: absolute`), ca să nu miște clasa și
+   sala de pe mijloc: în rând cu ele, cele două rânduri de sub cod ar fi împins
+   codul în sus și casetele n-ar mai fi arătat la fel.
+   Ștearsă dinadins — se citește când o cauți, nu sare în ochi de la doi metri,
+   unde trebuie să vezi clasa, nu contabilitatea anului. */
+.lic-orar__nr {
+  position: absolute;
+  inset-block-end: 3px;
+  inset-inline-end: 5px;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  opacity: 0.5;
+  pointer-events: none;            /* apeși pe ea, intri tot la clasă */
+}
+.lic-orar__cel a:hover .lic-orar__nr { opacity: 0.9; }
 .lic-orar__t tr.acum .lic-orar__cel.azi a { outline: 2px solid var(--color-danger); }
 
 /* ---------- o fișă, arătată neatinsă ---------- */

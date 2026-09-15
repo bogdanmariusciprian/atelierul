@@ -327,14 +327,75 @@ const ZI_LUNG = {
 };
 
 /**
+ * Luni–vineri, cu datele lor, pentru săptămâna pe care o arată grila.
+ *
+ * Orarul se repetă de la o săptămână la alta, dar numărul orei din planificare
+ * nu: aceeași casetă de marți e a patra oră săptămâna asta și a noua peste
+ * două. Numărul cere, deci, o DATĂ, nu doar o zi a săptămânii.
+ *
+ * Sâmbăta și duminica se arată săptămâna care VINE: în weekend te uiți în orar
+ * ca să-ți pregătești luni, nu ca să vezi ce-a fost vineri.
+ */
+function zileleSaptamanii(acum = new Date()) {
+  const d = new Date(acum.getFullYear(), acum.getMonth(), acum.getDate());
+  const aCata = d.getDay() === 0 ? 7 : d.getDay();   // duminică = 7, ca în bază
+  d.setDate(d.getDate() + (aCata >= 6 ? 8 - aCata : 1 - aCata));
+  return LUCRATOARE.map((z, i) => {
+    const zi = new Date(d);
+    zi.setDate(d.getDate() + i);
+    return { zi: z, data: ziuaISO(zi) };
+  });
+}
+
+/** „14–18 septembrie", ori „28 septembrie – 2 octombrie" peste pragul lunii. */
+function spanulZilelor(a, b) {
+  try {
+    const x = new Date(`${a}T00:00:00`);
+    const y = new Date(`${b}T00:00:00`);
+    const luna = (d) => d.toLocaleDateString("ro-RO", { month: "long" });
+    return x.getMonth() === y.getMonth()
+      ? `${x.getDate()}–${y.getDate()} ${luna(y)}`
+      : `${x.getDate()} ${luna(x)} – ${y.getDate()} ${luna(y)}`;
+  } catch { return ""; }
+}
+
+/**
+ * Numerele „5/95" ale săptămânii, gata de căutat pe celulă.
+ *
+ * Cheia e `clasa|data|ceas`, adică exact îmbinarea pe care o face și funcția din
+ * bază: planificarea se leagă de orar pe clasă, pe ziua din calendar și pe
+ * ceasul de început. `ora` din planificare e scrisă neîmpodobită („8:00", nu
+ * „08:00"), la fel ca `start`-ul intervalului, deci cele două se potrivesc de-a
+ * dreptul; `ora2()` e numai pentru citit, nu pentru potrivit.
+ *
+ * Numitorul e numărul de rânduri din planificarea clasei. Am verificat pe bază
+ * că e același cu `school_plan_meta.totaluri.ore` la toate șapte clasele, deci
+ * n-am mai adus încă un tabel pentru o cifră pe care o am deja.
+ */
+function numereleSaptamanii(zile) {
+  const aleSaptamanii = new Set(zile.map((z) => z.data));
+  const harta = new Map();
+  for (const c of CLASE) {
+    const p = planuri[c.cod];
+    if (!p || p.seAduce || !p.ore.length) continue;
+    const total = p.ore.length;
+    for (const o of p.ore) {
+      if (aleSaptamanii.has(o.data)) harta.set(`${c.cod}|${o.data}|${o.ora}`, { nr: o.nr, total });
+    }
+  }
+  return harta;
+}
+
+/**
  * Grila orarului: zilele pe orizontală, ceasurile pe verticală.
  *
  * Se arată NUMAI intervalele în care chiar ai ore. Școala are treisprezece, tu
  * ai ore în șase; un tabel cu șapte rânduri goale nu spune nimic și împinge
  * restul afară din ecran.
  *
- * Datele sunt cele aduse la deschiderea paginii, deci grila se desenează pe loc,
- * fără altă cerere.
+ * Orarul se desenează pe loc, din ce s-a adus la deschiderea paginii. Numerele
+ * din colțul celulelor vin pe urmă, din planificări, și se așază singure când
+ * sosesc: grila nu așteaptă după ele.
  */
 function vedereDeOrar() {
   const ore = orarul.saptamana;
@@ -353,29 +414,48 @@ function vedereDeOrar() {
   const m = new Date().getHours() * 60 + new Date().getMinutes();
   const culoarea = (cod) => CLASE.find((c) => c.cod === cod)?.hue ?? 250;
 
+  /* Planificările tuturor claselor din grilă: din ele iese numărul din colțul
+     fiecărei celule. Se cer o dată și rămân ținute minte, iar până sosesc grila
+     se vede întreagă, doar fără numere — nu ține nimic în loc.
+     Și clasele a 12-a intră aici: `faraOre` spune că lor nu li se ÎNȘIRĂ orele
+     pe ecranul clasei, nu că n-ar avea planificare. */
+  const zile = zileleSaptamanii();
+  CLASE.forEach((c) => { if (!planuri[c.cod]) aduPlanul(c.cod); });
+  const numere = numereleSaptamanii(zile);
+
   const cap = `<tr><th class="lic-orar__colt"></th>${
-    LUCRATOARE.map((z) => `<th class="lic-orar__zi${z === azi ? " azi" : ""}">${ZI_LUNG[z]}</th>`).join("")
+    zile.map(({ zi }) => `<th class="lic-orar__zi${zi === azi ? " azi" : ""}">${ZI_LUNG[zi]}</th>`).join("")
   }</tr>`;
 
   const randuri = folosite.map((i) => {
     const acum = m >= minute(i.start) && m < minute(i.end);
     return `<tr class="${acum ? "acum" : ""}">
       <th class="lic-orar__ceas"><b>${esc(ora2(i.start))}</b><small>${esc(ora2(i.end))}</small></th>
-      ${LUCRATOARE.map((z) => {
-        const o = pe.get(`${z}|${i.id}`);
+      ${zile.map(({ zi, data }) => {
+        const o = pe.get(`${zi}|${i.id}`);
         if (!o) return `<td class="lic-orar__gol"></td>`;
-        return `<td class="lic-orar__cel${z === azi ? " azi" : ""}" style="--h:${culoarea(o.clasa)}">
+        /* Zilele fără număr sunt zilele fără oră în planificare: vacanțe,
+           sărbători, săptămâna dinaintea orarului ăstuia. Celula rămâne
+           întreagă, doar fără cifra din colț. */
+        const n = numere.get(`${o.clasa}|${data}|${i.start}`);
+        return `<td class="lic-orar__cel${zi === azi ? " azi" : ""}" style="--h:${culoarea(o.clasa)}">
           <a href="#/v/clasa-${esc(o.clasa.toLowerCase())}">
             <b>${esc(o.clasa)}</b>${o.sala ? `<small>${esc(String(o.sala).toUpperCase())}</small>` : ""}
+            ${n ? `<i class="lic-orar__nr"
+                     title="A ${n.nr}-a oră din cele ${n.total} la ${esc(o.clasa)}">${n.nr}/${n.total}</i>` : ""}
           </a></td>`;
       }).join("")}
     </tr>`;
   }).join("");
 
+  /* Săptămâna e scrisă: fără ea, „5/95" ar sta pe o grilă care arată la fel în
+     toate săptămânile anului și n-ar spune al cui e numărul. */
+  const span = spanulZilelor(zile[0].data, zile[zile.length - 1].data);
   return `
     <div class="lic-orar">
       <h1 class="lic-orar__titlu">Orar</h1>
-      <p class="lic-orar__sub">${ore.length} ore pe săptămână. Apeși o oră și intri la clasa ei.</p>
+      <p class="lic-orar__sub">${ore.length} ore pe săptămână${
+        span ? ` · ${esc(span)}` : ""}. Apeși o oră și intri la clasa ei.</p>
       <div class="lic-orar__vas">
         <table class="lic-orar__t"><thead>${cap}</thead><tbody>${randuri}</tbody></table>
       </div>
@@ -390,8 +470,22 @@ async function aduPlanul(clasa) {
   planuri[clasa] = { seAduce: true, ore: [] };
   const r = await fetchPlan(clasa);
   planuri[clasa] = { seAduce: false, ore: r.date || [] };
-  /* Dacă între timp ai plecat pe alt ecran, nu-l smulgem de sub tine. */
-  if (rutaE("v") && rutaId() === `clasa-${clasa.toLowerCase()}`) deseneaza();
+  /* Dacă între timp ai plecat pe alt ecran, nu-l smulgem de sub tine. Orarul
+     intră și el la socoteală: numerele din colțul celulelor vin din aceleași
+     planificări, deci grila se umple pe măsură ce sosesc. */
+  const unde = rutaId();
+  if (rutaE("v") && (unde === `clasa-${clasa.toLowerCase()}` || unde === "orar")) cereDesen();
+}
+
+/* UN SINGUR DESEN LA MAI MULTE VENIRI. Orarul cere deodată planificările tuturor
+   celor șapte clase; dacă fiecare ar fi cerut desenul ei, ecranul s-ar fi rescris
+   de șapte ori într-o secundă, cu clipit cu tot. Cererile se strâng într-una
+   singură, pe cadrul următor. */
+let desenCerut = false;
+function cereDesen() {
+  if (desenCerut) return;
+  desenCerut = true;
+  requestAnimationFrame(() => { desenCerut = false; deseneaza(); });
 }
 
 const ziScurta = (iso) => {
