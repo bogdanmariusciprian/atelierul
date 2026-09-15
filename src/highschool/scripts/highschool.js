@@ -278,7 +278,6 @@ function cartonaseHtml() {
             <button type="button" class="lic-card" style="--h:${c.hue}"
               data-act="vedere" data-id="clasa-${c.cod.toLowerCase()}">
               <span class="lic-card__cod">${esc(c.cod)}</span>
-              <span class="lic-card__nume">${esc(c.nume)}</span>
               <span class="lic-card__stralucire" aria-hidden="true"></span>
             </button>
           </li>`).join("")}
@@ -291,8 +290,7 @@ function vedereDeClasa(c) {
   const fise = fiseleClasei(c.cod);
   return `
     <div class="lic-clasa" style="--h:${c.hue}">
-      <p class="lic-clasa__cod">${esc(c.cod)}</p>
-      <h1 class="lic-clasa__nume">${esc(c.nume)}</h1>
+      <h1 class="lic-clasa__cod">${esc(c.cod)}</h1>
       ${fise.length ? `
         <ul class="lic-fise">
           ${fise.map((f) => `

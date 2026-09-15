@@ -411,16 +411,14 @@
 }
 .lic-card:active { translate: 0 0; }
 
+/* Pe cartonaș stă NUMAI codul clasei. „a X-a D" era tot „10D", scris de două
+   ori pe același cartonaș. */
 .lic-card__cod {
-  font-size: clamp(2.2rem, 3.4vw, 3rem);
+  font-size: clamp(2.6rem, 4vw, 3.4rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
   color: oklch(42% 0.15 var(--h));
-}
-.lic-card__nume {
-  font-size: 0.92rem;
-  color: oklch(45% 0.05 var(--h));
 }
 
 /* Sclipirea care trece peste sticlă la apropiere. Un singur `translate`, deci
@@ -593,18 +591,12 @@
 /* ---------- vederea unei clase ---------- */
 .lic-clasa { max-inline-size: 48rem; }
 .lic-clasa__cod {
-  margin: 0;
+  margin: 0 0 1.2rem;
   font-size: clamp(3rem, 6vw, 4.5rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.04em;
   color: oklch(45% 0.15 var(--h));
-}
-.lic-clasa__nume {
-  margin: 0.2rem 0 1.2rem;
-  font-size: clamp(1.2rem, 2vw, 1.6rem);
-  font-weight: 500;
-  color: var(--color-text-muted);
 }
 .lic-clasa__gol {
   padding: 1.4rem;
