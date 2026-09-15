@@ -275,10 +275,13 @@
    părinte și ar fi dispărut cu totul. */
 .lic-acasa { position: relative; isolation: isolate; min-block-size: 100%; }
 
+/* Titlul se centrează și el: un titlu lipit de stânga peste un teanc de
+   cartonașe centrate arată strâmb. Spune dacă-l vrei la stânga. */
 .lic-acasa__titlu {
   margin: 0 0 1.4rem;
   font-size: clamp(1.6rem, 2.6vw, 2.4rem);
   letter-spacing: -0.02em;
+  text-align: center;
 }
 
 /* Petele de culoare. Stau în spate (`z-index: -1`) și nu prind mausul. */
@@ -309,15 +312,22 @@
 .lic-aurora span:nth-child(6) { inset-block-start: 36%; inset-inline-start: 32%; }
 .lic-aurora span:nth-child(7) { inset-block-start: 76%; inset-inline-start: 28%; }
 
+/* CENTRAT PE LĂȚIMEA PAGINII, cu flex, nu cu grilă. O grilă ar fi ținut
+   coloanele la locul lor, iar ultimul rând (trei cartonașe din șapte) ar fi
+   rămas lipit de stânga, sub un rând plin. La flex, fiecare rând se
+   centrează singur, deci și cel de jos. */
 .lic-carduri {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  /* Cartonașe mari, de deget: minimum 15rem, iar rândul se umple singur. */
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 1rem;
 }
+/* Cartonașe de deget: pleacă de la 15rem și nu se lăbărțează ca să umple
+   rândul; pe ecran îngust se strâng. */
+.lic-carduri > li { flex: 0 1 15rem; }
 
 .lic-card {
   position: relative;
