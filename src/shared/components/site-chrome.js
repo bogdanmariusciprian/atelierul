@@ -23,6 +23,8 @@ import { initUserMenu } from "../scripts/user-menu.js";
 import { initTodo } from "./todo-fab.js";
 import { initTagging } from "./tagging-fab.js";
 import { initExplanationProposals } from "./explanations-fab.js";
+import { initLiceuToggle } from "./liceu-toggle-fab.js";
+import { aduLiceuDeschis, liceuDeschisStiut } from "../scripts/liceu-gate.js";
 import { fetchOpenModerationCount } from "../scripts/forum-repo.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
 import { notifTotal, notifRows, consumeTray, relTime, loadNotifications, clearAllNotifications } from "../scripts/notif.js";
@@ -96,6 +98,7 @@ export async function renderChrome(basePath = "") {
      îl dă `order` din `fab-dock.css`. */
   safe(() => initTagging(basePath), "tagging");
   safe(() => initExplanationProposals(basePath), "explanationProposals");
+  safe(() => initLiceuToggle(basePath), "liceuToggle"); // „Liceu: afișat / ascuns" (admin)
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
   safe(addPlannerLink, "plannerLink"); // „Meditații" — added only if allowed
@@ -242,26 +245,45 @@ async function addPlannerLink() {
 
 // „LICEU" = un „L" plutitor pe marginea din dreapta, pe mijlocul ECRANULUI.
 //
-// Spre deosebire de „M"-ul de la Meditații, ăsta e al TUTUROR: nu întreabă
-// nimic despre cont, fiindcă modulul e deschis oricui ajunge pe sit.
+// APARE NUMAI CU SEMNUL APRINS (migrarea 0094). Profesorul îl vede mereu — el
+// are de unde intra ca să-l aprindă. Pentru ceilalți, semnul stins înseamnă că
+// nici butonul nu e, nici datele nu se dau: lacătul e în bază, ăsta e chipul
+// lui. Cât nu se știe nimic, butonul lipsește; o nepotrivire înclină spre
+// ascuns, nu spre arătat.
 //
 // SE LIPEȘTE DE `<body>`, nu într-un container al paginii, și asta nu e o
 // toană: un `transform` pe oricare părinte face din el noul reper pentru
 // `position: fixed`, iar butonul ar fi început să se plimbe cu pagina în loc să
 // stea pe mijlocul ecranului. E capcana care ne-a stricat odată un modal.
-function addLiceuFab() {
+async function addLiceuFab() {
   if (window.__liceuFabOn) return;
   /* În modul nu-l punem: acolo ești deja, iar modulul n-are bara sitului. */
   if (canonicalPath("/liceu/") === canonicalPath(window.location.pathname)) return;
   window.__liceuFabOn = true;
 
-  const a = document.createElement("a");
-  a.href = "/liceu/";
-  a.className = "liceu-fab";
-  a.textContent = "L";
-  a.title = "Liceu";
-  a.setAttribute("aria-label", "Liceu");
-  document.body.appendChild(a);
+  const pune = () => {
+    if (document.querySelector(".liceu-fab")) return;
+    const a = document.createElement("a");
+    a.href = "/liceu/";
+    a.className = "liceu-fab";
+    a.textContent = "L";
+    a.title = "Liceu";
+    a.setAttribute("aria-label", "Liceu");
+    document.body.appendChild(a);
+  };
+  const scoate = () => document.querySelector(".liceu-fab")?.remove();
+
+  /* Întâi ce știm din browser, ca butonul să nu clipească la fiecare pagină;
+     apoi adevărul de la server, care poate să-l pună ori să-l ia. */
+  if (isAdmin() || liceuDeschisStiut() === true) pune();
+  const deschis = await aduLiceuDeschis();
+  if (isAdmin() || deschis) pune(); else scoate();
+
+  /* Comutatorul din colțul celălalt anunță când l-ai întors; butonul se ia ori
+     se pune pe loc, fără să reîncarci pagina. */
+  window.addEventListener("atelier:liceu-deschis", (e) => {
+    if (isAdmin() || e.detail === true) pune(); else scoate();
+  });
 }
 
 // The "log out" glyph used by the header logout button (a door + arrow).

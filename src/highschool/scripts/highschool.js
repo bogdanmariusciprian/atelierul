@@ -25,7 +25,8 @@
 //    nu-și mută unul altuia panoul. (Pățania din `session.js`.)
 // Cuprins în română, nume în engleză.
 // =========================================================
-import { iaLocal, punLocal } from "../../shared/scripts/session.js";
+import { iaLocal, punLocal, isAdmin } from "../../shared/scripts/session.js";
+import { aduLiceuDeschis } from "../../shared/scripts/liceu-gate.js";
 import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
@@ -799,16 +800,57 @@ function apasa(e) {
   if (act === "vedere") { navigheaza(`v/${b.dataset.id}`); }
 }
 
+/* ---------------- modulul închis ---------------- */
+
+/**
+ * Ce vede cineva care intră pe link cu semnul stins.
+ *
+ * NU E O PERDEA PESTE CEVA. Sub fereastră nu se desenează nimic de ascuns și nu
+ * se cere nimic de la bază — nici orarul, nici planificările, nici cartonașele
+ * claselor. Iar dacă cineva ar cere datele de mână, politicile din bază i le
+ * refuză oricum (migrarea 0094). Fereastra e ușa închisă, nu un capac pus peste
+ * o masă întinsă.
+ *
+ * Rămâne numai fundalul colorat al modulului, încețoșat, ca pagina să nu arate
+ * ca o eroare a sitului: nu e stricată, e închisă.
+ */
+function ecranulInchis() {
+  radacina.classList.remove("lic--fisa");
+  radacina.classList.add("lic--acasa", "lic--inchis");
+  radacina.innerHTML = `
+    <div class="lic-acasa">
+      <div class="lic-aurora" aria-hidden="true">
+        ${CLASE.map((c) => `<span style="--h:${c.hue}"></span>`).join("")}
+      </div>
+
+      <div class="lic-inchis" role="alertdialog" aria-labelledby="lic-inchis-t">
+        <h1 class="lic-inchis__titlu" id="lic-inchis-t">Partea asta e închisă</h1>
+        <p class="lic-inchis__vorba">
+          Liceul se deschide când îl deschide profesorul. Până atunci nu e nimic
+          de văzut aici, nici măcar pe ocolite.
+        </p>
+        <a class="lic-inchis__btn" href="${esc(caleaSitului) || "/"}">Înapoi la site</a>
+      </div>
+    </div>`;
+}
+
 /* ---------------- pornirea ---------------- */
 
 /**
  * @param {HTMLElement} gazda
  * @param {string} basePath  ce se pune înaintea adreselor („../" de obicei)
  */
-export function renderHighschool(gazda, basePath = "") {
+export async function renderHighschool(gazda, basePath = "") {
   radacina = gazda;
   caleaSitului = basePath;
   if (!radacina) return;
+
+  /* SEMNUL, ÎNAINTE DE ORICE. Profesorul intră mereu — el are de unde-l aprinde.
+     Pentru ceilalți, cu semnul stins nu se desenează modulul și nu se cere
+     nicio dată: se pune fereastra și ne oprim aici.
+     Pagina e ținută ascunsă de poartă până sfârșim, deci nu apucă nimeni să
+     vadă modulul o clipă înainte de fereastră. */
+  if (!isAdmin() && !(await aduLiceuDeschis())) { ecranulInchis(); return; }
 
   /* LĂȚIMEA ȚINUTĂ MINTE, cu grijă la amândouă capetele.
        · un ZERO salvat e o lățime adevărată (ai tras panoul închis), deci nu se

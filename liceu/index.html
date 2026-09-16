@@ -27,8 +27,12 @@
 
     /* Poarta întâi: un vizitator din afara echipei e trimis la /in-curand/, iar
        pagina rămâne ascunsă (main.css o ține așa până la `gate-ready`). */
+    /* Se AȘTEAPTĂ desenul, nu se pornește și se pleacă: modulul întreabă întâi
+       baza dacă e deschis, iar dezvelirea trebuie să vină după răspuns. Altfel
+       cineva cu semnul stins ar fi apucat să vadă modulul o clipă, înainte să-i
+       cadă fereastra peste el. */
     if (await enforceGate()) {
-      renderHighschool(document.getElementById("liceu"), "../");
+      await renderHighschool(document.getElementById("liceu"), "../");
       revealGate();
     }
   </script>

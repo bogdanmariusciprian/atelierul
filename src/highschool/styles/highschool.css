@@ -769,6 +769,47 @@ a.lic-ora .lic-ora__semn {
   color: oklch(42% 0.14 var(--h));
 }
 
+/* =========================================================
+   MODULUL ÎNCHIS. Fundalul colorat rămâne, încețoșat, ca pagina să se citească
+   drept „închisă", nu „stricată". Sub fereastră nu e nimic de ascuns: cu semnul
+   stins nu se desenează niciun ecran și nu se cere nicio dată (migrarea 0094).
+   ========================================================= */
+.lic--inchis .lic-aurora { filter: blur(26px); opacity: 0.75; }
+
+.lic-inchis {
+  max-inline-size: 30rem;
+  padding: 2rem 2.2rem;
+  text-align: center;
+  border-radius: 20px;
+  border: 1px solid oklch(100% 0 0 / 0.55);
+  background: oklch(100% 0 0 / 0.72);
+  box-shadow: 0 30px 70px -30px oklch(30% 0.02 260 / 0.55);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .lic-inchis { background: oklch(100% 0 0 / 0.48); backdrop-filter: blur(14px); }
+}
+.lic-inchis__titlu {
+  margin: 0 0 0.6rem;
+  font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+  letter-spacing: -0.02em;
+}
+.lic-inchis__vorba {
+  margin: 0 0 1.4rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+.lic-inchis__btn {
+  display: inline-flex; align-items: center;
+  min-block-size: 44px;          /* de deget, ca tot ce se apasă în modul */
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.lic-inchis__btn:hover { background: var(--color-primary-dark); }
+
 /* ---------- grila orarului ---------- */
 .lic-orar__titlu {
   margin: 0 0 0.2rem;

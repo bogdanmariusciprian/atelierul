@@ -1,0 +1,71 @@
+/* =========================================================
+   Comutatorul „Liceu: afișat / ascuns", în rândul de jos-stânga.
+
+   ÎȘI POARTĂ SINGUR CULORILE, nu le ia din `variables.css`: butoanele plutitoare
+   apar și pe paginile care nu încarcă foaia sitului (tablele, atelierul de
+   redactare), unde variabilele sitului n-ar avea nicio valoare, iar butonul ar
+   ieși fără culoare. Foaia asta e adusă de widget odată cu el.
+
+   AȘEZAREA NU E AICI: mănunchiul intră în suportul comun (`fab-dock.css`), care
+   ține butoanele într-un rând și le dă locul cu `order`.
+   ========================================================= */
+
+.liceu-fab-wrap {
+  position: relative;          /* reper, dacă va crește vreodată un panou din el */
+  display: flex;
+  align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.liceu-fab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 42px;
+  padding: 0 15px;
+  border: none;
+  border-radius: 999px;
+  /* ÎNCHIS E STAREA ÎN CARE PORNEȘTE, deci ea poartă culoarea liniștită.
+     Deschis se aprinde, fiindcă atunci e ceva de știut: elevii văd modulul. */
+  background: #2b2f3a;
+  color: #cfd4e0;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 12px 28px -10px rgba(31, 36, 48, 0.6);
+  transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.liceu-fab-btn:hover:not(:disabled) { transform: translateY(-1px); }
+
+.liceu-fab-btn.is-on {
+  background: #7c3aed;         /* violetul „L"-ului din marginea dreaptă */
+  color: #fff;
+  box-shadow: 0 12px 28px -10px rgba(124, 58, 237, 0.75);
+}
+
+/* Cât nu se știe încă, ori cât se duce cererea: amorțit și fără mână. Un
+   comutator care se lasă apăsat înainte să fi aflat ar minți. */
+.liceu-fab-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* BAZA N-A PRIMIT. Butonul rămâne pe starea adevărată și clatină din cap, în loc
+   să se prefacă schimbat. */
+.liceu-fab-btn.a-dat-gres {
+  background: #b91c1c;
+  color: #fff;
+  animation: liceu-fab-clatina 0.4s ease;
+}
+@keyframes liceu-fab-clatina {
+  0%, 100% { transform: none; }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liceu-fab-btn.a-dat-gres { animation: none; }
+  .liceu-fab-btn:hover:not(:disabled) { transform: none; }
+}
+
+.liceu-fab-btn svg { flex: none; }
