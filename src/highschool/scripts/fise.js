@@ -51,9 +51,19 @@ export const FISE = [
     fisier: "9B. Ora 5. B. Literatura în timp. Epoci, școli literare și schimbarea temelor.html",
   },
   {
+    clasa: "9B", ora: 6, fel: "B",
+    titlu: "Genurile literare și formele literaturii de astăzi",
+    fisier: "9B. Ora 6. B. Genurile literare și formele literaturii de astăzi.html",
+  },
+  {
     clasa: "10D", ora: 5, fel: "B",
     titlu: "De la basmul popular la basmul cult",
     fisier: "10D. Ora 5. B. De la basmul popular la basmul cult.html",
+  },
+  {
+    clasa: "10D", ora: 6, fel: "B",
+    titlu: "Lectura textului. Reconstituirea poveștii și limbajul povestirii",
+    fisier: "10D. Ora 6. B. Lectura textului. Reconstituirea poveștii și limbajul povestirii.html",
   },
   {
     clasa: "11B", ora: 5, fel: "B",
@@ -69,6 +79,11 @@ export const FISE = [
     clasa: "11D", ora: 4, fel: "B",
     titlu: "Originile și evoluția limbii române. Substrat, strat, adstrat",
     fisier: "11D. Ora 4. B. Originile și evoluția limbii române. Substrat, strat, adstrat.html",
+  },
+  {
+    clasa: "11D", ora: 5, fel: "B",
+    titlu: "Influențele lingvistice",
+    fisier: "11D. Ora 5. B. Influențele lingvistice.html",
   },
   /* Luceafărul ține orele 7, 8 și 9 la amândouă clasele a 12-a (migrarea 0093),
      deci se deschide de pe oricare dintre ele. */
