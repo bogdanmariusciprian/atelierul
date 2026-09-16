@@ -30,8 +30,8 @@ import { aduLiceuDeschis } from "../../shared/scripts/liceu-gate.js";
 import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
-import { fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, ziuaISO } from "./liceu-repo.js";
-import { fiseleClasei, fisaDupaId, adresaFisei, FELUL_FISEI } from "./fise.js";
+import { fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, fetchFisa, ziuaISO } from "./liceu-repo.js";
+import { fiseleClasei, fisaDupaId, adresaFisei, cheiaFisei, FELUL_FISEI } from "./fise.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -599,6 +599,55 @@ function listaFiselor(fise) {
     </a></li>`).join("")}</ul>`;
 }
 
+/* ---------------- ecranul: o fișă ---------------- */
+
+/* Fișele aduse din găleată, ținute cât ține fila. O adresă `blob:` rămâne bună
+   până se închide fila, deci a doua deschidere a aceleiași fișe e pe loc — iar
+   la 4 MB bucata, asta se simte. */
+const fiseAduse = {};
+
+/**
+ * Aduce o fișă din găleată și o preface în adresă `blob:`.
+ *
+ * PLASĂ SPRE DEPOZIT, deocamdată. Cât timp fișierele mai sunt și în
+ * `liceu/fise/`, o găleată care nu răspunde nu te lasă fără fișă la oră: se
+ * deschide cea din depozit. Dar NU în tăcere — bara de sus o spune. O plasă
+ * tăcută ar fi fost mai rea decât lipsa ei: ai fi crezut că găleata merge.
+ * SE SCOATE odată cu folderul, când ștergem `liceu/fise/`.
+ */
+async function aduFisa(f) {
+  if (fiseAduse[f.id]) return;
+  fiseAduse[f.id] = { seAduce: true, url: "", dinDepozit: false };
+  try {
+    const html = await fetchFisa(cheiaFisei(f));
+    fiseAduse[f.id] = {
+      seAduce: false,
+      url: URL.createObjectURL(new Blob([html], { type: "text/html" })),
+      dinDepozit: false,
+    };
+  } catch (err) {
+    console.warn(`[liceu] fișa ${f.id} n-a venit din găleată:`, err?.message || err);
+    fiseAduse[f.id] = { seAduce: false, url: "", dinDepozit: true };
+  }
+  /* Dacă între timp ai plecat pe alt ecran, nu-l smulgem de sub tine. */
+  if (rutaE("f") && rutaId() === f.id) cereDesen();
+}
+
+/** Bara de sus a fișei, aceeași oricum ar veni pagina. */
+function baraDeFisa(f, adresaSingura, semn = "") {
+  return `
+    <div class="lic-fisa__bar">
+      <span class="lic-fisa__titlu">
+        <b>${esc(f.clasa)} · ${f.ore.length > 1 ? `Orele ${esc(f.ore.join(", "))}` : `Ora ${f.ora}`}</b>
+        <small>${esc(f.titlu)}${semn ? ` · <i>${esc(semn)}</i>` : ""}</small>
+      </span>
+      ${adresaSingura
+        ? `<a class="lic-btn" href="${adresaSingura}" target="_blank" rel="noopener"
+             title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>`
+        : ""}
+    </div>`;
+}
+
 /**
  * O fișă, arătată NEATINSĂ.
  *
@@ -608,27 +657,48 @@ function listaFiselor(fise) {
  * ar fi stricat cardul, iar ale mele i-ar fi schimbat fișa pe care o arată la
  * clasă. Cadrul le ține fiecare la ea acasă.
  *
- * `?in=liceu` e singurul lucru pe care i-l spune modulul fișei: „ești arătată
- * înăuntru". Fișa face ce vrea cu vorba asta ori o trece cu vederea — cele trei
- * prezentări n-o bagă în seamă, Luceafărul se face străveziu ca să stea pe
- * culoarea modulului, nu pe a lui. Semnul se pune NUMAI pe cadru; „Singură ↗"
- * deschide fișa curată, așa cum e ea pe sit.
+ * DOUĂ FELURI DE FIȘE, de când avem găleata (migrarea 0095):
+ *   · cele din GĂLEATĂ — cele nouă de la clasă. Nu au adresă pe sit, fiindcă
+ *     găleata e privată: vin ca text și se fac adresă `blob:`. Cu semnul stins,
+ *     nu vin deloc, și asta e tot rostul mutării;
+ *   · cele din SIT — deocamdată Luceafărul, lecție publică la `lectii/lectura/`,
+ *     unde îi e locul. Ele primesc `?in=liceu` și culoarea modulului, ca să se
+ *     așeze în cadru; cele din găleată n-au nevoie, n-au fundal al lor.
+ *
+ * `?in=liceu` e singurul lucru pe care i-l spune modulul unei fișe din sit:
+ * „ești arătată înăuntru". Fișa face ce vrea cu vorba asta ori o trece cu
+ * vederea. Semnul se pune NUMAI pe cadru; „Singură ↗" deschide fișa curată.
  */
 function vedereDeFisa(f) {
-  const adresa = adresaFisei(f, caleaSitului);
-  const bg = culoareaModulului();
-  const inCadru = `${adresa}?in=liceu${bg ? `&bg=${encodeURIComponent(bg)}` : ""}`;
+  if (f.cale) {
+    const adresa = adresaFisei(f, caleaSitului);
+    const bg = culoareaModulului();
+    const inCadru = `${adresa}?in=liceu${bg ? `&bg=${encodeURIComponent(bg)}` : ""}`;
+    return `
+      <div class="lic-fisa">
+        ${baraDeFisa(f, adresa)}
+        <iframe class="lic-fisa__cadru" src="${inCadru}"
+          allow="fullscreen" allowfullscreen
+          title="${esc(f.titlu)}"></iframe>
+      </div>`;
+  }
+
+  const adusa = fiseAduse[f.id];
+  if (!adusa) { aduFisa(f); }
+  if (!adusa || adusa.seAduce) {
+    return `
+      <div class="lic-fisa">
+        ${baraDeFisa(f, "")}
+        <p class="lic-clasa__gol">Aduc fișa…</p>
+      </div>`;
+  }
+
+  /* Găleata n-a răspuns: se deschide cea din depozit, și scrie că de-acolo e. */
+  const adresa = adusa.dinDepozit ? adresaFisei(f, caleaSitului) : adusa.url;
   return `
     <div class="lic-fisa">
-      <div class="lic-fisa__bar">
-        <span class="lic-fisa__titlu">
-          <b>${esc(f.clasa)} · ${f.ore.length > 1 ? `Orele ${esc(f.ore.join(", "))}` : `Ora ${f.ora}`}</b>
-          <small>${esc(f.titlu)}</small>
-        </span>
-        <a class="lic-btn" href="${adresa}" target="_blank" rel="noopener"
-           title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>
-      </div>
-      <iframe class="lic-fisa__cadru" src="${inCadru}"
+      ${baraDeFisa(f, adresa, adusa.dinDepozit ? "din depozit, nu din găleată" : "")}
+      <iframe class="lic-fisa__cadru" src="${adresa}"
         allow="fullscreen" allowfullscreen
         title="${esc(f.titlu)}"></iframe>
     </div>`;

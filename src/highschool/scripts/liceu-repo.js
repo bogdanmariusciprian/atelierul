@@ -122,6 +122,24 @@ export async function fetchPlan(clasa) {
   ) || [], []);
 }
 
+/**
+ * O fișă, adusă din găleata privată (migrarea 0095).
+ *
+ * NU TRECE PRIN PLASĂ. Celelalte cereri de aici își țin ultimul răspuns în
+ * browser, ca să meargă și fără net; o fișă are între 200 KB și 4 MB, iar nouă
+ * dintre ele ar fi umplut memoria browserului de câteva ori peste ce-i dă el
+ * voie unui sit. Cine are nevoie de ea o cere din nou.
+ *
+ * Întoarce textul paginii, nu o adresă: găleata e privată, deci fișierul nu are
+ * o adresă pe care s-o poată deschide cineva. Vine ca text și se face adresă
+ * `blob:` în modul, bună cât ține fila.
+ */
+export async function fetchFisa(cheie) {
+  const { data, error } = await supabase.storage.from("liceu-fise").download(cheie);
+  if (error) throw new Error(error.message || "fișa n-a venit din găleată");
+  return await data.text();
+}
+
 /** Ceasurile intervalelor și structura anului, din `school_config`. */
 export async function fetchConfig() {
   return cuPlasa("config", async () => {

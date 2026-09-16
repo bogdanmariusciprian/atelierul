@@ -122,7 +122,23 @@ export const fisaDupaId = (id) =>
   FISE.find((f) => f.id === String(id || "").toLowerCase()) || null;
 
 /**
- * Adresa fișierului.
+ * Numele fișei în găleata privată din Supabase (migrarea 0095).
+ *
+ * SCURT ȘI FĂRĂ DIACRITICE, fiindcă Supabase nu le primește în chei: filtrul
+ * lui lasă doar litere latine, cifre și câteva semne, iar un „ț" oprește urcarea
+ * cu „File name is invalid".
+ *
+ * E chiar `id`-ul fișei, deci nu se poate nepotrivi cu lista de mai sus: până
+ * acum numele fișierului purta titlul lecției, literă cu literă, și o singură
+ * diacritică greșită rupea legătura în tăcere. Acum numele nu mai e ceva de care
+ * atârnă ceva; titlul frumos stă în listă și se vede pe ecran.
+ */
+export const cheiaFisei = (f) => `${f.id}.html`;
+
+/**
+ * Adresa fișierului DIN SIT. O folosesc numai fișele care stau în sit, nu în
+ * găleată (deocamdată Luceafărul, care e lecție publică) și, o vreme, fișele
+ * din depozit, ca plasă până ștergem folderul.
  *
  * Numele au spații, puncte și diacritice, deci se trec prin
  * `encodeURIComponent`; altfel prima cratimă din ele ar rupe adresa. La o cale
