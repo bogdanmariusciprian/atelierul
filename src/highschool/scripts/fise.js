@@ -56,6 +56,16 @@ export const FISE = [
     fisier: "10D. Ora 5. B. De la basmul popular la basmul cult.html",
   },
   {
+    clasa: "11B", ora: 5, fel: "B",
+    titlu: "Fondul principal lexical. Latinitatea limbii române",
+    fisier: "11B. Ora 5. B. Fondul principal lexical. Latinitatea limbii române.html",
+  },
+  {
+    clasa: "11C", ora: 4, fel: "B",
+    titlu: "Originile și evoluția limbii române",
+    fisier: "11C. Ora 4. B. Originile și evoluția limbii române.html",
+  },
+  {
     clasa: "11D", ora: 4, fel: "B",
     titlu: "Originile și evoluția limbii române. Substrat, strat, adstrat",
     fisier: "11D. Ora 4. B. Originile și evoluția limbii române. Substrat, strat, adstrat.html",
