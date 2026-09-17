@@ -1,36 +1,30 @@
 // =========================================================
-// FIȘELE DE LECȚIE, lista lor.
+// FIȘELE DE LECȚIE: lista lor, ținută în bază (migrarea 0096).
 //
-// Fișele sunt fișiere HTML de sine stătătoare, scrise de Marius: își poartă
+// Fișele sunt pagini HTML de sine stătătoare, scrise de Marius: își poartă
 // singure stilurile și scripturile, fără nicio legătură spre altceva. De aceea
 // se arată NEATINSE, într-un cadru al lor (`<iframe>`), nu desfăcute și puse la
-// loc de mine. Așa arată la clasă exact ca pe disc, iar stilurile lor nu se
-// amestecă cu ale modulului, în niciun sens.
+// loc de mine. Așa arată la clasă exact cum arată pe disc.
 //
-// DE CE O LISTĂ SCRISĂ DE MÂNĂ. Un sit fără server nu poate întreba ce fișiere
-// sunt într-un folder; cineva trebuie să le numere. Iar o fișă nouă cere oricum
-// un commit (fișierul intră în depozit), deci un rând în plus aici nu adaugă
-// nicio bătaie de cap.
+// UNDE STAU FIȘIERELE. În găleata privată `liceu-fise` din Supabase (migrarea
+// 0095), nu în depozit. Găleata se uită la cine cere și la semnul „Liceu
+// deschis": cu semnul stins, fișierul nu se dă nimănui afară de profesor. Cât au
+// stat în depozit, GitHub le dădea oricui le știa adresa.
+// Fac excepție fișele cu `cale`: acelea sunt lecții publice ale sitului și
+// acolo le e locul (deocamdată Luceafărul, la `lectii/lectura/`).
 //
-// CA SĂ ADAUGI O FIȘĂ:
-//   1. pui fișierul în `liceu/fise/`, cu numele lui cu tot;
-//   2. adaugi un rând mai jos, cu același nume, literă cu literă.
-// Numele se scrie o singură dată aici și e chiar numele fișierului: dacă nu se
-// potrivesc, fișa nu se deschide, și se vede pe loc.
+// DE CE NU MAI E O LISTĂ SCRISĂ DE MÂNĂ. A fost, până acum: o fișă nouă cerea
+// fișierul urcat, un rând scris aici și un commit — trei pași, doi dintre ei pe
+// umerii altcuiva decât ai lui Marius. Acum rândul se scrie singur, din modul,
+// când urcă fișa.
 //
-// TREI ÎNSUȘIRI CARE POT SĂ LIPSEASCĂ:
-//   · `cale`  – o fișă care nu stă în `liceu/fise/`, ci în altă parte a sitului.
-//               Se scrie calea întreagă, de la rădăcină. Luceafărul e o lecție
-//               a sitului, la `lectii/lectura/`, și se arată de-acolo: copiată
-//               și aici, ar fi fost al doilea exemplar de 280 KB, care se
-//               depărtează de primul la întâia corectură.
-//   · `fel`   – litera A/B/C. Clasele a 12-a merg pe planificarea de bacalaureat
-//               și au altă socoteală, pe care Marius mi-o spune; până atunci
-//               fișele lor n-au literă, în loc să poarte una ghicită.
-//   · `ora`   – poate fi un număr ori mai multe. O lecție care ține trei ore are
-//               aceeași fișă la toate trei, și toate trei se deschid.
+// LISTA SE AJUNGE O DATĂ, la deschiderea modulului, și rămâne în memorie. Sunt
+// vreo zece rânduri; o cerere la fiecare ecran ar fi fost risipă, iar ecranele
+// care le caută (lista clasei, ruta unei fișe) se desenează din secundă în
+// secundă.
 // Cuprins în română, nume în engleză.
 // =========================================================
+import { fetchFise } from "./liceu-repo.js";
 
 /** Ce e fiecare literă, după înțelesul dat de Marius fișelor. */
 export const FELUL_FISEI = {
@@ -39,115 +33,64 @@ export const FELUL_FISEI = {
   C: { nume: "Fișa C", ce: "schița planului de lecție" },
 };
 
-export const FISE = [
-  {
-    clasa: "9B", ora: 4, fel: "B",
-    titlu: "Oralitate și scris. Literatura ca reprezentare, instituție și creație",
-    fisier: "9B. Ora 4. B. Oralitate și scris. Literatura ca reprezentare, instituție și creație.html",
-  },
-  {
-    clasa: "9B", ora: 5, fel: "B",
-    titlu: "Literatura în timp. Epoci, școli literare și schimbarea temelor",
-    fisier: "9B. Ora 5. B. Literatura în timp. Epoci, școli literare și schimbarea temelor.html",
-  },
-  {
-    clasa: "9B", ora: 6, fel: "B",
-    titlu: "Genurile literare și formele literaturii de astăzi",
-    fisier: "9B. Ora 6. B. Genurile literare și formele literaturii de astăzi.html",
-  },
-  {
-    clasa: "10D", ora: 5, fel: "B",
-    titlu: "De la basmul popular la basmul cult",
-    fisier: "10D. Ora 5. B. De la basmul popular la basmul cult.html",
-  },
-  {
-    clasa: "10D", ora: 6, fel: "B",
-    titlu: "Lectura textului. Reconstituirea poveștii și limbajul povestirii",
-    fisier: "10D. Ora 6. B. Lectura textului. Reconstituirea poveștii și limbajul povestirii.html",
-  },
-  {
-    clasa: "11B", ora: 5, fel: "B",
-    titlu: "Fondul principal lexical. Latinitatea limbii române",
-    fisier: "11B. Ora 5. B. Fondul principal lexical. Latinitatea limbii române.html",
-  },
-  {
-    clasa: "11C", ora: 4, fel: "B",
-    titlu: "Originile și evoluția limbii române",
-    fisier: "11C. Ora 4. B. Originile și evoluția limbii române.html",
-  },
-  {
-    clasa: "11D", ora: 4, fel: "B",
-    titlu: "Originile și evoluția limbii române. Substrat, strat, adstrat",
-    fisier: "11D. Ora 4. B. Originile și evoluția limbii române. Substrat, strat, adstrat.html",
-  },
-  {
-    clasa: "11D", ora: 5, fel: "B",
-    titlu: "Influențele lingvistice",
-    fisier: "11D. Ora 5. B. Influențele lingvistice.html",
-  },
-  /* Luceafărul ține orele 7, 8 și 9 la amândouă clasele a 12-a (migrarea 0093),
-     deci se deschide de pe oricare dintre ele. */
-  {
-    clasa: "12C", ora: [7, 8, 9],
-    titlu: "Mihai Eminescu, „Luceafărul” – poemul întreg, cu adnotări",
-    cale: "lectii/lectura/luceafarul/index.html",
-  },
-  {
-    clasa: "12D", ora: [7, 8, 9],
-    titlu: "Mihai Eminescu, „Luceafărul” – poemul întreg, cu adnotări",
-    cale: "lectii/lectura/luceafarul/index.html",
-  },
-].map((f) => {
-  const ore = Array.isArray(f.ora) ? [...f.ora].sort((a, b) => a - b) : [f.ora];
+/* Lista, cât ține pagina. Începe goală: până sosește, ecranele arată orele fără
+   fișe, nu o listă veche și mincinoasă. */
+let FISE = [];
+
+/** Un rând din bază, adus la forma cu care lucrează modulul. */
+function dinBaza(r) {
+  const ore = (Array.isArray(r.ore) ? r.ore : [r.ore]).map(Number).sort((a, b) => a - b);
   return {
-    ...f,
-    /* `ore` e lista întreagă; `ora` rămâne prima, fiindcă de ea atârnă numele
-       scurt și rânduirea, iar amândouă vor un singur număr. */
+    clasa: r.clasa,
     ore,
+    /* `ora` e prima dintre ele: de ea atârnă rânduirea, iar aceea vrea un singur
+       număr. `ore` rămâne lista întreagă, fiindcă o lecție de o săptămână are
+       aceeași fișă la toate orele ei. */
     ora: ore[0],
-    /* Un nume scurt pentru adresă, fără diacritice și fără spații: „9b-4-b".
-       Fără literă iese „12c-7". Litera se lipește scris, nu prin `filter`:
-       o listă curățată cu `Boolean` ar fi înghițit și un zero, iar numele ar fi
-       ieșit altul decât se citește de aici. */
-    id: `${f.clasa}-${ore[0]}${f.fel ? `-${f.fel}` : ""}`.toLowerCase(),
+    fel: r.fel || "",
+    titlu: r.titlu || "",
+    /* `id` e numele scurt din adresă („11d-5-b"), nu `id`-ul din bază: un `uuid`
+       în bara browserului n-ar spune nimănui nimic. */
+    id: r.slug,
+    fisier: r.fisier || "",
+    cale: r.cale || "",
   };
-});
+}
+
+/** Aduce lista. Se cheamă o dată, la pornirea modulului. */
+export async function aduFisele() {
+  FISE = (await fetchFise()).map(dinBaza);
+  return FISE;
+}
 
 /** Fișele unei clase, în ordinea orelor. */
 export const fiseleClasei = (clasa) =>
   FISE.filter((f) => f.clasa === clasa)
-    .sort((a, b) => a.ora - b.ora || String(a.fel || "").localeCompare(String(b.fel || "")));
+    .sort((a, b) => a.ora - b.ora || String(a.fel).localeCompare(String(b.fel)));
 
 export const fisaDupaId = (id) =>
   FISE.find((f) => f.id === String(id || "").toLowerCase()) || null;
 
 /**
- * Numele fișei în găleata privată din Supabase (migrarea 0095).
+ * Numele fișei în găleată.
  *
- * SCURT ȘI FĂRĂ DIACRITICE, fiindcă Supabase nu le primește în chei: filtrul
- * lui lasă doar litere latine, cifre și câteva semne, iar un „ț" oprește urcarea
- * cu „File name is invalid".
- *
- * E chiar `id`-ul fișei, deci nu se poate nepotrivi cu lista de mai sus: până
- * acum numele fișierului purta titlul lecției, literă cu literă, și o singură
- * diacritică greșită rupea legătura în tăcere. Acum numele nu mai e ceva de care
- * atârnă ceva; titlul frumos stă în listă și se vede pe ecran.
+ * SCURT ȘI FĂRĂ DIACRITICE, fiindcă Supabase nu le primește în chei: filtrul lui
+ * lasă doar litere latine, cifre și câteva semne, iar un „ț" oprește urcarea cu
+ * „File name is invalid". E chiar `id`-ul fișei, deci nu se poate nepotrivi cu
+ * lista.
  */
-export const cheiaFisei = (f) => `${f.id}.html`;
+export const cheiaFisei = (f) => f.fisier || `${f.id}.html`;
+
+/** Numele pe care-l va purta în găleată o fișă nouă: „11d-5-b.html". */
+export const cheiaNoua = (clasa, ora, fel) =>
+  `${[clasa, ora, fel].filter((x) => x !== "" && x != null).join("-")}.html`.toLowerCase();
 
 /**
- * Adresa fișierului DIN SIT. O folosesc numai fișele care stau în sit, nu în
- * găleată (deocamdată Luceafărul, care e lecție publică) și, o vreme, fișele
- * din depozit, ca plasă până ștergem folderul.
+ * Adresa unei fișe care stă ÎN SIT, nu în găleată (deocamdată Luceafărul).
  *
- * Numele au spații, puncte și diacritice, deci se trec prin
- * `encodeURIComponent`; altfel prima cratimă din ele ar rupe adresa. La o cale
- * întreagă, codarea se face pe bucăți: `encodeURIComponent` pe toată calea ar fi
- * prefăcut și liniuțele de despărțire în `%2F`, iar adresa n-ar mai fi arătat
- * spre niciun folder.
+ * Codarea se face pe bucăți: `encodeURIComponent` pe toată calea ar fi prefăcut
+ * și liniuțele de despărțire în `%2F`, iar adresa n-ar mai fi arătat spre niciun
+ * folder.
  */
-export const adresaFisei = (f, basePath = "") => (
-  f.cale
-    ? `${basePath}${f.cale.split("/").map(encodeURIComponent).join("/")}`
-    : `${basePath}liceu/fise/${encodeURIComponent(f.fisier)}`
-);
+export const adresaFisei = (f, basePath = "") =>
+  `${basePath}${String(f.cale || "").split("/").map(encodeURIComponent).join("/")}`;

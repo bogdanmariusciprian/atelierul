@@ -770,6 +770,88 @@ a.lic-ora .lic-ora__semn {
 }
 
 /* =========================================================
+   UNELTELE DE PE RÂNDUL OREI, numai la profesor: „+" la orele fără fișă,
+   „înlocuiește" și „șterge" la cele cu fișă.
+
+   STAU LÂNGĂ RÂND, NU PESTE EL. Rândul întreg e o legătură care deschide fișa;
+   un buton pus deasupra ei ar fi furat apăsarea. De-aia rândul e acum un flex
+   care ține legătura și uneltele alături.
+   ========================================================= */
+.lic-rand { display: flex; align-items: stretch; gap: 0.3rem; }
+.lic-rand > .lic-ora { flex: 1; min-inline-size: 0; }
+
+.lic-unelte { flex: none; display: flex; align-items: center; gap: 0.2rem; }
+.lic-unealta {
+  inline-size: 34px; block-size: 34px;
+  display: grid; place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  /* Șterse până le cauți: la oră te uiți la lecții, nu la unelte. */
+  opacity: 0.35;
+  transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.lic-rand:hover .lic-unealta,
+.lic-unealta:focus-visible { opacity: 1; }
+.lic-unealta:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.lic-unealta--rau:hover { color: var(--color-danger); border-color: var(--color-danger); }
+
+/* =========================================================
+   FEREASTRA DE URCARE. Un `<dialog>`, nu un div pus peste pagină: el își aduce
+   singur pânza din spate, apăsarea pe Escape și mutarea tastaturii înăuntru —
+   trei lucruri pe care altfel le-aș fi scris de mână, prost.
+   ========================================================= */
+.lic-urcare {
+  inline-size: min(30rem, 92vw);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.lic-urcare::backdrop { background: oklch(20% 0.02 260 / 0.45); }
+
+.lic-urcare__form { padding: 1.4rem 1.5rem 1.2rem; }
+.lic-urcare__titlu { margin: 0 0 0.15rem; font-size: 1.2rem; letter-spacing: -0.01em; }
+.lic-urcare__unde { margin: 0 0 1.1rem; color: var(--color-text-muted); font-size: 0.9rem; }
+
+.lic-urcare__camp { display: block; margin-block-end: 0.9rem; }
+.lic-urcare__camp > span {
+  display: block; margin-block-end: 0.3rem;
+  font-size: 0.82rem; color: var(--color-text-muted);
+}
+.lic-urcare__camp input,
+.lic-urcare__camp select {
+  inline-size: 100%;
+  font: inherit;
+  min-block-size: 44px;            /* de deget, ca tot ce se apasă în modul */
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: inherit;
+}
+
+.lic-urcare__vina {
+  margin: 0 0 0.9rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  font-size: 0.86rem;
+}
+
+.lic-urcare__butoane { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.lic-btn--tare {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+.lic-btn--tare:disabled { opacity: 0.6; cursor: default; }
+
+/* =========================================================
    MODULUL ÎNCHIS. Fundalul colorat rămâne, încețoșat, ca pagina să se citească
    drept „închisă", nu „stricată". Sub fereastră nu e nimic de ascuns: cu semnul
    stins nu se desenează niciun ecran și nu se cere nicio dată (migrarea 0094).

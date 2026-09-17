@@ -30,8 +30,13 @@ import { aduLiceuDeschis } from "../../shared/scripts/liceu-gate.js";
 import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
-import { fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, fetchFisa, ziuaISO } from "./liceu-repo.js";
-import { fiseleClasei, fisaDupaId, adresaFisei, cheiaFisei, FELUL_FISEI } from "./fise.js";
+import {
+  fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, fetchFisa,
+  salveazaFisa, stergeFisa, ziuaISO,
+} from "./liceu-repo.js";
+import {
+  aduFisele, fiseleClasei, fisaDupaId, adresaFisei, cheiaFisei, cheiaNoua, FELUL_FISEI,
+} from "./fise.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -550,11 +555,11 @@ function vedereDeClasa(c) {
       <span class="lic-ora__semn">${esc(f?.fel)}</span>`;
     return `
       ${nouaUnitate ? `<li class="lic-unit">${esc(o.unitatea)}</li>` : ""}
-      <li>${f
+      <li class="lic-rand">${f
         ? `<a class="lic-ora" href="#/f/${esc(f.id)}"
              title="${esc(vorbaFisei(f))}">${cuprins}</a>`
         : `<span class="lic-ora lic-ora--fara"
-             title="Ora asta n-are încă fișă">${cuprins}</span>`}</li>`;
+             title="Ora asta n-are încă fișă">${cuprins}</span>`}${unelteleOrei(c, o, f)}</li>`;
   }).join("");
 
   const cuFisa = p.ore.filter((o) => peOra.has(o.nr)).length;
@@ -569,6 +574,44 @@ function vedereDeClasa(c) {
 /** Ce scrie pe fișă când treci peste ea. Litera spune cel mai mult, dar nu toate
  *  fișele au una (vezi `fise.js`); atunci vorbește titlul ei. */
 const vorbaFisei = (f) => FELUL_FISEI[f?.fel]?.ce || f?.titlu || "";
+
+const PLUS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+  stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+
+const ROATA = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+  ><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>`;
+
+const COS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+  ><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></svg>`;
+
+/**
+ * Semnele de lângă o oră, pe care le vede DOAR profesorul.
+ *
+ * Stau chiar pe rândul orei, nu într-un buton „Fișă nouă" undeva sus: ești deja
+ * cu ochii pe ora aceea, deci clasa, numărul și titlul se știu din rândul pe
+ * care ai apăsat și nu le mai alegi din nicio listă. Asta era tot rostul.
+ */
+function unelteleOrei(c, o, f) {
+  if (!isAdmin()) return "";
+  const cheie = `${c.cod}|${o.nr}`;
+  if (!f) {
+    return `<span class="lic-unelte">
+      <button type="button" class="lic-unealta" data-act="fisa-noua" data-cheie="${esc(cheie)}"
+        title="Urcă o fișă pentru ora asta" aria-label="Urcă o fișă">${PLUS}</button>
+    </span>`;
+  }
+  /* Numai fișele din găleată se înlocuiesc și se șterg de aici. Cele cu `cale`
+     sunt lecții ale sitului: acelea se schimbă acolo unde stau, nu din modul. */
+  if (f.cale) return "";
+  return `<span class="lic-unelte">
+    <button type="button" class="lic-unealta" data-act="fisa-inlocuieste" data-cheie="${esc(cheie)}"
+      title="Urcă altă variantă peste asta" aria-label="Înlocuiește fișa">${ROATA}</button>
+    <button type="button" class="lic-unealta lic-unealta--rau" data-act="fisa-sterge" data-id="${esc(f.id)}"
+      title="Șterge fișa" aria-label="Șterge fișa">${COS}</button>
+  </span>`;
+}
 
 /**
  * Culoarea modulului, trimisă fișei odată cu `?in=liceu`.
@@ -609,25 +652,24 @@ const fiseAduse = {};
 /**
  * Aduce o fișă din găleată și o preface în adresă `blob:`.
  *
- * PLASĂ SPRE DEPOZIT, deocamdată. Cât timp fișierele mai sunt și în
- * `liceu/fise/`, o găleată care nu răspunde nu te lasă fără fișă la oră: se
- * deschide cea din depozit. Dar NU în tăcere — bara de sus o spune. O plasă
- * tăcută ar fi fost mai rea decât lipsa ei: ai fi crezut că găleata merge.
- * SE SCOATE odată cu folderul, când ștergem `liceu/fise/`.
+ * NU MAI E NICIO PLASĂ SPRE DEPOZIT. A fost una cât fișierele au stat în două
+ * locuri deodată; folderul `liceu/fise/` e șters, deci găleata e singurul drum,
+ * iar o greșeală se vede ca greșeală, nu ca o fișă care vine de altundeva.
  */
 async function aduFisa(f) {
   if (fiseAduse[f.id]) return;
-  fiseAduse[f.id] = { seAduce: true, url: "", dinDepozit: false };
+  fiseAduse[f.id] = { seAduce: true, url: "", vina: "" };
   try {
     const html = await fetchFisa(cheiaFisei(f));
     fiseAduse[f.id] = {
       seAduce: false,
       url: URL.createObjectURL(new Blob([html], { type: "text/html" })),
-      dinDepozit: false,
+      vina: "",
     };
   } catch (err) {
-    console.warn(`[liceu] fișa ${f.id} n-a venit din găleată:`, err?.message || err);
-    fiseAduse[f.id] = { seAduce: false, url: "", dinDepozit: true };
+    const vina = err?.message || String(err);
+    console.warn(`[liceu] fișa ${f.id} n-a venit din găleată:`, vina);
+    fiseAduse[f.id] = { seAduce: false, url: "", vina };
   }
   /* Dacă între timp ai plecat pe alt ecran, nu-l smulgem de sub tine. */
   if (rutaE("f") && rutaId() === f.id) cereDesen();
@@ -693,12 +735,23 @@ function vedereDeFisa(f) {
       </div>`;
   }
 
-  /* Găleata n-a răspuns: se deschide cea din depozit, și scrie că de-acolo e. */
-  const adresa = adusa.dinDepozit ? adresaFisei(f, caleaSitului) : adusa.url;
+  /* Găleata n-a răspuns. Se spune de ce, pe șleau, în loc să rămână un cadru
+     alb din care nu înțelege nimeni nimic. */
+  if (!adusa.url) {
+    return `
+      <div class="lic-fisa">
+        ${baraDeFisa(f, "")}
+        <div class="lic-gol">
+          <p>Fișa asta n-a venit din găleată.</p>
+          <p class="lic-gol__vina">${esc(adusa.vina)}</p>
+        </div>
+      </div>`;
+  }
+
   return `
     <div class="lic-fisa">
-      ${baraDeFisa(f, adresa, adusa.dinDepozit ? "din depozit, nu din găleată" : "")}
-      <iframe class="lic-fisa__cadru" src="${adresa}"
+      ${baraDeFisa(f, adusa.url)}
+      <iframe class="lic-fisa__cadru" src="${adusa.url}"
         allow="fullscreen" allowfullscreen
         title="${esc(f.titlu)}"></iframe>
     </div>`;
@@ -848,6 +901,131 @@ function oraDeArata() {
   });
 }
 
+/* ---------------- urcarea unei fișe ---------------- */
+
+/**
+ * Fereastra de urcare, deschisă de „+" ori de „înlocuiește".
+ *
+ * TREI LUCRURI VIN DE-A GATA din rândul pe care ai apăsat: clasa, ora și
+ * titlul lecției din planificare. Rămâne să alegi fișierul; litera și titlul se
+ * pot schimba, dacă vrei altele.
+ *
+ * NUMELE DIN GĂLEATĂ ÎL PUNE CODUL — `11d-5-b.html` — oricum s-ar chema
+ * fișierul pe discul tău. De-aia nu mai redenumești nimic: diacriticele care
+ * opreau urcarea nu mai ajung niciodată până acolo.
+ */
+function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
+  const vechi = document.getElementById("lic-urcare");
+  if (vechi) vechi.remove();
+
+  const d = document.createElement("dialog");
+  d.id = "lic-urcare";
+  d.className = "lic-urcare";
+  d.innerHTML = `
+    <form method="dialog" class="lic-urcare__form">
+      <h2 class="lic-urcare__titlu">${fisaVeche ? "Înlocuiește fișa" : "Fișă nouă"}</h2>
+      <p class="lic-urcare__unde">${esc(clasa)} · Ora ${nr}</p>
+
+      <label class="lic-urcare__camp">
+        <span>Fișierul</span>
+        <input type="file" name="fisier" accept=".html,text/html" required />
+      </label>
+
+      <label class="lic-urcare__camp">
+        <span>Titlul, cum se va vedea în listă</span>
+        <input type="text" name="titlu" value="${esc(fisaVeche?.titlu || titlu || "")}" required />
+      </label>
+
+      <label class="lic-urcare__camp">
+        <span>Felul</span>
+        <select name="fel">
+          ${["", "A", "B", "C"].map((x) => `
+            <option value="${x}" ${(fisaVeche?.fel || "B") === x ? "selected" : ""}>${
+              x ? `${x} — ${esc(FELUL_FISEI[x].ce)}` : "fără literă"}</option>`).join("")}
+        </select>
+      </label>
+
+      <p class="lic-urcare__vina" data-rol="vina" hidden></p>
+
+      <div class="lic-urcare__butoane">
+        <button type="button" class="lic-btn" data-act="urcare-lasa">Lasă</button>
+        <button type="submit" class="lic-btn lic-btn--tare" data-rol="urca">
+          ${fisaVeche ? "Înlocuiește" : "Urcă"}
+        </button>
+      </div>
+    </form>`;
+  document.body.appendChild(d);
+
+  const form = d.querySelector("form");
+  const vina = d.querySelector("[data-rol='vina']");
+  const btn = d.querySelector("[data-rol='urca']");
+
+  d.addEventListener("click", (e) => {
+    if (e.target.closest("[data-act='urcare-lasa']")) d.close();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    /* Fereastra NU se închide la trimitere: rămâne deschisă cât se urcă, ca să
+       aibă unde să apară greșeala dacă baza refuză. */
+    e.preventDefault();
+    const file = form.fisier.files?.[0];
+    if (!file) return;
+
+    btn.disabled = true;
+    btn.textContent = "Urc…";
+    vina.hidden = true;
+
+    try {
+      const fel = form.fel.value;
+      await salveazaFisa({
+        clasa, ore: [nr], fel, titlu: form.titlu.value.trim(),
+        /* La înlocuire se păstrează numele vechi, chiar dacă ai schimbat litera:
+           altfel ar fi rămas în găleată și fișierul vechi, sub numele lui, iar
+           fișa ar fi avut două trupuri. */
+        fisier: fisaVeche?.fisier || cheiaNoua(clasa, nr, fel),
+        file,
+      });
+      await aduFisele();
+      /* Fișa ținută în memorie de la deschiderea de dinainte nu mai e bună. */
+      delete fiseAduse[(fisaVeche?.id) || cheiaNoua(clasa, nr, fel).replace(/\.html$/, "")];
+      d.close();
+      deseneaza();
+    } catch (err) {
+      vina.textContent = err?.message || String(err);
+      vina.hidden = false;
+      btn.disabled = false;
+      btn.textContent = fisaVeche ? "Înlocuiește" : "Urcă";
+    }
+  });
+
+  d.addEventListener("close", () => d.remove());
+  d.showModal();
+}
+
+/** Ora din planificare pe care s-a apăsat („11D|5"), cu titlul ei. */
+function oraDupaCheie(cheie) {
+  const [cod, nrText] = String(cheie || "").split("|");
+  const nr = Number(nrText);
+  const plan = planuri[cod];
+  const o = plan?.ore?.find((x) => x.nr === nr) || null;
+  return { clasa: cod, nr, titlu: o?.titlu || "" };
+}
+
+async function stergeFisaDinLista(id) {
+  const f = fisaDupaId(id);
+  if (!f) return;
+  if (!window.confirm(`Ștergi fișa „${f.titlu}"? Se scoate și fișierul din găleată.`)) return;
+  try {
+    await stergeFisa({ slug: f.id, fisier: f.fisier });
+    delete fiseAduse[f.id];
+    await aduFisele();
+    deseneaza();
+  } catch (err) {
+    console.warn("[liceu] ștergerea fișei:", err?.message || err);
+    window.alert(`Fișa n-a putut fi ștearsă: ${err?.message || err}`);
+  }
+}
+
 /* ---------------- apăsările ---------------- */
 
 function apasa(e) {
@@ -867,7 +1045,19 @@ function apasa(e) {
   const act = b.dataset.act;
   if (act === "inapoi") { inapoi(); return; }
   if (act === "burger") { strange(!stare.strans); return; }
-  if (act === "vedere") { navigheaza(`v/${b.dataset.id}`); }
+  if (act === "vedere") { navigheaza(`v/${b.dataset.id}`); return; }
+
+  /* Uneltele de pe rândul orei. Se opresc aici, ca apăsarea să nu meargă mai
+     departe la rândul de dedesubt, care deschide fișa. */
+  if (act === "fisa-noua" || act === "fisa-inlocuieste") {
+    e.preventDefault();
+    const unde = oraDupaCheie(b.dataset.cheie);
+    const peOra = new Map();
+    fiseleClasei(unde.clasa).forEach((f) => f.ore.forEach((o) => peOra.set(o, f)));
+    fereastraDeFisa({ ...unde, fisaVeche: act === "fisa-inlocuieste" ? peOra.get(unde.nr) : null });
+    return;
+  }
+  if (act === "fisa-sterge") { e.preventDefault(); stergeFisaDinLista(b.dataset.id); }
 }
 
 /* ---------------- modulul închis ---------------- */
@@ -921,6 +1111,13 @@ export async function renderHighschool(gazda, basePath = "") {
      Pagina e ținută ascunsă de poartă până sfârșim, deci nu apucă nimeni să
      vadă modulul o clipă înainte de fereastră. */
   if (!isAdmin() && !(await aduLiceuDeschis())) { ecranulInchis(); return; }
+
+  /* Lista fișelor, o dată, înainte de primul desen: ruta se citește din ea
+     (`#/f/11d-5-b` are nevoie să știe că fișa aia există), iar fără ea cineva
+     care intră de-a dreptul pe adresa unei fișe ar fi ajuns pe ecranul de
+     pornire, fără nicio vorbă. */
+  try { await aduFisele(); }
+  catch (e) { console.warn("[liceu] lista fișelor:", e?.message || e); }
 
   /* LĂȚIMEA ȚINUTĂ MINTE, cu grijă la amândouă capetele.
        · un ZERO salvat e o lățime adevărată (ai tras panoul închis), deci nu se

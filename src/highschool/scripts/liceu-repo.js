@@ -21,6 +21,10 @@ import { cheiaMea } from "../../shared/scripts/session.js";
 
 const CHEIE = (nume) => cheiaMea(`liceu:${nume}`);
 
+/* Anul școlar, scris o singură dată. Era literal în patru locuri; la vară,
+   uitat într-unul singur, ar fi amestecat doi ani în același ecran. */
+export const AN_SCOLAR = "2026-2027";
+
 function pune(nume, date) {
   try { localStorage.setItem(CHEIE(nume), JSON.stringify({ la: Date.now(), date })); }
   catch { /* mod privat ori memorie plină */ }
@@ -117,7 +121,7 @@ export async function fetchPlan(clasa) {
     await supabase.from("school_plan")
       .select("nr, data, ora, fel, unitatea, titlu")
       .eq("clasa", clasa)
-      .eq("an_scolar", "2026-2027")
+      .eq("an_scolar", AN_SCOLAR)
       .order("nr")
   ) || [], []);
 }
@@ -138,6 +142,58 @@ export async function fetchFisa(cheie) {
   const { data, error } = await supabase.storage.from("liceu-fise").download(cheie);
   if (error) throw new Error(error.message || "fișa n-a venit din găleată");
   return await data.text();
+}
+
+/** Lista fișelor (migrarea 0096). Fără plasă: e o listă scurtă, și dacă nu vine,
+ *  e mai bine să se vadă că nu vine decât să se arate una veche. */
+export async function fetchFise() {
+  const randuri = verifica(
+    await supabase.from("school_fise")
+      .select("clasa, ore, fel, titlu, slug, fisier, cale")
+      .eq("an_scolar", AN_SCOLAR)
+  );
+  return randuri || [];
+}
+
+/**
+ * Scrie o fișă: întâi fișierul în găleată, apoi rândul.
+ *
+ * ÎN ORDINEA ASTA, DINADINS. Dacă rândul nu intră, rămâne un fișier fără rând:
+ * nimeni nu-l vede, nu strică nimic, iar paza migrării ți-l arată. Pe dos, ar fi
+ * rămas un rând fără fișier — adică o fișă scrisă în listă, pe care o deschizi
+ * la oră și nu vine.
+ *
+ * `upsert` la amândouă: același drum și pentru o fișă nouă, și pentru
+ * înlocuirea uneia care există. Altfel ar fi fost două funcții care fac aproape
+ * același lucru, iar una dintre ele s-ar fi stricat pe tăcute.
+ */
+export async function salveazaFisa({ clasa, ore, fel, titlu, fisier, file }) {
+  const urcat = await supabase.storage.from("liceu-fise")
+    .upload(fisier, file, { contentType: "text/html", upsert: true });
+  if (urcat.error) throw new Error(urcat.error.message || "fișierul n-a intrat în găleată");
+
+  verifica(await supabase.from("school_fise").upsert({
+    an_scolar: AN_SCOLAR,
+    clasa, ore, titlu, fisier,
+    fel: fel || null,
+    slug: fisier.replace(/\.html$/i, ""),
+  }, { onConflict: "an_scolar,slug" }));
+}
+
+/**
+ * Scoate o fișă: întâi rândul, apoi fișierul.
+ *
+ * TOT DINADINS PE DOS FAȚĂ DE SCRIERE. Dacă ștergerea fișierului dă greș, rămâne
+ * un fișier pe care nu-l mai cheamă nimeni — gunoi, nu greșeală. Pe dos, ar fi
+ * rămas un rând care arată spre un fișier șters.
+ */
+export async function stergeFisa({ slug, fisier }) {
+  verifica(await supabase.from("school_fise").delete()
+    .eq("an_scolar", AN_SCOLAR).eq("slug", slug));
+  if (fisier) {
+    const { error } = await supabase.storage.from("liceu-fise").remove([fisier]);
+    if (error) console.warn("liceu-repo/stergeFisa, fișierul a rămas:", error.message);
+  }
 }
 
 /** Ceasurile intervalelor și structura anului, din `school_config`. */
