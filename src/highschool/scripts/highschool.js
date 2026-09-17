@@ -581,10 +581,13 @@ const PLUS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke
 /* SCHIMBUL, nu o săgeată rotită. Cercul cu săgeată se citește peste tot ca
    „reîncarcă"; aici nu reîncarci nimic, ci pui altă variantă în locul celei de
    acum. Două săgeți care se încrucișează spun chiar asta. */
+/* CELE PATRU LINII SE SCRIU PE UN SINGUR RÂND. Rupt între `/` și `>`, browserul
+   citește liniile de după ca fiind ÎNĂUNTRUL primeia, iar dintr-un `path` nu se
+   desenează copii: ieșea o singură săgeată, ca un „reîncarcă". Pățanie, nu
+   toană. */
 const SCHIMB = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
-  ><path d="M3 5h13a2 2 0 0 1 2 2v8"/><path d="M14 11l4 4 4-4"/
-  ><path d="M21 19H8a2 2 0 0 1-2-2V9"/><path d="M10 13L6 9l-4 4"/></svg>`;
+  ><path d="M3 5h13a2 2 0 0 1 2 2v8"/><path d="M14 11l4 4 4-4"/><path d="M21 19H8a2 2 0 0 1-2-2V9"/><path d="M10 13L6 9l-4 4"/></svg>`;
 
 const COS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
@@ -964,8 +967,18 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
   const vina = d.querySelector("[data-rol='vina']");
   const btn = d.querySelector("[data-rol='urca']");
 
+  /* `seUrca` ține fereastra deschisă cât se urcă: altfel, o apăsare pe lângă ea
+     ar fi închis-o la mijlocul drumului, iar greșeala, dacă venea, n-ar mai fi
+     avut unde să se arate. */
+  let seUrca = false;
+
   d.addEventListener("click", (e) => {
-    if (e.target.closest("[data-act='urcare-lasa']")) d.close();
+    if (e.target.closest("[data-act='urcare-lasa']")) { d.close(); return; }
+    /* APĂSAREA PE LÂNGĂ FEREASTRĂ o închide. Pânza din spate e o parte a
+       ferestrei, nu un element al ei, deci o apăsare pe ea are drept țintă chiar
+       `<dialog>`-ul. Dinăuntru, țintă e mereu altceva — formularul îi umple tot
+       locul, fiindcă marginile sunt ale lui, nu ale ferestrei. */
+    if (e.target === d && !seUrca) d.close();
   });
 
   form.addEventListener("submit", async (e) => {
@@ -975,6 +988,7 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
     const file = form.fisier.files?.[0];
     if (!file) return;
 
+    seUrca = true;
     btn.disabled = true;
     btn.textContent = "Urc…";
     vina.hidden = true;
@@ -999,6 +1013,8 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
       vina.hidden = false;
       btn.disabled = false;
       btn.textContent = fisaVeche ? "Înlocuiește" : "Urcă";
+    } finally {
+      seUrca = false;
     }
   });
 
