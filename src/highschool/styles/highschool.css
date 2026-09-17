@@ -803,8 +803,18 @@ a.lic-ora .lic-ora__semn {
    singur pânza din spate, apăsarea pe Escape și mutarea tastaturii înăuntru —
    trei lucruri pe care altfel le-aș fi scris de mână, prost.
    ========================================================= */
+/* CENTRAREA E SCRISĂ DE MÂNĂ, nu lăsată pe seama browserului. Un `<dialog>`
+   deschis modal se așază singur pe mijloc, dar prin `margin: auto` — iar
+   `base.css` pune `margin: 0` pe tot, ceea ce i-l ia. Fără rândurile astea,
+   fereastra se lipește de colțul din stânga sus. */
 .lic-urcare {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   inline-size: min(30rem, 92vw);
+  block-size: fit-content;
+  max-block-size: calc(100dvh - 2rem);
+  overflow: auto;
   padding: 0;
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -844,12 +854,6 @@ a.lic-ora .lic-ora__semn {
 }
 
 .lic-urcare__butoane { display: flex; justify-content: flex-end; gap: 0.5rem; }
-.lic-btn--tare {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
-}
-.lic-btn--tare:disabled { opacity: 0.6; cursor: default; }
 
 /* =========================================================
    MODULUL ÎNCHIS. Fundalul colorat rămâne, încețoșat, ca pagina să se citească
@@ -1004,6 +1008,22 @@ a.lic-ora .lic-ora__semn {
   text-decoration: none;
 }
 .lic-btn:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
+
+/* BUTONUL CARE FACE LUCRUL, apăsat cu culoare: pe o fereastră cu două butoane,
+   ochiul trebuie să știe dintr-o privire care duce înainte și care dă înapoi.
+   Stă AICI, imediat după `.lic-btn`, nu lângă fereastra de urcare unde l-am pus
+   întâi: amândouă sunt selectoare de-o clasă, deci câștigă cel scris mai jos,
+   iar de-acolo `.lic-btn` îi lua fundalul înapoi și butonul rămânea searbăd. */
+.lic-btn--tare {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lic-btn--tare:hover { background: var(--color-primary-dark); color: #fff; }
+.lic-btn--tare:disabled { opacity: 0.6; cursor: default; }
+
 /* Cadrul fișei: fără chenar, cât tot locul rămas. `min-block-size: 0` e ce-l
    lasă să se micșoreze într-un părinte de tip flex; fără el, ar împinge bara de
    sus afară din ecran. */

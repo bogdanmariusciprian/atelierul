@@ -578,9 +578,13 @@ const vorbaFisei = (f) => FELUL_FISEI[f?.fel]?.ce || f?.titlu || "";
 const PLUS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
   stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
 
-const ROATA = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+/* SCHIMBUL, nu o săgeată rotită. Cercul cu săgeată se citește peste tot ca
+   „reîncarcă"; aici nu reîncarci nimic, ci pui altă variantă în locul celei de
+   acum. Două săgeți care se încrucișează spun chiar asta. */
+const SCHIMB = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
-  ><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>`;
+  ><path d="M3 5h13a2 2 0 0 1 2 2v8"/><path d="M14 11l4 4 4-4"/
+  ><path d="M21 19H8a2 2 0 0 1-2-2V9"/><path d="M10 13L6 9l-4 4"/></svg>`;
 
 const COS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
@@ -607,7 +611,7 @@ function unelteleOrei(c, o, f) {
   if (f.cale) return "";
   return `<span class="lic-unelte">
     <button type="button" class="lic-unealta" data-act="fisa-inlocuieste" data-cheie="${esc(cheie)}"
-      title="Urcă altă variantă peste asta" aria-label="Înlocuiește fișa">${ROATA}</button>
+      title="Urcă altă variantă peste asta" aria-label="Înlocuiește fișa">${SCHIMB}</button>
     <button type="button" class="lic-unealta lic-unealta--rau" data-act="fisa-sterge" data-id="${esc(f.id)}"
       title="Șterge fișa" aria-label="Șterge fișa">${COS}</button>
   </span>`;
@@ -948,7 +952,7 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
       <p class="lic-urcare__vina" data-rol="vina" hidden></p>
 
       <div class="lic-urcare__butoane">
-        <button type="button" class="lic-btn" data-act="urcare-lasa">Lasă</button>
+        <button type="button" class="lic-btn" data-act="urcare-lasa">Renunță</button>
         <button type="submit" class="lic-btn lic-btn--tare" data-rol="urca">
           ${fisaVeche ? "Înlocuiește" : "Urcă"}
         </button>
