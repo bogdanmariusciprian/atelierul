@@ -896,11 +896,39 @@ a.lic-ora .lic-ora__semn {
 }
 .lic-inchis__btn:hover { background: var(--color-primary-dark); }
 
+/* BANDA DE ORAR, în lista unei clase: de aici încolo s-a schimbat orarul.
+   Se vede din prima, fiindcă e singurul rând care taie lista pe toată lățimea;
+   dar nu strigă, fiindcă nu e o lecție, ci o notă de pe margine. */
+.lic-banda-orar {
+  margin-block: 0.9rem 0.45rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px dashed var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
 /* ---------- grila orarului ---------- */
 .lic-orar__titlu {
   margin: 0 0 0.2rem;
   font-size: clamp(1.5rem, 3vw, 2.1rem);
   letter-spacing: -0.02em;
+}
+/* Care orar se vede. Numai în septembrie s-a schimbat de trei ori, iar grila
+   arată la fel de fiecare dată: fără nume, n-ai de unde ști pe care te uiți. */
+.lic-orar__acum {
+  margin: 0 0 0.3rem;
+  display: inline-block;
+  padding: 0.16rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary-dark);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 .lic-orar__sub { margin: 0 0 1.2rem; font-size: 0.88rem; color: var(--color-text-muted); }
 

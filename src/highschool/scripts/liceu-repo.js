@@ -96,7 +96,7 @@ export async function fetchSaptamana() {
   return cuPlasa("saptamana", async () => {
     const randuri = verifica(
       await supabase.from("school_timetable")
-        .select("zi, period, clasa, sala, valabil_de_la")
+        .select("zi, period, clasa, sala, valabil_de_la, eticheta")
         .lte("valabil_de_la", ziuaISO())
         .order("valabil_de_la", { ascending: false })
     ) || [];
@@ -104,8 +104,32 @@ export async function fetchSaptamana() {
     /* Se ține numai orarul cel mai nou dintre cele începute: rândurile vin
        sortate descrescător, deci prima dată găsită e cea bună. */
     const deLa = randuri[0].valabil_de_la;
+    const eticheta = randuri[0].eticheta || "";
     return randuri.filter((r) => r.valabil_de_la === deLa)
-      .map(({ zi, period, clasa, sala }) => ({ zi, period, clasa, sala }));
+      .map(({ zi, period, clasa, sala }) => ({ zi, period, clasa, sala, deLa, eticheta }));
+  }, []);
+}
+
+/**
+ * Orarele anului, cu etichetele lor, în ordinea intrării în vigoare.
+ *
+ * Îi trebuie listei unei clase: acolo se pune o bandă la fiecare schimbare de
+ * orar, ca să se vadă de unde încolo s-a mutat ora. Sunt trei rânduri pe an,
+ * deci se cer o dată și se țin.
+ */
+export async function fetchOrare() {
+  return cuPlasa("orare", async () => {
+    const randuri = verifica(
+      await supabase.from("school_timetable")
+        .select("valabil_de_la, eticheta")
+        .eq("an_scolar", AN_SCOLAR)
+        .order("valabil_de_la")
+    ) || [];
+    const vazute = new Map();
+    for (const r of randuri) {
+      if (!vazute.has(r.valabil_de_la)) vazute.set(r.valabil_de_la, r.eticheta || "");
+    }
+    return [...vazute].map(([din, eticheta]) => ({ din, eticheta }));
   }, []);
 }
 

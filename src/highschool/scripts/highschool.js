@@ -31,7 +31,7 @@ import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
 import {
-  fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, fetchFisa,
+  fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, fetchFisa, fetchOrare,
   salveazaFisa, stergeFisa, ziuaISO,
 } from "./liceu-repo.js";
 import {
@@ -453,11 +453,14 @@ function vedereDeOrar() {
   }).join("");
 
   /* Săptămâna e scrisă: fără ea, „5/95" ar sta pe o grilă care arată la fel în
-     toate săptămânile anului și n-ar spune al cui e numărul. */
+     toate săptămânile anului și n-ar spune al cui e numărul. Iar eticheta spune
+     CARE orar se vede — orarul s-a schimbat de trei ori numai în septembrie. */
   const span = spanulZilelor(zile[0].data, zile[zile.length - 1].data);
+  const eticheta = ore[0]?.eticheta || "";
   return `
     <div class="lic-orar">
       <h1 class="lic-orar__titlu">Orar</h1>
+      ${eticheta ? `<p class="lic-orar__acum">${esc(eticheta)}</p>` : ""}
       <p class="lic-orar__sub">${ore.length} ore pe săptămână${
         span ? ` · ${esc(span)}` : ""}. Apeși o oră și intri la clasa ei.</p>
       <div class="lic-orar__vas">
@@ -535,9 +538,19 @@ function vedereDeClasa(c) {
       <p class="lic-clasa__gol">Aduc planificarea…</p></div>`;
   }
   if (!p.ore.length) {
+    /* 11F și 12F ajung aici, și e în regulă: au câte o oră pe săptămână în orar,
+       dar n-au planificare. Ecranul lor există (cerut de Marius), doar că e gol
+       până apare una. */
     return `<div class="lic-clasa" style="--h:${c.hue}">${cap}
-      <p class="lic-clasa__gol">Planificarea clasei ăsteia n-a fost încă adusă în bază.</p></div>`;
+      <p class="lic-clasa__gol">Clasa asta n-are încă planificare în bază.
+        Orele ei se văd în orar; lista de aici se umple când intră planificarea.</p></div>`;
   }
+
+  /* BENZILE DE ORAR, în ordine, ca să se vadă de unde încolo s-a mutat ora.
+     Prima nu se pune: „Orar – 7 sept." deasupra primei ore a anului n-ar spune
+     nimic, fiindcă n-a fost niciun orar înaintea lui. */
+  const benziDeOrar = (orarul.orare || []).slice(1);
+  let urmatoareaBanda = 0;
 
   /* Un titlu de unitate la fiecare unitate nouă: o sută de rânduri la rând se
      citesc ca o listă fără capete. */
@@ -546,6 +559,17 @@ function vedereDeClasa(c) {
     const f = peOra.get(o.nr);
     const nouaUnitate = o.unitatea && o.unitatea !== unitateaDeSus;
     if (nouaUnitate) unitateaDeSus = o.unitatea;
+
+    /* BANDA SE SCRIE ÎNAINTEA PRIMEI ORE CARE MERGE PE ORARUL CEL NOU, inclusiv
+       când ora aceea cade fix în ziua intrării în vigoare — de-aia `<=`, nu `<`.
+       E regula din documentul de predare al lui Marius (§5), unde scrie că s-a
+       greșit de două ori cu `<`: banda ajungea SUB chiar ora pe care o descrie. */
+    let banda = "";
+    while (urmatoareaBanda < benziDeOrar.length
+           && benziDeOrar[urmatoareaBanda].din <= o.data) {
+      const b = benziDeOrar[urmatoareaBanda++];
+      banda += `<li class="lic-banda-orar">${esc(b.eticheta || `Orar nou, din ${b.din}`)}</li>`;
+    }
     const cuprins = `
       <span class="lic-ora__nr">Ora ${o.nr}</span>
       <span class="lic-ora__ce">
@@ -554,6 +578,7 @@ function vedereDeClasa(c) {
       </span>
       <span class="lic-ora__semn">${esc(f?.fel)}</span>`;
     return `
+      ${banda}
       ${nouaUnitate ? `<li class="lic-unit">${esc(o.unitatea)}</li>` : ""}
       <li class="lic-rand">${f
         ? `<a class="lic-ora" href="#/f/${esc(f.id)}"
@@ -869,23 +894,29 @@ function faCardul() {
    ori pe minut (are un ceas care bate la secundă), deci n-are cum să ceară
    serverul de fiecare dată: ce s-a adus stă aici, iar socoteala „ce oră e acum"
    se face în browser, din datele astea. */
-const orarul = { zi: null, ore: [], saptamana: [], intervale: [], adus: false };
+const orarul = { zi: null, ore: [], saptamana: [], intervale: [], orare: [], adus: false };
 
 async function aduOrarul() {
   const azi = ziuaISO();
-  const [z, s, c] = await Promise.all([fetchZiua(azi), fetchSaptamana(), fetchConfig()]);
+  const [z, s, c, o] = await Promise.all([
+    fetchZiua(azi), fetchSaptamana(), fetchConfig(), fetchOrare(),
+  ]);
   orarul.zi = azi;
   orarul.ore = z.date || [];
   orarul.saptamana = s.date || [];
   orarul.intervale = (c.date || {}).intervale || [];
+  /* Cele trei orare ale anului, cu etichetele lor: din ele se nasc benzile din
+     lista unei clase. */
+  orarul.orare = o.date || [];
   /* Fără intervale nu se poate socoti nimic: ceasurile orelor vin din ele. Dacă
      lipsesc (baza încă nu e umplută), cardul rămâne cu ceasul lui și spune
      cinstit că n-are orar, în loc să arate o zi goală ca și cum ar fi liber. */
   orarul.adus = orarul.intervale.length > 0;
   if (card) card.improspateaza();
-  /* Dacă tocmai te uitai la grila orarului cât se aduceau datele, se redesenează
-     ca s-o vezi plină, nu cu „orarul n-a fost adus". */
-  if (rutaE("v") && rutaId() === "orar") deseneaza();
+  /* Dacă tocmai te uitai la grila orarului ori la o clasă cât se aduceau datele,
+     se redesenează: grila ca s-o vezi plină, clasa ca să-i apară benzile de
+     orar, care vin din ce tocmai a sosit. */
+  if (rutaE("v")) deseneaza();
 }
 
 /**
