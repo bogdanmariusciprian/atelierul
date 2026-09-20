@@ -14,11 +14,13 @@
 //    un teanc de mână, ci folosim chiar istoria browserului (`pushState` /
 //    `popstate`): ea E un teanc, și unul pe care Back-ul browserului îl știe
 //    deja. Un teanc al nostru pe lângă al lui s-ar fi dezacordat de ele la
-//    prima apăsare pe Back, iar butonul ar fi dus în altă parte decât săgeata
-//    de sus a browserului. Adâncimea se ține în starea fiecărui pas, ca să
-//    știm când s-a golit: atunci săgeata scrie „Înapoi la site".
-//    O singură excepție, la vederile cu `inapoiAcasa` (deocamdată orarul): din
-//    ele săgeata duce la clase. Motivul e scris la `inapoi()`.
+//    prima apăsare pe Back.
+//    Două locuri fac excepție, și amândouă duc la ecranul cu clasele: orarul
+//    (și orice vedere cu `inapoiAcasa`), fiindcă se ajunge în el de oriunde; și
+//    un ecran deschis de-a dreptul pe adresa lui, fiindcă de-acolo n-ai fost
+//    nicăieri înăuntru.
+//    Iar ECRANUL CU CLASELE E RĂDĂCINA: de pe el se iese la sit, oricum ai fi
+//    ajuns acolo. Toate trei sunt scrise într-un singur loc, `sageataInapoi()`.
 //
 // 3. LĂȚIMEA PANOULUI E A CONTULUI, nu a browserului. Trece prin `punLocal`,
 //    care lipește numele contului la cheie: doi oameni pe același calculator
@@ -135,29 +137,48 @@ function navigheaza(ruta) {
 const vedereaDeAcum = () => (rutaE("v") ? vedereaDupaId(rutaId()) : null);
 
 /**
- * Săgeata din colțul de sus-stânga. Cât timp am pași în urmă, scoate câte unul;
- * când s-a golit, iese din modul.
+ * CE FACE SĂGEATA din colțul de sus-stânga, și ce scrie pe ea — dintr-un singur
+ * loc. Vorba și fapta se scriau în două locuri, și tocmai asta le-a despărțit o
+ * dată: butonul spunea „Înapoi" pe ecranul cu clasele, dar de-acolo n-avea unde
+ * să se întoarcă.
  *
- * ORARUL FACE EXCEPȚIE (`inapoiAcasa`). El se deschide dintr-un buton al
- * panoului, deci se ajunge în el de oriunde: de pe cartonașe, dintr-o clasă,
- * din mijlocul unei fișe. „Unde am fost" ar fi însemnat, de acolo, orice, iar
- * săgeata ar fi dus de fiecare dată în altă parte. Din orar duce la clase.
+ * Trei feluri, în ordinea în care se întreabă:
  *
- * Pasul orarului se ÎNLOCUIEȘTE, nu se pune altul peste el. Cu un pas nou,
- * Back-ul browserului te-ar fi întors în orar, de unde săgeata te-ar fi scos
- * iarăși la clase: un du-te-vino fără capăt. Înlocuit, orarul iese din teanc,
- * iar cele două săgeți — a noastră și a browserului — rămân de acord, cum spune
- * regula 2 din capul fișierului.
+ * 1. ECRANUL CU CLASELE E RĂDĂCINA MODULULUI. De-acolo se iese la sit, și nu se
+ *    mai numără pașii: „Clasele mele" înseamnă capăt, oricum ai ajuns la el.
+ *
+ * 2. ORARUL (și orice vedere cu `inapoiAcasa`) duce la clase. El se deschide
+ *    dintr-un buton al panoului, deci se ajunge în el de oriunde — de pe
+ *    cartonașe, dintr-o clasă, din mijlocul unei fișe — iar „unde am fost" ar fi
+ *    însemnat, de acolo, orice.
+ *
+ * 3. CINE A INTRAT DE-A DREPTUL pe adresa unui ecran (dintr-un mesaj, dintr-un
+ *    favorit) n-a fost nicăieri înăuntru: „un pas în urmă" l-ar fi scos din sit
+ *    de la prima apăsare. Duce tot la clase.
+ *
+ * În rest, un pas în urmă, prin chiar istoria browserului.
  */
+function sageataInapoi() {
+  if (!stare.vedere) return { vorba: "Înapoi la site", fel: "sit" };
+  if (vedereaDeAcum()?.inapoiAcasa) return { vorba: "Înapoi la clase", fel: "clase" };
+  if (stare.adancime === 0) return { vorba: "Înapoi la clase", fel: "clase" };
+  return { vorba: "Înapoi", fel: "pas" };
+}
+
 function inapoi() {
-  if (vedereaDeAcum()?.inapoiAcasa) {
+  const { fel } = sageataInapoi();
+  if (fel === "sit") { location.href = caleaSitului || "/"; return; }
+  if (fel === "clase") {
+    /* Pasul se ÎNLOCUIEȘTE, nu se pune altul peste el. Cu un pas nou, Back-ul
+       browserului te-ar fi întors de unde tocmai ai plecat, de unde săgeata
+       te-ar fi scos iarăși la clase: un du-te-vino fără capăt. Înlocuit, ecranul
+       iese din teanc. */
     stare.vedere = null;
     history.replaceState({ liceu: stare.adancime }, "", hashPentru(null));
     deseneaza();
     return;
   }
-  if (stare.adancime > 0) { history.back(); return; }
-  location.href = caleaSitului || "/";
+  history.back();
 }
 
 /* ---------------- lățimea panoului ---------------- */
@@ -919,12 +940,9 @@ function cuprinsHtml() {
 }
 
 function deseneaza() {
-  /* Săgeata spune unde duce, nu doar că duce undeva. Trei vorbe, în ordinea
-     asta: din orar scoate la clase; din restul scoate un pas; când teancul e
-     gol, scoate din modul. */
-  const vorbaInapoi = vedereaDeAcum()?.inapoiAcasa
-    ? "Înapoi la clase"
-    : (stare.adancime === 0 ? "Înapoi la site" : "Înapoi");
+  /* Vorba de pe săgeată vine din aceeași socoteală ca fapta ei (`sageataInapoi`),
+     nu dintr-una paralelă: altfel se despart, și s-au despărțit deja o dată. */
+  const vorbaInapoi = sageataInapoi().vorba;
   /* Două ecrane umplu cuprinsul până la margini, fiecare din alt motiv:
      fișa fiindcă își are derularea ei, în cadru; ecranul de pornire fiindcă
      fundalul lui colorat trebuie să ajungă în toate colțurile, iar cartonașele
