@@ -131,7 +131,7 @@ export async function fetchOrarul() {
 export async function fetchPlan(clasa) {
   return cuPlasa(`plan:${clasa}`, async () => verifica(
     await supabase.from("school_plan")
-      .select("nr, data, ora, fel, unitatea, titlu")
+      .select("nr, saptamana, data, ora, fel, unitatea, titlu")
       .eq("clasa", clasa)
       .eq("an_scolar", AN_SCOLAR)
       .order("nr")

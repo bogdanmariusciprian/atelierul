@@ -479,39 +479,69 @@ const SAG_DR = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stro
   stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
 
 /**
- * Rândul de sus al orarului: săgețile, eticheta orarului și săptămâna.
+ * A câta săptămână de școală e cea arătată.
+ *
+ * Nu se socotește din calendar, ci se citește din planificări: acolo scrie, la
+ * fiecare oră, în ce săptămână de curs cade. Numărat calendaristic, ar fi ieșit
+ * greșit — vacanțele nu avansează numărătoarea, iar între S7 și S8 e o
+ * săptămână întreagă de toamnă.
+ *
+ * Întoarce `null` într-o săptămână fără nicio oră (vacanță, Școala altfel), și
+ * e bine așa: acolo nu există un număr de spus.
+ */
+function numarulSaptamanii(zile) {
+  const ale = new Set(zile.map((z) => z.data));
+  for (const c of CLASE) {
+    const p = planuri[c.cod];
+    if (!p || p.seAduce) continue;
+    for (const o of p.ore) if (ale.has(o.data) && o.saptamana) return o.saptamana;
+  }
+  return null;
+}
+
+/**
+ * Antetul orarului, pe două rânduri: sus cine ești, jos unde umbli.
  *
  * O SINGURĂ PERECHE DE SĂGEȚI, pe săptămâni. Umblând din săptămână în
- * săptămână treci oricum prin toate orarele anului, iar eticheta îți spune pe
- * care ești; două perechi, una pentru orare și una pentru săptămâni, ar fi
- * cerut să ții minte care ce face.
+ * săptămână treci oricum prin toate orarele anului, iar eticheta de sus îți
+ * spune pe care ești; două perechi, una pentru orare și una pentru săptămâni,
+ * ar fi cerut să ții minte care ce face.
  *
  * Nu schimbă nimic altundeva în modul: nici cardul cu ora, nici listele
  * claselor, nici adresa din bara browserului. E o privire, nu o unealtă.
  */
-function randulDeSusAlOrarului(peZi, span) {
+function randulDeSusAlOrarului(peZi, span, zile) {
   const etichete = [...new Set(peZi.map((z) => z.eticheta).filter(Boolean))];
   const luni = luneaDinGrila();
   const { stanga, dreapta } = margini();
   const eDeAcum = stare.saptamanaAleasa === null;
+  const nr = numarulSaptamanii(zile);
 
   return `
-    <div class="lic-orare">
-      <button type="button" class="lic-orare__sag" data-act="sapt-inapoi"
-        ${stanga && luni <= stanga ? "disabled" : ""}
-        title="Săptămâna de dinainte" aria-label="Săptămâna de dinainte">${SAG_ST}</button>
+    <div class="lic-antet">
+      <div class="lic-antet__sus">
+        <h1 class="lic-orar__titlu">Orar</h1>
+        ${etichete.map((e) => `<span class="lic-orar__acum${
+          eDeAcum ? "" : " lic-orar__acum--vechi"}">${esc(e)}</span>`).join(" ")}
+      </div>
 
-      ${etichete.map((e) => `<span class="lic-orar__acum${
-        eDeAcum ? "" : " lic-orar__acum--vechi"}">${esc(e)}</span>`).join(" ")}
+      <div class="lic-antet__jos">
+        <button type="button" class="lic-orare__sag" data-act="sapt-inapoi"
+          ${stanga && luni <= stanga ? "disabled" : ""}
+          title="Săptămâna de dinainte" aria-label="Săptămâna de dinainte">${SAG_ST}</button>
 
-      <b class="lic-orare__span">${esc(span)}</b>
+        <b class="lic-orare__span">${esc(span)}</b>
 
-      <button type="button" class="lic-orare__sag" data-act="sapt-inainte"
-        ${dreapta && luni >= dreapta ? "disabled" : ""}
-        title="Săptămâna de după" aria-label="Săptămâna de după">${SAG_DR}</button>
+        <button type="button" class="lic-orare__sag" data-act="sapt-inainte"
+          ${dreapta && luni >= dreapta ? "disabled" : ""}
+          title="Săptămâna de după" aria-label="Săptămâna de după">${SAG_DR}</button>
 
-      ${eDeAcum ? "" : `<button type="button" class="lic-orare__azi"
-        data-act="sapt-acum">înapoi la săptămâna de acum</button>`}
+        <span class="lic-antet__capat">
+          ${nr ? `<span class="lic-antet__nr">săptămâna ${nr}</span>` : ""}
+          ${eDeAcum ? "" : `<button type="button" class="lic-orare__azi"
+            data-act="sapt-acum">înapoi la cea de acum</button>`}
+        </span>
+      </div>
     </div>`;
 }
 
@@ -541,9 +571,20 @@ function vedereDeOrar() {
   });
   const toateOrele = peZi.flatMap((z) => z.ore);
 
-  if (!toateOrele.length || !iv.length) {
+  if (!iv.length) {
     return `<div class="lic-orar"><h1 class="lic-orar__titlu">Orar</h1>
       <p class="lic-clasa__gol">Orarul n-a fost adus.</p></div>`;
+  }
+  /* O săptămână fără nicio oră e o vacanță, nu o stricăciune: antetul rămâne,
+     ca să te poți întoarce cu săgețile, iar în locul grilei scrie de ce e gol.
+     Fără antet, ai fi ajuns într-o fundătură din care nu se mai iese. */
+  if (!toateOrele.length) {
+    const span = spanulZilelor(zile[0].data, zile[zile.length - 1].data);
+    return `
+      <div class="lic-orar">
+        ${randulDeSusAlOrarului(peZi, span, zile)}
+        <p class="lic-clasa__gol">Săptămâna asta n-are nicio oră în orar.</p>
+      </div>`;
   }
 
   const folosite = iv
@@ -594,8 +635,7 @@ function vedereDeOrar() {
   const span = spanulZilelor(zile[0].data, zile[zile.length - 1].data);
   return `
     <div class="lic-orar">
-      <h1 class="lic-orar__titlu">Orar</h1>
-      ${randulDeSusAlOrarului(peZi, span)}
+      ${randulDeSusAlOrarului(peZi, span, zile)}
       <div class="lic-orar__vas">
         <table class="lic-orar__t"><thead>${cap}</thead><tbody>${randuri}</tbody></table>
       </div>

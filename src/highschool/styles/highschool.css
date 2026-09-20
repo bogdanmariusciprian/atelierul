@@ -914,7 +914,7 @@ a.lic-ora .lic-ora__semn {
 
 /* ---------- grila orarului ---------- */
 .lic-orar__titlu {
-  margin: 0 0 0.2rem;
+  margin: 0;
   font-size: clamp(1.5rem, 3vw, 2.1rem);
   letter-spacing: -0.02em;
 }
@@ -939,20 +939,48 @@ a.lic-ora .lic-ora__semn {
   color: var(--color-text-muted);
 }
 
-/* Rândul de sus al orarului: săgețile, eticheta orarului și săptămâna.
-   O singură pereche de săgeți, pe săptămâni — prin ele treci oricum prin toate
-   orarele anului. E o privire, nu o unealtă: nu schimbă nimic altundeva. */
-.lic-orare {
+/* ANTETUL ORARULUI, PE DOUĂ RÂNDURI: sus cine ești (titlul și ce orar e în
+   vigoare), jos unde umbli (săptămâna și săgețile). Despărțite de o linie
+   subțire, fiindcă sunt două lucruri deosebite: unul spune, celălalt se apasă. */
+.lic-antet { margin-block-end: 1.1rem; }
+
+.lic-antet__sus {
   display: flex; align-items: center; flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-block-end: 1.1rem;
+  gap: 0.5rem;
+  margin-block-end: 0.55rem;
 }
+
+.lic-antet__jos {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-block-start: 0.55rem;
+  border-block-start: 1px solid var(--color-border);
+}
+
 /* Săptămâna arătată: ea e lucrul pe care umbli, deci ea se citește cel mai
    bine din rândul ăsta. */
 .lic-orare__span {
-  font-size: 0.95rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+}
+
+/* Capătul din dreapta: a câta săptămână de școală e, iar când te-ai dus înapoi,
+   și calea de întoarcere. */
+.lic-antet__capat {
+  margin-inline-start: auto;
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.lic-antet__nr { color: var(--color-text-muted); font-size: 0.8rem; }
+
+/* De ce n-a venit o fișă din găleată. Scris, nu ascuns: un cadru alb din care
+   nu înțelege nimeni nimic e mai rău decât o vorbă urâtă, dar limpede. */
+.lic-gol__vina {
+  margin-block-start: 0.4rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  color: var(--color-danger);
 }
 .lic-orare__sag {
   inline-size: 30px; block-size: 30px;
