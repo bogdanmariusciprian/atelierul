@@ -337,6 +337,12 @@ const ZI_LUNG = {
   luni: "Luni", marti: "Marți", miercuri: "Miercuri", joi: "Joi", vineri: "Vineri",
 };
 
+/* CÂND SE ÎNTOARCE PAGINA, vineri seara. Cerut de Marius: la ceasul ăsta
+   săptămâna s-a încheiat, iar orarul pe care vrea să-l vadă e al celei care
+   vine. Zece minute înainte de miezul nopții, nu la miezul nopții, fiindcă
+   vineri seara se pregătește lunea. */
+const VINERI_SEARA = 23 * 60 + 50;
+
 /**
  * Luni–vineri, cu datele lor, pentru săptămâna pe care o arată grila.
  *
@@ -344,13 +350,18 @@ const ZI_LUNG = {
  * nu: aceeași casetă de marți e a patra oră săptămâna asta și a noua peste
  * două. Numărul cere, deci, o DATĂ, nu doar o zi a săptămânii.
  *
- * Sâmbăta și duminica se arată săptămâna care VINE: în weekend te uiți în orar
- * ca să-ți pregătești luni, nu ca să vezi ce-a fost vineri.
+ * SE TRECE LA SĂPTĂMÂNA CARE VINE vineri de la 23:50, și rămâne așa toată
+ * sâmbăta și duminica: de-atunci încolo, cine se uită în orar se uită ca să-și
+ * pregătească lunea, nu ca să vadă ce-a fost.
  */
 function zileleSaptamanii(acum = new Date()) {
   const d = new Date(acum.getFullYear(), acum.getMonth(), acum.getDate());
   const aCata = d.getDay() === 0 ? 7 : d.getDay();   // duminică = 7, ca în bază
-  d.setDate(d.getDate() + (aCata >= 6 ? 8 - aCata : 1 - aCata));
+  const minutul = acum.getHours() * 60 + acum.getMinutes();
+  const sEncheiat = aCata >= 6 || (aCata === 5 && minutul >= VINERI_SEARA);
+  /* `8 - aCata` duce la lunea care vine, și merge la fel pentru vineri (+3),
+     sâmbătă (+2) și duminică (+1). `1 - aCata` duce la lunea săptămânii de acum. */
+  d.setDate(d.getDate() + (sEncheiat ? 8 - aCata : 1 - aCata));
   return LUCRATOARE.map((z, i) => {
     const zi = new Date(d);
     zi.setDate(d.getDate() + i);
@@ -1326,6 +1337,23 @@ export async function renderHighschool(gazda, basePath = "") {
 
   /* Fereastra s-a schimbat: punem cât încape acum, fără să atingem alegerea. */
   window.addEventListener("resize", aplicaLatimea);
+
+  /* SĂPTĂMÂNA SE ÎNTOARCE SINGURĂ, fără să umble nimeni la pagină. Pe tabla din
+     clasă modulul stă deschis ore întregi, iar pragul de vineri seara ar fi
+     trecut pe lângă el: ai fi văzut luni dimineața săptămâna trecută, fiindcă
+     grila se desenase vineri la prânz.
+     Se uită la CE SĂPTĂMÂNĂ ar trebui arătată, nu la ceas, deci prinde și
+     pragul de vineri, și miezul nopții, cu aceeași socoteală. Cât umbli prin
+     orarele vechi nu se atinge nimic: amintirea ta e mai importantă decât
+     punctualitatea mea. */
+  let saptamanaDesenata = zileleSaptamanii()[0].data;
+  setInterval(() => {
+    const acum = zileleSaptamanii()[0].data;
+    if (acum === saptamanaDesenata) return;
+    saptamanaDesenata = acum;
+    if (stare.orarAles) return;
+    if (rutaE("v") && rutaId() === "orar") deseneaza();
+  }, 20000);
 
   deseneaza();
   /* Strângerea se pune DUPĂ primul desen: `strange` caută butonul în pagină. */
