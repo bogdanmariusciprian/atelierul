@@ -87,6 +87,11 @@ const stare = {
   adancime: 0,           // câți pași am făcut ÎN modul
   latime: LAT_START,
   strans: false,
+  /* Orarul la care te uiți în grilă, ca dată de intrare în vigoare. `null` =
+     cel potrivit săptămânii de acum. Umblatul prin ele e o privire înapoi, o
+     amintire: nu schimbă nimic altundeva — nici cardul, nici listele claselor,
+     nici adresa din bara browserului. De-aia stă aici, în stare, și nu în rută. */
+  orarAles: null,
 };
 
 let radacina = null;
@@ -393,6 +398,70 @@ function numereleSaptamanii(zile) {
 }
 
 /**
+ * Orarul SĂPTĂMÂNII DE ACUM — cel de la care pornește grila când n-ai ales nimic.
+ *
+ * Al primei zile din săptămâna arătată, NU al zilei de azi: duminica, grila
+ * arată deja săptămâna care vine, iar aceea poate merge pe alt orar.
+ */
+function orarulSaptamaniiDeAcum() {
+  const zile = zileleSaptamanii();
+  return orarulLa(zile[0].data).ore[0]?.deLa || null;
+}
+
+/** Pe ce orar stă grila: cel ales cu săgețile, ori cel de mai sus.
+ *  Un singur loc care răspunde, fiindcă întrebarea vine din două părți —
+ *  de la săgeți, ca să știe încotro, și de la grilă, ca să știe ce desenează. */
+const orarulDinGrila = () => stare.orarAles || orarulSaptamaniiDeAcum();
+
+const SAG_ST = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>`;
+const SAG_DR = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+  stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+
+/**
+ * Săgețile de umblat prin orarele anului, cu eticheta între ele.
+ *
+ * E O AMINTIRE, NU O UNEALTĂ. Nu schimbă nimic: nici cardul cu ora, nici
+ * listele claselor, nici adresa din bara browserului. Marius a cerut-o ca să
+ * poată vedea cum arătau orarele de dinainte, atât.
+ *
+ * Cât te uiți la unul ieșit din uz, se vede limpede că nu e cel de acum, și e o
+ * cale înapoi dintr-o apăsare. Fără asta, ai putea rămâne cu ochii pe un orar
+ * vechi fără să-ți dai seama — și e chiar felul de greșeală pe care grila asta
+ * ar trebui s-o împiedice.
+ */
+function umblaPrinOrare(peZi) {
+  const toate = orarul.orare || [];
+  const etichete = [...new Set(peZi.map((z) => z.eticheta).filter(Boolean))];
+
+  if (toate.length < 2) {
+    return etichete.map((e) => `<p class="lic-orar__acum">${esc(e)}</p>`).join(" ");
+  }
+
+  const i = toate.findIndex((o) => o.din === orarulDinGrila());
+  const eDeAcum = stare.orarAles === null;
+
+  return `
+    <div class="lic-orare">
+      <button type="button" class="lic-orare__sag" data-act="orar-inapoi"
+        ${i <= 0 ? "disabled" : ""} title="Orarul de dinainte"
+        aria-label="Orarul de dinainte">${SAG_ST}</button>
+
+      <span class="lic-orar__acum${eDeAcum ? "" : " lic-orar__acum--vechi"}">
+        ${etichete.map(esc).join(" + ")}
+      </span>
+
+      <button type="button" class="lic-orare__sag" data-act="orar-inainte"
+        ${i < 0 || i >= toate.length - 1 ? "disabled" : ""} title="Orarul de după"
+        aria-label="Orarul de după">${SAG_DR}</button>
+
+      ${eDeAcum
+        ? `<small class="lic-orare__nota">cel de acum</small>`
+        : `<button type="button" class="lic-orare__azi" data-act="orar-azi">înapoi la cel de acum</button>`}
+    </div>`;
+}
+
+/**
  * Grila orarului: zilele pe orizontală, ceasurile pe verticală.
  *
  * Se arată NUMAI intervalele în care chiar ai ore. Școala are treisprezece, tu
@@ -405,7 +474,15 @@ function numereleSaptamanii(zile) {
  */
 function vedereDeOrar() {
   const iv = orarul.intervale;
-  const zile = zileleSaptamanii();
+
+  /* SĂPTĂMÂNA ARĂTATĂ. De obicei cea de acum; dacă te-ai dus înapoi printre
+     orare, cea în care a intrat în vigoare orarul ales — altfel numerele din
+     colțul celulelor ar fi ale unei săptămâni care mergea pe alt orar, adică o
+     minciună curată. */
+  const ales = stare.orarAles;
+  const zile = ales
+    ? zileleSaptamanii(new Date(`${ales}T12:00:00`))
+    : zileleSaptamanii();
 
   /* FIECARE ZI ÎȘI ARE ORARUL EI. Nu „orarul de azi": duminica, grila arată
      săptămâna care vine, iar aceea poate merge pe alt orar decât cel de acum.
@@ -471,9 +548,11 @@ function vedereDeOrar() {
   return `
     <div class="lic-orar">
       <h1 class="lic-orar__titlu">Orar</h1>
-      ${etichete.map((e) => `<p class="lic-orar__acum">${esc(e)}</p>`).join(" ")}
+      ${umblaPrinOrare(peZi)}
       <p class="lic-orar__sub">${toateOrele.length} ore pe săptămână${
-        span ? ` · ${esc(span)}` : ""}. Apeși o oră și intri la clasa ei.</p>
+        span ? ` · ${esc(span)}` : ""}${
+        etichete.length > 1 ? " · săptămâna e tăiată de o schimbare de orar" : ""
+      }. Apeși o oră și intri la clasa ei.</p>
       <div class="lic-orar__vas">
         <table class="lic-orar__t"><thead>${cap}</thead><tbody>${randuri}</tbody></table>
       </div>
@@ -1139,7 +1218,23 @@ function apasa(e) {
     fereastraDeFisa({ ...unde, fisaVeche: act === "fisa-inlocuieste" ? peOra.get(unde.nr) : null });
     return;
   }
-  if (act === "fisa-sterge") { e.preventDefault(); stergeFisaDinLista(b.dataset.id); }
+  if (act === "fisa-sterge") { e.preventDefault(); stergeFisaDinLista(b.dataset.id); return; }
+
+  /* Umblatul prin orarele anului. Nu trece prin `navigheaza`: nu e un ecran
+     nou, e același ecran cu altă privire, iar săgeata „Înapoi" n-are de ce să
+     numere pașii ăștia. */
+  if (act === "orar-inapoi" || act === "orar-inainte" || act === "orar-azi") {
+    if (act === "orar-azi") { stare.orarAles = null; deseneaza(); return; }
+    const toate = orarul.orare || [];
+    const i = toate.findIndex((o) => o.din === orarulDinGrila());
+    const j = i + (act === "orar-inainte" ? 1 : -1);
+    if (i < 0 || j < 0 || j >= toate.length) return;
+    /* Pe cel al săptămânii de acum nu se ține nimic: așa, când te întorci pe
+       ecran, grila pornește iar de la săptămâna de acum, nu de unde ai lăsat-o.
+       Amintirea nu se lipește de tine. */
+    stare.orarAles = toate[j].din === orarulSaptamaniiDeAcum() ? null : toate[j].din;
+    deseneaza();
+  }
 }
 
 /* ---------------- modulul închis ---------------- */

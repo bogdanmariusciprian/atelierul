@@ -921,7 +921,6 @@ a.lic-ora .lic-ora__semn {
 /* Care orar se vede. Numai în septembrie s-a schimbat de trei ori, iar grila
    arată la fel de fiecare dată: fără nume, n-ai de unde ști pe care te uiți. */
 .lic-orar__acum {
-  margin: 0 0 0.3rem;
   display: inline-block;
   padding: 0.16rem 0.6rem;
   border-radius: 999px;
@@ -929,6 +928,45 @@ a.lic-ora .lic-ora__semn {
   color: var(--color-primary-dark);
   font-size: 0.8rem;
   font-weight: 600;
+}
+/* Un orar ieșit din uz arată ALTFEL, nu doar cu alt nume. Cât te uiți înapoi,
+   trebuie să se vadă dintr-o privire că nu e cel de azi — altminteri ai putea
+   rămâne cu ochii pe el fără să-ți dai seama, și tocmai asta ar trebui grila
+   să împiedice. */
+.lic-orar__acum--vechi {
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+}
+
+/* Săgețile de umblat prin orarele anului. E o amintire, nu o unealtă: nu
+   schimbă nimic altundeva în modul. */
+.lic-orare {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-block-end: 0.35rem;
+}
+.lic-orare__sag {
+  inline-size: 30px; block-size: 30px;
+  display: grid; place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.lic-orare__sag:hover:not(:disabled) { color: var(--color-primary); border-color: var(--color-primary); }
+.lic-orare__sag:disabled { opacity: 0.3; cursor: default; }
+
+.lic-orare__nota { color: var(--color-text-muted); font-size: 0.76rem; }
+.lic-orare__azi {
+  font: inherit; font-size: 0.76rem;
+  padding: 0.1rem 0.5rem;
+  border: 0; border-radius: 999px;
+  background: none;
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
 }
 .lic-orar__sub { margin: 0 0 1.2rem; font-size: 0.88rem; color: var(--color-text-muted); }
 
