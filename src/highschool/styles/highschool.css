@@ -476,7 +476,15 @@
   inset-block-end: 16px;
   inset-inline-end: 16px;
   z-index: 50;
+  /* SE TRAGE CU DEGETUL, deci degetul nu mai derulează pagina de sub el. Fără
+     asta, pe tabla interactivă tragerea ar fi fost furată de derulare, iar
+     cardul ar fi rămas pe loc. */
+  touch-action: none;
+  cursor: grab;
 }
+.lic-orcard--trage { cursor: grabbing; user-select: none; }
+/* Butoanele dinăuntru se apasă, nu se trag: mâna arată altfel peste ele. */
+.lic-orcard :is(button, a) { cursor: pointer; }
 
 .hc {
   position: relative;

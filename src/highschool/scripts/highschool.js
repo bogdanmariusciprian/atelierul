@@ -1106,6 +1106,107 @@ function felulCardului() {
   return plin ? "fantoma" : "prezentare";
 }
 
+const CHEIE_LOC = "liceu:cardul-locul";
+
+/**
+ * CARDUL SE TRAGE UNDE VREI, iar locul lui se ține minte pe cont.
+ *
+ * Până acum locul îl ghiceam eu: dreapta jos, și stânga jos peste o fișă,
+ * fiindcă se bătea cu panoul Luceafărului. Ghicitul ține până la prima fișă cu
+ * uneltele în alt colț. Așa, muți o dată și gata.
+ *
+ * SE PUNE `left`/`top` ÎN STIL, PE ELEMENT. Foaia îl așază din colțuri
+ * (`inset-block-end`, `inset-inline-end`), iar peste o fișă îl mută în stânga;
+ * un stil scris pe element bate toate regulile din foaie, deci alegerea ta
+ * rămâne oriunde ar fi cardul.
+ *
+ * SE ȚINE ÎN PIXELI, NU ÎN PROCENTE. Pe un ecran mai mic, procentele l-ar fi
+ * lipit de altceva decât colțul la care te uitai; pixelii, tăiați la marginea
+ * ferestrei, îl păstrează unde l-ai pus, iar dacă nu mai încape, îl aduc
+ * înăuntru.
+ */
+function mutaCardul(casa) {
+  let locul = iaLocal(CHEIE_LOC, null);
+  const bun = (l) => l && typeof l.x === "number" && typeof l.y === "number"
+    && Number.isFinite(l.x) && Number.isFinite(l.y);
+
+  function aseaza() {
+    if (!bun(locul)) {
+      casa.style.removeProperty("left");
+      casa.style.removeProperty("top");
+      casa.style.removeProperty("inset-inline-end");
+      casa.style.removeProperty("inset-block-end");
+      return;
+    }
+    const c = casa.getBoundingClientRect();
+    /* Tăiat la marginea ferestrei: cardul n-are voie să iasă din ecran, nici
+       când l-ai pus bine pe un monitor mare și deschizi pe altul mic. */
+    const x = Math.min(Math.max(0, locul.x), Math.max(0, window.innerWidth - c.width));
+    const y = Math.min(Math.max(0, locul.y), Math.max(0, window.innerHeight - c.height));
+    casa.style.left = `${x}px`;
+    casa.style.top = `${y}px`;
+    casa.style.insetInlineEnd = "auto";
+    casa.style.insetBlockEnd = "auto";
+  }
+
+  let trage = false, aMiscat = false, dx = 0, dy = 0;
+  /* PRAGUL DE PATRU PIXELI. Fără el, o apăsare pe butonul de ascuns ar fi
+     pornit o mutare de un pixel, iar apăsarea s-ar fi pierdut. */
+  const PRAG = 4;
+
+  casa.addEventListener("pointerdown", (e) => {
+    /* Pe butoanele dinăuntru nu se trage: ele se apasă. Cardul se prinde de
+       orice altceva. */
+    if (e.target.closest("button, a")) return;
+    const c = casa.getBoundingClientRect();
+    dx = e.clientX - c.left;
+    dy = e.clientY - c.top;
+    trage = true; aMiscat = false;
+    casa.setPointerCapture(e.pointerId);
+  });
+
+  casa.addEventListener("pointermove", (e) => {
+    if (!trage) return;
+    const x = e.clientX - dx;
+    const y = e.clientY - dy;
+    if (!aMiscat) {
+      const c = casa.getBoundingClientRect();
+      if (Math.abs(x - c.left) < PRAG && Math.abs(y - c.top) < PRAG) return;
+      aMiscat = true;
+      casa.classList.add("lic-orcard--trage");
+    }
+    locul = { x, y };
+    aseaza();
+  });
+
+  const gata = (e) => {
+    if (!trage) return;
+    trage = false;
+    try { casa.releasePointerCapture(e.pointerId); } catch { /* deja eliberat */ }
+    casa.classList.remove("lic-orcard--trage");
+    if (aMiscat) punLocal(CHEIE_LOC, locul);
+  };
+  casa.addEventListener("pointerup", gata);
+  casa.addEventListener("pointercancel", gata);
+
+  /* O apăsare care a fost de fapt o tragere nu trebuie să ajungă la butoanele
+     de dedesubt: se oprește în drum. */
+  casa.addEventListener("click", (e) => {
+    if (aMiscat) { e.stopPropagation(); e.preventDefault(); aMiscat = false; }
+  }, true);
+
+  /* Dublu-click: înapoi în colțul din oficiu, ca la mânerul panoului. */
+  casa.addEventListener("dblclick", (e) => {
+    if (e.target.closest("button, a")) return;
+    locul = null;
+    punLocal(CHEIE_LOC, null);
+    aseaza();
+  });
+
+  window.addEventListener("resize", aseaza);
+  aseaza();
+}
+
 function faCardul() {
   if (card) return;
   const casa = document.createElement("div");
@@ -1113,6 +1214,7 @@ function faCardul() {
   casa.id = "lic-orcard";
   document.body.appendChild(casa);
   card = hourCard(casa, oraDeArata, felulCardului);
+  mutaCardul(casa);
   /* Intrarea și ieșirea din ecranul plin, prinse pe loc. Cardul își verifică
      modul și singur, o dată pe secundă, dar o secundă de card larg peste un
      slide se vede. */
