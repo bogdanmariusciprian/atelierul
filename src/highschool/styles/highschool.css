@@ -281,7 +281,7 @@
    STICLA ARE NEVOIE DE CEVA DEDESUBT. `backdrop-filter` tulbură ce e ÎN SPATELE
    elementului. Pe fundalul plat al sitului n-ar avea ce tulbura, iar cartonașul
    ar fi ieșit o casetă spălăcită, nu sticlă. De-aia dedesubt stau pete mari și
-   neclare de culoare — `.lic-aurora` — luate chiar din nuanțele claselor.
+   neclare de culoare – `.lic-aurora` – luate chiar din nuanțele claselor.
    ========================================================= */
 /* ECRANUL DE PORNIRE UMPLE TOT CUPRINSUL, iar cartonașele stau pe mijloc.
    Cuprinsul își lasă marginile interioare și se face o coloană de tip flex;
@@ -625,8 +625,8 @@
 }
 
 /* PESTE O FIȘĂ, CARDUL TRECE ÎN STÂNGA JOS.
-   Fișele își au uneltele lor plutitoare tot în dreapta jos — Luceafărul acolo
-   are zoomul și ecranul plin — iar cardul se așeza peste ele. Se dă el la o
+   Fișele își au uneltele lor plutitoare tot în dreapta jos – Luceafărul acolo
+   are zoomul și ecranul plin – iar cardul se așeza peste ele. Se dă el la o
    parte, nu ele: fișa e materialul de la oră, modulul e doar rama din jur.
    Ridicat în sus ar fi fost o cârpeală: la o fișă cu panoul mai înalt s-ar fi
    atins din nou. Mutat într-un colț pe care fișele nu-l folosesc, nu se mai
@@ -638,10 +638,10 @@
 /* Butonul de ascuns iese din colț și intră în rând: pe un card de un rând,
    colțul e chiar peste ceas. */
 .hc--scurt .hc__x { position: static; margin-inline-start: 0.1rem; }
-/* A DOUA PASTILĂ, lângă ceas. Ceasul spune cât e, asta spune cât mai ai — două
+/* A DOUA PASTILĂ, lângă ceas. Ceasul spune cât e, asta spune cât mai ai – două
    lucruri deosebite, deci două forme deosebite, nu un rând lung de text.
    Cele trei fețe: minutele orei (aprinse), pauza (caldă) și vorbele în care
-   n-ai oră acum (șterse, fără pastilă — n-au de ce să tragă ochiul). */
+   n-ai oră acum (șterse, fără pastilă – n-au de ce să tragă ochiul). */
 .hc-scurt__vorba {
   font-size: 0.9rem;
   color: var(--color-text-muted);
@@ -688,7 +688,7 @@
    `showPopover()` a fost refuzat. */
 .lic-orcard:popover-open {
   position: fixed;
-  /* sus, dreapta, jos, stânga — adică lipit de colțul din stânga jos, ca și
+  /* sus, dreapta, jos, stânga – adică lipit de colțul din stânga jos, ca și
      ceilalți doi „moduri de fișă" de mai sus */
   inset: auto auto 16px 16px;
   margin: 0;
@@ -827,11 +827,11 @@ a.lic-ora .lic-ora__semn {
 
 /* =========================================================
    FEREASTRA DE URCARE. Un `<dialog>`, nu un div pus peste pagină: el își aduce
-   singur pânza din spate, apăsarea pe Escape și mutarea tastaturii înăuntru —
+   singur pânza din spate, apăsarea pe Escape și mutarea tastaturii înăuntru –
    trei lucruri pe care altfel le-aș fi scris de mână, prost.
    ========================================================= */
 /* CENTRAREA E SCRISĂ DE MÂNĂ, nu lăsată pe seama browserului. Un `<dialog>`
-   deschis modal se așază singur pe mijloc, dar prin `margin: auto` — iar
+   deschis modal se așază singur pe mijloc, dar prin `margin: auto` – iar
    `base.css` pune `margin: 0` pe tot, ceea ce i-l ia. Fără rândurile astea,
    fereastra se lipește de colțul din stânga sus. */
 .lic-urcare {
@@ -957,7 +957,7 @@ a.lic-ora .lic-ora__semn {
   font-weight: 600;
 }
 /* Un orar ieșit din uz arată ALTFEL, nu doar cu alt nume. Cât te uiți înapoi,
-   trebuie să se vadă dintr-o privire că nu e cel de azi — altminteri ai putea
+   trebuie să se vadă dintr-o privire că nu e cel de azi – altminteri ai putea
    rămâne cu ochii pe el fără să-ți dai seama, și tocmai asta ar trebui grila
    să împiedice. */
 .lic-orar__acum--vechi {
@@ -1116,7 +1116,7 @@ a.lic-ora .lic-ora__semn {
 .lic-orar__cel small { font-size: 0.72rem; opacity: 0.75; }
 
 /* ORELE ȚINUTE SE STING. Săptămâna se citește atunci ca un drum: ce e în urmă,
-   ce e înainte. Nu se ascund — se retrag. */
+   ce e înainte. Nu se ascund – se retrag. */
 .lic-orar__cel--trecuta a { opacity: 0.4; }
 .lic-orar__cel--trecuta a:hover { opacity: 1; }
 
@@ -1138,7 +1138,7 @@ a.lic-ora .lic-ora__semn {
 
 /* SEMNUL FIȘEI, în colțul de sus-stânga al celulei. Stă PESTE legătura spre
    clasă, nu în ea: apeși semnul și intri în material, apeși în rest și intri la
-   clasă. De-aia e buton, nu încă o legătură — două legături una într-alta n-au
+   clasă. De-aia e buton, nu încă o legătură – două legături una într-alta n-au
    voie în HTML și s-ar fi desfăcut urât. */
 .lic-orar__cel { position: relative; }
 .lic-orar__fisa {
@@ -1183,7 +1183,7 @@ a.lic-ora .lic-ora__semn {
    Scoasă din curgerea celulei (`position: absolute`), ca să nu miște clasa și
    sala de pe mijloc: în rând cu ele, cele două rânduri de sub cod ar fi împins
    codul în sus și casetele n-ar mai fi arătat la fel.
-   Ștearsă dinadins — se citește când o cauți, nu sare în ochi de la doi metri,
+   Ștearsă dinadins – se citește când o cauți, nu sare în ochi de la doi metri,
    unde trebuie să vezi clasa, nu contabilitatea anului. */
 .lic-orar__nr {
   position: absolute;
@@ -1218,8 +1218,10 @@ a.lic-ora .lic-ora__semn {
 .lic-fisa__titlu { min-inline-size: 0; }
 
 /* =========================================================
-   TELECOMANDA, în bara fișei, numai la profesor.
+   TELECOMANDA, în bara fișei.
    Două butoane, nu o împerechere: pe tablă apeși „Urmez", pe laptop „Conduc".
+   „Urmez" îl vede oricine intră în modul – tabla nu e logată în niciun cont;
+   „Conduc" numai profesorul.
    ========================================================= */
 .lic-telec {
   margin-inline-start: auto;
@@ -1245,6 +1247,9 @@ a.lic-ora .lic-ora__semn {
 .lic-telec__stare { font-size: 0.72rem; color: var(--color-text-muted); }
 .lic-telec__stare--legat { color: #15803d; }
 .lic-telec__stare--rupt { color: var(--color-danger); }
+/* Legătura ține, dar nu conduce nimeni: nici verde (ar minți), nici roșu (nu e
+   nimic stricat). Rămâne cenușiul barei, scris anume ca să se vadă că e voit. */
+.lic-telec__stare--tacere { color: var(--color-text-muted); }
 .lic-telec__vina {
   font-size: 0.72rem;
   color: var(--color-text-muted);
@@ -1253,7 +1258,9 @@ a.lic-ora .lic-ora__semn {
 
 /* CÂT URMEAZĂ, FIȘA NU SE LASĂ ATINSĂ. Tabla e interactivă; o apăsare de-a
    unui elev ar abate-o de la ce conduci, fără ca tu să afli. Bara de sus rămâne
-   la îndemână, ca să te poți desprinde. */
+   la îndemână, ca să te poți desprinde.
+   Clasa se pune abia când chiar vine ceva pe canal, și cade când se face
+   tăcere: cine apasă „Urmez" fără să conducă nimeni rămâne cu lecția lui. */
 .lic-fisa--urmeaza .lic-fisa__cadru { pointer-events: none; }
 .lic-fisa__titlu b { display: block; font-size: 0.9rem; }
 .lic-fisa__titlu small { color: var(--color-text-muted); font-size: 0.8rem; }

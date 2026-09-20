@@ -1,20 +1,27 @@
 // =========================================================
 // TELECOMANDA: laptopul conduce, tabla urmează.
 //
-// Un canal Supabase Realtime, închis pe contul profesorului (migrarea 0100).
-// Situl stă pe GitHub Pages, fără server al lui, deci ăsta e singurul drum pe
-// care poate veni o împingere din afară într-o filă deschisă.
+// Un canal Supabase Realtime, pe care scrie numai profesorul, dar îl poate
+// asculta oricine intră în modul – și tabla, care nu e logată în niciun cont, și
+// un elev care vrea lecția pe ecranul lui (migrarea 0100). Situl stă pe GitHub
+// Pages, fără server al lui, deci ăsta e singurul drum pe care poate veni o
+// împingere din afară într-o filă deschisă.
 //
 // 1. ÎNTR-O SINGURĂ DIRECȚIE, DINADINS. Cine conduce trimite; cine urmează
-//    numai pune. Tabla nu răspunde niciodată înapoi — așa nu există ecou, nici
+//    numai pune. Tabla nu răspunde niciodată înapoi – așa nu există ecou, nici
 //    întrebarea „cine are dreptate", nici două aparate care se trag unul pe
-//    altul. Cerut de Marius, și e alegerea bună.
+//    altul. Cerut de Marius, și e alegerea bună. Acum, când poate asculta
+//    oricine, e și paza: un ascultător n-are ce trimite.
 //
-// 2. CEL CARE URMEAZĂ CERE STAREA LA INTRARE. Asta e singura vorbă pe care o
-//    scoate: „am intrat, unde ești?". Fără ea, tabla pornită după laptop ar fi
-//    rămas pe primul slide până la următoarea apăsare.
+// 2. CEL CARE URMEAZĂ NU SCOATE NICIO VORBĂ. Nici măcar „am intrat, unde
+//    ești?" – fiindcă vorba aia ar fi o scriere, iar scrierea e numai a
+//    profesorului. Așa, ascultătorul e mut pe bune, nu doar din bună purtare.
+//    Tabla pornită după laptop n-ar fi știut de una singură la ce slide e, așa
+//    că nu întreabă ea: SPUNE CEL CARE CONDUCE, din când în când, chiar dacă
+//    nu s-a schimbat nimic. Costă un mesaj la trei secunde și scapă de
+//    întrebare cu totul.
 //
-// 3. PE CANAL NU TRECE NIMIC DE ASCUNS — doar fișa și numărul slide-ului.
+// 3. PE CANAL NU TRECE NIMIC DE ASCUNS – doar fișa și numărul slide-ului.
 //    Notițele se citesc din tabelul lor, de către aparatul care conduce, și nu
 //    pleacă mai departe niciodată.
 //
@@ -61,18 +68,12 @@ export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
         ultimulCeas = payload.ceas;
         peStare?.({ fisa: payload.fisa, slide: Number(payload.slide) || 0 });
       });
-    } else {
-      canal.on("broadcast", { event: "cine-e" }, () => trimite(true));
     }
 
     canal.subscribe((stare, vina) => {
       if (oprit) return;
       if (stare === "SUBSCRIBED") {
         spune("legat");
-        /* Cel care urmează întreabă unde e cel care conduce. */
-        if (rol === "urmez") {
-          canal.send({ type: "broadcast", event: "cine-e", payload: {} }).catch(() => {});
-        }
         return;
       }
       if (stare === "CHANNEL_ERROR" || stare === "TIMED_OUT" || stare === "CLOSED") {
@@ -81,23 +82,36 @@ export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
     });
   }
 
-  /** Trimite starea de acum. Numai cel care conduce. `silit` o trimite chiar
-   *  dacă nu s-a schimbat nimic — la întrebarea celui care tocmai a intrat. */
+  /**
+   * Trimite starea de acum. Numai cel care conduce.
+   *
+   * Trimite când s-a schimbat ceva – și, pe deasupra, o dată la trei secunde
+   * chiar dacă nu s-a schimbat nimic. Repetarea aia e tot rostul: cine intră pe
+   * canal la mijlocul orei află singur unde suntem, fără să ceară, fiindcă n-are
+   * voie să ceară. `silit` o trimite pe loc, oricum ar fi.
+   */
+  const REPETA = 3000;
   let ultimaTrimisa = "";
+  let ultimaClipa = 0;
   function trimite(silit = false) {
     if (rol !== "conduc" || !canal) return;
     const s = stareaMea?.();
     if (!s) return;
+    const acum = Date.now();
     const amprenta = `${s.fisa}|${s.slide}`;
-    if (!silit && amprenta === ultimaTrimisa) return;
+    const seRepeta = acum - ultimaClipa >= REPETA;
+    if (!silit && !seRepeta && amprenta === ultimaTrimisa) return;
     ultimaTrimisa = amprenta;
+    ultimaClipa = acum;
     canal.send({
       type: "broadcast", event: "stare",
-      payload: { fisa: s.fisa, slide: s.slide, ceas: Date.now() },
+      payload: { fisa: s.fisa, slide: s.slide, ceas: acum },
     }).catch(() => {});
   }
 
-  porneste();
+  /* Pornirea e asincronă; orice cădere de-a ei se spune pe bară, nu se scapă
+     ca respingere neprinsă în mijlocul orei. */
+  porneste().catch((e) => spune("rupt", e?.message || String(e)));
 
   return {
     trimite,

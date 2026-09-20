@@ -74,7 +74,7 @@ const CHEIE_STRANS = "liceu:panoul-strans";
    butoanele care vor veni în panou să aleagă fiecare pentru ea. */
 const VEDERI = [
   { id: "orar", nume: "Orar", desen: () => vedereDeOrar(), inapoiAcasa: true },
-  /* Clasele au alt drum spre ele — cartonașele de pe ecranul de pornire — deci
+  /* Clasele au alt drum spre ele – cartonașele de pe ecranul de pornire – deci
      nu se mai înșiră și în panou: ar fi fost aceeași listă de două ori. */
   ...CLASE.map((c) => ({
     id: `clasa-${c.cod.toLowerCase()}`,
@@ -92,7 +92,7 @@ const stare = {
   latime: LAT_START,
   strans: false,
   /* Săptămâna la care te uiți în grilă, ca luni a ei („2026-09-21"). `null` =
-     săptămâna de acum. Umblatul prin ele nu schimbă nimic altundeva — nici
+     săptămâna de acum. Umblatul prin ele nu schimbă nimic altundeva – nici
      cardul, nici listele claselor, nici adresa din bara browserului. De-aia stă
      aici, în stare, și nu în rută.
      Săptămâna a luat locul orarului: mergând din săptămână în săptămână treci
@@ -139,7 +139,7 @@ function navigheaza(ruta) {
 const vedereaDeAcum = () => (rutaE("v") ? vedereaDupaId(rutaId()) : null);
 
 /**
- * CE FACE SĂGEATA din colțul de sus-stânga, și ce scrie pe ea — dintr-un singur
+ * CE FACE SĂGEATA din colțul de sus-stânga, și ce scrie pe ea – dintr-un singur
  * loc. Vorba și fapta se scriau în două locuri, și tocmai asta le-a despărțit o
  * dată: butonul spunea „Înapoi" pe ecranul cu clasele, dar de-acolo n-avea unde
  * să se întoarcă.
@@ -150,8 +150,8 @@ const vedereaDeAcum = () => (rutaE("v") ? vedereaDupaId(rutaId()) : null);
  *    mai numără pașii: „Clasele mele" înseamnă capăt, oricum ai ajuns la el.
  *
  * 2. ORARUL (și orice vedere cu `inapoiAcasa`) duce la clase. El se deschide
- *    dintr-un buton al panoului, deci se ajunge în el de oriunde — de pe
- *    cartonașe, dintr-o clasă, din mijlocul unei fișe — iar „unde am fost" ar fi
+ *    dintr-un buton al panoului, deci se ajunge în el de oriunde – de pe
+ *    cartonașe, dintr-o clasă, din mijlocul unei fișe – iar „unde am fost" ar fi
  *    însemnat, de acolo, orice.
  *
  * 3. CINE A INTRAT DE-A DREPTUL pe adresa unui ecran (dintr-un mesaj, dintr-un
@@ -235,7 +235,7 @@ function strange(da) {
 
 /* TRAGEREA, cu evenimente de pointer: unul singur pentru maus, deget și creion.
    `setPointerCapture` face ca mișcarea să rămână a mânerului chiar dacă
-   degetul iese de pe el — altfel, tras repede, panoul rămânea în urmă și se
+   degetul iese de pe el – altfel, tras repede, panoul rămânea în urmă și se
    oprea din mers. */
 function legaManerul(maner) {
   let pornit = false;
@@ -458,7 +458,7 @@ function luneaDeLanga(luni, cate) {
  * Cât de departe se poate umbla: de la săptămâna primului orar până la
  * săptămâna ultimei ore din planificări.
  *
- * Dincolo de capete nu e nimic de văzut — nici orar, nici numere — iar o grilă
+ * Dincolo de capete nu e nimic de văzut – nici orar, nici numere – iar o grilă
  * goală, la care ai ajuns apăsând o săgeată, se citește ca o stricăciune. Mai
  * bine nu se apasă.
  */
@@ -499,7 +499,7 @@ function spanScurt(luni) {
  * urechile săptămânilor vecine ieșind de sub ea.
  *
  * DE CE URECHI, și nu două săgeți. O săgeată spune doar „mai e ceva acolo".
- * Urechea spune CE e acolo — „14–18 sept." — deci știi unde ajungi înainte să
+ * Urechea spune CE e acolo – „14–18 sept." – deci știi unde ajungi înainte să
  * apeși, și știi unde ești fără să citești data din mijloc. Pe tablă, unde
  * apeși cu degetul și nu revii ușor dintr-o apăsare greșită, asta contează.
  *
@@ -595,7 +595,7 @@ function vedereDeOrar() {
     .flatMap((z) => z.ore);
 
   /* O SĂPTĂMÂNĂ FĂRĂ NICIO ORĂ NU E O STRICĂCIUNE. Antetul rămâne, ca să te
-     poți întoarce cu urechile filei, iar în locul grilei scrie de ce e goală —
+     poți întoarce cu urechile filei, iar în locul grilei scrie de ce e goală –
      din structura anului, pe numele ei. Fără antet, ai fi ajuns într-o fundătură
      din care nu se mai iese. */
   if (!toateOrele.length) {
@@ -622,7 +622,7 @@ function vedereDeOrar() {
 
   /* Planificările tuturor claselor din grilă: din ele iese numărul din colțul
      fiecărei celule. Se cer o dată și rămân ținute minte, iar până sosesc grila
-     se vede întreagă, doar fără numere — nu ține nimic în loc. */
+     se vede întreagă, doar fără numere – nu ține nimic în loc. */
   CLASE.forEach((c) => { if (!planuri[c.cod]) aduPlanul(c.cod); });
   const numere = numereleSaptamanii(zile);
 
@@ -797,7 +797,7 @@ function vedereDeClasa(c) {
     if (nouaUnitate) unitateaDeSus = o.unitatea;
 
     /* BANDA SE SCRIE ÎNAINTEA PRIMEI ORE CARE MERGE PE ORARUL CEL NOU, inclusiv
-       când ora aceea cade fix în ziua intrării în vigoare — de-aia `<=`, nu `<`.
+       când ora aceea cade fix în ziua intrării în vigoare – de-aia `<=`, nu `<`.
        E regula din documentul de predare al lui Marius (§5), unde scrie că s-a
        greșit de două ori cu `<`: banda ajungea SUB chiar ora pe care o descrie. */
     let banda = "";
@@ -914,17 +914,35 @@ function listaFiselor(fise) {
 
 const CHEIE_ROL = "liceu:telecomanda-rol";
 
-/* Cine e aparatul ăsta: `null` = nimeni, singur. Se ține minte pe cont, ca
-   tabla să rămână „urmez" peste reîncărcări — altfel, la fiecare pornire a
-   dimineții ar trebui apăsat din nou, pe un ecran la care ajungi greu. */
+/* Cine e aparatul ăsta: `null` = nimeni, singur. Se ține minte pe cont – și
+   tabla, nelogată, are sertarul ei – ca să rămână „urmez" peste reîncărcări;
+   altfel, la fiecare pornire a dimineții ar trebui apăsat din nou, pe un ecran
+   la care ajungi greu. */
+
+/** Rolul ținut minte, curățat: „conduc" e numai al profesorului. Se curăță aici,
+ *  la citire, fiindcă primul desen vine înaintea pornirii telecomenzii, și n-ar
+ *  fi bine ca butonul să apară apăsat la cineva care oricum nu poate conduce. */
+function rolulTinutMinte() {
+  const r = iaLocal(CHEIE_ROL, null);
+  return r === "conduc" && !isAdmin() ? null : r;
+}
+
+/* Cât timp fără niciun mesaj înseamnă „nu conduce nimeni". Cel care conduce
+   repetă din trei în trei secunde, deci opt e larg chiar și pe net de școală. */
+const TACERE = 8000;
+
 const telec = {
-  rol: iaLocal(CHEIE_ROL, null),
+  rol: rolulTinutMinte(),
   legat: "rupt",     // leg | legat | rupt
   vina: "",
   fir: null,         // legătura deschisă
-  bate: null,        // ceasul care întreabă fișa ce slide arată
+  bate: null,        // ceasul: la „conduc" întreabă fișa, la „urmez" pândește tăcerea
   punte: null,       // puntea spre fișa de acum
+  venit: 0,          // clipa ultimului mesaj primit; 0 = încă niciunul
 };
+
+/** Conduce cineva chiar acum? Numai pentru cel care urmează. */
+const seConduce = () => telec.venit > 0 && Date.now() - telec.venit < TACERE;
 
 /** Puntea spre fișa din cadru, refăcută la fiecare desen (cadrul e altul). */
 function legPuntea() {
@@ -936,6 +954,12 @@ function legPuntea() {
 /**
  * Pornește ori oprește telecomanda, după rolul ales.
  *
+ * CONDUCE NUMAI PROFESORUL, URMEAZĂ ORICINE. Tabla din clasă nu e logată în
+ * niciun cont, iar un elev poate urmări lecția pe ecranul lui – de-aia „urmez"
+ * nu cere nimic. „Conduc" cere: altfel, oricine din fundul clasei ar putea da
+ * slide-urile mai departe. Oprirea de-aici e numai pentru ochi; cea adevărată e
+ * în bază, unde politica de scriere cere profesorul (migrarea 0100).
+ *
  * CEL CARE CONDUCE ÎȘI ÎNTREABĂ FIȘA, nu așteaptă ca ea să-i spună. De trei ori
  * pe secundă o întreabă „la ce slide ești?", și trimite doar când s-a schimbat.
  * Așa, fișa n-are nimic de anunțat: cele patru rânduri ale înțelegerii rămân
@@ -944,8 +968,9 @@ function legPuntea() {
 function pornesteTelecomanda() {
   if (telec.fir) { telec.fir.opreste(); telec.fir = null; }
   if (telec.bate) { clearInterval(telec.bate); telec.bate = null; }
-  telec.legat = "rupt"; telec.vina = "";
-  if (!telec.rol || !isAdmin()) return;
+  telec.legat = "rupt"; telec.vina = ""; telec.venit = 0;
+  if (!telec.rol) return;
+  if (telec.rol === "conduc" && !isAdmin()) { telec.rol = null; return; }
 
   telec.fir = telecomanda({
     rol: telec.rol,
@@ -962,29 +987,67 @@ function pornesteTelecomanda() {
       return { fisa: rutaId(), slide: p.slide() };
     },
     peStare: (s) => {
+      /* CADRUL SE ÎNGHEAȚĂ ABIA CÂND CHIAR CONDUCE CINEVA, nu la apăsarea
+         butonului. Cine apasă „Urmez" când nu conduce nimeni ar fi rămas cu
+         lecția moartă în mână, fără să priceapă de ce. Clasa se pune pe loc,
+         fără desen: un desen ar fi reîncărcat fișa.
+         Se întreabă ÎNAINTE de a pune clipa nouă – așa prinde și pornirea, și
+         întoarcerea după o tăcere. Cu `!telec.venit`, a doua n-ar fi prins-o. */
+      const eraTacere = !seConduce();
+      telec.venit = Date.now();
+      if (eraTacere) {
+        radacina?.querySelector(".lic-fisa")?.classList.add("lic-fisa--urmeaza");
+        picteazaBaraTelec();
+      }
+
       /* Fișa cerută nu e cea deschisă: se deschide ea întâi. */
       if (s.fisa && s.fisa !== rutaId()) { navigheaza(`f/${s.fisa}`); return; }
       const p = telec.punte;
-      if (p && p.fel !== "fara") p.laSlide(s.slide);
+      if (!p || p.fel === "fara") return;
+      /* ÎNTREBĂM FIȘA UNDE E, nu ne ținem minte unde am pus-o. Cel care conduce
+         repetă starea din trei în trei secunde, și n-are rost să-i dăm de
+         fiecare dată același „du-te la 5" – ar reporni animațiile slide-ului.
+         Iar dacă fișa s-a reîncărcat între timp și a căzut la început, tot de-
+         aici se ridică singură, fiindcă întrebarea spune adevărul. */
+      if (p.slide() === s.slide) return;
+      p.laSlide(s.slide);
     },
   });
 
   if (telec.rol === "conduc") {
     telec.bate = setInterval(() => telec.fir && telec.fir.trimite(), 350);
+  } else {
+    /* Cel care urmează pândește tăcerea: dacă nu mai vine nimic, scrie pe bară
+       că nu conduce nimeni și dezgheață cadrul, ca lecția să rămână a lui. */
+    let inainte = seConduce();
+    telec.bate = setInterval(() => {
+      const acum = seConduce();
+      if (acum === inainte) return;
+      inainte = acum;
+      if (!acum) radacina?.querySelector(".lic-fisa")?.classList.remove("lic-fisa--urmeaza");
+      picteazaBaraTelec();
+    }, 2000);
   }
 }
 
 function alegeRolul(rol) {
+  if (rol === "conduc" && !isAdmin()) return;
   telec.rol = telec.rol === rol ? null : rol;
   punLocal(CHEIE_ROL, telec.rol);
   pornesteTelecomanda();
-  deseneaza();
+  /* NU UN DESEN ÎNTREG. Ar fi pus alt cadru în pagină, adică ar fi reîncărcat
+     fișa – ai fi apăsat „Conduc" în mijlocul orei și lecția s-ar fi întors la
+     primul slide, de față cu clasa. Se schimbă numai ce ține de rol: bara și
+     îngheț-dezgheț cadrul. Nimic altceva din ecran nu atârnă de `telec.rol`. */
+  radacina?.querySelector(".lic-fisa")
+    ?.classList.toggle("lic-fisa--urmeaza", telec.rol === "urmez" && seConduce());
+  picteazaBaraTelec();
 }
 
 /* ---------------- ecranul: o fișă ---------------- */
 
 /* Fișele aduse din găleată, ținute cât ține fila. O adresă `blob:` rămâne bună
-   până se închide fila, deci a doua deschidere a aceleiași fișe e pe loc — iar
+   până se închide fila, deci a doua deschidere a aceleiași fișe e pe loc – iar
    la 4 MB bucata, asta se simte. */
 const fiseAduse = {};
 
@@ -1023,24 +1086,33 @@ const TELEC_SEMN = {
 };
 
 /**
- * Rândul telecomenzii, numai la profesor: cine e aparatul ăsta și cum stă
- * legătura.
+ * Rândul telecomenzii: cine e aparatul ăsta și cum stă legătura.
  *
  * DOUĂ BUTOANE, NU O ÎMPERECHERE. Pe tablă apeși „Urmez", pe laptop „Conduc".
  * Fără coduri, fără căutat aparate: spui limpede ce e fiecare, iar dacă te
  * răzgândești, apeși din nou pe același buton și te desprinzi.
+ *
+ * „URMEZ" E LA VEDEREA TUTUROR, „CONDUC" NUMAI LA PROFESOR. Tabla din clasă nu
+ * e logată, deci butonul ei nu poate cere cont; iar un elev care vrea să vadă
+ * lecția pe ecranul lui n-are de ce să fie oprit. Cine conduce rămâne unul
+ * singur – și asta o ține baza, nu butonul de-aici.
  */
 function randTelecomanda(punte) {
-  if (!isAdmin()) return "";
   const r = telec.rol;
-  const stare = { leg: "mă leg…", legat: "legată", rupt: "nelegată" }[telec.legat];
+  /* La „urmez", „legată" ar fi fost o jumătate de adevăr: legătura ține, dar
+     poate nu conduce nimeni de partea cealaltă. Spunem care din două. */
+  const tacere = telec.legat === "legat" && r === "urmez" && !seConduce();
+  const stare = telec.legat === "legat" && r === "urmez"
+    ? (tacere ? "nu conduce nimeni" : "merg după profesor")
+    : { leg: "mă leg…", legat: "legată", rupt: "nelegată" }[telec.legat];
+  const felStare = tacere ? "tacere" : telec.legat;
 
   const buton = (care, vorba) => `
     <button type="button" class="lic-telec__buton${r === care ? " on" : ""}"
       data-act="telec-${care}" aria-pressed="${r === care}"
       title="${care === "conduc"
         ? "Aparatul ăsta conduce: ce faci aici se vede pe tablă"
-        : "Aparatul ăsta urmează: arată ce se conduce de aiurea"}"
+        : "Aparatul ăsta urmează: arată ce derulează profesorul"}"
       >${TELEC_SEMN[care]}${vorba}</button>`;
 
   const vorbaPuntii = {
@@ -1050,9 +1122,9 @@ function randTelecomanda(punte) {
 
   return `
     <div class="lic-telec">
-      ${buton("conduc", "Conduc")}
+      ${isAdmin() ? buton("conduc", "Conduc") : ""}
       ${buton("urmez", "Urmez")}
-      ${r ? `<span class="lic-telec__stare lic-telec__stare--${telec.legat}">${esc(stare)}</span>` : ""}
+      ${r ? `<span class="lic-telec__stare lic-telec__stare--${felStare}">${esc(stare)}</span>` : ""}
       ${r && vorbaPuntii ? `<span class="lic-telec__vina">${esc(vorbaPuntii)}</span>` : ""}
       ${r && telec.legat === "rupt" && telec.vina
         ? `<span class="lic-telec__vina">${esc(telec.vina)}</span>` : ""}
@@ -1060,7 +1132,7 @@ function randTelecomanda(punte) {
 }
 
 /** Desenează din nou NUMAI rândul telecomenzii. Un desen întreg ar fi rupt
- *  cadrul fișei din pagină și ar fi reîncărcat-o — adică ar fi luat-o de la
+ *  cadrul fișei din pagină și ar fi reîncărcat-o – adică ar fi luat-o de la
  *  primul slide, în mijlocul orei. */
 function picteazaBaraTelec() {
   const loc = radacina?.querySelector(".lic-telec");
@@ -1092,15 +1164,15 @@ function baraDeFisa(f, adresaSingura, semn = "") {
  *
  * Într-un `<iframe>`, nu desfăcută și pusă la loc de mine: fișierele lui Marius
  * își poartă singure stilurile și scripturile. Lipite de-a dreptul în pagină,
- * stilurile lor s-ar fi bătut cu ale modulului în amândouă sensurile — ale lui
+ * stilurile lor s-ar fi bătut cu ale modulului în amândouă sensurile – ale lui
  * ar fi stricat cardul, iar ale mele i-ar fi schimbat fișa pe care o arată la
  * clasă. Cadrul le ține fiecare la ea acasă.
  *
  * DOUĂ FELURI DE FIȘE, de când avem găleata (migrarea 0095):
- *   · cele din GĂLEATĂ — cele nouă de la clasă. Nu au adresă pe sit, fiindcă
+ *   · cele din GĂLEATĂ – cele nouă de la clasă. Nu au adresă pe sit, fiindcă
  *     găleata e privată: vin ca text și se fac adresă `blob:`. Cu semnul stins,
  *     nu vin deloc, și asta e tot rostul mutării;
- *   · cele din SIT — deocamdată Luceafărul, lecție publică la `lectii/lectura/`,
+ *   · cele din SIT – deocamdată Luceafărul, lecție publică la `lectii/lectura/`,
  *     unde îi e locul. Ele primesc `?in=liceu` și culoarea modulului, ca să se
  *     așeze în cadru; cele din găleată n-au nevoie, n-au fundal al lor.
  *
@@ -1147,9 +1219,9 @@ function vedereDeFisa(f) {
 
   /* CÂT URMEAZĂ, CADRUL NU SE LASĂ ATINS. Tabla e interactivă; dacă un elev
      apasă pe slide, ea s-ar abate de la ce conduci tu, iar tu n-ai avea de unde
-     ști — comanda următoare ar aduce-o înapoi, dar între timp arată altceva
+     ști – comanda următoare ar aduce-o înapoi, dar între timp arată altceva
      decât crezi. Mai bine nu se poate atinge deloc. */
-  const urmeaza = telec.rol === "urmez" && isAdmin();
+  const urmeaza = telec.rol === "urmez" && seConduce();
   return `
     <div class="lic-fisa${urmeaza ? " lic-fisa--urmeaza" : ""}">
       ${baraDeFisa(f, adusa.url)}
@@ -1379,7 +1451,7 @@ const orarul = {
   zi: null, ore: [], toate: [], intervale: [], orare: [],
   /* Structura anului (ordinul 3.194/2026): vacanțele, zilele libere,
      săptămânile de curs și cele două speciale. Din ea află grila de ce e goală
-     o zi — altfel, o vacanță arată la fel cu o zi în care n-au venit datele. */
+     o zi – altfel, o vacanță arată la fel cu o zi în care n-au venit datele. */
   structura: {},
   adus: false,
 };
@@ -1423,7 +1495,7 @@ function saptamanaDeScoala(zile) {
  * Orarul în vigoare la o ANUMITĂ zi, cu eticheta lui.
  *
  * Nu „orarul de azi". Grila arată o săptămână care poate fi alta decât cea de
- * azi — duminica arată săptămâna care vine — iar lista unei clase se întinde
+ * azi – duminica arată săptămâna care vine – iar lista unei clase se întinde
  * peste tot anul. Fiecare ecran întreabă pentru ziua pe care o arată.
  */
 function orarulLa(data) {
@@ -1492,7 +1564,7 @@ function oraDeArata() {
  * titlul lecției din planificare. Rămâne să alegi fișierul; litera și titlul se
  * pot schimba, dacă vrei altele.
  *
- * NUMELE DIN GĂLEATĂ ÎL PUNE CODUL — `11d-5-b.html` — oricum s-ar chema
+ * NUMELE DIN GĂLEATĂ ÎL PUNE CODUL – `11d-5-b.html` – oricum s-ar chema
  * fișierul pe discul tău. De-aia nu mai redenumești nimic: diacriticele care
  * opreau urcarea nu mai ajung niciodată până acolo.
  */
@@ -1523,7 +1595,7 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
         <select name="fel">
           ${["", "A", "B", "C"].map((x) => `
             <option value="${x}" ${(fisaVeche?.fel || "B") === x ? "selected" : ""}>${
-              x ? `${x} — ${esc(FELUL_FISEI[x].ce)}` : "fără literă"}</option>`).join("")}
+              x ? `${x} – ${esc(FELUL_FISEI[x].ce)}` : "fără literă"}</option>`).join("")}
         </select>
       </label>
 
@@ -1551,7 +1623,7 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
     if (e.target.closest("[data-act='urcare-lasa']")) { d.close(); return; }
     /* APĂSAREA PE LÂNGĂ FEREASTRĂ o închide. Pânza din spate e o parte a
        ferestrei, nu un element al ei, deci o apăsare pe ea are drept țintă chiar
-       `<dialog>`-ul. Dinăuntru, țintă e mereu altceva — formularul îi umple tot
+       `<dialog>`-ul. Dinăuntru, țintă e mereu altceva – formularul îi umple tot
        locul, fiindcă marginile sunt ale lui, nu ale ferestrei. */
     if (e.target === d && !seUrca) d.close();
   });
@@ -1689,7 +1761,7 @@ function apasa(e) {
  * Ce vede cineva care intră pe link cu semnul stins.
  *
  * NU E O PERDEA PESTE CEVA. Sub fereastră nu se desenează nimic de ascuns și nu
- * se cere nimic de la bază — nici orarul, nici planificările, nici cartonașele
+ * se cere nimic de la bază – nici orarul, nici planificările, nici cartonașele
  * claselor. Iar dacă cineva ar cere datele de mână, politicile din bază i le
  * refuză oricum (migrarea 0094). Fereastra e ușa închisă, nu un capac pus peste
  * o masă întinsă.
@@ -1728,7 +1800,7 @@ export async function renderHighschool(gazda, basePath = "") {
   caleaSitului = basePath;
   if (!radacina) return;
 
-  /* SEMNUL, ÎNAINTE DE ORICE. Profesorul intră mereu — el are de unde-l aprinde.
+  /* SEMNUL, ÎNAINTE DE ORICE. Profesorul intră mereu – el are de unde-l aprinde.
      Pentru ceilalți, cu semnul stins nu se desenează modulul și nu se cere
      nicio dată: se pune fereastra și ne oprim aici.
      Pagina e ținută ascunsă de poartă până sfârșim, deci nu apucă nimeni să

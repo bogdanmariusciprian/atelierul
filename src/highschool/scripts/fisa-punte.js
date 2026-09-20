@@ -2,7 +2,7 @@
 // PUNTEA DINTRE MODUL ȘI FIȘĂ.
 //
 // Modulul are nevoie de trei lucruri de la o fișă deschisă în cadru: la ce
-// slide e, câte are, și du-te la al n-lea. Atât — restul lecției e treaba ei.
+// slide e, câte are, și du-te la al n-lea. Atât – restul lecției e treaba ei.
 //
 // TREI TREPTE, ÎN ORDINEA ASTA:
 //
@@ -13,7 +13,7 @@
 //
 //   2. NUMELE VECHI (`goTo`, `current`, `slides`). Fișele făcute înainte de
 //      înțelegere le au la vedere, fiindcă așa le-a scris generatorul. Modulul
-//      le folosește ca să meargă și cu ele — dar e o portiță, nu o ușă: prima
+//      le folosește ca să meargă și cu ele – dar e o portiță, nu o ușă: prima
 //      fișă generată altfel nu le va mai avea.
 //
 //   3. NIMIC. Atunci se spune pe față că fișa nu se lasă condusă, în loc să
@@ -21,7 +21,7 @@
 //
 // DE CE NU CITIM DOM-UL FIȘEI. S-ar fi putut ghici slide-ul după clasa `active`
 // de pe secțiuni. Merge azi, fiindcă toate fișele au fost scrise cam la fel, și
-// se rupe în ziua în care una e scrisă altfel — fără să spună nimic. O punte
+// se rupe în ziua în care una e scrisă altfel – fără să spună nimic. O punte
 // care se rupe zgomotos e mai bună decât una care minte.
 //
 // DE CE E CU PUTINȚĂ. Fișele vin din găleată ca adresă `blob:`, făcută chiar de
@@ -70,7 +70,7 @@ export function puntea(cadru) {
   }
 
   /* Treapta 2: numele vechi. `current` și `slides` sunt `let`/`const` la
-     nivelul de sus al scriptului fișei, deci NU stau pe `window` — se citesc
+     nivelul de sus al scriptului fișei, deci NU stau pe `window` – se citesc
      prin `eval` în fereastra ei, singura cale de a ajunge la cuprinsul acela.
      E scris o dată aici, ca urâțenia să nu se împrăștie prin modul. */
   const vechi = (cod) => {
