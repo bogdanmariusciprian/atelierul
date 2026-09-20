@@ -33,16 +33,19 @@ import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
 import {
-  fetchZiua, fetchOrarul, fetchConfig, fetchPlan, fetchFisa,
+  fetchZiua, fetchOrarul, fetchConfig, fetchPlan, fetchFisa, fetchFisaBruta,
   salveazaFisa, stergeFisa, ziuaISO,
 } from "./liceu-repo.js";
 import {
   aduFisele, fiseleClasei, fisaDupaId, adresaFisei, cheiaFisei, cheiaNoua, FELUL_FISEI,
+  materialelePeOra, numeleMaterialului, numeNouDeMaterial, formatulFisierului, numeDinFisier,
 } from "./fise.js";
 import { puntea, vorbaPuntii } from "./fisa-punte.js";
 import { telecomanda, MAX_JURNAL } from "./telecomanda.js";
 import { cePunem } from "./jurnal.js";
 import { cuAcelasiZar } from "./zarul.js";
+import { desenezaPdf } from "./pdf-desen.js";
+import { paginaDePdf } from "./pdf-pagina.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -756,8 +759,7 @@ function vedereDeClasa(c) {
   /* O fișă poate ține mai multe ore (o lecție întinsă pe o săptămână), deci se
      așază pe fiecare dintre ele: din oricare oră a Luceafărului se deschide
      același poem. */
-  const peOra = new Map();
-  fise.forEach((f) => f.ore.forEach((o) => peOra.set(o, f)));
+  const peOra = materialelePeOra(fise);
 
   const cap = `<h1 class="lic-clasa__cod">${esc(c.cod)}</h1>`;
 
@@ -794,7 +796,11 @@ function vedereDeClasa(c) {
      citesc ca o listă fără capete. */
   let unitateaDeSus = null;
   const randuri = p.ore.map((o) => {
-    const f = peOra.get(o.nr);
+    const ale = peOra.get(o.nr) || [];
+    /* Cu unul singur, rândul rămâne cum a fost dintotdeauna: apeși pe el și se
+       deschide. Cu mai multe, rândul nu mai poate deschide nimic singur – care
+       dintre ele? – și atunci se desfac dedesubt, cu numele lor. */
+    const f = ale.length === 1 ? ale[0] : null;
     const nouaUnitate = o.unitatea && o.unitatea !== unitateaDeSus;
     if (nouaUnitate) unitateaDeSus = o.unitatea;
 
@@ -815,17 +821,25 @@ function vedereDeClasa(c) {
         <small>${ziScurta(o.data)} · ${esc(o.ora)}</small>
       </span>
       <span class="lic-ora__semn">${esc(f?.fel)}</span>`;
+
+    const capulRandului = f
+      ? `<a class="lic-ora" href="#/f/${esc(f.id)}"
+           title="${esc(vorbaFisei(f))}">${cuprins}</a>`
+      : `<span class="lic-ora${ale.length ? "" : " lic-ora--fara"}"
+           title="${ale.length
+             ? `Ora asta are ${ale.length} materiale`
+             : "Ora asta n-are încă material"}">${cuprins}</span>`;
+
     return `
       ${banda}
       ${nouaUnitate ? `<li class="lic-unit">${esc(o.unitatea)}</li>` : ""}
-      <li class="lic-rand">${f
-        ? `<a class="lic-ora" href="#/f/${esc(f.id)}"
-             title="${esc(vorbaFisei(f))}">${cuprins}</a>`
-        : `<span class="lic-ora lic-ora--fara"
-             title="Ora asta n-are încă fișă">${cuprins}</span>`}${unelteleOrei(c, o, f)}</li>`;
+      <li class="lic-rand${ale.length > 1 ? " lic-rand--multe" : ""}">
+        ${capulRandului}${unelteleOrei(c, o, f)}
+        ${ale.length > 1 ? randuriDeMaterial(ale) : ""}
+      </li>`;
   }).join("");
 
-  const cuFisa = p.ore.filter((o) => peOra.has(o.nr)).length;
+  const cuFisa = p.ore.filter((o) => (peOra.get(o.nr) || []).length).length;
   return `
     <div class="lic-clasa" style="--h:${c.hue}">
       ${cap}
@@ -856,30 +870,62 @@ const COS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke=
   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
   ><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></svg>`;
 
+const SEMN_HTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>`;
+const SEMN_PDF = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 17.5v-4h1.2a1.2 1.2 0 0 1 0 2.4H8.5M12.8 17.5v-4h1a1.6 1.6 0 0 1 1.6 2 1.6 1.6 0 0 1-1.6 2zM17.4 13.5h-1.1v4"/></svg>`;
+
+/** Semnul felului de fișier, pe rândul materialului. */
+const semnulFormatului = (f) => (f?.format === "pdf" ? SEMN_PDF : SEMN_HTML);
+
+/**
+ * Rândurile subțiri de sub o oră cu mai multe materiale.
+ *
+ * SE DESFAC ABIA DE LA AL DOILEA ÎNCOLO. Cu unul singur, rândul orei îl deschide
+ * chiar el, ca dintotdeauna, și n-ar avea niciun rost să pun un rând în plus care
+ * spune același lucru a doua oară.
+ */
+function randuriDeMaterial(ale) {
+  return `<ul class="lic-mat">${ale.map((f) => `
+    <li class="lic-mat__rand">
+      <a class="lic-mat__ce" href="#/f/${esc(f.id)}" title="${esc(vorbaFisei(f))}">
+        <span class="lic-mat__semn lic-mat__semn--${f.format}">${semnulFormatului(f)}</span>
+        <span class="lic-mat__nume">${esc(numeleMaterialului(f))}</span>
+      </a>
+      ${unelteleMaterialului(f)}
+    </li>`).join("")}</ul>`;
+}
+
 /**
  * Semnele de lângă o oră, pe care le vede DOAR profesorul.
  *
  * Stau chiar pe rândul orei, nu într-un buton „Fișă nouă" undeva sus: ești deja
  * cu ochii pe ora aceea, deci clasa, numărul și titlul se știu din rândul pe
  * care ai apăsat și nu le mai alegi din nicio listă. Asta era tot rostul.
+ *
+ * „+"-UL E MEREU AICI, și când ora are deja trei materiale: de-aia a fost toată
+ * lucrarea. Înlocuitul și ștersul, în schimb, au plecat de pe rândul orei pe
+ * rândul fiecărui material, acolo unde se știe pe care dintre ele îl atingi –
+ * afară de cazul cu unul singur, când rândul orei ESTE materialul.
  */
 function unelteleOrei(c, o, f) {
   if (!isAdmin()) return "";
   const cheie = `${c.cod}|${o.nr}`;
-  if (!f) {
-    return `<span class="lic-unelte">
-      <button type="button" class="lic-unealta" data-act="fisa-noua" data-cheie="${esc(cheie)}"
-        title="Urcă o fișă pentru ora asta" aria-label="Urcă o fișă">${PLUS}</button>
-    </span>`;
-  }
-  /* Numai fișele din găleată se înlocuiesc și se șterg de aici. Cele cu `cale`
-     sunt lecții ale sitului: acelea se schimbă acolo unde stau, nu din modul. */
-  if (f.cale) return "";
+  const plus = `<button type="button" class="lic-unealta" data-act="fisa-noua" data-cheie="${esc(cheie)}"
+      title="Adaugă un material la ora asta" aria-label="Adaugă un material">${PLUS}</button>`;
+  return `<span class="lic-unelte">${plus}${f ? unelteleMaterialului(f, cheie) : ""}</span>`;
+}
+
+/** Înlocuiește și șterge, pentru un material anume. */
+function unelteleMaterialului(f, cheie = "") {
+  if (!isAdmin()) return "";
+  /* Numai materialele din găleată se înlocuiesc și se șterg de aici. Cele cu
+     `cale` sunt lecții ale sitului: acelea se schimbă acolo unde stau. */
+  if (!f || f.cale) return "";
   return `<span class="lic-unelte">
-    <button type="button" class="lic-unealta" data-act="fisa-inlocuieste" data-cheie="${esc(cheie)}"
-      title="Urcă altă variantă peste asta" aria-label="Înlocuiește fișa">${SCHIMB}</button>
+    <button type="button" class="lic-unealta" data-act="fisa-inlocuieste"
+      data-cheie="${esc(cheie)}" data-id="${esc(f.id)}"
+      title="Urcă altă variantă peste asta" aria-label="Înlocuiește materialul">${SCHIMB}</button>
     <button type="button" class="lic-unealta lic-unealta--rau" data-act="fisa-sterge" data-id="${esc(f.id)}"
-      title="Șterge fișa" aria-label="Șterge fișa">${COS}</button>
+      title="Șterge materialul" aria-label="Șterge materialul">${COS}</button>
   </span>`;
 }
 
@@ -1202,10 +1248,46 @@ const fiseAduse = {};
  * locuri deodată; folderul `liceu/fise/` e șters, deci găleata e singurul drum,
  * iar o greșeală se vede ca greșeală, nu ca o fișă care vine de altundeva.
  */
+/**
+ * Un PDF, prefăcut într-o fișă cu slide-uri.
+ *
+ * Se desenează paginile, se taie în fâșii 16:9 și iese o pagină HTML ca oricare
+ * alta – cu înțelegerea `fisaLiceu`, deci cu telecomandă și cu ecoul apăsărilor.
+ * `descarca` rămâne documentul propriu-zis, în picioare, neatins.
+ */
+async function aduPdf(f) {
+  const octeti = await fetchFisaBruta(cheiaFisei(f));
+  const original = URL.createObjectURL(new Blob([octeti], { type: "application/pdf" }));
+  try {
+    const { pagini, masuri } = await desenezaPdf(octeti);
+    if (!pagini.length) throw new Error("PDF-ul n-are nicio pagină de arătat");
+    return {
+      url: URL.createObjectURL(new Blob([paginaDePdf({
+        pagini, masuri,
+        titlu: numeleMaterialului(f),
+        descarca: original,
+        numeFisier: cheiaFisei(f),
+      })], { type: "text/html" })),
+      original,
+    };
+  } catch (err) {
+    /* Desenul n-a ieșit. Adresa documentului rămâne bună, iar ecranul fișei o
+       arată: ora se ține mai departe, cu PDF-ul deschis în filă nouă. */
+    err.original = original;
+    throw err;
+  }
+}
+
 async function aduFisa(f) {
   if (fiseAduse[f.id]) return;
   fiseAduse[f.id] = { seAduce: true, url: "", vina: "" };
   try {
+    if (f.format === "pdf") {
+      const { url, original } = await aduPdf(f);
+      fiseAduse[f.id] = { seAduce: false, url, original, vina: "" };
+      if (rutaE("f") && rutaId() === f.id) cereDesen();
+      return;
+    }
     const html = await fetchFisa(cheiaFisei(f));
     fiseAduse[f.id] = {
       seAduce: false,
@@ -1381,15 +1463,23 @@ function vedereDeFisa(f) {
       </div>`;
   }
 
-  /* Găleata n-a răspuns. Se spune de ce, pe șleau, în loc să rămână un cadru
-     alb din care nu înțelege nimeni nimic. */
+  /* Găleata n-a răspuns, ori PDF-ul n-a putut fi desenat. Se spune de ce, pe
+     șleau, în loc să rămână un cadru alb din care nu înțelege nimeni nimic.
+     DACĂ E UN PDF ȘI DOCUMENTUL A VENIT, ora nu e pierdută: descărcarea și
+     deschiderea în filă nouă rămân la îndemână, iar lecția merge înainte cu
+     vizualizatorul browserului. */
   if (!adusa.url) {
     return `
       <div class="lic-fisa">
-        ${baraDeFisa(f, "")}
+        ${baraDeFisa(f, adusa.original || "")}
         <div class="lic-gol">
-          <p>Fișa asta n-a venit din găleată.</p>
+          <p>${adusa.original
+            ? "PDF-ul ăsta n-a putut fi desenat pe fâșii."
+            : "Materialul ăsta n-a venit din găleată."}</p>
           <p class="lic-gol__vina">${esc(adusa.vina)}</p>
+          ${adusa.original ? `
+            <p><a class="lic-btn lic-btn--tare" href="${adusa.original}"
+                  target="_blank" rel="noopener">Deschide PDF-ul într-o filă nouă</a></p>` : ""}
         </div>
       </div>`;
   }
@@ -1742,12 +1832,18 @@ function oraDeArata() {
  * Fereastra de urcare, deschisă de „+" ori de „înlocuiește".
  *
  * TREI LUCRURI VIN DE-A GATA din rândul pe care ai apăsat: clasa, ora și
- * titlul lecției din planificare. Rămâne să alegi fișierul; litera și titlul se
- * pot schimba, dacă vrei altele.
+ * titlul lecției din planificare. Rămâne să alegi fișierul; numele scurt,
+ * litera și titlul se pot schimba, dacă vrei altele.
  *
- * NUMELE DIN GĂLEATĂ ÎL PUNE CODUL – `11d-5-b.html` – oricum s-ar chema
- * fișierul pe discul tău. De-aia nu mai redenumești nimic: diacriticele care
- * opreau urcarea nu mai ajung niciodată până acolo.
+ * NUMELE DIN GĂLEATĂ ÎL PUNE CODUL – `11d-5-b.html`, `12c-7-2.pdf` – oricum
+ * s-ar chema fișierul pe discul tău. De-aia nu mai redenumești nimic:
+ * diacriticele care opreau urcarea nu mai ajung niciodată până acolo.
+ *
+ * NUMELE SCURT E NOU, și e nou fiindcă o oră poate ține acum mai multe
+ * materiale. Titlul vine din planificare și e același la toate; ce le deosebește
+ * pe rândul lor e numele ăsta („Particularități", „Fișă de lucru"). Se propune
+ * numele fișierului fără coadă, ca să n-ai de scris nimic dacă ți-l numești deja
+ * cum trebuie pe disc.
  */
 function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
   const vechi = document.getElementById("lic-urcare");
@@ -1758,16 +1854,22 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
   d.className = "lic-urcare";
   d.innerHTML = `
     <form method="dialog" class="lic-urcare__form">
-      <h2 class="lic-urcare__titlu">${fisaVeche ? "Înlocuiește fișa" : "Fișă nouă"}</h2>
+      <h2 class="lic-urcare__titlu">${fisaVeche ? "Înlocuiește materialul" : "Material nou"}</h2>
       <p class="lic-urcare__unde">${esc(clasa)} · Ora ${nr}</p>
 
       <label class="lic-urcare__camp">
         <span>Fișierul</span>
-        <input type="file" name="fisier" accept=".html,text/html" required />
+        <input type="file" name="fisier" accept=".html,.pdf,text/html,application/pdf" required />
       </label>
 
       <label class="lic-urcare__camp">
-        <span>Titlul, cum se va vedea în listă</span>
+        <span>Numele scurt, cel de pe rândul materialului</span>
+        <input type="text" name="nume" value="${esc(fisaVeche?.nume || "")}"
+          placeholder="se ia din numele fișierului" />
+      </label>
+
+      <label class="lic-urcare__camp">
+        <span>Titlul lecției, cum se vede în listă</span>
         <input type="text" name="titlu" value="${esc(fisaVeche?.titlu || titlu || "")}" required />
       </label>
 
@@ -1794,6 +1896,16 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
   const form = d.querySelector("form");
   const vina = d.querySelector("[data-rol='vina']");
   const btn = d.querySelector("[data-rol='urca']");
+
+  /* Numele scurt se umple singur din fișierul ales, dar numai cât timp nu l-ai
+     atins tu: dacă l-ai scris cu mâna, alegerea altui fișier nu ți-l mai ia. */
+  let numeScrisDeMana = Boolean(fisaVeche?.nume);
+  form.nume.addEventListener("input", () => { numeScrisDeMana = true; });
+  form.fisier.addEventListener("change", () => {
+    if (numeScrisDeMana) return;
+    const f = form.fisier.files?.[0];
+    if (f) form.nume.value = numeDinFisier(f.name);
+  });
 
   /* `seUrca` ține fereastra deschisă cât se urcă: altfel, o apăsare pe lângă ea
      ar fi închis-o la mijlocul drumului, iar greșeala, dacă venea, n-ar mai fi
@@ -1823,17 +1935,27 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
 
     try {
       const fel = form.fel.value;
+      const format = formatulFisierului(file.name);
+      const nume = form.nume.value.trim() || numeDinFisier(file.name);
+
+      /* LA ÎNLOCUIRE SE PĂSTREAZĂ NUMELE VECHI, chiar dacă ai schimbat litera:
+         altfel ar fi rămas în găleată și fișierul vechi, sub numele lui, iar
+         materialul ar fi avut două trupuri.
+         La unul nou se caută primul nume liber dintre cele luate, nu se numără
+         câte sunt: după o ștergere, numărătoarea ar fi nimerit peste un nume
+         care încă există. */
+      const slug = fisaVeche?.id
+        || numeNouDeMaterial(clasa, nr, fel, fiseleClasei(clasa).map((x) => x.id));
+      const fisier = fisaVeche?.fisier || cheiaNoua(slug, format);
+
       await salveazaFisa({
-        clasa, ore: [nr], fel, titlu: form.titlu.value.trim(),
-        /* La înlocuire se păstrează numele vechi, chiar dacă ai schimbat litera:
-           altfel ar fi rămas în găleată și fișierul vechi, sub numele lui, iar
-           fișa ar fi avut două trupuri. */
-        fisier: fisaVeche?.fisier || cheiaNoua(clasa, nr, fel),
-        file,
+        clasa, ore: [nr], fel, nume, format,
+        titlu: form.titlu.value.trim(),
+        slug, fisier, file,
       });
       await aduFisele();
-      /* Fișa ținută în memorie de la deschiderea de dinainte nu mai e bună. */
-      delete fiseAduse[(fisaVeche?.id) || cheiaNoua(clasa, nr, fel).replace(/\.html$/, "")];
+      /* Materialul ținut în memorie de la deschiderea de dinainte nu mai e bun. */
+      delete fiseAduse[slug];
       d.close();
       deseneaza();
     } catch (err) {
@@ -1900,10 +2022,14 @@ function apasa(e) {
      departe la rândul de dedesubt, care deschide fișa. */
   if (act === "fisa-noua" || act === "fisa-inlocuieste") {
     e.preventDefault();
-    const unde = oraDupaCheie(b.dataset.cheie);
-    const peOra = new Map();
-    fiseleClasei(unde.clasa).forEach((f) => f.ore.forEach((o) => peOra.set(o, f)));
-    fereastraDeFisa({ ...unde, fisaVeche: act === "fisa-inlocuieste" ? peOra.get(unde.nr) : null });
+    /* LA ÎNLOCUIRE SE ȘTIE EXACT CARE MATERIAL, din `data-id`. Înainte se căuta
+       „materialul orei", fiindcă era unul singur; acum ar fi nimerit pe care o
+       vrea harta, adică pe cel greșit din trei. */
+    const vechi = act === "fisa-inlocuieste" ? fisaDupaId(b.dataset.id) : null;
+    const unde = vechi && !b.dataset.cheie
+      ? { clasa: vechi.clasa, nr: vechi.ora, titlu: vechi.titlu }
+      : oraDupaCheie(b.dataset.cheie);
+    fereastraDeFisa({ ...unde, fisaVeche: vechi });
     return;
   }
   if (act === "fisa-sterge") { e.preventDefault(); stergeFisaDinLista(b.dataset.id); return; }

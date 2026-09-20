@@ -807,6 +807,62 @@ a.lic-ora .lic-ora__semn {
 .lic-rand { display: flex; align-items: stretch; gap: 0.3rem; }
 .lic-rand > .lic-ora { flex: 1; min-inline-size: 0; }
 
+/* =========================================================
+   ORA CU MAI MULTE MATERIALE.
+   Cu unul singur, rândul orei e chiar materialul și nimic din ce urmează nu se
+   vede. De la al doilea încolo, rândul se face o cutie: capul lui sus, iar
+   materialele desfăcute dedesubt, unul sub altul.
+   ========================================================= */
+.lic-rand--multe {
+  flex-wrap: wrap;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.25rem;
+}
+/* Capul cutiei nu mai e o legătură, deci nu trebuie să pară una. */
+.lic-rand--multe > .lic-ora { cursor: default; }
+
+.lic-mat {
+  flex-basis: 100%;
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  border-block-start: 1px solid var(--color-border);
+}
+.lic-mat__rand {
+  display: flex; align-items: center; gap: 0.3rem;
+}
+.lic-mat__rand + .lic-mat__rand { border-block-start: 1px solid var(--color-border); }
+
+.lic-mat__ce {
+  flex: 1; min-inline-size: 0;
+  display: flex; align-items: center; gap: 0.5rem;
+  /* Aliniat sub titlul lecției, nu sub numărul orei: așa se citește ca o listă
+     a lecției aceleia, nu ca niște rânduri răzlețe. */
+  padding: 0.45rem 0.5rem 0.45rem 4.2rem;
+  min-block-size: 40px;
+  text-decoration: none;
+  color: var(--color-text);
+  border-radius: 9px;
+}
+.lic-mat__ce:hover { background: var(--color-bg); color: var(--color-primary-dark); }
+
+.lic-mat__semn { flex: none; display: grid; place-items: center; color: var(--color-text-muted); }
+.lic-mat__semn--pdf { color: var(--color-danger); }
+
+.lic-mat__nume {
+  font-size: 0.88rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Uneltele materialului se aprind la fel ca ale orei, dar de pe rândul LOR. */
+.lic-mat__rand:hover .lic-unealta { opacity: 1; }
+
+@media (max-width: 640px) {
+  /* Pe telefon nu mai încape retragerea de sub titlu; se aliniază la stânga. */
+  .lic-mat__ce { padding-inline-start: 0.6rem; }
+}
+
 .lic-unelte { flex: none; display: flex; align-items: center; gap: 0.2rem; }
 .lic-unealta {
   inline-size: 34px; block-size: 34px;

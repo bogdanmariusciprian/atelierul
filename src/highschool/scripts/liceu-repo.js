@@ -156,12 +156,19 @@ export async function fetchFisa(cheie) {
   return await data.text();
 }
 
+/** Același fișier, dar în octeți: PDF-urile nu se citesc ca text. */
+export async function fetchFisaBruta(cheie) {
+  const { data, error } = await supabase.storage.from("liceu-fise").download(cheie);
+  if (error) throw new Error(error.message || "fișa n-a venit din găleată");
+  return await data.arrayBuffer();
+}
+
 /** Lista fișelor (migrarea 0096). Fără plasă: e o listă scurtă, și dacă nu vine,
  *  e mai bine să se vadă că nu vine decât să se arate una veche. */
 export async function fetchFise() {
   const randuri = verifica(
     await supabase.from("school_fise")
-      .select("clasa, ore, fel, titlu, slug, fisier, cale")
+      .select("clasa, ore, fel, titlu, nume, format, ordine, slug, fisier, cale")
       .eq("an_scolar", AN_SCOLAR)
   );
   return randuri || [];
@@ -179,16 +186,21 @@ export async function fetchFise() {
  * înlocuirea uneia care există. Altfel ar fi fost două funcții care fac aproape
  * același lucru, iar una dintre ele s-ar fi stricat pe tăcute.
  */
-export async function salveazaFisa({ clasa, ore, fel, titlu, fisier, file }) {
+export async function salveazaFisa({ clasa, ore, fel, titlu, nume, format, slug, fisier, file }) {
+  /* FELUL SE SPUNE PE FAȚĂ, nu se lasă ghicit de browser. Găleata primește doar
+     `text/html` și `application/pdf` (migrarea 0101), iar un fișier venit de pe
+     disc cu felul gol ar fi fost oprit la ușă cu un mesaj care nu spune de ce. */
+  const contentType = format === "pdf" ? "application/pdf" : "text/html";
   const urcat = await supabase.storage.from("liceu-fise")
-    .upload(fisier, file, { contentType: "text/html", upsert: true });
+    .upload(fisier, file, { contentType, upsert: true });
   if (urcat.error) throw new Error(urcat.error.message || "fișierul n-a intrat în găleată");
 
   verifica(await supabase.from("school_fise").upsert({
     an_scolar: AN_SCOLAR,
-    clasa, ore, titlu, fisier,
+    clasa, ore, titlu, fisier, slug,
     fel: fel || null,
-    slug: fisier.replace(/\.html$/i, ""),
+    nume: nume || null,
+    format: format === "pdf" ? "pdf" : "html",
   }, { onConflict: "an_scolar,slug" }));
 }
 

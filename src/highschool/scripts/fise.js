@@ -49,6 +49,12 @@ function dinBaza(r) {
     ora: ore[0],
     fel: r.fel || "",
     titlu: r.titlu || "",
+    /* Numele scurt al materialului, cel de pe rândul lui („Particularități").
+       `titlu` e titlul LECȚIEI, același pentru toate materialele unei ore, deci
+       nu le poate deosebi între ele. Gol înseamnă „arată titlul". */
+    nume: r.nume || "",
+    format: r.format === "pdf" ? "pdf" : "html",
+    ordine: Number(r.ordine) || 1,
     /* `id` e numele scurt din adresă („11d-5-b"), nu `id`-ul din bază: un `uuid`
        în bara browserului n-ar spune nimănui nimic. */
     id: r.slug,
@@ -56,6 +62,10 @@ function dinBaza(r) {
     cale: r.cale || "",
   };
 }
+
+/** Ce scrie pe rândul unui material. */
+export const numeleMaterialului = (f) =>
+  f?.nume || FELUL_FISEI[f?.fel]?.nume || f?.titlu || "Material";
 
 /** Aduce lista. Se cheamă o dată, la pornirea modulului. */
 export async function aduFisele() {
@@ -65,8 +75,35 @@ export async function aduFisele() {
 
 /** Fișele unei clase, în ordinea orelor. */
 export const fiseleClasei = (clasa) =>
-  FISE.filter((f) => f.clasa === clasa)
-    .sort((a, b) => a.ora - b.ora || String(a.fel).localeCompare(String(b.fel)));
+  FISE.filter((f) => f.clasa === clasa).sort(randuieste);
+
+/** Ordinea a două materiale: întâi ora, apoi ce-ai cerut tu, apoi litera. */
+function randuieste(a, b) {
+  return a.ora - b.ora
+    || a.ordine - b.ordine
+    || String(a.fel).localeCompare(String(b.fel))
+    || String(a.id).localeCompare(String(b.id));
+}
+
+/**
+ * Materialele fiecărei ore, grupate.
+ *
+ * O ORĂ POATE ȚINE ORICÂTE. Până la migrarea 0101 era cel mult unul, și de-aia
+ * codul de deasupra lucra cu o hartă „ora → materialul". Acum harta duce la o
+ * LISTĂ, iar rândul orei se desface dedesubt dacă are mai mult de unul.
+ *
+ * Un material atârnat de mai multe ore (Luceafărul, pe 7, 8 și 9) intră în
+ * lista fiecăreia dintre ele: e același lucru, arătat de unde ajungi la el.
+ */
+export function materialelePeOra(fise) {
+  const peOra = new Map();
+  fise.forEach((f) => f.ore.forEach((o) => {
+    if (!peOra.has(o)) peOra.set(o, []);
+    peOra.get(o).push(f);
+  }));
+  peOra.forEach((lista) => lista.sort(randuieste));
+  return peOra;
+}
 
 export const fisaDupaId = (id) =>
   FISE.find((f) => f.id === String(id || "").toLowerCase()) || null;
@@ -79,11 +116,45 @@ export const fisaDupaId = (id) =>
  * „File name is invalid". E chiar `id`-ul fișei, deci nu se poate nepotrivi cu
  * lista.
  */
-export const cheiaFisei = (f) => f.fisier || `${f.id}.html`;
+export const cheiaFisei = (f) => f.fisier || `${f.id}.${f.format === "pdf" ? "pdf" : "html"}`;
 
-/** Numele pe care-l va purta în găleată o fișă nouă: „11d-5-b.html". */
-export const cheiaNoua = (clasa, ora, fel) =>
-  `${[clasa, ora, fel].filter((x) => x !== "" && x != null).join("-")}.html`.toLowerCase();
+/**
+ * Numele scurt al unui material NOU, și cheia lui din găleată.
+ *
+ * ERA „clasa-ora-fel", și ținea cât timp o oră avea un singur material. Din
+ * clipa în care poate ține trei, numele acela se repetă, iar baza îl refuză
+ * (`unique (an_scolar, slug)`) ori, mai rău, fișierul din găleată s-ar fi scris
+ * peste altul. Așa că, de la al doilea încolo, se pune o coadă: „12c-7",
+ * „12c-7-2", „12c-7-3". Primul rămâne fără coadă, ca adresele de până azi să nu
+ * se schimbe.
+ *
+ * `luate` sunt numele deja folosite; se caută primul liber, nu se numără câte
+ * sunt: după o ștergere, numărătoarea ar fi dat peste un nume care există încă.
+ */
+export function numeNouDeMaterial(clasa, ora, fel, luate = []) {
+  const stiute = new Set(luate.map((x) => String(x).toLowerCase()));
+  const temei = [clasa, ora, fel]
+    .filter((x) => x !== "" && x != null).join("-").toLowerCase();
+  if (!stiute.has(temei)) return temei;
+  for (let i = 2; i < 1000; i++) {
+    if (!stiute.has(`${temei}-${i}`)) return `${temei}-${i}`;
+  }
+  /* O mie de materiale la aceeași oră nu se va întâmpla, dar un nume care se
+     repetă ar strica fișa altcuiva, deci mai bine ceva ce sigur nu se repetă. */
+  return `${temei}-${Date.now().toString(36)}`;
+}
+
+/** Cheia din găleată a unui material nou: numele lui, plus coada fișierului. */
+export const cheiaNoua = (nume, format) =>
+  `${nume}.${format === "pdf" ? "pdf" : "html"}`.toLowerCase();
+
+/** Ce fel de fișier e, după coada numelui de pe disc. */
+export const formatulFisierului = (numeDePeDisc) =>
+  /\.pdf$/i.test(String(numeDePeDisc || "")) ? "pdf" : "html";
+
+/** Numele fișierului fără coada lui, ca nume scurt propus la urcare. */
+export const numeDinFisier = (numeDePeDisc) =>
+  String(numeDePeDisc || "").replace(/\.[^.]+$/, "").trim();
 
 /**
  * Adresa unei fișe care stă ÎN SIT, nu în găleată (deocamdată Luceafărul).

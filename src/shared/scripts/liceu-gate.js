@@ -2,7 +2,7 @@
 // SEMNUL „MODULUL LICEU E DESCHIS" (migrarea 0094).
 //
 // Un singur bit, ținut în `school_config`, pe care numai profesorul îl schimbă.
-// Stins, orarul și planificările nu se mai citesc de nimeni afară de el — și nu
+// Stins, orarul și planificările nu se mai citesc de nimeni afară de el – și nu
 // „nu se mai desenează", ci chiar nu se mai dau: politicile din bază îl întreabă
 // înainte de orice rând. Ce e aici, în browser, e doar chipul lacătului:
 // butonul „L" care se ascunde și fereastra de peste modul.
