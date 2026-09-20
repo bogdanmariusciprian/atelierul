@@ -169,6 +169,11 @@ export function puntea(cadru) {
       const el = elementulDe(w?.document, cale);
       if (!el) return false;
       try {
+        /* Se ridică un semn cât ține apăsarea, ca fișa să poată deosebi o
+           comandă venită de pe laptop de un deget adevărat. Vezi mai jos, la
+           ecranul plin: e singurul loc unde deosebirea contează. Apăsarea se
+           face în întregime în rândul următor, deci semnul se stinge la timp. */
+        w.__licDeLaDistanta = true;
         /* NU `el.click()`: acela e doar pe elementele HTML, iar în lecții se
            apasă des pe un `<use>` dintr-o iconiță SVG, care n-are metoda. Un
            eveniment făcut de mână merge pe orice și urcă la fel ca unul
@@ -178,31 +183,46 @@ export function puntea(cadru) {
         }));
         return true;
       } catch { return false; }
+      finally { w.__licDeLaDistanta = false; }
     },
 
     /**
-     * ECRANUL PLIN AL ACESTEI FILE NU SE ATINGE DE LA DISTANȚĂ.
+     * ECRANUL PLIN AL TABLEI RĂMÂNE AL CELUI CARE STĂ LÂNGĂ EA.
      *
-     * Se pune pe aparatul care URMEAZĂ. Marius pune tabla pe tot ecranul cu
-     * mâna lui, o dată, la începutul orei; de-acolo încolo, o apăsare venită de
-     * pe laptop n-are voie nici s-o scoată, nici s-o bage. Fără asta, apăsarea
-     * pe butonul de ecran plin ar fi ajuns și la tablă și ar fi SCOS-O din
-     * ecranul plin pe care tocmai îl pusese – fix pe dos decât vrea.
+     * Se pune pe aparatul care URMEAZĂ, și face O SINGURĂ deosebire: butonul
+     * de ecran plin apăsat cu degetul, pe tablă, merge ca oricând; aceeași
+     * apăsare venită de pe laptop se lasă baltă.
      *
-     * (Browserul oricum nu lasă o filă să intre pe tot ecranul fără ca omul să
-     * apese chiar acolo, deci partea de intrat n-ar fi mers nici de-ar fi vrut.)
+     * DE CE. Fără nimic, apăsarea ta pe butonul de ecran plin al laptopului
+     * ajungea și la tablă și o SCOTEA din ecranul plin pe care tocmai îl
+     * pusesei cu mâna – fix pe dos decât vrei. Am oprit-o întâi cu totul, și a
+     * ieșit mai rău: nu mai mergea nici butonul tablei. Acum se oprește doar ce
+     * vine de departe.
+     *
+     * (Browserul nu lasă oricum o filă să intre pe tot ecranul fără ca omul să
+     * apese chiar acolo; ieșirea, în schimb, n-are nevoie de nicio apăsare, și
+     * tocmai ea făcea stricăciunea.)
      */
-    nuAtingeEcranul() {
-      if (!w) return;
-      const nimic = () => Promise.resolve();
-      const pune = (unde, nume) => {
-        try { Object.defineProperty(unde, nume, { value: nimic, configurable: true, writable: true }); }
-        catch { /* filă care nu se lasă: las-o */ }
+    ecranulPlinRamaneAlTau() {
+      if (!w || w.__licEcranPazit) return;
+      const imbraca = (unde, nume) => {
+        try {
+          const vechi = unde[nume];
+          if (typeof vechi !== "function") return;
+          Object.defineProperty(unde, nume, {
+            configurable: true, writable: true,
+            value: function (...ce) {
+              if (w.__licDeLaDistanta) return Promise.resolve();
+              return vechi.apply(this, ce);
+            },
+          });
+        } catch { /* filă care nu se lasă: las-o */ }
       };
-      pune(w.Element.prototype, "requestFullscreen");
-      pune(w.Element.prototype, "webkitRequestFullscreen");
-      pune(w.document, "exitFullscreen");
-      pune(w.document, "webkitExitFullscreen");
+      imbraca(w.Element.prototype, "requestFullscreen");
+      imbraca(w.Element.prototype, "webkitRequestFullscreen");
+      imbraca(w.document, "exitFullscreen");
+      imbraca(w.document, "webkitExitFullscreen");
+      w.__licEcranPazit = true;
     },
 
     /** Lasă fișa în pace: se cheamă înainte de a face altă punte. */

@@ -986,7 +986,7 @@ function potrivestePuntea() {
      întors în jurnal ca și cum le-ar fi făcut cineva. */
   p.uita();
 
-  if (telec.rol === "urmez") { p.nuAtingeEcranul(); return; }
+  if (telec.rol === "urmez") { p.ecranulPlinRamaneAlTau(); return; }
   if (!isAdmin()) return;
 
   /* SE SCRIE ÎN JURNAL ȘI CÂND NU CONDUCE NIMENI. Pare risipă și e tocmai
@@ -1287,6 +1287,31 @@ function picteazaBaraTelec() {
   if (gata) loc.replaceWith(gata);
 }
 
+const SEMN_PLIN = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
+const SEMN_STRANS = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h3a2 2 0 0 0 2-2V3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M21 16h-3a2 2 0 0 0-2 2v3"/></svg>`;
+
+/**
+ * Ecran plin, din MODUL, nu din fișă.
+ *
+ * DE CE ÎNCĂ UNUL, când fișa are deja butonul ei. Fiindcă butonul fișei stă
+ * ÎNĂUNTRUL cadrului, iar cadrul, cât urmează tabla, nu se lasă atins – așa ai
+ * cerut, ca să nu-l poată împinge un elev. Butonul ăsta stă pe bara modulului,
+ * în afara cadrului, deci merge oricând: și când urmezi, și când conduci.
+ *
+ * SE UMPLE `radacina`, nu cadrul. Cadrul se face din nou la fiecare schimbare
+ * de fișă, iar browserul scoate din ecranul plin orice element pe care îl
+ * scoți din pagină: ai fi ieșit singur din ecran, în mijlocul orei, trecând la
+ * fișa următoare. `radacina` rămâne aceeași de la început până la sfârșit.
+ */
+function ecranPlin() {
+  const d = document;
+  const acum = d.fullscreenElement || d.webkitFullscreenElement;
+  try {
+    if (acum) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else (radacina.requestFullscreen || radacina.webkitRequestFullscreen).call(radacina);
+  } catch { /* browserul a zis nu; n-avem ce face și nu stricăm ora pentru atât */ }
+}
+
 /** Bara de sus a fișei, aceeași oricum ar veni pagina. */
 function baraDeFisa(f, adresaSingura, semn = "") {
   return `
@@ -1296,6 +1321,12 @@ function baraDeFisa(f, adresaSingura, semn = "") {
         <small>${esc(f.titlu)}${semn ? ` · <i>${esc(semn)}</i>` : ""}</small>
       </span>
       ${randTelecomanda(telec.punte)}
+      <button type="button" class="lic-fisa__plin" data-act="ecran-plin"
+        title="Lecția pe tot ecranul">
+        <span class="lic-fisa__plin--intra">${SEMN_PLIN}</span>
+        <span class="lic-fisa__plin--iese">${SEMN_STRANS}</span>
+        <span class="sr-only">Pe tot ecranul</span>
+      </button>
       ${adresaSingura
         ? `<a class="lic-btn" href="${adresaSingura}" target="_blank" rel="noopener"
              title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>`
@@ -1862,6 +1893,7 @@ function apasa(e) {
   const act = b.dataset.act;
   if (act === "inapoi") { inapoi(); return; }
   if (act === "burger") { strange(!stare.strans); return; }
+  if (act === "ecran-plin") { ecranPlin(); return; }
   if (act === "vedere") { navigheaza(`v/${b.dataset.id}`); return; }
 
   /* Uneltele de pe rândul orei. Se opresc aici, ca apăsarea să nu meargă mai

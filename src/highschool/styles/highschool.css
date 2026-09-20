@@ -1264,6 +1264,41 @@ a.lic-ora .lic-ora__semn {
 .lic-fisa--urmeaza .lic-fisa__cadru { pointer-events: none; }
 .lic-fisa__titlu b { display: block; font-size: 0.9rem; }
 .lic-fisa__titlu small { color: var(--color-text-muted); font-size: 0.8rem; }
+
+/* =========================================================
+   ECRANUL PLIN, DIN MODUL.
+   Fișa are butonul ei, dar acela stă înăuntrul cadrului, iar cadrul nu se lasă
+   atins cât urmează tabla. Ăsta stă pe bara modulului, deci merge oricând.
+   ========================================================= */
+.lic-fisa__plin {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-inline-size: 44px; min-block-size: 44px;   /* de deget, ca tot ce se apasă aici */
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.lic-fisa__plin:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
+/* Iconița spune ce se întâmplă dacă apeși, iar starea o știe browserul, nu JS:
+   așa nu mai e nimic de ținut minte și nimic de desenat din nou. */
+.lic-fisa__plin--iese { display: none; }
+.lic:fullscreen .lic-fisa__plin--intra { display: none; }
+.lic:fullscreen .lic-fisa__plin--iese { display: inline-flex; }
+
+/* Pe tot ecranul rămâne DOAR lecția: panoul cu clasele și rândul de sus pleacă,
+   bara subțire a fișei rămâne, ca să ai la îndemână și ieșirea, și „Urmez".
+   Fundalul se pune anume: browserul pictează negru sub un element pus pe tot
+   ecranul, iar prin colțurile rotunjite s-ar fi văzut. */
+.lic:fullscreen {
+  background: var(--color-bg);
+  grid-template-columns: 0 0 1fr;
+}
+.lic:fullscreen .lic-sus,
+.lic:fullscreen .lic-panou,
+.lic:fullscreen .lic-maner { display: none; }
 .lic-btn {
   flex: none;
   font: inherit; font-size: 0.85rem;
