@@ -14,7 +14,7 @@
 // acolo le e locul (deocamdată Luceafărul, la `lectii/lectura/`).
 //
 // DE CE NU MAI E O LISTĂ SCRISĂ DE MÂNĂ. A fost, până acum: o fișă nouă cerea
-// fișierul urcat, un rând scris aici și un commit — trei pași, doi dintre ei pe
+// fișierul urcat, un rând scris aici și un commit – trei pași, doi dintre ei pe
 // umerii altcuiva decât ai lui Marius. Acum rândul se scrie singur, din modul,
 // când urcă fișa.
 //

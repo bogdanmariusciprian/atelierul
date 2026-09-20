@@ -21,26 +21,38 @@
 //    nu s-a schimbat nimic. Costă un mesaj la trei secunde și scapă de
 //    întrebare cu totul.
 //
-// 3. PE CANAL NU TRECE NIMIC DE ASCUNS – doar fișa și numărul slide-ului.
-//    Notițele se citesc din tabelul lor, de către aparatul care conduce, și nu
-//    pleacă mai departe niciodată.
+// 3. PE CANAL NU TRECE NIMIC DE ASCUNS – fișa, numărul slide-ului și locurile
+//    apăsate („al treilea copil al lui…"). Notițele se citesc din tabelul lor,
+//    de către aparatul care conduce, și nu pleacă mai departe niciodată.
 //
 // 4. MESAJELE VECHI SE ARUNCĂ. Fiecare poartă ceasul la care a fost trimis; pe
 //    o rețea de școală, două mesaje se pot întoarce pe dos, iar tabla ar fi
 //    sărit înapoi cu un slide fără să priceapă nimeni de ce.
+//
+// 5. JURNALUL MERGE ÎNTREG DE FIECARE DATĂ, nu doar apăsarea de acum. Pare
+//    risipă și nu e: așa, un mesaj pierdut nu lasă tabla în urmă pe tăcute. Ea
+//    își vede lista, o compară cu a ta, și dacă a rămas în urmă ia fișa de la
+//    capăt și reface apăsările în ordine. Tot de-aici se pune la punct și o
+//    tablă pornită la mijlocul orei: prinde toată ora din primul mesaj.
+//    O oră are zeci de apăsări, nu mii; un drum are vreo cincisprezece litere.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { supabase } from "../../shared/scripts/supabase-client.js";
 
 const SUBIECT = "liceu:telecomanda";
 
+/* Oprire de siguranță pentru jurnal. Nicio oră n-are atâtea apăsări; e pusă ca
+   un mesaj să nu crească niciodată spre pragul de 256 KB al canalului, orice
+   s-ar întâmpla (o apăsare ținută apăsată, un aparat luat razna). */
+export const MAX_JURNAL = 2000;
+
 /**
  * Deschide legătura.
  *
  * @param {object} cfg
  * @param {"conduc"|"urmez"} cfg.rol
- * @param {(s: {fisa: string, slide: number}) => void} cfg.peStare  numai la „urmez"
- * @param {() => ({fisa: string, slide: number} | null)} cfg.stareaMea  numai la „conduc"
+ * @param {(s: {fisa: string, slide: number, jurnal: string[]}) => void} cfg.peStare  numai la „urmez"
+ * @param {() => ({fisa: string, slide: number, jurnal: string[]} | null)} cfg.stareaMea  numai la „conduc"
  * @param {(cum: "leg"|"legat"|"rupt", vina?: string) => void} cfg.peLegatura
  */
 export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
@@ -66,7 +78,15 @@ export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
         if (!payload || typeof payload.ceas !== "number") return;
         if (payload.ceas < ultimulCeas) return;   // mesaj întors pe dos
         ultimulCeas = payload.ceas;
-        peStare?.({ fisa: payload.fisa, slide: Number(payload.slide) || 0 });
+        peStare?.({
+          fisa: payload.fisa,
+          slide: Number(payload.slide) || 0,
+          /* Jurnalul se curăță AICI, la intrare: mai departe se apasă după el,
+             iar un rând care nu e text ar fi umblat prin pagina fișei. */
+          jurnal: Array.isArray(payload.jurnal)
+            ? payload.jurnal.filter((c) => typeof c === "string")
+            : [],
+        });
       });
     }
 
@@ -98,14 +118,18 @@ export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
     const s = stareaMea?.();
     if (!s) return;
     const acum = Date.now();
-    const amprenta = `${s.fisa}|${s.slide}`;
+    const jurnal = Array.isArray(s.jurnal) ? s.jurnal.slice(0, MAX_JURNAL) : [];
+    /* În amprentă intră și CÂTE apăsări sunt, nu și care: o apăsare nouă se
+       vede în număr, iar numărul e de o mie de ori mai ieftin de comparat de
+       trei ori pe secundă decât toată lista. */
+    const amprenta = `${s.fisa}|${s.slide}|${jurnal.length}`;
     const seRepeta = acum - ultimaClipa >= REPETA;
     if (!silit && !seRepeta && amprenta === ultimaTrimisa) return;
     ultimaTrimisa = amprenta;
     ultimaClipa = acum;
     canal.send({
       type: "broadcast", event: "stare",
-      payload: { fisa: s.fisa, slide: s.slide, ceas: acum },
+      payload: { fisa: s.fisa, slide: s.slide, jurnal, ceas: acum },
     }).catch(() => {});
   }
 

@@ -1,10 +1,28 @@
 // =========================================================
 // PUNTEA DINTRE MODUL ȘI FIȘĂ.
 //
-// Modulul are nevoie de trei lucruri de la o fișă deschisă în cadru: la ce
-// slide e, câte are, și du-te la al n-lea. Atât – restul lecției e treaba ei.
+// Modulul are nevoie de două lucruri de la o fișă deschisă în cadru:
+//   1. LA CE SLIDE E și du-te la al n-lea. Asta cere ca fișa să vorbească
+//      (vezi cele trei trepte de mai jos).
+//   2. CE S-A APĂSAT ȘI UNDE. Asta NU cere nimic de la fișă: apăsările se
+//      ascultă din afară, iar pe celălalt ecran se apasă din nou în același
+//      loc. Merge și pe o fișă care nu vorbește deloc.
 //
-// TREI TREPTE, ÎN ORDINEA ASTA:
+// DE CE APĂSAREA, NU URMA EI. S-ar fi putut copia urma: ce clase s-au pus pe
+// elemente, ce s-a ascuns, ce s-a aprins. Dar jumătate din ce face o lecție nu
+// lasă urmă de copiat: panoul de explicații de sub zapis își scrie textul la
+// fața locului, cronometrul își numără secundele lui. Dacă, în schimb, tabla
+// APASĂ, atunci codul lecției rulează și acolo, și face singur tot ce ar fi
+// făcut la tine. Nu trebuie să știu dinainte ce face fiecare buton – și nici
+// nu voi ști, fiindcă fișele de mâine vor avea butoane la care azi nu mă
+// gândesc.
+//
+// PREȚUL: cele două ecrane trebuie să pornească IDENTIC. De-aia modulul pune
+// pe amândouă același zar (vezi `cuAcelasiZar` în highschool.js): o fișă care
+// amestecă ceva la întâmplare ar fi așezat cuvintele altfel pe tablă, iar
+// „apasă al treilea" ar fi nimerit alt cuvânt.
+//
+// TREI TREPTE PENTRU SLIDE, ÎN ORDINEA ASTA:
 //
 //   1. ÎNȚELEGEREA (`window.fisaLiceu`). Fișa își spune singură starea, prin
 //      patru rânduri lipite la sfârșitul scriptului ei. E treapta bună: fișa
@@ -16,18 +34,13 @@
 //      le folosește ca să meargă și cu ele – dar e o portiță, nu o ușă: prima
 //      fișă generată altfel nu le va mai avea.
 //
-//   3. NIMIC. Atunci se spune pe față că fișa nu se lasă condusă, în loc să
-//      tacă și să pară stricată.
-//
-// DE CE NU CITIM DOM-UL FIȘEI. S-ar fi putut ghici slide-ul după clasa `active`
-// de pe secțiuni. Merge azi, fiindcă toate fișele au fost scrise cam la fel, și
-// se rupe în ziua în care una e scrisă altfel – fără să spună nimic. O punte
-// care se rupe zgomotos e mai bună decât una care minte.
+//   3. NIMIC. Atunci se spune pe față că fișa nu se lasă dusă de la un slide la
+//      altul, în loc să tacă și să pară stricată. APĂSĂRILE MERG ȘI AȘA.
 //
 // DE CE E CU PUTINȚĂ. Fișele vin din găleată ca adresă `blob:`, făcută chiar de
 // modul, iar Luceafărul stă în sit: amândouă sunt pe aceeași origine cu pagina,
 // deci se poate vorbi cu ele. Dacă vreodată o fișă ar veni de pe alt domeniu,
-// `contentWindow` ar arunca, iar aici se întoarce treapta a treia.
+// `contentWindow` ar arunca, iar aici se întoarce puntea goală.
 // Cuprins în română, nume în engleză.
 // =========================================================
 
@@ -42,19 +55,53 @@ function fereastraFisei(cadru) {
 }
 
 /**
- * Face puntea spre fișa dintr-un cadru.
+ * Drumul până la un element, ca șir de numere: „1.3.0.2" înseamnă al doilea
+ * copil al lui `<html>`, al patrulea copil al aceluia, și așa mai departe.
  *
- * @param {HTMLIFrameElement} cadru
- * @returns {{fel: "intelegere"|"vechi"|"fara", slide: ()=>number,
- *            cate: ()=>number, laSlide: (n:number)=>void, versiune: number}}
+ * DE CE NUMERE ȘI NU UN SELECTOR CSS. Un selector ar fi cerut ca elementul să
+ * aibă ceva de care să-l prinzi – un `id`, o clasă anume – iar într-o lecție
+ * cele mai multe lucruri apăsate n-au nimic: sunt al șaptelea `<li>` dintr-o
+ * listă. Numărătoarea merge pe orice, fără să cer nimic de la fișă.
+ *
+ * Se numără DOAR elementele (`children`), nu și textele dintre ele: spațiile
+ * dintr-un HTML scris frumos ar fi mutat numerele.
+ *
+ * @returns {string|null} drumul, „" pentru `<html>`, ori `null` dacă elementul
+ *   nu mai e în pagină.
  */
-export function puntea(cadru) {
-  const fara = {
-    fel: "fara", versiune: 0,
-    slide: () => 0, cate: () => 0, laSlide: () => {},
-  };
+export function caleaCatre(el) {
+  const sus = el?.ownerDocument?.documentElement;
+  if (!el || !sus) return null;
+  if (el === sus) return "";
+  const pasi = [];
+  let n = el;
+  while (n && n !== sus) {
+    const parinte = n.parentElement;
+    if (!parinte) return null;          // scos din pagină între timp
+    pasi.push(Array.prototype.indexOf.call(parinte.children, n));
+    n = parinte;
+  }
+  return pasi.reverse().join(".");
+}
 
-  const w = fereastraFisei(cadru);
+/** Elementul de la capătul unui drum. `null` dacă drumul nu duce nicăieri. */
+export function elementulDe(doc, cale) {
+  const sus = doc?.documentElement;
+  if (!sus || typeof cale !== "string") return null;
+  if (cale === "") return sus;
+  let n = sus;
+  for (const bucata of cale.split(".")) {
+    const i = Number(bucata);
+    if (!Number.isInteger(i) || i < 0) return null;
+    n = n.children?.[i];
+    if (!n) return null;
+  }
+  return n;
+}
+
+/** Partea de slide-uri a punții: care din cele trei trepte se potrivește. */
+function comandaSlideurilor(w) {
+  const fara = { fel: "fara", versiune: 0, slide: () => 0, cate: () => 0, laSlide: () => {} };
   if (!w) return fara;
 
   /* Treapta 1: înțelegerea. */
@@ -76,7 +123,7 @@ export function puntea(cadru) {
   const vechi = (cod) => {
     try { return w.eval(cod); } catch { return undefined; }
   };
-  if (typeof vechi("typeof goTo") === "string" && vechi("typeof goTo") === "function") {
+  if (vechi("typeof goTo") === "function") {
     return {
       fel: "vechi",
       versiune: 0,
@@ -89,9 +136,88 @@ export function puntea(cadru) {
   return fara;
 }
 
-/** Ce scrie pe ecran despre puntea găsită. */
+/**
+ * Face puntea spre fișa dintr-un cadru.
+ *
+ * @param {HTMLIFrameElement} cadru
+ */
+export function puntea(cadru) {
+  const w = fereastraFisei(cadru);
+  const comanda = comandaSlideurilor(w);
+  let ascultator = null;
+
+  return {
+    ...comanda,
+
+    /** Spune-mi, de fiecare dată când se apasă ceva, pe ce s-a apăsat. */
+    pePunere(spune) {
+      this.uita();
+      if (!w) return;
+      /* ÎN FAZA DE CAPTARE, adică înainte să apuce fișa să-și facă treaba. Așa
+         prindem apăsarea chiar dacă lecția oprește drumul evenimentului în sus
+         (`stopPropagation`), ceea ce fac multe butoane. */
+      ascultator = (ev) => {
+        const cale = caleaCatre(ev.target);
+        if (cale !== null) spune(cale);
+      };
+      try { w.document.addEventListener("click", ascultator, true); }
+      catch { ascultator = null; }
+    },
+
+    /** Apasă din nou, în același loc. Întoarce `false` dacă n-a găsit locul. */
+    apasa(cale) {
+      const el = elementulDe(w?.document, cale);
+      if (!el) return false;
+      try {
+        /* NU `el.click()`: acela e doar pe elementele HTML, iar în lecții se
+           apasă des pe un `<use>` dintr-o iconiță SVG, care n-are metoda. Un
+           eveniment făcut de mână merge pe orice și urcă la fel ca unul
+           adevărat, deci ascultătorii fișei îl prind unde l-ar fi prins. */
+        el.dispatchEvent(new w.MouseEvent("click", {
+          bubbles: true, cancelable: true, composed: true, view: w,
+        }));
+        return true;
+      } catch { return false; }
+    },
+
+    /**
+     * ECRANUL PLIN AL ACESTEI FILE NU SE ATINGE DE LA DISTANȚĂ.
+     *
+     * Se pune pe aparatul care URMEAZĂ. Marius pune tabla pe tot ecranul cu
+     * mâna lui, o dată, la începutul orei; de-acolo încolo, o apăsare venită de
+     * pe laptop n-are voie nici s-o scoată, nici s-o bage. Fără asta, apăsarea
+     * pe butonul de ecran plin ar fi ajuns și la tablă și ar fi SCOS-O din
+     * ecranul plin pe care tocmai îl pusese – fix pe dos decât vrea.
+     *
+     * (Browserul oricum nu lasă o filă să intre pe tot ecranul fără ca omul să
+     * apese chiar acolo, deci partea de intrat n-ar fi mers nici de-ar fi vrut.)
+     */
+    nuAtingeEcranul() {
+      if (!w) return;
+      const nimic = () => Promise.resolve();
+      const pune = (unde, nume) => {
+        try { Object.defineProperty(unde, nume, { value: nimic, configurable: true, writable: true }); }
+        catch { /* filă care nu se lasă: las-o */ }
+      };
+      pune(w.Element.prototype, "requestFullscreen");
+      pune(w.Element.prototype, "webkitRequestFullscreen");
+      pune(w.document, "exitFullscreen");
+      pune(w.document, "webkitExitFullscreen");
+    },
+
+    /** Lasă fișa în pace: se cheamă înainte de a face altă punte. */
+    uita() {
+      if (!ascultator) return;
+      try { w?.document.removeEventListener("click", ascultator, true); } catch { /* dusă */ }
+      ascultator = null;
+    },
+  };
+}
+
+/** Ce scrie pe ecran despre puntea găsită. Numai despre SLIDE-uri: apăsările
+ *  merg pe toate trei treptele, deci n-au ce să anunțe. */
 export const vorbaPuntii = {
   intelegere: "",
-  vechi: "fișa asta e dinaintea înțelegerii: se derulează, dar fără interacțiuni",
-  fara: "fișa asta nu se lasă condusă de la distanță",
+  vechi: "fișa asta e dinaintea înțelegerii: apăsările merg, slide-urile se duc pe portița veche",
+  fara: "fișa asta nu se lasă dusă de la un slide la altul; apăsările merg",
 };

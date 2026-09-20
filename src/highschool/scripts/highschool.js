@@ -39,8 +39,10 @@ import {
 import {
   aduFisele, fiseleClasei, fisaDupaId, adresaFisei, cheiaFisei, cheiaNoua, FELUL_FISEI,
 } from "./fise.js";
-import { puntea } from "./fisa-punte.js";
-import { telecomanda } from "./telecomanda.js";
+import { puntea, vorbaPuntii } from "./fisa-punte.js";
+import { telecomanda, MAX_JURNAL } from "./telecomanda.js";
+import { cePunem } from "./jurnal.js";
+import { cuAcelasiZar } from "./zarul.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -939,16 +941,69 @@ const telec = {
   bate: null,        // ceasul: la „conduc" întreabă fișa, la „urmez" pândește tăcerea
   punte: null,       // puntea spre fișa de acum
   venit: 0,          // clipa ultimului mesaj primit; 0 = încă niciunul
+
+  /* La „conduc": ce s-a apăsat de la deschiderea fișei, în ordine. */
+  jurnal: [],
+  jurnalFisa: "",
+
+  /* La „urmez": ce am apăsat deja, ca să știu de unde încolo e nou. Se ține
+     toată lista, nu doar câte sunt: dacă ale noastre s-au despărțit pe drum,
+     numărul ar fi arătat la fel și n-am fi aflat niciodată. */
+  aplicate: [],
+  aplicateFisa: "",
+  deRefacut: null,   // lista de refăcut după ce se reîncarcă fișa
+  dinNou: false,     // prima aliniere după „Urmez" ia fișa de la capăt
+  slideCerut: 0,
 };
 
 /** Conduce cineva chiar acum? Numai pentru cel care urmează. */
 const seConduce = () => telec.venit > 0 && Date.now() - telec.venit < TACERE;
 
-/** Puntea spre fișa din cadru, refăcută la fiecare desen (cadrul e altul). */
+/**
+ * Puntea spre fișa din cadru, refăcută la fiecare încărcare (cadrul e altul, și
+ * fereastra dinăuntru la fel).
+ */
 function legPuntea() {
   const cadru = radacina?.querySelector(".lic-fisa__cadru");
+  telec.punte?.uita?.();
   telec.punte = cadru ? puntea(cadru) : null;
+  potrivestePuntea();
   return telec.punte;
+}
+
+/**
+ * Leagă puntea la rolul de acum: cel care conduce ascultă apăsările, cel care
+ * urmează își apără ecranul plin. Se cheamă și la fiecare încărcare a fișei, și
+ * la fiecare schimbare de rol – altfel, apăsând „Conduc" în mijlocul orei, n-ar
+ * fi ascultat nimeni până la următoarea fișă.
+ */
+function potrivestePuntea() {
+  const p = telec.punte;
+  if (!p) return;
+  /* Se dezleagă întâi, oricare ar fi rolul nou: trecând la „urmez",
+     ascultătorul vechi ar fi rămas agățat de fișă – iar acolo e otravă curată,
+     fiindcă apăsările pe care le face chiar el, de la distanță, i s-ar fi
+     întors în jurnal ca și cum le-ar fi făcut cineva. */
+  p.uita();
+
+  if (telec.rol === "urmez") { p.nuAtingeEcranul(); return; }
+  if (!isAdmin()) return;
+
+  /* SE SCRIE ÎN JURNAL ȘI CÂND NU CONDUCE NIMENI. Pare risipă și e tocmai
+     lucrul care salvează ora: dacă ai deschis fișa, ai arătat trei lucruri și
+     abia pe urmă ți-ai adus aminte să apeși „Conduc", jurnalul le are pe toate
+     trei, iar tabla le prinde din urmă din primul mesaj. Altfel ar fi pornit de
+     la o fișă curată și ar fi rămas cu trei lucruri în minus toată ora, fără ca
+     cineva să priceapă de ce. */
+  p.pePunere((cale) => {
+    const fisa = rutaId();
+    if (telec.jurnalFisa !== fisa) { telec.jurnal = []; telec.jurnalFisa = fisa; }
+    if (telec.jurnal.length >= MAX_JURNAL) return;
+    telec.jurnal.push(cale);
+    /* Silit, ca să plece pe loc: o apăsare care ajunge la tablă peste o
+       treime de secundă se vede ca întârziere, de față cu clasa. */
+    if (telec.rol === "conduc") telec.fir?.trimite(true);
+  });
 }
 
 /**
@@ -969,6 +1024,14 @@ function pornesteTelecomanda() {
   if (telec.fir) { telec.fir.opreste(); telec.fir = null; }
   if (telec.bate) { clearInterval(telec.bate); telec.bate = null; }
   telec.legat = "rupt"; telec.vina = ""; telec.venit = 0;
+  /* Ce am apăsat ca urmăritor se uită: e socoteala altei legături. Jurnalul MEU
+     de apăsări nu se atinge – el ține de fișa deschisă, nu de legătură, și
+     tocmai el e cel care aduce tabla din urmă când apeși „Conduc" mai târziu. */
+  telec.aplicate = []; telec.aplicateFisa = ""; telec.deRefacut = null;
+  /* La intrarea în „urmez", prima aliniere se face cu fișa luată de la capăt:
+     tabla poate să fi fost atinsă cu degetul înainte de apăsarea butonului, iar
+     apăsările profesorului puse peste o fișă deja umblată ar fi dat altceva. */
+  telec.dinNou = telec.rol === "urmez";
   if (!telec.rol) return;
   if (telec.rol === "conduc" && !isAdmin()) { telec.rol = null; return; }
 
@@ -982,9 +1045,17 @@ function pornesteTelecomanda() {
       picteazaBaraTelec();
     },
     stareaMea: () => {
+      /* SE TRIMITE ȘI DE PE O FIȘĂ CARE NU VORBEȘTE (`fel === "fara"`, cum e
+         Luceafărul). Slide-ul ei va fi mereu 0 și n-are ce strica, dar
+         apăsările merg – și tocmai alea sunt lecția acolo. */
+      if (!rutaE("f")) return null;
       const p = telec.punte;
-      if (!p || p.fel === "fara" || !rutaE("f")) return null;
-      return { fisa: rutaId(), slide: p.slide() };
+      const fisa = rutaId();
+      return {
+        fisa,
+        slide: p ? p.slide() : 0,
+        jurnal: telec.jurnalFisa === fisa ? telec.jurnal : [],
+      };
     },
     peStare: (s) => {
       /* CADRUL SE ÎNGHEAȚĂ ABIA CÂND CHIAR CONDUCE CINEVA, nu la apăsarea
@@ -1000,15 +1071,25 @@ function pornesteTelecomanda() {
         picteazaBaraTelec();
       }
 
-      /* Fișa cerută nu e cea deschisă: se deschide ea întâi. */
+      /* Fișa cerută nu e cea deschisă: se deschide ea întâi. Restul vine cu
+         mesajul următor, care e la cel mult trei secunde. */
       if (s.fisa && s.fisa !== rutaId()) { navigheaza(`f/${s.fisa}`); return; }
+
+      telec.slideCerut = s.slide;
+      impacaJurnalul(s.fisa, s.jurnal);
+      /* Dacă tocmai s-a pornit o reîncărcare, puntea de acum se duce odată cu
+         fereastra veche: slide-ul îl pune `refaApasarile`, după ce fișa revine. */
+      if (telec.deRefacut) return;
+
       const p = telec.punte;
       if (!p || p.fel === "fara") return;
       /* ÎNTREBĂM FIȘA UNDE E, nu ne ținem minte unde am pus-o. Cel care conduce
          repetă starea din trei în trei secunde, și n-are rost să-i dăm de
          fiecare dată același „du-te la 5" – ar reporni animațiile slide-ului.
          Iar dacă fișa s-a reîncărcat între timp și a căzut la început, tot de-
-         aici se ridică singură, fiindcă întrebarea spune adevărul. */
+         aici se ridică singură, fiindcă întrebarea spune adevărul.
+         SE PUNE LA URMĂ, după apăsări: printre ele sunt și cele pe săgețile de
+         navigare, iar slide-ul e cuvântul care încheie. */
       if (p.slide() === s.slide) return;
       p.laSlide(s.slide);
     },
@@ -1030,10 +1111,69 @@ function pornesteTelecomanda() {
   }
 }
 
+/** Aduce apăsările tablei la zi, după lista celui care conduce. Ce e de făcut
+ *  se hotărăște în `jurnal.js`; aici se face. */
+function impacaJurnalul(fisa, jurnal) {
+  if (telec.deRefacut) return;               // se reîncarcă acum; nu ne încurcăm
+  const lista = Array.isArray(jurnal) ? jurnal : [];
+  if (telec.aplicateFisa !== fisa) { telec.aplicateFisa = fisa; telec.aplicate = []; }
+
+  if (telec.dinNou) {
+    if (refaDeLaCapat(fisa, lista)) { telec.dinNou = false; return; }
+    /* N-are ce reîncărca (n-a ajuns încă la o fișă): rămâne de făcut. */
+  }
+
+  const ce = cePunem(telec.aplicate, lista);
+  if (ce.fel === "nimic") return;
+  if (ce.fel === "de-la-capat") { refaDeLaCapat(fisa, lista); return; }
+
+  const p = telec.punte;
+  if (!p) return;
+  for (let i = ce.deLa; i < lista.length; i++) p.apasa(lista[i]);
+  telec.aplicate = lista.slice();
+}
+
+/** Fișa se ia de la început, apoi se refac apăsările. Refacerea o face
+ *  ascultătorul de „încărcat", fiindcă până atunci n-are ce apăsa.
+ *  @returns {boolean} dacă s-a apucat chiar să reîncarce */
+function refaDeLaCapat(fisa, lista) {
+  const cadru = radacina?.querySelector(".lic-fisa__cadru");
+  if (!cadru) return false;
+  telec.aplicateFisa = fisa;
+  telec.aplicate = [];
+  telec.deRefacut = lista.slice();
+  try { cadru.contentWindow.location.reload(); return true; }
+  catch { telec.deRefacut = null; return false; }   // altă origine: n-avem ce reface
+}
+
+/** După ce fișa s-a încărcat din nou: apasă tot jurnalul, apoi pune slide-ul. */
+function refaApasarile() {
+  if (!telec.deRefacut) return;
+  const lista = telec.deRefacut;
+  telec.deRefacut = null;
+  const p = telec.punte;
+  if (!p) return;
+  lista.forEach((cale) => p.apasa(cale));
+  telec.aplicate = lista.slice();
+  if (p.fel !== "fara" && p.slide() !== telec.slideCerut) p.laSlide(telec.slideCerut);
+}
+
 function alegeRolul(rol) {
   if (rol === "conduc" && !isAdmin()) return;
+  const inainte = telec.rol;
   telec.rol = telec.rol === rol ? null : rol;
   punLocal(CHEIE_ROL, telec.rol);
+
+  /* IEȘIND DIN „URMEZ", JURNALUL MEU DEVINE CE-AM URMAT. Cât am urmat, apăsările
+     n-au venit de la degetul meu, deci nu s-au scris în jurnal – dar ele S-AU
+     ÎNTÂMPLAT în fișa asta. Dacă mă apuc acum să conduc de pe aparatul ăsta,
+     trebuie să pot spune tot ce s-a făcut în ea, nu doar de la butonul apăsat
+     încoace. */
+  if (inainte === "urmez" && telec.rol !== "urmez") {
+    telec.jurnal = telec.aplicate.slice();
+    telec.jurnalFisa = telec.aplicateFisa;
+  }
+
   pornesteTelecomanda();
   /* NU UN DESEN ÎNTREG. Ar fi pus alt cadru în pagină, adică ar fi reîncărcat
      fișa – ai fi apăsat „Conduc" în mijlocul orei și lecția s-ar fi întors la
@@ -1041,6 +1181,10 @@ function alegeRolul(rol) {
      îngheț-dezgheț cadrul. Nimic altceva din ecran nu atârnă de `telec.rol`. */
   radacina?.querySelector(".lic-fisa")
     ?.classList.toggle("lic-fisa--urmeaza", telec.rol === "urmez" && seConduce());
+  /* Puntea e aceeași, dar are altă treabă acum: ascultă apăsările ori își apără
+     ecranul plin. Fără rândul ăsta, „Conduc" apăsat în mijlocul orei n-ar fi
+     ascultat nimic până la fișa următoare. */
+  potrivestePuntea();
   picteazaBaraTelec();
 }
 
@@ -1065,7 +1209,7 @@ async function aduFisa(f) {
     const html = await fetchFisa(cheiaFisei(f));
     fiseAduse[f.id] = {
       seAduce: false,
-      url: URL.createObjectURL(new Blob([html], { type: "text/html" })),
+      url: URL.createObjectURL(new Blob([cuAcelasiZar(html, f.id)], { type: "text/html" })),
       vina: "",
     };
   } catch (err) {
@@ -1115,17 +1259,17 @@ function randTelecomanda(punte) {
         : "Aparatul ăsta urmează: arată ce derulează profesorul"}"
       >${TELEC_SEMN[care]}${vorba}</button>`;
 
-  const vorbaPuntii = {
-    vechi: "fișa e dinaintea înțelegerii: se derulează, dar fără interacțiuni",
-    fara: "fișa asta nu se lasă condusă de la distanță",
-  }[punte?.fel] || "";
+  /* Vorba vine din puntea însăși, nu scrisă a doua oară aici: se despărțiseră
+     deja o dată, iar cea de-aici mai spunea „fără interacțiuni" după ce
+     interacțiunile începuseră să meargă. */
+  const vorba = vorbaPuntii[punte?.fel] || "";
 
   return `
     <div class="lic-telec">
       ${isAdmin() ? buton("conduc", "Conduc") : ""}
       ${buton("urmez", "Urmez")}
       ${r ? `<span class="lic-telec__stare lic-telec__stare--${felStare}">${esc(stare)}</span>` : ""}
-      ${r && vorbaPuntii ? `<span class="lic-telec__vina">${esc(vorbaPuntii)}</span>` : ""}
+      ${r && vorba ? `<span class="lic-telec__vina">${esc(vorba)}</span>` : ""}
       ${r && telec.legat === "rupt" && telec.vina
         ? `<span class="lic-telec__vina">${esc(telec.vina)}</span>` : ""}
     </div>`;
@@ -1185,8 +1329,10 @@ function vedereDeFisa(f) {
     const adresa = adresaFisei(f, caleaSitului);
     const bg = culoareaModulului();
     const inCadru = `${adresa}?in=liceu${bg ? `&bg=${encodeURIComponent(bg)}` : ""}`;
+    /* Și fișa din sit se încremenește cât urmează. Lipsea, și tabla ar fi putut
+       fi abătută cu degetul tocmai la Luceafărul. */
     return `
-      <div class="lic-fisa">
+      <div class="lic-fisa${telec.rol === "urmez" && seConduce() ? " lic-fisa--urmeaza" : ""}">
         ${baraDeFisa(f, adresa)}
         <iframe class="lic-fisa__cadru" src="${inCadru}"
           allow="fullscreen" allowfullscreen
@@ -1287,11 +1433,15 @@ function deseneaza() {
   /* PUNTEA SE LEAGĂ DUPĂ CE CADRUL S-A ÎNCĂRCAT, nu acum: `contentWindow` e
      gol până atunci, iar `fisaLiceu` nici n-a apucat să existe. La fiecare
      desen cadrul e altul, deci și puntea se face din nou. */
+  telec.punte?.uita?.();
   telec.punte = null;
   const cadru = radacina.querySelector(".lic-fisa__cadru");
   if (cadru) {
-    const leaga = () => { legPuntea(); picteazaBaraTelec(); };
-    cadru.addEventListener("load", leaga, { once: true });
+    /* NU `{ once: true }`. Fișa se mai încarcă o dată, de bunăvoie, când tabla
+       rămâne în urmă și o ia de la capăt (`refaDeLaCapat`); cu „o singură
+       dată", a doua încărcare ar fi rămas fără punte, deci mută. */
+    const leaga = () => { legPuntea(); refaApasarile(); picteazaBaraTelec(); };
+    cadru.addEventListener("load", leaga);
     /* Dacă s-a încărcat deja (fișă adusă din memorie), `load` nu mai vine. */
     if (cadru.contentDocument?.readyState === "complete") leaga();
   }

@@ -95,7 +95,7 @@ export async function fetchZiua(zi = ziuaISO()) {
 /**
  * ORARUL ÎNTREG AL ANULUI: toate orarele deodată, nu numai cel de azi.
  *
- * Aducea, până acum, doar orarul în vigoare la data de azi — și era greșit,
+ * Aducea, până acum, doar orarul în vigoare la data de azi – și era greșit,
  * chiar dacă părea firesc. Grila arată o SĂPTĂMÂNĂ, iar duminica arată
  * săptămâna care vine: pe 20 septembrie, grila scria zilele lui 21–25, dar
  * orarul ales era cel de pe 14, fiindcă acela era „în vigoare azi". Două
@@ -125,7 +125,7 @@ export async function fetchOrarul() {
  * Planificarea unei clase: toate orele anului, în ordine.
  *
  * NU se cere și coloana `blocuri`. Acolo stau noțiunile, activitățile și vorba
- * „pentru fișa de bacalaureat" — sute de kilobiți pe clasă, dintre care lista
+ * „pentru fișa de bacalaureat" – sute de kilobiți pe clasă, dintre care lista
  * n-are nevoie de nicio literă. Se aduc doar cele șase coloane care se văd.
  */
 export async function fetchPlan(clasa) {
@@ -172,7 +172,7 @@ export async function fetchFise() {
  *
  * ÎN ORDINEA ASTA, DINADINS. Dacă rândul nu intră, rămâne un fișier fără rând:
  * nimeni nu-l vede, nu strică nimic, iar paza migrării ți-l arată. Pe dos, ar fi
- * rămas un rând fără fișier — adică o fișă scrisă în listă, pe care o deschizi
+ * rămas un rând fără fișier – adică o fișă scrisă în listă, pe care o deschizi
  * la oră și nu vine.
  *
  * `upsert` la amândouă: același drum și pentru o fișă nouă, și pentru
@@ -196,7 +196,7 @@ export async function salveazaFisa({ clasa, ore, fel, titlu, fisier, file }) {
  * Scoate o fișă: întâi rândul, apoi fișierul.
  *
  * TOT DINADINS PE DOS FAȚĂ DE SCRIERE. Dacă ștergerea fișierului dă greș, rămâne
- * un fișier pe care nu-l mai cheamă nimeni — gunoi, nu greșeală. Pe dos, ar fi
+ * un fișier pe care nu-l mai cheamă nimeni – gunoi, nu greșeală. Pe dos, ar fi
  * rămas un rând care arată spre un fișier șters.
  */
 export async function stergeFisa({ slug, fisier }) {

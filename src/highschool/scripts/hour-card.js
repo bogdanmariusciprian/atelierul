@@ -78,7 +78,7 @@ function patrate(ramas, durata) {
     aria-label="${trecut} din ${durata} minute au trecut">${celule}</div>`;
 }
 
-/** Clasa, sala și „a câta din câte" — scrise la fel peste tot. */
+/** Clasa, sala și „a câta din câte" – scrise la fel peste tot. */
 function capul(o) {
   if (!o) return "";
   return `<span class="hc-clasa">${esc(o.clasa)}${
@@ -175,7 +175,7 @@ function vorbaScurta(s) {
   if (s.fel === "ora") return { fel: "min", text: `${s.ramas} min` };
   if (s.fel === "pauza") return { fel: "pauza", text: `pauză · ${s.pana} min` };
   /* Stările fără oră n-au pastilă: `fel` gol înseamnă text simplu, șters. Nu
-     pun o clasă care nu face nimic — o clasă fără stil în foaie e chiar felul
+     pun o clasă care nu face nimic – o clasă fără stil în foaie e chiar felul
      de scăpare care se vede abia peste o lună. */
   if (s.fel === "inainte") return { fel: "", text: `prima oră peste ${s.pana} min` };
   if (s.fel === "gata") return { fel: "", text: "gata pe azi" };
@@ -257,7 +257,7 @@ export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => 
     const s = stareaDeDat();
 
     /* Peste o prezentare: numai ceasul și minutele. La fel și pe tot ecranul,
-       unde în plus se stinge și nu mai prinde apăsările (din CSS) — de aceea
+       unde în plus se stinge și nu mai prinde apăsările (din CSS) – de aceea
        acolo nu se mai pune nici butonul de ascuns: n-ar putea fi apăsat. */
     if (mod !== "plin") {
       gazda.innerHTML = scurtHtml(s, acum, mod === "prezentare");
@@ -320,7 +320,7 @@ export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => 
   deseneaza();
 
   /* Din secundă în secundă: ceasul, numărătoarea din pauză, și trecerea dintr-o
-     stare în alta (care nu poate aștepta minutul rotund — la 12:15:00 ești deja
+     stare în alta (care nu poate aștepta minutul rotund – la 12:15:00 ești deja
      în oră). */
   peSecunda = setInterval(() => {
     /* Modul se verifică și aici, nu numai la `fullscreenchange`. Ecranul plin
