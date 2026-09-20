@@ -939,40 +939,71 @@ a.lic-ora .lic-ora__semn {
   color: var(--color-text-muted);
 }
 
-/* ANTETUL ORARULUI, PE DOUĂ RÂNDURI: sus cine ești (titlul și ce orar e în
-   vigoare), jos unde umbli (săptămâna și săgețile). Despărțite de o linie
-   subțire, fiindcă sunt două lucruri deosebite: unul spune, celălalt se apasă. */
-.lic-antet { margin-block-end: 1.1rem; }
-
-.lic-antet__sus {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-block-end: 0.55rem;
+/* ANTETUL ORARULUI: titlul centrat, iar sub el săptămâna ca o FILĂ DE DOSAR, cu
+   urechile săptămânilor vecine ieșind de sub ea.
+   Urechea spune CE e alături („14–18 sept."), nu doar că mai e ceva: știi unde
+   ajungi înainte să apeși. Pe tablă, unde apeși cu degetul, asta contează. */
+.lic-antet { margin-block-end: 1.2rem; text-align: center; }
+.lic-antet__orar {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
 }
 
-.lic-antet__jos {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: 0.5rem;
-  padding-block-start: 0.55rem;
-  border-block-start: 1px solid var(--color-border);
+.lic-file {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: 0;
+  margin-block-start: 0.7rem;
 }
 
-/* Săptămâna arătată: ea e lucrul pe care umbli, deci ea se citește cel mai
-   bine din rândul ăsta. */
-.lic-orare__span {
-  font-size: 1.05rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+.lic-fila {
+  padding: 0.5rem 1.4rem;
+  border-radius: 12px 12px 0 0;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  line-height: 1.25;
 }
+.lic-fila--acum {
+  background: color-mix(in srgb, var(--color-primary) 13%, transparent);
+  color: var(--color-primary-dark);
+}
+.lic-fila__sus { display: block; font-size: 0.72rem; letter-spacing: 0.02em; }
+.lic-fila__span {
+  display: block;
+  font-size: 1.05rem; font-weight: 600;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+.lic-fila--acum .lic-fila__span { color: var(--color-primary-dark); }
 
-/* Capătul din dreapta: a câta săptămână de școală e, iar când te-ai dus înapoi,
-   și calea de întoarcere. */
-.lic-antet__capat {
-  margin-inline-start: auto;
-  display: flex; align-items: center; gap: 0.6rem;
+/* Urechile: fișele vecine, ieșind de sub cea din mijloc. Mai scunde și mai
+   șterse, fiindcă nu ești pe ele. */
+.lic-fila__ureche {
+  font: inherit; font-size: 0.72rem;
+  padding: 0.35rem 0.7rem;
+  border: 0;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-end;
+  margin-block-end: 2px;
 }
-.lic-antet__nr { color: var(--color-text-muted); font-size: 0.8rem; }
+.lic-fila__ureche:first-child { border-radius: 10px 0 0 0; }
+.lic-fila__ureche:last-child  { border-radius: 0 10px 0 0; }
+.lic-fila__ureche:hover { color: var(--color-primary); background: var(--color-surface); }
+/* La capătul anului nu mai e nicio vecină: rămâne un locșor gol, ca fila să nu
+   sară dintr-o parte în alta când ajungi la margine. */
+.lic-fila__ureche--stinsa { inline-size: 3.2rem; block-size: 1px; }
+
+.lic-file__dunga {
+  block-size: 3px;
+  border-radius: 2px;
+  background: var(--color-border);
+}
+.lic-file__dunga--acum { background: color-mix(in srgb, var(--color-primary) 40%, transparent); }
+
+.lic-antet__revino { margin: 0.55rem 0 0; }
 
 /* De ce n-a venit o fișă din găleată. Scris, nu ascuns: un cadru alb din care
    nu înțelege nimeni nimic e mai rău decât o vorbă urâtă, dar limpede. */
@@ -1056,6 +1087,70 @@ a.lic-ora .lic-ora__semn {
 .lic-orar__cel a:hover { border-color: oklch(62% 0.14 var(--h)); box-shadow: var(--shadow-sm); }
 .lic-orar__cel b { font-size: 1.05rem; }
 .lic-orar__cel small { font-size: 0.72rem; opacity: 0.75; }
+
+/* ORELE ȚINUTE SE STING. Săptămâna se citește atunci ca un drum: ce e în urmă,
+   ce e înainte. Nu se ascund — se retrag. */
+.lic-orar__cel--trecuta a { opacity: 0.4; }
+.lic-orar__cel--trecuta a:hover { opacity: 1; }
+
+/* ORA CARE URMEAZĂ, însemnată numai când nu ești într-una: chenar punctat și
+   peste cât începe. Punctat, nu plin, ca să nu se bată cu ora de acum, care e
+   însemnată cu linie întreagă. */
+.lic-orar__cel--urmeaza a {
+  border-style: dashed;
+  border-color: oklch(55% 0.16 var(--h));
+}
+.lic-orar__peste {
+  display: block;
+  margin-block-start: 0.1rem;
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: oklch(45% 0.16 var(--h));
+}
+
+/* SEMNUL FIȘEI, în colțul de sus-stânga al celulei. Stă PESTE legătura spre
+   clasă, nu în ea: apeși semnul și intri în material, apeși în rest și intri la
+   clasă. De-aia e buton, nu încă o legătură — două legături una într-alta n-au
+   voie în HTML și s-ar fi desfăcut urât. */
+.lic-orar__cel { position: relative; }
+.lic-orar__fisa {
+  position: absolute;
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  inline-size: 22px; block-size: 22px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 6px;
+  background: none;
+  color: oklch(45% 0.14 var(--h));
+  cursor: pointer;
+  opacity: 0.55;
+}
+.lic-orar__cel:hover .lic-orar__fisa,
+.lic-orar__fisa:focus-visible { opacity: 1; background: oklch(100% 0 0 / 0.7); }
+
+/* ZILELE LIBERE ÎȘI IAU COLOANA. Scris de ce e goală, nu lăsat gol: o vacanță
+   arăta până acum la fel cu o zi în care n-au venit datele. */
+.lic-orar__zi--liber { color: var(--color-text-muted); }
+.lic-orar__liber {
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  vertical-align: middle;
+  padding: 0.5rem 0.3rem;
+}
+.lic-orar__liber span {
+  display: block;
+  font-size: 0.76rem;
+  line-height: 1.3;
+  /* Scrisă pe verticală: o coloană de orar e îngustă, iar „Vacanța de toamnă"
+     pe orizontală s-ar fi rupt în trei rânduri strâmbe. */
+  writing-mode: vertical-rl;
+  rotate: 180deg;
+  margin-inline: auto;
+}
+.lic-orar__liber--vacanta { background: color-mix(in srgb, #b45309 10%, transparent); color: #92400e; }
+.lic-orar__liber--special { background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary-dark); }
 
 /* A CÂTA ORĂ DIN AN, în colțul de jos-dreapta al casetei.
    Scoasă din curgerea celulei (`position: absolute`), ca să nu miște clasa și
