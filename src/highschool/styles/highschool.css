@@ -1216,6 +1216,45 @@ a.lic-ora .lic-ora__semn {
   background: var(--color-surface);
 }
 .lic-fisa__titlu { min-inline-size: 0; }
+
+/* =========================================================
+   TELECOMANDA, în bara fișei, numai la profesor.
+   Două butoane, nu o împerechere: pe tablă apeși „Urmez", pe laptop „Conduc".
+   ========================================================= */
+.lic-telec {
+  margin-inline-start: auto;
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+}
+.lic-telec__buton {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font: inherit; font-size: 0.76rem;
+  min-block-size: 34px; padding: 0 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.lic-telec__buton:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.lic-telec__buton.on {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.lic-telec__stare { font-size: 0.72rem; color: var(--color-text-muted); }
+.lic-telec__stare--legat { color: #15803d; }
+.lic-telec__stare--rupt { color: var(--color-danger); }
+.lic-telec__vina {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  max-inline-size: 16rem;
+}
+
+/* CÂT URMEAZĂ, FIȘA NU SE LASĂ ATINSĂ. Tabla e interactivă; o apăsare de-a
+   unui elev ar abate-o de la ce conduci, fără ca tu să afli. Bara de sus rămâne
+   la îndemână, ca să te poți desprinde. */
+.lic-fisa--urmeaza .lic-fisa__cadru { pointer-events: none; }
 .lic-fisa__titlu b { display: block; font-size: 0.9rem; }
 .lic-fisa__titlu small { color: var(--color-text-muted); font-size: 0.8rem; }
 .lic-btn {

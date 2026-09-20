@@ -39,6 +39,8 @@ import {
 import {
   aduFisele, fiseleClasei, fisaDupaId, adresaFisei, cheiaFisei, cheiaNoua, FELUL_FISEI,
 } from "./fise.js";
+import { puntea } from "./fisa-punte.js";
+import { telecomanda } from "./telecomanda.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -908,6 +910,77 @@ function listaFiselor(fise) {
     </a></li>`).join("")}</ul>`;
 }
 
+/* ---------------- telecomanda ---------------- */
+
+const CHEIE_ROL = "liceu:telecomanda-rol";
+
+/* Cine e aparatul ăsta: `null` = nimeni, singur. Se ține minte pe cont, ca
+   tabla să rămână „urmez" peste reîncărcări — altfel, la fiecare pornire a
+   dimineții ar trebui apăsat din nou, pe un ecran la care ajungi greu. */
+const telec = {
+  rol: iaLocal(CHEIE_ROL, null),
+  legat: "rupt",     // leg | legat | rupt
+  vina: "",
+  fir: null,         // legătura deschisă
+  bate: null,        // ceasul care întreabă fișa ce slide arată
+  punte: null,       // puntea spre fișa de acum
+};
+
+/** Puntea spre fișa din cadru, refăcută la fiecare desen (cadrul e altul). */
+function legPuntea() {
+  const cadru = radacina?.querySelector(".lic-fisa__cadru");
+  telec.punte = cadru ? puntea(cadru) : null;
+  return telec.punte;
+}
+
+/**
+ * Pornește ori oprește telecomanda, după rolul ales.
+ *
+ * CEL CARE CONDUCE ÎȘI ÎNTREABĂ FIȘA, nu așteaptă ca ea să-i spună. De trei ori
+ * pe secundă o întreabă „la ce slide ești?", și trimite doar când s-a schimbat.
+ * Așa, fișa n-are nimic de anunțat: cele patru rânduri ale înțelegerii rămân
+ * patru, și niciun element nou pus vreodată în lecție nu cere ceva în plus.
+ */
+function pornesteTelecomanda() {
+  if (telec.fir) { telec.fir.opreste(); telec.fir = null; }
+  if (telec.bate) { clearInterval(telec.bate); telec.bate = null; }
+  telec.legat = "rupt"; telec.vina = "";
+  if (!telec.rol || !isAdmin()) return;
+
+  telec.fir = telecomanda({
+    rol: telec.rol,
+    peLegatura: (cum, vina) => {
+      telec.legat = cum;
+      telec.vina = vina || "";
+      /* Numai bara se schimbă, nu tot ecranul: un desen întreg ar fi rupt
+         cadrul fișei din pagină și ar fi reîncărcat-o. */
+      picteazaBaraTelec();
+    },
+    stareaMea: () => {
+      const p = telec.punte;
+      if (!p || p.fel === "fara" || !rutaE("f")) return null;
+      return { fisa: rutaId(), slide: p.slide() };
+    },
+    peStare: (s) => {
+      /* Fișa cerută nu e cea deschisă: se deschide ea întâi. */
+      if (s.fisa && s.fisa !== rutaId()) { navigheaza(`f/${s.fisa}`); return; }
+      const p = telec.punte;
+      if (p && p.fel !== "fara") p.laSlide(s.slide);
+    },
+  });
+
+  if (telec.rol === "conduc") {
+    telec.bate = setInterval(() => telec.fir && telec.fir.trimite(), 350);
+  }
+}
+
+function alegeRolul(rol) {
+  telec.rol = telec.rol === rol ? null : rol;
+  punLocal(CHEIE_ROL, telec.rol);
+  pornesteTelecomanda();
+  deseneaza();
+}
+
 /* ---------------- ecranul: o fișă ---------------- */
 
 /* Fișele aduse din găleată, ținute cât ține fila. O adresă `blob:` rămâne bună
@@ -941,6 +1014,63 @@ async function aduFisa(f) {
   if (rutaE("f") && rutaId() === f.id) cereDesen();
 }
 
+const TELEC_SEMN = {
+  conduc: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`,
+  urmez: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    ><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`,
+};
+
+/**
+ * Rândul telecomenzii, numai la profesor: cine e aparatul ăsta și cum stă
+ * legătura.
+ *
+ * DOUĂ BUTOANE, NU O ÎMPERECHERE. Pe tablă apeși „Urmez", pe laptop „Conduc".
+ * Fără coduri, fără căutat aparate: spui limpede ce e fiecare, iar dacă te
+ * răzgândești, apeși din nou pe același buton și te desprinzi.
+ */
+function randTelecomanda(punte) {
+  if (!isAdmin()) return "";
+  const r = telec.rol;
+  const stare = { leg: "mă leg…", legat: "legată", rupt: "nelegată" }[telec.legat];
+
+  const buton = (care, vorba) => `
+    <button type="button" class="lic-telec__buton${r === care ? " on" : ""}"
+      data-act="telec-${care}" aria-pressed="${r === care}"
+      title="${care === "conduc"
+        ? "Aparatul ăsta conduce: ce faci aici se vede pe tablă"
+        : "Aparatul ăsta urmează: arată ce se conduce de aiurea"}"
+      >${TELEC_SEMN[care]}${vorba}</button>`;
+
+  const vorbaPuntii = {
+    vechi: "fișa e dinaintea înțelegerii: se derulează, dar fără interacțiuni",
+    fara: "fișa asta nu se lasă condusă de la distanță",
+  }[punte?.fel] || "";
+
+  return `
+    <div class="lic-telec">
+      ${buton("conduc", "Conduc")}
+      ${buton("urmez", "Urmez")}
+      ${r ? `<span class="lic-telec__stare lic-telec__stare--${telec.legat}">${esc(stare)}</span>` : ""}
+      ${r && vorbaPuntii ? `<span class="lic-telec__vina">${esc(vorbaPuntii)}</span>` : ""}
+      ${r && telec.legat === "rupt" && telec.vina
+        ? `<span class="lic-telec__vina">${esc(telec.vina)}</span>` : ""}
+    </div>`;
+}
+
+/** Desenează din nou NUMAI rândul telecomenzii. Un desen întreg ar fi rupt
+ *  cadrul fișei din pagină și ar fi reîncărcat-o — adică ar fi luat-o de la
+ *  primul slide, în mijlocul orei. */
+function picteazaBaraTelec() {
+  const loc = radacina?.querySelector(".lic-telec");
+  if (!loc) return;
+  const nou = document.createElement("div");
+  nou.innerHTML = randTelecomanda(telec.punte);
+  const gata = nou.firstElementChild;
+  if (gata) loc.replaceWith(gata);
+}
+
 /** Bara de sus a fișei, aceeași oricum ar veni pagina. */
 function baraDeFisa(f, adresaSingura, semn = "") {
   return `
@@ -949,6 +1079,7 @@ function baraDeFisa(f, adresaSingura, semn = "") {
         <b>${esc(f.clasa)} · ${f.ore.length > 1 ? `Orele ${esc(f.ore.join(", "))}` : `Ora ${f.ora}`}</b>
         <small>${esc(f.titlu)}${semn ? ` · <i>${esc(semn)}</i>` : ""}</small>
       </span>
+      ${randTelecomanda(telec.punte)}
       ${adresaSingura
         ? `<a class="lic-btn" href="${adresaSingura}" target="_blank" rel="noopener"
              title="Deschide fișa singură, într-o filă nouă">Singură ↗</a>`
@@ -1014,8 +1145,13 @@ function vedereDeFisa(f) {
       </div>`;
   }
 
+  /* CÂT URMEAZĂ, CADRUL NU SE LASĂ ATINS. Tabla e interactivă; dacă un elev
+     apasă pe slide, ea s-ar abate de la ce conduci tu, iar tu n-ai avea de unde
+     ști — comanda următoare ar aduce-o înapoi, dar între timp arată altceva
+     decât crezi. Mai bine nu se poate atinge deloc. */
+  const urmeaza = telec.rol === "urmez" && isAdmin();
   return `
-    <div class="lic-fisa">
+    <div class="lic-fisa${urmeaza ? " lic-fisa--urmeaza" : ""}">
       ${baraDeFisa(f, adusa.url)}
       <iframe class="lic-fisa__cadru" src="${adusa.url}"
         allow="fullscreen" allowfullscreen
@@ -1075,6 +1211,18 @@ function deseneaza() {
 
   aplicaLatimea();
   legaManerul(radacina.querySelector("[data-rol='maner']"));
+
+  /* PUNTEA SE LEAGĂ DUPĂ CE CADRUL S-A ÎNCĂRCAT, nu acum: `contentWindow` e
+     gol până atunci, iar `fisaLiceu` nici n-a apucat să existe. La fiecare
+     desen cadrul e altul, deci și puntea se face din nou. */
+  telec.punte = null;
+  const cadru = radacina.querySelector(".lic-fisa__cadru");
+  if (cadru) {
+    const leaga = () => { legPuntea(); picteazaBaraTelec(); };
+    cadru.addEventListener("load", leaga, { once: true });
+    /* Dacă s-a încărcat deja (fișă adusă din memorie), `load` nu mai vine. */
+    if (cadru.contentDocument?.readyState === "complete") leaga();
+  }
 }
 
 /**
@@ -1506,6 +1654,9 @@ function apasa(e) {
   }
   if (act === "fisa-sterge") { e.preventDefault(); stergeFisaDinLista(b.dataset.id); return; }
 
+  if (act === "telec-conduc") { alegeRolul("conduc"); return; }
+  if (act === "telec-urmez") { alegeRolul("urmez"); return; }
+
   /* Umblatul prin orarele anului. Nu trece prin `navigheaza`: nu e un ecran
      nou, e același ecran cu altă privire, iar săgeata „Înapoi" n-are de ce să
      numere pașii ăștia. */
@@ -1643,6 +1794,8 @@ export async function renderHighschool(gazda, basePath = "") {
   /* Strângerea se pune DUPĂ primul desen: `strange` caută butonul în pagină. */
   strange(iaLocal(CHEIE_STRANS, false) === true);
   faCardul();
+  /* Telecomanda, dacă aparatul ăsta are un rol ținut minte din altă zi. */
+  pornesteTelecomanda();
   /* Orarul vine pe urmă, fără să țină pagina în loc: cardul se arată cu ceasul
      lui, iar când datele ajung se împrospătează singur. */
   aduOrarul().catch((e) => console.warn("[liceu] orarul:", e));
