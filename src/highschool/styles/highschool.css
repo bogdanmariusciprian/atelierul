@@ -939,12 +939,20 @@ a.lic-ora .lic-ora__semn {
   color: var(--color-text-muted);
 }
 
-/* Săgețile de umblat prin orarele anului. E o amintire, nu o unealtă: nu
-   schimbă nimic altundeva în modul. */
+/* Rândul de sus al orarului: săgețile, eticheta orarului și săptămâna.
+   O singură pereche de săgeți, pe săptămâni — prin ele treci oricum prin toate
+   orarele anului. E o privire, nu o unealtă: nu schimbă nimic altundeva. */
 .lic-orare {
   display: flex; align-items: center; flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-block-end: 0.35rem;
+  gap: 0.45rem;
+  margin-block-end: 1.1rem;
+}
+/* Săptămâna arătată: ea e lucrul pe care umbli, deci ea se citește cel mai
+   bine din rândul ăsta. */
+.lic-orare__span {
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 .lic-orare__sag {
   inline-size: 30px; block-size: 30px;
@@ -968,7 +976,6 @@ a.lic-ora .lic-ora__semn {
   text-decoration: underline;
   cursor: pointer;
 }
-.lic-orar__sub { margin: 0 0 1.2rem; font-size: 0.88rem; color: var(--color-text-muted); }
 
 .lic-orar__vas { overflow-x: auto; }
 .lic-orar__t {
