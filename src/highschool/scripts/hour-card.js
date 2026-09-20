@@ -163,23 +163,40 @@ const timerHtml = (sec) => {
 /* CÂND CARDUL SE SCURTEAZĂ. Peste o prezentare deschisă la clasă, cardul întreg
    e prea mult: acoperă slide-ul și spune lucruri pe care le știi deja (ești la
    ora aceea, doar ce-ai deschis fișa ei). Rămân cele două care chiar se cer cu
-   coada ochiului: cât e ceasul și cât mai e până la pauză. */
+   coada ochiului: cât e ceasul și cât mai e până la pauză.
+   DOUĂ PASTILE, nu una: ceasul roșu rămâne cum e, iar minutele vin alături, în
+   pastila lor. Cât mai ai e altceva decât cât e ceasul, deci se citesc separat.
+
+   TOATE CELE CINCI STĂRI ÎȘI AU VORBA LOR. Până acum, „azi n-ai ore" nu scria
+   nimic, iar cardul arăta ca și cum s-ar fi stricat: doar ceasul, singur. Un
+   ecran care tace nu spune „n-am ce spune", spune „nu merg". */
 function vorbaScurta(s) {
-  if (!s) return "";
-  if (s.fel === "ora") return `<b>${s.ramas}</b> min până la pauză`;
-  if (s.fel === "pauza") return `pauză, încă <b>${s.pana}</b> min`;
-  if (s.fel === "inainte") return `peste <b>${s.pana}</b> min începe`;
-  if (s.fel === "gata") return "gata pe azi";
-  return "";
+  if (!s) return null;
+  if (s.fel === "ora") return { fel: "min", text: `${s.ramas} min` };
+  if (s.fel === "pauza") return { fel: "pauza", text: `pauză · ${s.pana} min` };
+  /* Stările fără oră n-au pastilă: `fel` gol înseamnă text simplu, șters. Nu
+     pun o clasă care nu face nimic — o clasă fără stil în foaie e chiar felul
+     de scăpare care se vede abia peste o lună. */
+  if (s.fel === "inainte") return { fel: "", text: `prima oră peste ${s.pana} min` };
+  if (s.fel === "gata") return { fel: "", text: "gata pe azi" };
+  if (s.fel === "liber") {
+    return {
+      fel: "",
+      text: s.ora
+        ? `azi n-ai ore · ${ZI_LUNG[s.urmZi] || s.urmZi}, ${ora2(s.ora.start)} cu ${s.ora.clasa}`
+        : "azi n-ai ore",
+    };
+  }
+  return null;
 }
 
 function scurtHtml(s, acum, cuX) {
-  const vorba = vorbaScurta(s);
+  const v = vorbaScurta(s);
   return `
     <div class="hc hc--scurt" role="status">
       ${cuX ? `<button type="button" class="hc__x" data-act="hc-ascunde" aria-label="Ascunde">${X_SVG}</button>` : ""}
       <span class="hc-pastila">${CEAS_SVG}<b data-rol="ceas">${ceasAcum(acum)}</b></span>
-      ${vorba ? `<span class="hc-scurt__vorba">${vorba}</span>` : ""}
+      ${v ? `<span class="hc-scurt__vorba${v.fel ? ` hc-scurt__vorba--${v.fel}` : ""}">${esc(v.text)}</span>` : ""}
     </div>`;
 }
 

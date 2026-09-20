@@ -638,11 +638,30 @@
 /* Butonul de ascuns iese din colț și intră în rând: pe un card de un rând,
    colțul e chiar peste ceas. */
 .hc--scurt .hc__x { position: static; margin-inline-start: 0.1rem; }
+/* A DOUA PASTILĂ, lângă ceas. Ceasul spune cât e, asta spune cât mai ai — două
+   lucruri deosebite, deci două forme deosebite, nu un rând lung de text.
+   Cele trei fețe: minutele orei (aprinse), pauza (caldă) și vorbele în care
+   n-ai oră acum (șterse, fără pastilă — n-au de ce să tragă ochiul). */
 .hc-scurt__vorba {
-  font-size: 0.9rem; color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums; white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.hc-scurt__vorba b { font-size: 1.15rem; color: var(--color-text); }
+.hc-scurt__vorba--min,
+.hc-scurt__vorba--pauza {
+  padding: 0.16rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.hc-scurt__vorba--min {
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  color: var(--color-primary-dark);
+}
+.hc-scurt__vorba--pauza {
+  background: color-mix(in srgb, #b45309 14%, transparent);
+  color: #92400e;
+}
 
 /* =========================================================
    PE TOT ECRANUL: CARDUL SE FACE FANTOMĂ.
