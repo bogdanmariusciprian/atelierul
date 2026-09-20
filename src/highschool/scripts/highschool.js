@@ -31,7 +31,7 @@ import { CLASE } from "./classes.js";
 import { hourCard } from "./hour-card.js";
 import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
 import {
-  fetchZiua, fetchSaptamana, fetchConfig, fetchPlan, fetchFisa, fetchOrare,
+  fetchZiua, fetchOrarul, fetchConfig, fetchPlan, fetchFisa,
   salveazaFisa, stergeFisa, ziuaISO,
 } from "./liceu-repo.js";
 import {
@@ -404,18 +404,28 @@ function numereleSaptamanii(zile) {
  * sosesc: grila nu așteaptă după ele.
  */
 function vedereDeOrar() {
-  const ore = orarul.saptamana;
   const iv = orarul.intervale;
-  if (!ore.length || !iv.length) {
+  const zile = zileleSaptamanii();
+
+  /* FIECARE ZI ÎȘI ARE ORARUL EI. Nu „orarul de azi": duminica, grila arată
+     săptămâna care vine, iar aceea poate merge pe alt orar decât cel de acum.
+     Așa se vede cum trebuie și o schimbare picată în mijlocul săptămânii. */
+  const peZi = zile.map(({ zi, data }) => {
+    const { ore, eticheta } = orarulLa(data);
+    return { zi, data, eticheta, ore: ore.filter((o) => o.zi === zi) };
+  });
+  const toateOrele = peZi.flatMap((z) => z.ore);
+
+  if (!toateOrele.length || !iv.length) {
     return `<div class="lic-orar"><h1 class="lic-orar__titlu">Orar</h1>
       <p class="lic-clasa__gol">Orarul n-a fost adus.</p></div>`;
   }
 
   const folosite = iv
-    .filter((i) => ore.some((o) => String(o.period) === String(i.id)))
+    .filter((i) => toateOrele.some((o) => String(o.period) === String(i.id)))
     .sort((a, b) => minute(a.start) - minute(b.start));
 
-  const pe = new Map(ore.map((o) => [`${o.zi}|${o.period}`, o]));
+  const pe = new Map(peZi.flatMap((z) => z.ore.map((o) => [`${z.zi}|${o.period}`, o])));
   const azi = numeZi(new Date());
   const m = new Date().getHours() * 60 + new Date().getMinutes();
   const culoarea = (cod) => CLASE.find((c) => c.cod === cod)?.hue ?? 250;
@@ -423,7 +433,6 @@ function vedereDeOrar() {
   /* Planificările tuturor claselor din grilă: din ele iese numărul din colțul
      fiecărei celule. Se cer o dată și rămân ținute minte, iar până sosesc grila
      se vede întreagă, doar fără numere — nu ține nimic în loc. */
-  const zile = zileleSaptamanii();
   CLASE.forEach((c) => { if (!planuri[c.cod]) aduPlanul(c.cod); });
   const numere = numereleSaptamanii(zile);
 
@@ -454,14 +463,16 @@ function vedereDeOrar() {
 
   /* Săptămâna e scrisă: fără ea, „5/95" ar sta pe o grilă care arată la fel în
      toate săptămânile anului și n-ar spune al cui e numărul. Iar eticheta spune
-     CARE orar se vede — orarul s-a schimbat de trei ori numai în septembrie. */
+     CARE orar se vede — numai în septembrie s-a schimbat de trei ori.
+     Etichetele se strâng din toate zilele arătate: o săptămână tăiată de o
+     schimbare de orar le poartă pe amândouă, și e bine să se vadă. */
   const span = spanulZilelor(zile[0].data, zile[zile.length - 1].data);
-  const eticheta = ore[0]?.eticheta || "";
+  const etichete = [...new Set(peZi.map((z) => z.eticheta).filter(Boolean))];
   return `
     <div class="lic-orar">
       <h1 class="lic-orar__titlu">Orar</h1>
-      ${eticheta ? `<p class="lic-orar__acum">${esc(eticheta)}</p>` : ""}
-      <p class="lic-orar__sub">${ore.length} ore pe săptămână${
+      ${etichete.map((e) => `<p class="lic-orar__acum">${esc(e)}</p>`).join(" ")}
+      <p class="lic-orar__sub">${toateOrele.length} ore pe săptămână${
         span ? ` · ${esc(span)}` : ""}. Apeși o oră și intri la clasa ei.</p>
       <div class="lic-orar__vas">
         <table class="lic-orar__t"><thead>${cap}</thead><tbody>${randuri}</tbody></table>
@@ -894,20 +905,38 @@ function faCardul() {
    ori pe minut (are un ceas care bate la secundă), deci n-are cum să ceară
    serverul de fiecare dată: ce s-a adus stă aici, iar socoteala „ce oră e acum"
    se face în browser, din datele astea. */
-const orarul = { zi: null, ore: [], saptamana: [], intervale: [], orare: [], adus: false };
+const orarul = { zi: null, ore: [], toate: [], intervale: [], orare: [], adus: false };
+
+/**
+ * Orarul în vigoare la o ANUMITĂ zi, cu eticheta lui.
+ *
+ * Nu „orarul de azi". Grila arată o săptămână care poate fi alta decât cea de
+ * azi — duminica arată săptămâna care vine — iar lista unei clase se întinde
+ * peste tot anul. Fiecare ecran întreabă pentru ziua pe care o arată.
+ */
+function orarulLa(data) {
+  const valabile = (orarul.toate || []).filter((r) => r.deLa <= data);
+  if (!valabile.length) return { ore: [], eticheta: "" };
+  /* Cel mai nou dintre cele începute. */
+  const deLa = valabile.reduce((m, r) => (r.deLa > m ? r.deLa : m), "");
+  const ale = valabile.filter((r) => r.deLa === deLa);
+  return { ore: ale, eticheta: ale[0]?.eticheta || "" };
+}
 
 async function aduOrarul() {
   const azi = ziuaISO();
-  const [z, s, c, o] = await Promise.all([
-    fetchZiua(azi), fetchSaptamana(), fetchConfig(), fetchOrare(),
-  ]);
+  const [z, t, c] = await Promise.all([fetchZiua(azi), fetchOrarul(), fetchConfig()]);
   orarul.zi = azi;
   orarul.ore = z.date || [];
-  orarul.saptamana = s.date || [];
+  orarul.toate = t.date || [];
   orarul.intervale = (c.date || {}).intervale || [];
-  /* Cele trei orare ale anului, cu etichetele lor: din ele se nasc benzile din
-     lista unei clase. */
-  orarul.orare = o.date || [];
+  /* Cele trei orare ale anului, cu etichetele lor, în ordine: din ele se nasc
+     benzile din lista unei clase. Se scot din rândurile de mai sus, nu se cer
+     încă o dată. */
+  const vazute = new Map();
+  for (const r of orarul.toate) if (!vazute.has(r.deLa)) vazute.set(r.deLa, r.eticheta);
+  orarul.orare = [...vazute].map(([din, eticheta]) => ({ din, eticheta }))
+    .sort((a, b) => a.din.localeCompare(b.din));
   /* Fără intervale nu se poate socoti nimic: ceasurile orelor vin din ele. Dacă
      lipsesc (baza încă nu e umplută), cardul rămâne cu ceasul lui și spune
      cinstit că n-are orar, în loc să arate o zi goală ca și cum ar fi liber. */
@@ -934,7 +963,9 @@ function oraDeArata() {
   return stareaDeAcum({
     acum: new Date(),
     oreleZilei: orarul.ore,
-    saptamana: orarul.saptamana,
+    /* Cardul caută „următoarea zi cu ore", deci îi trebuie orarul de AZI, nu
+       cel al săptămânii arătate în grilă. */
+    saptamana: orarulLa(azi).ore,
     intervale: orarul.intervale,
   });
 }
