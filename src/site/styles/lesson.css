@@ -952,15 +952,17 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
 
 /* SEMNUL „BAC" (0103): lecție care intră la bacalaureat. Plin, în culoarea
    domeniului, ca să se deosebească de „elev", care e doar conturat. */
+/* Cât semnul de tablă de lângă titlu (0.95em înălțime), nu mai mult. */
 .track-node__bac {
   display: inline-block;
-  vertical-align: 0.08em;
-  margin-left: 0.5em;
-  padding: 0.05em 0.5em;
+  vertical-align: 0.14em;
+  margin-left: 0.45em;
+  padding: 0 0.42em;
   border-radius: 999px;
   background: var(--card-color, var(--color-primary));
   color: #fff;
-  font-size: 0.68em;
+  font-size: 0.56em;
+  line-height: 1.55;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
