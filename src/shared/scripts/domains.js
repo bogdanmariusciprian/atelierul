@@ -11,6 +11,5 @@ export const LESSON_DOMAINS = [
   { slug: "sintaxa-frazei", label: "Sintaxa frazei", color: "#2563eb", icon: "🧩", watermark: "assets/icons/calendar-lines-pen.svg" },
   { slug: "redactare", label: "Redactare", color: "#0891b2", icon: "✍️", watermark: "assets/icons/pencil.svg" },
   { slug: "lectura", label: "Lectură", color: "#ea580c", icon: "📖", watermark: "assets/icons/book-open-cover.svg" },
-  // Iconița din colțul cartonașului vine când e SVG-ul (Font Awesome Pro, ca celelalte).
-  { slug: "literatura-liceu", label: "Literatură (liceu)", color: "#db2777", icon: "🎭" },
+  { slug: "literatura-liceu", label: "Literatură (liceu)", color: "#db2777", icon: "📚", watermark: "assets/icons/books.svg" },
 ];
