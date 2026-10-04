@@ -139,19 +139,6 @@ export const LESSONS = [
     summary: "Un text narativ cu întrebări de înțelegere.",
     ready: true,
   },
-  /* O PAGINĂ ÎNTREAGĂ, ADUSĂ DIN AFARĂ, ca tabla de la sintaxa frazei: poemul
-     cu adnotările lui Marius, cu tema și cu uneltele lui. Nu cheamă bara
-     sitului, dinadins („fără titlul paginii, fără navul paginii; pui doar o
-     săgeată discretă «Către site»"), deci în listă e singurul loc din care se
-     poate ajunge la ea. */
-  {
-    domain: "lectura",
-    slug: "lectura-luceafarul",
-    title: "Luceafărul: strofe și adnotări",
-    href: "lectii/lectura/luceafarul/",
-    summary: "Poemul întreg, pe tablouri, cu adnotări și zece imagini.",
-    ready: true,
-  },
   { domain: "lectura", title: "Textul liric" },
   { domain: "lectura", title: "Textul dramatic" },
   { domain: "lectura", title: "Textul nonliterar" },
@@ -160,6 +147,24 @@ export const LESSONS = [
   { domain: "lectura", title: "Genurile literare: epic, liric, dramatic" },
   { domain: "lectura", title: "Ideea principală și ideea secundară" },
   { domain: "lectura", title: "Planul simplu și planul dezvoltat de idei" },
+
+  // ---------- Literatură (liceu) ----------
+  /* O PAGINĂ ÎNTREAGĂ, ADUSĂ DIN AFARĂ, ca tabla de la sintaxa frazei: poemul
+     cu adnotările lui Marius, cu tema și cu uneltele lui. Nu cheamă bara
+     sitului, dinadins („fără titlul paginii, fără navul paginii; pui doar o
+     săgeată discretă «Către site»"), deci în listă e singurul loc din care se
+     poate ajunge la ea.
+     A stat la Lectură până la 4 octombrie 2026. S-a mutat doar domeniul:
+     adresa și `slug`-ul rămân, fiindcă pe ele stau progresul elevilor și fișa
+     claselor a XII-a din modulul Liceu (`school_fise`, 0096). */
+  {
+    domain: "literatura-liceu",
+    slug: "lectura-luceafarul",
+    title: "Luceafărul: strofe și adnotări",
+    href: "lectii/lectura/luceafarul/",
+    summary: "Poemul întreg, pe tablouri, cu adnotări și zece imagini.",
+    ready: true,
+  },
 ];
 
 /** The lesson entry for a STABLE slug (or null). Use this instead of
