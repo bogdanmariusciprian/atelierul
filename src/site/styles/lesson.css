@@ -950,6 +950,48 @@ a.lessons-search__hit.is-active { background: color-mix(in srgb, var(--color-pri
 }
 .track-node__label:hover .track-node__pupil { opacity: 1; }
 
+/* SEMNUL „BAC" (0103): lecție care intră la bacalaureat. Plin, în culoarea
+   domeniului, ca să se deosebească de „elev", care e doar conturat. */
+.track-node__bac {
+  display: inline-block;
+  vertical-align: 0.08em;
+  margin-left: 0.5em;
+  padding: 0.05em 0.5em;
+  border-radius: 999px;
+  background: var(--card-color, var(--color-primary));
+  color: #fff;
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* Comutatorul adminului, la capătul rândului: conturat cât e stins, plin cât
+   e aprins. Se vede doar la admin (îl pune `lessons-hub.js`). */
+.track-node__bac-comutator {
+  flex: none;
+  margin-left: auto;
+  padding: 0.15rem 0.55rem;
+  border: 1px dashed var(--card-color, var(--color-border));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--card-color, var(--color-text-muted));
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.track-node__bac-comutator:hover { opacity: 1; }
+.track-node__bac-comutator.is-on {
+  border-style: solid;
+  background: var(--card-color, var(--color-primary));
+  color: #fff;
+  opacity: 0.9;
+}
+.track-node__bac-comutator:disabled { cursor: progress; opacity: 0.35; }
+
 .track-node__label:hover .track-node__title {
   color: var(--card-color);
 }

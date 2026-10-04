@@ -8,8 +8,9 @@ import { LESSON_DOMAINS } from "../../shared/scripts/domains.js";
 import { LESSONS } from "../../shared/scripts/lessons-index.js";
 import { isLessonDone, mergeServerProgress } from "./lesson-progress.js";
 import { fetchMyLessonProgress } from "../../shared/scripts/forum-repo.js";
-import { isLoggedIn } from "../../shared/scripts/session.js";
+import { isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
 import { publishedLessons } from "../../shared/scripts/lesson-proposals-repo.js";
+import { bacSlugs, puneBac } from "../../shared/scripts/lesson-badges-repo.js";
 
 let _progressSynced = false; // pull server completion state once per page
 
@@ -19,6 +20,18 @@ let _progressSynced = false; // pull server completion state once per page
    Până vin, hubul arată ce știe; când vin, se redesenează. */
 let _propuseAduse = false;
 let _propuse = [];
+
+/* SEMNUL „BAC" (0103) stă tot în bază: îl pune Marius din pagină, cu
+   comutatorul de lângă fiecare lecție, fără commit. Se aduce o dată pe pagină,
+   ca lecțiile elevilor. Comutatorul apare doar în domeniile de aici; semnul
+   pus se vede la oricine. */
+const DOMENII_BAC = ["literatura-liceu"];
+let _bacAdus = false;
+let _bac = new Set();
+
+const semnulBac = () =>
+  `<span class="track-node__bac" role="img"
+         aria-label="Lecție pentru bacalaureat">BAC</span>`;
 
 /** Catalogul din cod plus lecțiile publicate de elevi, în aceeași formă. */
 function toateLectiile() {
@@ -47,6 +60,14 @@ function lessonProgress(lesson) {
  * uses pathLength="100" so the dasharray value is the percentage.
  */
 function nodeMarkup(lesson, index, basePath, progress = 0) {
+  const bac = !!lesson.slug && _bac.has(lesson.slug);
+  /* Comutatorul stă în afara legăturii lecției: un buton nu are voie să stea
+     într-un link. Doar adminul îl vede, doar la domeniile cu semn. */
+  const comutator = lesson.slug && isAdmin() && DOMENII_BAC.includes(lesson.domain)
+    ? `<button class="track-node__bac-comutator${bac ? " is-on" : ""}" type="button"
+               data-bac="${lesson.slug}" aria-pressed="${bac}"
+               title="${bac ? "Scoate semnul BAC" : "Pune semnul BAC"}">BAC</button>`
+    : "";
   const ready = lesson.ready && lesson.href;
   const ring = `
     <svg class="node__ring" viewBox="0 0 100 100" aria-hidden="true">
@@ -86,7 +107,7 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
       <li class="track-node track-node--soon">
         <span class="node">${ring}</span>
         <span class="track-node__label">
-          <span class="track-node__title">${lesson.title}${tabla}
+          <span class="track-node__title">${lesson.title}${tabla}${bac ? semnulBac() : ""}
             <span class="track-node__soon">în curând</span>
           </span>
           ${summary}
@@ -99,9 +120,10 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
     <li class="track-node">
       <a class="node" href="${href}" aria-label="${lesson.title}">${ring}</a>
       <a class="track-node__label" href="${href}">
-        <span class="track-node__title">${lesson.title}${tabla}${deElev}</span>
+        <span class="track-node__title">${lesson.title}${tabla}${deElev}${bac ? semnulBac() : ""}</span>
         ${summary}
       </a>
+      ${comutator}
     </li>`;
 }
 
@@ -278,6 +300,26 @@ export function renderLessonsHub(basePath = "") {
 
   initLessonsSearch(mount, basePath);
 
+  /* Comutatorul „BAC": schimbă semnul pe loc, în rândul lui, fără să
+     redeseneze lista (ar închide panoul extins și ar pierde derularea). */
+  mount.querySelectorAll(".track-node__bac-comutator").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const slug = btn.dataset.bac;
+      btn.disabled = true;
+      const { ok, bac } = await puneBac(slug, !_bac.has(slug));
+      btn.disabled = false;
+      if (bac) _bac.add(slug); else _bac.delete(slug);
+      btn.classList.toggle("is-on", bac);
+      btn.setAttribute("aria-pressed", String(bac));
+      btn.title = bac ? "Scoate semnul BAC" : "Pune semnul BAC";
+      const titlu = btn.closest(".track-node").querySelector(".track-node__title");
+      titlu.querySelector(".track-node__bac")?.remove();
+      if (bac) titlu.insertAdjacentHTML("beforeend", semnulBac());
+      if (!ok) btn.animate([{ transform: "translateX(-3px)" }, { transform: "translateX(3px)" },
+        { transform: "none" }], { duration: 220 });
+    });
+  });
+
   const tabButtons = mount.querySelectorAll(".domain-tab");
   const panelSections = mount.querySelectorAll(".domain-panel");
 
@@ -326,6 +368,16 @@ export function renderLessonsHub(basePath = "") {
     ? fromHash
     : LESSON_DOMAINS[0].slug;
   activate(initial);
+
+  /* Semnele „BAC", aduse O DATĂ pe pagină, pentru oricine. */
+  if (!_bacAdus) {
+    _bacAdus = true;
+    bacSlugs().then((s) => {
+      if (!s.size) return;
+      _bac = s;
+      renderLessonsHub(basePath);
+    });
+  }
 
   /* Lecțiile publicate de elevi, aduse O DATĂ pe pagină. Se cer și pentru un
      vizitator nelogat: sunt conținut de sit, ca oricare altă lecție. */
