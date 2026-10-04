@@ -5,17 +5,8 @@
 // într-o pânză, la o lățime mare, și abia poza aceea se plimbă prin fereastra
 // 16:9 (vezi `pdf-pagina.js`).
 //
-// BIBLIOTECA VINE DIN AFARĂ, de pe `esm.sh`, de unde vine deja și Supabase.
-// Versiunea e scrisă pe de-a-ntregul, nu „ultima din familia 6": o lecție nu
-// are voie să se strice într-o dimineață fiindcă a urcat cineva o versiune nouă
-// peste noapte. Când vrem alta, o schimbăm aici, cu ochii pe ea.
-//
-// DESPRE LUCRĂTORUL LUI PDF.JS. Biblioteca își face treaba grea într-un
-// „worker", iar un worker NU poate fi pornit de la o adresă de pe alt domeniu –
-// browserul o refuză. Nu ne luptăm cu asta: îi spunem unde e fișierul și lăsăm
-// pdf.js să aleagă. Dacă nu poate porni workerul, are singur o cale de rezervă
-// prin care aduce același cod și-l rulează pe firul paginii. Mai încet, dar la
-// o fișă de două-trei pagini nu se simte.
+// pdf.js vine din `src/shared/scripts/pdfjs.js`, același pentru tot situl
+// (versiunea, lucrătorul și calea de rezervă sunt lămurite acolo).
 //
 // DACĂ TOTUȘI NU MERGE, funcția aruncă, iar ecranul fișei arată limpede că
 // desenul n-a ieșit și lasă la vedere descărcarea și deschiderea într-o filă
@@ -28,8 +19,7 @@
 // Cuprins în română, nume în engleză.
 // =========================================================
 
-const PDFJS = "https://esm.sh/pdfjs-dist@6.3.289/build/pdf.mjs";
-const LUCRATOR = "https://esm.sh/pdfjs-dist@6.3.289/build/pdf.worker.mjs";
+import { aduPdfjs } from "../../shared/scripts/pdfjs.js";
 
 /* Lățimea la care se desenează o pagină. O A4 iese 1800 × 2546, adică peste 200
    de puncte pe țol: pe o tablă de 1920 fâșia umple lățimea fără să se vadă
@@ -41,18 +31,6 @@ const LATIME = 1800;
    se spună pe față decât să se blocheze tabla în timpul orei. */
 const MAX_PAGINI = 40;
 
-let biblioteca = null;
-
-/** Aduce pdf.js o singură dată, cât ține fila. */
-async function adubiblioteca() {
-  if (biblioteca) return biblioteca;
-  const pdfjs = await import(/* @vite-ignore */ PDFJS);
-  try { pdfjs.GlobalWorkerOptions.workerSrc = LUCRATOR; }
-  catch { /* fără worker, pdf.js merge pe firul paginii */ }
-  biblioteca = pdfjs;
-  return pdfjs;
-}
-
 /**
  * Desenează toate paginile unui PDF.
  *
@@ -60,7 +38,7 @@ async function adubiblioteca() {
  * @returns {Promise<{pagini: string[], masuri: {latime:number,inaltime:number}[]}>}
  */
 export async function desenezaPdf(octeti) {
-  const pdfjs = await adubiblioteca();
+  const pdfjs = await aduPdfjs();
   /* Octeții se dau într-o copie: pdf.js și-i ia în stăpânire, iar dacă cineva
      deschide fișa a doua oară din aceiași octeți, ar găsi o mână goală. */
   const doc = await pdfjs.getDocument({ data: new Uint8Array(octeti.slice(0)) }).promise;

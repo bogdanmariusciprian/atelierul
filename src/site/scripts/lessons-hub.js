@@ -14,6 +14,7 @@ import { bacSlugs, puneBac } from "../../shared/scripts/lesson-badges-repo.js";
 import {
   fileSiEtichete, adaugaFila, redenumesteFila, stergeFila, puneEticheta,
 } from "../../shared/scripts/lesson-tabs-repo.js";
+import { lectiiPdf, urcaPdf, inlocuiestePdf, stergePdf } from "../../shared/scripts/lesson-pdf-repo.js";
 
 let _progressSynced = false; // pull server completion state once per page
 
@@ -45,6 +46,14 @@ const _filaActiva = new Map();     // domeniu → id-ul filei ori "toate"
 let _editez = null;                // { domeniu, id } cât adminul scrie un nume (id null = filă nouă)
 let _eroareFila = "";
 
+/* LECȚIILE PDF (0105): urcate de Marius din panou, doar la Literatură (liceu).
+   Stau în bază și se aduc o dată pe pagină, ca lecțiile elevilor; se deschid
+   pe pagina-șablon `lectii/pdf/#adresa`. */
+const DOMENII_PDF = ["literatura-liceu"];
+let _pdfAduse = false;
+let _pdf = [];                     // rândurile din `lectii_pdf`
+let _formPdf = null;               // domeniul în care e deschis formularul de urcare
+
 const fileleDomeniului = (domeniu) => _file.filter((f) => f.domeniu === domeniu);
 const inFila = (filaId, lesson) => !!lesson.slug && !!_etichete.get(filaId)?.has(lesson.slug);
 
@@ -61,9 +70,18 @@ const semnulBac = () =>
   `<span class="track-node__bac" role="img"
          aria-label="Lecție pentru bacalaureat">BAC</span>`;
 
-/** Catalogul din cod plus lecțiile publicate de elevi, în aceeași formă. */
+/** Catalogul din cod, lecțiile PDF și lecțiile publicate de elevi, în aceeași formă. */
 function toateLectiile() {
-  return [...LESSONS, ..._propuse.map((l) => ({
+  const pdf = _pdf.map((p) => ({
+    domain: p.domeniu,
+    slug: p.slug,
+    title: p.titlu,
+    href: `lectii/pdf/#${p.slug}`,
+    summary: p.rezumat || "",
+    ready: true,
+    pdf: p,
+  }));
+  return [...LESSONS, ...pdf, ..._propuse.map((l) => ({
     domain: l.domain,
     slug: `propusa-${l.slug}`,
     title: l.title,
@@ -105,8 +123,15 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
                         title="${pus ? "Scoate din fila" : "Pune în fila"} „${scapa(f.nume)}”">${scapa(f.nume)}</button>`;
       }).join("")
     : "";
-  const unelte = comutator || etichete
-    ? `<span class="track-node__admin">${etichete}${comutator}</span>`
+  /* La lecțiile PDF, adminul le mai poate înlocui fișierul ori le poate șterge. */
+  const pdfUnelte = lesson.pdf && isAdmin()
+    ? `<button class="track-node__pdf-unealta" type="button" data-inlocuieste="${lesson.slug}"
+               title="Pune alt PDF în locul acestuia">înlocuiește</button>
+       <button class="track-node__pdf-unealta track-node__pdf-unealta--sterge" type="button"
+               data-sterge-pdf="${lesson.slug}" title="Șterge lecția">șterge</button>`
+    : "";
+  const unelte = comutator || etichete || pdfUnelte
+    ? `<span class="track-node__admin">${etichete}${comutator}${pdfUnelte}</span>`
     : "";
   const ready = lesson.ready && lesson.href;
   const ring = `
@@ -286,6 +311,34 @@ function fileMarkup(domeniu, lessons) {
   return `<div class="domain-subtabs__row" role="tablist" aria-label="File">${butoane}${nou}</div>`;
 }
 
+/** Sub listă, doar pentru admin: butonul „+ Adaugă un PDF", ori formularul. */
+function pdfAdminMarkup(domeniu) {
+  if (!isAdmin() || !DOMENII_PDF.includes(domeniu)) return "";
+  if (_formPdf !== domeniu) {
+    return `<button type="button" class="pdf-adauga" data-pdf-deschide>+ Adaugă un PDF</button>`;
+  }
+  return `
+    <form class="pdf-form" novalidate>
+      <label class="pdf-form__camp">
+        <span>Fișierul (PDF, cel mult 20 MB)</span>
+        <input type="file" name="fisier" accept="application/pdf,.pdf" />
+      </label>
+      <label class="pdf-form__camp">
+        <span>Titlul</span>
+        <input type="text" name="titlu" maxlength="120" placeholder="Luceafărul: comentariu pe tablouri" />
+      </label>
+      <label class="pdf-form__camp">
+        <span>O frază despre lecție <em>(nu e obligatorie)</em></span>
+        <input type="text" name="rezumat" maxlength="200" />
+      </label>
+      <div class="pdf-form__jos">
+        <button type="submit" class="pdf-form__urca">Urcă</button>
+        <button type="button" class="pdf-form__renunta" data-pdf-renunta>Renunță</button>
+        <span class="pdf-form__stare" aria-live="polite"></span>
+      </div>
+    </form>`;
+}
+
 /** Redesenează filele și lista unui singur panou, fără să atingă restul paginii. */
 function redeseneazaPanoul(panel, basePath) {
   const domeniu = panel.id;
@@ -294,6 +347,13 @@ function redeseneazaPanoul(panel, basePath) {
   const sus = vp ? vp.scrollTop : 0;
   panel.querySelector(".domain-subtabs").innerHTML = fileMarkup(domeniu, lessons);
   panel.querySelector(".domain-panel__track").innerHTML = trackMarkup(domeniu, lessons, basePath);
+  panel.querySelector(".domain-panel__pdf").innerHTML = pdfAdminMarkup(domeniu);
+  /* Numărul de lecții, în antet și în fila din stânga: s-a schimbat dacă
+     a venit ori a plecat un PDF. */
+  const meta = panel.querySelector(".domain-panel__meta");
+  if (meta) meta.textContent = `${lessons.length} ${lessons.length === 1 ? "lecție" : "lecții"}`;
+  const tab = document.querySelector(`.domain-tab[data-target="${domeniu}"] .domain-tab__count`);
+  if (tab) tab.textContent = lessons.length;
   if (vp) vp.scrollTop = sus;
   leaga(panel, basePath);
   panel.querySelector(".domain-subtab__input")?.focus();
@@ -301,6 +361,8 @@ function redeseneazaPanoul(panel, basePath) {
 
 /** Leagă butoanele dintr-o bucată de pagină (toată lista ori un singur panou). */
 function leaga(radacina, basePath) {
+  leagaPdf(radacina, basePath);
+
   /* Comutatorul „BAC": schimbă semnul pe loc, în rândul lui, fără să
      redeseneze lista (ar închide panoul extins și ar pierde derularea). */
   radacina.querySelectorAll(".track-node__bac-comutator").forEach((btn) => {
@@ -420,6 +482,107 @@ function leaga(radacina, basePath) {
   });
 }
 
+/** Uneltele PDF ale adminului: urcare, înlocuire, ștergere. */
+function leagaPdf(radacina, basePath) {
+  radacina.querySelectorAll("[data-pdf-deschide]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const panel = btn.closest(".domain-panel");
+      _formPdf = panel.id;
+      redeseneazaPanoul(panel, basePath);
+      panel.querySelector(".pdf-form input[type=file]")?.focus();
+    });
+  });
+
+  radacina.querySelectorAll("[data-pdf-renunta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _formPdf = null;
+      redeseneazaPanoul(btn.closest(".domain-panel"), basePath);
+    });
+  });
+
+  radacina.querySelectorAll(".pdf-form").forEach((form) => {
+    const panel = form.closest(".domain-panel");
+    const fisier = form.elements.fisier;
+    const titlu = form.elements.titlu;
+    const stare = form.querySelector(".pdf-form__stare");
+    /* Titlul se propune din numele fișierului, cât timp nu l-ai scris tu. */
+    let titluScris = false;
+    titlu.addEventListener("input", () => { titluScris = true; });
+    fisier.addEventListener("change", () => {
+      const f = fisier.files[0];
+      if (f && !titluScris) titlu.value = f.name.replace(/\.pdf$/i, "").replace(/[_]+/g, " ").trim();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const butoane = form.querySelectorAll("button, input");
+      butoane.forEach((b) => { b.disabled = true; });
+      stare.textContent = "Se urcă…";
+      const r = await urcaPdf({
+        file: fisier.files[0], titlu: titlu.value, rezumat: form.elements.rezumat.value, domeniu: panel.id,
+      });
+      if (r.eroare) {
+        butoane.forEach((b) => { b.disabled = false; });
+        stare.textContent = r.eroare;
+        return;
+      }
+      _pdf.push(r.lectie);
+      /* Dacă era deschisă o filă, lecția nouă intră și în ea: acolo te uitai. */
+      const fila = filaActiva(panel.id);
+      if (fila !== "toate") {
+        const { pus } = await puneEticheta(fila, r.lectie.slug, true);
+        if (pus) {
+          if (!_etichete.has(fila)) _etichete.set(fila, new Set());
+          _etichete.get(fila).add(r.lectie.slug);
+        }
+      }
+      _formPdf = null;
+      redeseneazaPanoul(panel, basePath);
+    });
+  });
+
+  radacina.querySelectorAll("[data-inlocuieste]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const lectie = _pdf.find((p) => p.slug === btn.dataset.inlocuieste);
+      if (!lectie) return;
+      const alege = document.createElement("input");
+      alege.type = "file";
+      alege.accept = "application/pdf,.pdf";
+      alege.addEventListener("change", async () => {
+        const f = alege.files[0];
+        if (!f) return;
+        btn.disabled = true;
+        btn.textContent = "se urcă…";
+        const r = await inlocuiestePdf(lectie, f);
+        if (r.eroare) {
+          btn.disabled = false;
+          btn.textContent = "înlocuiește";
+          btn.title = r.eroare;
+          clatina(btn);
+          return;
+        }
+        _pdf = _pdf.map((p) => (p.id === r.lectie.id ? r.lectie : p));
+        redeseneazaPanoul(btn.closest(".domain-panel"), basePath);
+      });
+      alege.click();
+    });
+  });
+
+  radacina.querySelectorAll("[data-sterge-pdf]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const lectie = _pdf.find((p) => p.slug === btn.dataset.stergePdf);
+      if (!lectie) return;
+      if (!confirm(`Ștergi lecția „${lectie.titlu}”? Se șterge și fișierul PDF.`)) return;
+      btn.disabled = true;
+      if (!(await stergePdf(lectie))) { btn.disabled = false; clatina(btn); return; }
+      _pdf = _pdf.filter((p) => p.id !== lectie.id);
+      _bac.delete(lectie.slug);
+      _etichete.forEach((s) => s.delete(lectie.slug));
+      redeseneazaPanoul(btn.closest(".domain-panel"), basePath);
+    });
+  });
+}
+
 /** Un mic tremur: baza n-a primit schimbarea, iar butonul arată ce a rămas. */
 function clatina(el) {
   el.animate([{ transform: "translateX(-3px)" }, { transform: "translateX(3px)" },
@@ -487,6 +650,7 @@ export function renderLessonsHub(basePath = "") {
           </header>
           <div class="domain-subtabs">${fileMarkup(domain.slug, lessons)}</div>
           ${track}
+          <div class="domain-panel__pdf">${pdfAdminMarkup(domain.slug)}</div>
         </div>
         <div class="panel-blur panel-blur--top" aria-hidden="true"></div>
         <div class="panel-blur panel-blur--bottom" aria-hidden="true"></div>
@@ -576,6 +740,16 @@ export function renderLessonsHub(basePath = "") {
     ? fromHash
     : LESSON_DOMAINS[0].slug;
   activate(initial);
+
+  /* Lecțiile PDF, aduse O DATĂ pe pagină, pentru oricine. */
+  if (!_pdfAduse) {
+    _pdfAduse = true;
+    lectiiPdf().then((l) => {
+      if (!l.length) return;
+      _pdf = l;
+      renderLessonsHub(basePath);
+    });
+  }
 
   /* Filele și etichetele, aduse O DATĂ pe pagină, pentru oricine. */
   if (!_fileAduse) {

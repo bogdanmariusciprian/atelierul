@@ -1,0 +1,86 @@
+/* =========================================================
+   LECȚIA PDF (0105), la `lectii/pdf/#adresa`. Culoarea vine din
+   `--lesson-color`, pusă de `pdf-lesson.js` după domeniul lecției.
+   ========================================================= */
+
+.pdfl { max-width: 920px; margin: 0 auto; padding: 1.5rem 0 3rem; }
+
+.pdfl__cap { margin-bottom: 1rem; }
+.pdfl__inapoi {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  color: var(--lesson-color, var(--color-primary));
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.pdfl__inapoi:hover { text-decoration: underline; }
+.pdfl__titlu { margin: 0; font-size: clamp(1.5rem, 3vw, 2rem); }
+.pdfl__rezumat { margin: 0.4rem 0 0; color: var(--color-text-muted); }
+
+/* Bara de unelte rămâne sus cât derulezi foile. */
+.pdfl__bara {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--lesson-color, var(--color-primary)) 25%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface, #fff) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+.pdfl__pagina { font-size: 0.85rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.pdfl__marire, .pdfl__actiuni { display: inline-flex; align-items: center; gap: 0.35rem; }
+.pdfl__procent { min-width: 3.2em; text-align: center; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+.pdfl__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--lesson-color, var(--color-primary)) 40%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lesson-color, var(--color-primary));
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pdfl__btn:hover { background: color-mix(in srgb, var(--lesson-color, var(--color-primary)) 10%, transparent); }
+.pdfl__btn--plin {
+  background: var(--lesson-color, var(--color-primary));
+  border-color: var(--lesson-color, var(--color-primary));
+  color: #fff;
+}
+.pdfl__btn--plin:hover { filter: brightness(0.92); background: var(--lesson-color, var(--color-primary)); }
+
+/* Foile, una sub alta. La mărire se lățesc peste lățimea paginii și se
+   derulează în lateral, în cutia lor. */
+.pdfl__foi { --marire: 1; overflow-x: auto; }
+.pdfl__foaie {
+  width: calc(100% * var(--marire));
+  margin: 0 auto 1rem;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(0 0 0 / 0.12));
+  overflow: hidden;
+}
+.pdfl__foaie canvas { display: block; width: 100%; height: 100%; }
+
+.pdfl-stare { color: var(--color-text-muted); text-align: center; padding: 1rem 0; }
+.pdfl-gol { text-align: center; padding: 2rem 0; }
+
+@media (max-width: 560px) {
+  .pdfl__bara { top: 0.25rem; }
+  .pdfl__btn--text { display: none; }   /* pe telefon ajunge „Descarcă" */
+}
