@@ -501,7 +501,7 @@ body:has(.admin-quick__panel:not([hidden])) .liceu-fab {
 .domain-card--lectura       { --card-color: #ea580c; background: linear-gradient(135deg, #ffedd5, #fed7aa); } /* orange */
 .domain-card--fonetica      { --card-color: #dc2626; background: linear-gradient(135deg, #fee2e2, #fecaca); } /* red    */
 .domain-card--redactare     { --card-color: #0891b2; background: linear-gradient(135deg, #cffafe, #a5f3fc); } /* cyan   */
-.domain-card--literatura-liceu { --card-color: #db2777; background: linear-gradient(135deg, #fce7f3, #fbcfe8); } /* pink */
+.domain-card--literatura-liceu { --card-color: #334155; background: linear-gradient(135deg, #f1f5f9, #e2e8f0); } /* slate */
 
 /* Hover: lift + switch to the same fine violet gradient as the menu */
 .domain-card:hover {
