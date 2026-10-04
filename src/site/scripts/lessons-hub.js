@@ -11,6 +11,9 @@ import { fetchMyLessonProgress } from "../../shared/scripts/forum-repo.js";
 import { isAdmin, isLoggedIn } from "../../shared/scripts/session.js";
 import { publishedLessons } from "../../shared/scripts/lesson-proposals-repo.js";
 import { bacSlugs, puneBac } from "../../shared/scripts/lesson-badges-repo.js";
+import {
+  fileSiEtichete, adaugaFila, redenumesteFila, stergeFila, puneEticheta,
+} from "../../shared/scripts/lesson-tabs-repo.js";
 
 let _progressSynced = false; // pull server completion state once per page
 
@@ -28,6 +31,31 @@ let _propuse = [];
 const DOMENII_BAC = ["literatura-liceu"];
 let _bacAdus = false;
 let _bac = new Set();
+
+/* FILELE DIN PANOU (0104): „Toate", apoi filele domeniului („Curente
+   literare", „Opere", câte mai pune Marius). O lecție stă în oricâte file,
+   după eticheta pusă de el din pagină. Eticheta NU se vede lângă titlu, ca
+   „BAC": e doar locul în care se găsește lecția. Toate stau în bază și se aduc
+   o dată pe pagină. */
+const DOMENII_CU_FILE = ["literatura-liceu"];
+let _fileAduse = false;
+let _file = [];                    // [{ id, domeniu, nume, ordine }], în ordine
+let _etichete = new Map();         // fila_id → Set de slug-uri
+const _filaActiva = new Map();     // domeniu → id-ul filei ori "toate"
+let _editez = null;                // { domeniu, id } cât adminul scrie un nume (id null = filă nouă)
+let _eroareFila = "";
+
+const fileleDomeniului = (domeniu) => _file.filter((f) => f.domeniu === domeniu);
+const inFila = (filaId, lesson) => !!lesson.slug && !!_etichete.get(filaId)?.has(lesson.slug);
+
+/** Fila deschisă într-un domeniu; „toate" dacă fila aleasă nu mai există. */
+function filaActiva(domeniu) {
+  const id = _filaActiva.get(domeniu) || "toate";
+  return id === "toate" || _file.some((f) => f.id === id) ? id : "toate";
+}
+
+const scapa = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 const semnulBac = () =>
   `<span class="track-node__bac" role="img"
@@ -67,6 +95,18 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
     ? `<button class="track-node__bac-comutator${bac ? " is-on" : ""}" type="button"
                data-bac="${lesson.slug}" aria-pressed="${bac}"
                title="${bac ? "Scoate semnul BAC" : "Pune semnul BAC"}">BAC</button>`
+    : "";
+  /* Etichetele, tot doar pentru admin: câte un comutator pe filă. */
+  const etichete = lesson.slug && isAdmin() && DOMENII_CU_FILE.includes(lesson.domain)
+    ? fileleDomeniului(lesson.domain).map((f) => {
+        const pus = inFila(f.id, lesson);
+        return `<button class="track-node__eticheta${pus ? " is-on" : ""}" type="button"
+                        data-fila="${f.id}" data-slug="${lesson.slug}" aria-pressed="${pus}"
+                        title="${pus ? "Scoate din fila" : "Pune în fila"} „${scapa(f.nume)}”">${scapa(f.nume)}</button>`;
+      }).join("")
+    : "";
+  const unelte = comutator || etichete
+    ? `<span class="track-node__admin">${etichete}${comutator}</span>`
     : "";
   const ready = lesson.ready && lesson.href;
   const ring = `
@@ -123,7 +163,7 @@ function nodeMarkup(lesson, index, basePath, progress = 0) {
         <span class="track-node__title">${lesson.title}${tabla}${deElev}${bac ? semnulBac() : ""}</span>
         ${summary}
       </a>
-      ${comutator}
+      ${unelte}
     </li>`;
 }
 
@@ -196,6 +236,196 @@ function initLessonsSearch(mount, basePath) {
   });
 }
 
+/** Lista unui domeniu, după fila deschisă. Numerele încep de la 1 în fiecare filă. */
+function trackMarkup(domeniu, lessons, basePath) {
+  const activa = filaActiva(domeniu);
+  const arata = activa === "toate" ? lessons : lessons.filter((l) => inFila(activa, l));
+  if (arata.length) {
+    return `<ol class="lesson-track">${arata
+      .map((l, i) => nodeMarkup(l, i + 1, basePath, lessonProgress(l)))
+      .join("")}</ol>`;
+  }
+  return `<p class="lesson-track__empty">${lessons.length ? "Nicio lecție în fila asta încă." : "În curând."}</p>`;
+}
+
+/** Rândul cu file de deasupra listei. Gol dacă domeniul n-are file (și nu ești admin). */
+function fileMarkup(domeniu, lessons) {
+  if (!DOMENII_CU_FILE.includes(domeniu)) return "";
+  const file = fileleDomeniului(domeniu);
+  const admin = isAdmin();
+  if (!file.length && !admin) return "";
+  const activa = filaActiva(domeniu);
+  const numar = (id) => (id === "toate" ? lessons.length : lessons.filter((l) => inFila(id, l)).length);
+  const camp = (valoare) => `
+    <span class="domain-subtab domain-subtab--edit">
+      <input class="domain-subtab__input" type="text" maxlength="40" value="${scapa(valoare)}"
+             placeholder="Numele filei" aria-label="Numele filei" />
+      ${_eroareFila ? `<span class="domain-subtab__eroare">${scapa(_eroareFila)}</span>` : ""}
+    </span>`;
+
+  const butoane = [{ id: "toate", nume: "Toate" }, ...file].map((f) => {
+    if (_editez && _editez.domeniu === domeniu && _editez.id === f.id) return camp(f.nume);
+    const e = f.id === activa;
+    const adminFila = admin && e && f.id !== "toate"
+      ? `<span class="domain-subtab__unelte">
+           <button type="button" class="domain-subtab__unealta" data-redenumeste="${f.id}" title="Redenumește fila">✎</button>
+           <button type="button" class="domain-subtab__unealta" data-sterge="${f.id}" title="Șterge fila">×</button>
+         </span>`
+      : "";
+    return `<span class="domain-subtab-wrap">
+        <button type="button" class="domain-subtab${e ? " is-active" : ""}" role="tab"
+                aria-selected="${e}" data-fila="${f.id}">${scapa(f.nume)}<span class="domain-subtab__count">${numar(f.id)}</span></button>${adminFila}
+      </span>`;
+  }).join("");
+
+  const nou = admin
+    ? (_editez && _editez.domeniu === domeniu && _editez.id === null
+        ? camp("")
+        : `<button type="button" class="domain-subtab domain-subtab--add" data-adauga title="Filă nouă">+</button>`)
+    : "";
+  return `<div class="domain-subtabs__row" role="tablist" aria-label="File">${butoane}${nou}</div>`;
+}
+
+/** Redesenează filele și lista unui singur panou, fără să atingă restul paginii. */
+function redeseneazaPanoul(panel, basePath) {
+  const domeniu = panel.id;
+  const lessons = toateLectiile().filter((l) => l.domain === domeniu);
+  const vp = panel.querySelector(".domain-panel__viewport");
+  const sus = vp ? vp.scrollTop : 0;
+  panel.querySelector(".domain-subtabs").innerHTML = fileMarkup(domeniu, lessons);
+  panel.querySelector(".domain-panel__track").innerHTML = trackMarkup(domeniu, lessons, basePath);
+  if (vp) vp.scrollTop = sus;
+  leaga(panel, basePath);
+  panel.querySelector(".domain-subtab__input")?.focus();
+}
+
+/** Leagă butoanele dintr-o bucată de pagină (toată lista ori un singur panou). */
+function leaga(radacina, basePath) {
+  /* Comutatorul „BAC": schimbă semnul pe loc, în rândul lui, fără să
+     redeseneze lista (ar închide panoul extins și ar pierde derularea). */
+  radacina.querySelectorAll(".track-node__bac-comutator").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const slug = btn.dataset.bac;
+      btn.disabled = true;
+      const { ok, bac } = await puneBac(slug, !_bac.has(slug));
+      btn.disabled = false;
+      if (bac) _bac.add(slug); else _bac.delete(slug);
+      btn.classList.toggle("is-on", bac);
+      btn.setAttribute("aria-pressed", String(bac));
+      btn.title = bac ? "Scoate semnul BAC" : "Pune semnul BAC";
+      const titlu = btn.closest(".track-node").querySelector(".track-node__title");
+      titlu.querySelector(".track-node__bac")?.remove();
+      if (bac) titlu.insertAdjacentHTML("beforeend", semnulBac());
+      if (!ok) clatina(btn);
+    });
+  });
+
+  /* Eticheta: lecția intră ori iese din filă. Panoul se redesenează, fiindcă
+     se schimbă numerele de pe file și, în fila deschisă, chiar lista. */
+  radacina.querySelectorAll(".track-node__eticheta").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const { fila, slug } = btn.dataset;
+      btn.disabled = true;
+      const { ok, pus } = await puneEticheta(fila, slug, !inFila(fila, { slug }));
+      if (!_etichete.has(fila)) _etichete.set(fila, new Set());
+      if (pus) _etichete.get(fila).add(slug); else _etichete.get(fila).delete(slug);
+      const panel = btn.closest(".domain-panel");
+      redeseneazaPanoul(panel, basePath);
+      if (!ok) {
+        const nou = panel.querySelector(`.track-node__eticheta[data-fila="${fila}"][data-slug="${slug}"]`);
+        if (nou) clatina(nou);
+      }
+    });
+  });
+
+  radacina.querySelectorAll(".domain-subtab[data-fila]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const panel = btn.closest(".domain-panel");
+      _filaActiva.set(panel.id, btn.dataset.fila);
+      _editez = null;
+      redeseneazaPanoul(panel, basePath);
+    });
+  });
+
+  radacina.querySelectorAll("[data-adauga]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _editez = { domeniu: btn.closest(".domain-panel").id, id: null };
+      _eroareFila = "";
+      redeseneazaPanoul(btn.closest(".domain-panel"), basePath);
+    });
+  });
+
+  radacina.querySelectorAll("[data-redenumeste]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      _editez = { domeniu: btn.closest(".domain-panel").id, id: btn.dataset.redenumeste };
+      _eroareFila = "";
+      redeseneazaPanoul(btn.closest(".domain-panel"), basePath);
+    });
+  });
+
+  radacina.querySelectorAll("[data-sterge]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const f = _file.find((x) => x.id === btn.dataset.sterge);
+      if (!f) return;
+      if (!confirm(`Ștergi fila „${f.nume}”? Lecțiile rămân; pleacă doar din fila asta.`)) return;
+      btn.disabled = true;
+      if (await stergeFila(f.id)) {
+        _file = _file.filter((x) => x.id !== f.id);
+        _etichete.delete(f.id);
+        _filaActiva.set(f.domeniu, "toate");
+      }
+      redeseneazaPanoul(btn.closest(".domain-panel"), basePath);
+    });
+  });
+
+  /* Câmpul de nume: Enter salvează, Esc ori clicul în altă parte renunță. */
+  radacina.querySelectorAll(".domain-subtab__input").forEach((input) => {
+    const panel = input.closest(".domain-panel");
+    const renunta = () => {
+      if (!_editez) return;
+      _editez = null;
+      _eroareFila = "";
+      redeseneazaPanoul(panel, basePath);
+    };
+    let salvez = false;
+    input.addEventListener("keydown", async (e) => {
+      if (e.key === "Escape") { e.preventDefault(); renunta(); return; }
+      if (e.key !== "Enter" || salvez) return;
+      e.preventDefault();
+      salvez = true;
+      const { domeniu, id } = _editez;
+      const r = id === null
+        ? await adaugaFila(domeniu, input.value,
+            Math.max(0, ...fileleDomeniului(domeniu).map((f) => f.ordine)) + 1)
+        : await redenumesteFila(id, input.value);
+      salvez = false;
+      if (r.eroare) {
+        _eroareFila = r.eroare;
+        redeseneazaPanoul(panel, basePath);
+        const nou = panel.querySelector(".domain-subtab__input");
+        if (nou) nou.value = input.value;
+        return;
+      }
+      if (id === null) {
+        _file.push(r.fila);
+        _filaActiva.set(domeniu, r.fila.id);
+      } else {
+        _file = _file.map((f) => (f.id === id ? r.fila : f));
+      }
+      _editez = null;
+      _eroareFila = "";
+      redeseneazaPanoul(panel, basePath);
+    });
+    input.addEventListener("blur", () => { if (!salvez) setTimeout(renunta, 120); });
+  });
+}
+
+/** Un mic tremur: baza n-a primit schimbarea, iar butonul arată ce a rămas. */
+function clatina(el) {
+  el.animate([{ transform: "translateX(-3px)" }, { transform: "translateX(3px)" },
+    { transform: "none" }], { duration: 220 });
+}
+
 export function renderLessonsHub(basePath = "") {
   const mount = document.getElementById("lessons-hub");
   if (!mount) return;
@@ -231,11 +461,7 @@ export function renderLessonsHub(basePath = "") {
 
   const panels = LESSON_DOMAINS.map((domain) => {
     const lessons = catalog.filter((l) => l.domain === domain.slug);
-    const track = lessons.length
-      ? `<ol class="lesson-track">${lessons
-          .map((l, i) => nodeMarkup(l, i + 1, basePath, lessonProgress(l)))
-          .join("")}</ol>`
-      : `<p class="lesson-track__empty">În curând.</p>`;
+    const track = `<div class="domain-panel__track">${trackMarkup(domain.slug, lessons, basePath)}</div>`;
 
     // Dots are generated dynamically by fancy-scroll.js (as many as
     // needed for a smooth scroll), so this container starts empty.
@@ -259,6 +485,7 @@ export function renderLessonsHub(basePath = "") {
               <p class="domain-panel__meta">${countLabel(lessons.length)}</p>
             </div>
           </header>
+          <div class="domain-subtabs">${fileMarkup(domain.slug, lessons)}</div>
           ${track}
         </div>
         <div class="panel-blur panel-blur--top" aria-hidden="true"></div>
@@ -299,26 +526,7 @@ export function renderLessonsHub(basePath = "") {
     </div>`;
 
   initLessonsSearch(mount, basePath);
-
-  /* Comutatorul „BAC": schimbă semnul pe loc, în rândul lui, fără să
-     redeseneze lista (ar închide panoul extins și ar pierde derularea). */
-  mount.querySelectorAll(".track-node__bac-comutator").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const slug = btn.dataset.bac;
-      btn.disabled = true;
-      const { ok, bac } = await puneBac(slug, !_bac.has(slug));
-      btn.disabled = false;
-      if (bac) _bac.add(slug); else _bac.delete(slug);
-      btn.classList.toggle("is-on", bac);
-      btn.setAttribute("aria-pressed", String(bac));
-      btn.title = bac ? "Scoate semnul BAC" : "Pune semnul BAC";
-      const titlu = btn.closest(".track-node").querySelector(".track-node__title");
-      titlu.querySelector(".track-node__bac")?.remove();
-      if (bac) titlu.insertAdjacentHTML("beforeend", semnulBac());
-      if (!ok) btn.animate([{ transform: "translateX(-3px)" }, { transform: "translateX(3px)" },
-        { transform: "none" }], { duration: 220 });
-    });
-  });
+  leaga(mount, basePath);
 
   const tabButtons = mount.querySelectorAll(".domain-tab");
   const panelSections = mount.querySelectorAll(".domain-panel");
@@ -368,6 +576,17 @@ export function renderLessonsHub(basePath = "") {
     ? fromHash
     : LESSON_DOMAINS[0].slug;
   activate(initial);
+
+  /* Filele și etichetele, aduse O DATĂ pe pagină, pentru oricine. */
+  if (!_fileAduse) {
+    _fileAduse = true;
+    fileSiEtichete().then(({ file, etichete }) => {
+      if (!file.length) return;
+      _file = file;
+      _etichete = etichete;
+      renderLessonsHub(basePath);
+    });
+  }
 
   /* Semnele „BAC", aduse O DATĂ pe pagină, pentru oricine. */
   if (!_bacAdus) {
