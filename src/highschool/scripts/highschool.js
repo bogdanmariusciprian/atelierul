@@ -1695,6 +1695,9 @@ function mutaCardul(casa) {
   });
 
   window.addEventListener("resize", aseaza);
+  /* Cardul lungit cu planificarea poate ieși pe jos din ecran, dacă l-ai mutat
+     sus: se aduce înăuntru. Strâns, se întoarce unde l-ai pus. */
+  casa.addEventListener("hc:marime", aseaza);
   aseaza();
 }
 
@@ -1704,7 +1707,7 @@ function faCardul() {
   casa.className = "lic-orcard";
   casa.id = "lic-orcard";
   document.body.appendChild(casa);
-  card = hourCard(casa, oraDeArata, felulCardului);
+  card = hourCard(casa, oraDeArata, felulCardului, lectiileDinJur);
   mutaCardul(casa);
   /* Intrarea și ieșirea din ecranul plin, prinse pe loc. Cardul își verifică
      modul și singur, o dată pe secundă, dar o secundă de card larg peste un
@@ -1829,6 +1832,55 @@ function oraDeArata() {
     felZi: (d) => felulZilei(ziuaISO(d)),
     saptamanaLa: (d) => orarulLa(ziuaISO(d)).ore,
   });
+}
+
+/** Câte lecții se arată în cardul lungit, înainte și după cea de acum. */
+const IN_JUR = 4;
+
+/**
+ * Lecțiile din jurul celei de acum, pentru cardul lungit: patru din urmă,
+ * cea de acum ori cea care urmează, patru înainte.
+ *
+ * CARE E „CEA DE ACUM". În oră, ora de acum; în pauză și înainte de prima oră,
+ * cea care vine – pe acestea le aduce `fetchZiua` cu numărul lor din
+ * planificare. După ultima oră și în zilele fără ore, prima oră din următoarea
+ * zi de școală; aceea vine din orar, fără număr, deci se caută în planificare
+ * după clasă, dată și ceas.
+ *
+ * @returns {null | {clasa, seAduce?, randuri?}}
+ */
+function lectiileDinJur(s) {
+  if (!s) return null;
+  let o = null, data = ziuaISO();
+  if (["ora", "pauza", "inainte"].includes(s.fel)) o = s.ora;
+  else if (s.fel === "liber" && s.ora) { o = s.ora; data = ziuaISO(s.urmData); }
+  else if (s.fel === "gata" && s.urmator?.ora) { o = s.urmator.ora; data = ziuaISO(s.urmator.urmData); }
+  if (!o?.clasa) return null;
+
+  const clasa = o.clasa;
+  const plan = planuri[clasa];
+  if (!plan) {
+    aduPlanul(clasa).then(() => card && card.improspateaza());
+    return { clasa, seAduce: true };
+  }
+  if (plan.seAduce) return { clasa, seAduce: true };
+  const ore = plan.ore;
+  if (!ore.length) return { clasa, randuri: [] };
+
+  let i = o.nr ? ore.findIndex((r) => Number(r.nr) === Number(o.nr)) : -1;
+  if (i < 0) {
+    /* Fără număr: aceeași zi și același ceas; altfel prima oră din ziua aceea
+       ori de după ea (o oră mutată, o planificare încă neîmpărțită pe zile). */
+    const ceas = minute(o.start);
+    i = ore.findIndex((r) => r.data === data && minute(r.ora) === ceas);
+    if (i < 0) i = ore.findIndex((r) => r.data && r.data >= data);
+    if (i < 0) i = ore.length - 1;
+  }
+  return {
+    clasa,
+    randuri: ore.slice(Math.max(0, i - IN_JUR), i + IN_JUR + 1)
+      .map((r) => ({ nr: r.nr, data: r.data, titlu: r.titlu, aici: r === ore[i] })),
+  };
 }
 
 /* ---------------- urcarea unei fișe ---------------- */

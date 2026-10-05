@@ -20,6 +20,11 @@
 // schimbă starea. Un card refăcut de șaizeci de ori pe minut ar fi ținut placa
 // video trează degeaba și ar fi rupt animația pastilei la fiecare bătaie.
 //
+// UNDE EȘTI ÎN PLANIFICARE. Un click pe card îl lungește: patru lecții din
+// urmă (stinse), lecția de acum ori cea care urmează (scoasă în față) și
+// patru înainte, pentru clasa ei. Un click în afara cardului îl strânge la
+// loc. Lista i-o dă pagina (`lectiile`), cardul doar o desenează.
+//
 // ASCUNDEREA NU E ÎNCHIDERE. Rămâne un buton mic, ca să-l poți chema înapoi;
 // alegerea se ține pe cont, nu pe browser.
 //
@@ -158,6 +163,35 @@ function ziuaUrmatoare(s) {
   return `${zi}, ${s.urmData.getDate()} ${LUNI[s.urmData.getMonth()]}`;
 }
 
+/** „joi 8 oct", scurt, ca să încapă lângă titlu. */
+function ziScurta(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short" })
+    .replace(/\./g, "").replace(",", "");
+}
+
+/**
+ * Lista din cardul lungit: lecțiile din jurul celei de acum.
+ * @param {null | {clasa, seAduce?, randuri?: Array<{nr, data, titlu, aici}>}} l
+ */
+function lectiileHtml(l) {
+  if (!l) return `<div class="hc-plan"><p class="hc-plan__gol">Nu știu ce oră urmează.</p></div>`;
+  const cap = `<p class="hc-plan__cap">Planificarea la <b>${esc(l.clasa)}</b></p>`;
+  if (l.seAduce) return `<div class="hc-plan">${cap}<p class="hc-plan__gol">Se aduce planificarea…</p></div>`;
+  if (!l.randuri?.length) return `<div class="hc-plan">${cap}<p class="hc-plan__gol">Clasa n-are planificare.</p></div>`;
+  let trecut = true;
+  const randuri = l.randuri.map((r) => {
+    if (r.aici) trecut = false;
+    const fel = r.aici ? "aici" : trecut ? "trecut" : "viitor";
+    return `<li class="hc-plan__r hc-plan__r--${fel}"${r.aici ? ' aria-current="true"' : ""}>
+        <span class="hc-plan__nr">${esc(String(r.nr))}${r.data ? ` · ${esc(ziScurta(r.data))}` : ""}</span>
+        <span class="hc-plan__t" title="${esc(r.titlu || "")}">${esc(r.titlu || "fără titlu")}</span>
+      </li>`;
+  }).join("");
+  return `<div class="hc-plan">${cap}<ol class="hc-plan__l">${randuri}</ol></div>`;
+}
+
 /* SPATELE, cât ține pauza. Cifra mare de pe față spune „peste cât", dar în
    pauză vrei celălalt lucru: cât mai ai. În ultimul minut se numără secundele. */
 function spateHtml(s) {
@@ -224,12 +258,16 @@ function scurtHtml(s, acum, cuX) {
  *        fantoma    – fișa pe tot ecranul: la fel, dar stins și fără să prindă
  *                     apăsările, ca să poți atinge slide-ul de dedesubt
  */
-export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => "plin") {
+export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => "plin",
+                         lectiile = () => null) {
   if (!gazda) return { improspateaza() {}, opreste() {} };
 
   let peMinut = null, peSecunda = null, potrivire = null;
   let ultimFel = "", ultimulMod = "";
   let ascuns = iaLocal(CHEIE_ASCUNS, false) === true;
+  /* Lungit cu planificarea. Nu se ține minte: se strânge singur la primul
+     click în afara lui, deci la o pagină nouă pornește strâns. */
+  let deschis = false;
 
   /* PE TOT ECRANUL, CARDUL TREBUIE SĂ URCE ÎN „TOP LAYER".
      Un element trecut pe tot ecranul prin Fullscreen API se desenează într-un
@@ -292,13 +330,31 @@ export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => 
     ultimFel = s.fel;
     const pauza = s.fel === "pauza";
     gazda.innerHTML = `
-      <div class="hc hc--${esc(s.fel)}" role="status">
+      <div class="hc hc--${esc(s.fel)}${deschis ? " hc--deschis" : ""}" role="status"
+           title="${deschis ? "" : "Apasă ca să vezi unde ești în planificare"}">
         <button type="button" class="hc__x" data-act="hc-ascunde" aria-label="Ascunde">${X_SVG}</button>
         ${s.special ? `<span class="hc-special">${esc(s.special)}</span>` : ""}
         ${pauza ? spateHtml(s) : fataHtml(s, acum)}
+        ${deschis ? lectiileHtml(lectiile(s)) : ""}
       </div>`;
     if (pauza) bateTimerul(s);
   }
+
+  /* Cardul și-a schimbat înălțimea: pagina, care îl ține pe ecran, află. */
+  const anuntaMarimea = () => gazda.dispatchEvent(new CustomEvent("hc:marime"));
+
+  function strange() {
+    if (!deschis) return;
+    deschis = false;
+    deseneaza();
+    anuntaMarimea();
+  }
+  /* Un click în afara cardului îl strânge. Prins la captură, ca să ajungă aici
+     și când pagina oprește clickul mai jos. */
+  const peAfara = (e) => { if (deschis && !gazda.contains(e.target)) strange(); };
+  document.addEventListener("click", peAfara, true);
+  const laEsc = (e) => { if (e.key === "Escape") strange(); };
+  document.addEventListener("keydown", laEsc);
 
   /* Numai ceasul din pastilă, o dată pe secundă. Restul cardului nu se atinge. */
   function bateCeasul() {
@@ -324,7 +380,17 @@ export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => 
 
   function apasa(e) {
     const b = e.target.closest("[data-act]");
-    if (!b) return;
+    /* Click pe card, nu pe un buton: se lungește ori se strânge. Doar pe cardul
+       întreg; peste o fișă cardul e mic și n-are loc de listă. */
+    if (!b) {
+      /* Nu `e.target.closest(".hc")`: cardul se trage, iar tragerea îi prinde
+         pointerul, așa că un click simplu ajunge pe cutia din jur, nu pe card. */
+      if (ascuns || ultimulMod !== "plin" || !gazda.querySelector(".hc")) return;
+      deschis = !deschis;
+      deseneaza();
+      anuntaMarimea();
+      return;
+    }
     if (b.dataset.act === "hc-ascunde") ascuns = true;
     else if (b.dataset.act === "hc-arata") ascuns = false;
     else return;
@@ -362,6 +428,8 @@ export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => 
     opreste() {
       clearInterval(peSecunda); clearInterval(peMinut); clearTimeout(potrivire);
       gazda.removeEventListener("click", apasa);
+      document.removeEventListener("click", peAfara, true);
+      document.removeEventListener("keydown", laEsc);
       potrivesteStratul(false);
       gazda.innerHTML = "";
     },

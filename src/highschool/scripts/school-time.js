@@ -110,7 +110,13 @@ function stareaZileiDeCurs(acum, oreleZilei, oreLa, intervale, felZi) {
   }
 
   const urmatoarea = ore.find((o) => o.de > m);
-  if (!urmatoarea) return { fel: "gata", ultima: ore[ore.length - 1] };
+  /* După ultima oră, cardul poate arăta unde ești în planificare doar dacă
+     știe ce urmează: prima oră din următoarea zi de școală, ținută deoparte
+     (`urmator`), ca să nu se încurce cu ora din celelalte stări. */
+  if (!urmatoarea) {
+    return { fel: "gata", ultima: ore[ore.length - 1],
+             urmator: primaDinUrmatoareaZi(acum, oreLa, intervale, felZi) };
+  }
 
   /* Cât ține pauza: de la sfârșitul orei dinainte până la începutul celei care
      vine. Înainte de prima oră a zilei nu există „ora dinainte", deci bara se

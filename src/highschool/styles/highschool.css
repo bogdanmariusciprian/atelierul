@@ -528,6 +528,50 @@
 .hc-iv { font-size: 0.95rem; font-weight: 500; font-variant-numeric: tabular-nums; }
 .hc-sub { margin-block-start: 0.25rem; font-size: 0.85rem; color: var(--color-text-muted); }
 .hc-lectie { display: block; }
+/* ---- cardul lungit: unde ești în planificare ----
+   Patru lecții din urmă, stinse; cea de acum, scoasă în față și scrisă
+   întreagă; patru înainte. Titlurile lungi se taie pe un rând, iar întregul
+   stă în `title`. */
+.hc-plan {
+  margin-block-start: 0.7rem;
+  padding-block-start: 0.6rem;
+  border-block-start: 1px dashed var(--color-border);
+  animation: hc-plan 0.18s ease-out;
+}
+@keyframes hc-plan { from { opacity: 0; transform: translateY(-4px); } }
+.hc-plan__cap { margin: 0 0 0.35rem; font-size: 0.72rem; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--color-text-muted); }
+.hc-plan__cap b { color: var(--color-text); letter-spacing: 0; }
+.hc-plan__gol { margin: 0; font-size: 0.82rem; color: var(--color-text-muted); }
+.hc-plan__l { display: grid; gap: 0.1rem; margin: 0; padding: 0; list-style: none; }
+.hc-plan__r {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.14rem 0.4rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.hc-plan__nr { color: var(--color-text-muted); font-size: 0.72rem; font-variant-numeric: tabular-nums;
+  white-space: nowrap; }
+.hc-plan__t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hc-plan__r--trecut { opacity: 0.45; }
+.hc-plan__r--aici {
+  margin-block: 0.15rem;
+  padding-block: 0.35rem;
+  background: color-mix(in srgb, var(--color-primary) 13%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+  font-weight: 700;
+}
+.hc-plan__r--aici .hc-plan__t { white-space: normal; }
+.hc-plan__r--aici .hc-plan__nr { color: var(--color-primary-dark, var(--color-primary)); }
+/* Deschis, cardul se lățește puțin: titlurile din planificare sunt lungi. */
+.hc--deschis { inline-size: min(27rem, calc(100vw - 32px)); }
+/* Cât e strâns, cardul arată că se poate deschide. */
+.hc:not(.hc--deschis) { cursor: pointer; }
+
 /* Eticheta săptămânii speciale (Școala altfel, Săptămâna verde): orele rămân,
    dar se vede că săptămâna nu e una obișnuită. */
 .hc-special {
