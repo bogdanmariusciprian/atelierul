@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<title>#LaTablă: de la 5 la 26 de enunțuri – Atelierul-LRO</title>
+<title>#LaTablă: de la 5 la 18 enunțuri – Atelierul-LRO</title>
 <meta name="robots" content="noindex">
 <!-- Ascunsă până răspunde poarta de prelansare, ca la celelalte table. -->
 <style>html:not(.gate-ready) body { visibility: hidden; }</style>
@@ -15,13 +15,16 @@
   <div class="tr-cap__in">
     <a class="tr-inapoi" href="../" title="Înapoi la lecție" aria-label="Înapoi la lecție"><span aria-hidden="true">←</span></a>
     <span class="tr-marca"><span class="tr-marca__icon" aria-hidden="true"></span>#LaTablă</span>
-    <span class="tr-lectie">De la 5 la 26 de enunțuri</span>
+    <span class="tr-lectie">De la 5 la 18 enunțuri</span>
 
+    <!-- Treptele și câte enunțuri are fiecare parte pe ele: Intro, Reper 1,
+         Reper 2, Reper 3, Concluzie. Stau AICI, nu și în script (vezi
+         tabla-redactare.js): suma lor e numărul de pe buton. -->
     <div class="tr-trepte" role="tablist" aria-label="Câte enunțuri">
-      <button type="button" role="tab" class="tr-treapta" data-n="5">5</button>
-      <button type="button" role="tab" class="tr-treapta" data-n="8">8</button>
-      <button type="button" role="tab" class="tr-treapta" data-n="14">14</button>
-      <button type="button" role="tab" class="tr-treapta" data-n="26">26</button>
+      <button type="button" role="tab" class="tr-treapta" data-n="5" data-parti="1,1,1,1,1">5</button>
+      <button type="button" role="tab" class="tr-treapta" data-n="8" data-parti="1,2,2,2,1">8</button>
+      <button type="button" role="tab" class="tr-treapta" data-n="14" data-parti="1,4,4,4,1">14</button>
+      <button type="button" role="tab" class="tr-treapta" data-n="18" data-parti="1,4,8,4,1">18</button>
     </div>
 
     <div class="tr-unelte">

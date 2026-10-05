@@ -1,18 +1,31 @@
 // =========================================================
-// #LaTablă, redactare: de la 5 la 26 de enunțuri.
+// #LaTablă, redactare: de la 5 la 18 enunțuri.
 //
-// Patru trepte: 5, 8, 14, 26. Pe prima scrii cinci enunțuri. Pe fiecare
-// treaptă următoare, enunțurile de pe treapta dinainte se rescriu cu mai multe
-// detalii.
+// Cinci părți, mereu aceleași, în ordinea asta: Intro, Reper 1 - trăsături,
+// Reper 2 - scene semnificative, Reper 3 - structură și compoziție, Concluzie.
+// Pe prima treaptă e câte un enunț pe parte. Pe treptele următoare, unele părți
+// se rescriu în mai multe enunțuri, cu mai multe detalii, altele rămân cum erau.
 //
-// PRIMUL ȘI ULTIMUL NU SE DUBLEAZĂ, niciodată (regula lui Marius): pe fiecare
-// treaptă se rescriu într-un singur enunț. Fiecare enunț din mijloc se
-// dublează. De-aici numerele treptelor: 1 + 3×2 + 1 = 8, 1 + 6×2 + 1 = 14,
-// 1 + 12×2 + 1 = 26. (O vreme totalurile au fost 10, 20, 40, cu mijlocul
-// împărțit inegal; Marius a ales înapoi dublarea curată.)
+//   treapta   Intro  Reper 1  Reper 2  Reper 3  Concluzie
+//      5        1       1        1        1         1
+//      8        1       2        2        2         1
+//     14        1       4        4        4         1
+//     18        1       4        8        4         1
 //
-// O TREAPTĂ PE ECRAN. Deasupra fiecărui grup stă, stins, enunțul din care
-// pornește, ca să știi ce rescrii. Așa încape și pe proiector.
+// (regula lui Marius, 5 octombrie 2026). Intro și Concluzie nu se rescriu
+// niciodată: după treapta 5 apar gata scrise, fără câmp. La fel o parte care
+// are pe o treaptă tot atâtea enunțuri câte avea pe cea dinainte (Reper 1 și
+// Reper 3 la 18). O parte care crește se rescrie pe grupuri: fiecare enunț
+// de pe treapta dinainte stă deasupra, stins și fără număr, iar sub el sunt
+// câmpurile în care se desface (doi, la dublare).
+//
+// Toate enunțurile unei trepte sunt numerotate de la 1 la capăt, și cele gata
+// scrise; fără număr rămâne doar enunțul stins de deasupra unui grup.
+//
+// PĂRȚILE FIECĂREI TREPTE STAU ÎN PAGINĂ, pe butoane (`data-parti`), nu și
+// aici. Pagina și scriptul sunt ținute de browser fiecare pe socoteala lui,
+// până la 10 minute după un push (GitHub Pages); cu numerele scrise în două
+// locuri, o pagină nouă cu un script vechi ar fi avut butoane care nu fac nimic.
 //
 // LIVE (0106). Scrie doar adminul; tot ce scrie, plus treapta pe care e, pleacă
 // în bază și ajunge pe loc la toți cei care au tabla deschisă. Ceilalți citesc
@@ -28,16 +41,55 @@ import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeF
   from "../../shared/scripts/tabla-live-repo.js";
 
 const SLUG = "redactare-enunturi";
-/* TREPTELE SE CITESC DIN BUTOANELE PAGINII, nu se scriu și aici. Pagina și
-   scriptul sunt ținute de browser fiecare pe socoteala lui, până la 10 minute
-   după un push (GitHub Pages); cu numerele scrise în două locuri, o pagină
-   nouă cu un script vechi ar fi avut butoane care nu fac nimic. Așa, butonul
-   apăsat e mereu o treaptă pe care scriptul o cunoaște. */
-const TREPTE = (() => {
-  const din = [...document.querySelectorAll(".tr-treapta")]
-    .map((b) => Number(b.dataset.n)).filter((n) => n > 0);
-  return din.length ? din : [5, 8, 14, 26];
+
+/* Cele cinci părți, cu etichetele lor. */
+const PARTI = [
+  { cheie: "intro", eticheta: "Intro" },
+  { cheie: "r1", eticheta: "Reper 1 - trăsături" },
+  { cheie: "r2", eticheta: "Reper 2 - scene semnificative" },
+  { cheie: "r3", eticheta: "Reper 3 - structură și compoziție" },
+  { cheie: "concluzie", eticheta: "Concluzie" },
+];
+
+/* Treptele și câte enunțuri are fiecare parte pe ele, citite din butoane. */
+const STRUCTURA = (() => {
+  const din = [...document.querySelectorAll(".tr-treapta")].map((b) => {
+    const parti = String(b.dataset.parti || "").split(",").map(Number);
+    return { n: Number(b.dataset.n), parti };
+  }).filter((t) => t.n > 0 && t.parti.length === PARTI.length
+    && t.parti.every((x) => x > 0) && t.parti.reduce((a, x) => a + x, 0) === t.n);
+  return din.length ? din : [
+    { n: 5, parti: [1, 1, 1, 1, 1] }, { n: 8, parti: [1, 2, 2, 2, 1] },
+    { n: 14, parti: [1, 4, 4, 4, 1] }, { n: 18, parti: [1, 4, 8, 4, 1] },
+  ];
 })();
+const TREPTE = STRUCTURA.map((t) => t.n);
+const partiLa = (n) => STRUCTURA.find((t) => t.n === n).parti;
+const treaptaDinainte = (n) => TREPTE[TREPTE.indexOf(n) - 1];
+/** Unde începe partea `p` în enunțurile treptei `n`. */
+const inceputul = (n, p) => partiLa(n).slice(0, p).reduce((a, x) => a + x, 0);
+
+/**
+ * Partea `p` se scrie pe treapta `n`? Pe prima treaptă, da, toate. Mai sus,
+ * doar dacă are mai multe enunțuri decât pe treapta dinainte; altfel ia
+ * enunțurile de acolo, gata scrise.
+ */
+function seScrie(n, p) {
+  const sus = treaptaDinainte(n);
+  return !sus || partiLa(n)[p] > partiLa(sus)[p];
+}
+
+/**
+ * Textul enunțului `j` din partea `p`, pe treapta `n`. O parte care nu se
+ * scrie pe treapta asta îl ia de pe treapta dinainte (și tot așa, în jos).
+ * @returns {{text: string, n: number, i: number}} unde stă de fapt enunțul
+ */
+function enuntul(n, p, j) {
+  if (!seScrie(n, p)) return enuntul(treaptaDinainte(n), p, j);
+  const i = inceputul(n, p) + j;
+  return { text: enunturi[n][i] || "", n, i };
+}
+
 const CHEIE_MARIME = "tabla-redactare:marime";
 /* Cât se așteaptă după ultima tastă până se trimite. Destul de scurt ca să
    pară live, destul de lung ca să nu plece o cerere la fiecare literă. */
@@ -62,7 +114,7 @@ function normalizeaza(d) {
   const f = d?.fisa;
   const fisa = f && /^[a-z0-9-]+\.docx$/.test(String(f.fisier || ""))
     ? { fisier: f.fisier, nume: String(f.nume || "fișa.docx"), marime: Number(f.marime) || 0 } : null;
-  return { treapta: TREPTE.includes(Number(d?.treapta)) ? Number(d.treapta) : 5, enunturi: e, fisa };
+  return { treapta: TREPTE.includes(Number(d?.treapta)) ? Number(d.treapta) : TREPTE[0], enunturi: e, fisa };
 }
 
 let scriu = isAdmin();
@@ -71,61 +123,60 @@ let { treapta, enunturi, fisa } = normalizeaza(null);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function camp(n, i) {
+/** Un enunț de scris: numărul lui pe treaptă și câmpul. */
+function camp(n, i, nr) {
   return `<div class="tr-rand">
-      <span class="tr-nr">${i + 1}.</span>
+      <span class="tr-nr">${nr}.</span>
       <textarea class="tr-camp" rows="1" data-n="${n}" data-i="${i}"${scriu ? "" : " readonly tabindex=\"-1\""}
-        aria-label="Enunțul ${i + 1} din ${n}" placeholder="${scriu ? `Enunțul ${i + 1}` : ""}">${esc(enunturi[n][i])}</textarea>
+        aria-label="Enunțul ${nr} din ${n}" placeholder="${scriu ? `Enunțul ${nr}` : ""}">${esc(enunturi[n][i])}</textarea>
     </div>`;
 }
 
-function textParinte(sus, k) {
-  const p = enunturi[sus][k].trim();
-  return p ? esc(p) : `<em>enunțul ${k + 1} de la ${sus} e încă gol</em>`;
-}
-
-/** Treapta dinainte (8 → 5, 14 → 8, 26 → 14). */
-const treaptaDinainte = (n) => TREPTE[TREPTE.indexOf(n) - 1];
-
-/**
- * Cum se împart enunțurile treptei `n` pe enunțurile treptei dinainte.
- * Primul și ultimul au câte un singur „copil"; cele din mijloc își împart
- * restul. La 5 / 8 / 14 / 26 iese exact câte doi fiecare; dacă pagina ar avea
- * alte numere, restul se împarte cât mai egal, cu unul în plus la cele dintâi,
- * ca tabla să meargă oricum.
- * @returns {Array<{parinte: number, copii: number[], capat: "" | "primul" | "ultimul"}>}
- */
-function grupuri(n) {
-  const sus = treaptaDinainte(n);
-  const mijlocSus = sus - 2;
-  const mijlocJos = n - 2;
-  const baza = Math.floor(mijlocJos / mijlocSus);
-  const inPlus = mijlocJos % mijlocSus;
-  const g = [{ parinte: 0, copii: [0], capat: "primul" }];
-  let i = 1;
-  for (let k = 0; k < mijlocSus; k++) {
-    const cati = baza + (k < inPlus ? 1 : 0);
-    g.push({ parinte: k + 1, copii: Array.from({ length: cati }, (_, j) => i + j), capat: "" });
-    i += cati;
-  }
-  g.push({ parinte: sus - 1, copii: [n - 1], capat: "ultimul" });
-  return g;
+/** Un enunț gata scris, adus de pe o treaptă de mai jos: cu număr, fără câmp. */
+function fix(text, nr) {
+  return `<div class="tr-rand tr-rand--fix">
+      <span class="tr-nr">${nr}.</span>
+      <p class="tr-fix">${text.trim() ? esc(text) : "<em>încă nescris</em>"}</p>
+    </div>`;
 }
 
 function deseneaza() {
   const n = treapta;
+  const sus = treaptaDinainte(n);
   document.body.classList.toggle("tr--citeste", !scriu);
-  if (n === 5) {
-    foaie.innerHTML = `<div class="tr-grup tr-grup--prima">${
-      Array.from({ length: 5 }, (_, i) => camp(5, i)).join("")}</div>`;
-  } else {
-    const sus = treaptaDinainte(n);
-    foaie.innerHTML = grupuri(n).map((g) => `<div class="tr-grup${g.capat ? " tr-grup--capat" : ""}">
-          ${g.capat ? `<span class="tr-capat">${g.capat === "primul" ? "primul enunț" : "ultimul enunț"} · rămâne unul</span>` : ""}
-          <p class="tr-parinte" data-k="${g.parinte}"><span class="tr-nr">${g.parinte + 1}.</span><span class="tr-parinte__t">${textParinte(sus, g.parinte)}</span></p>
-          ${g.copii.map((i) => camp(n, i)).join("")}
-        </div>`).join("");
-  }
+  let nr = 0;
+  foaie.innerHTML = PARTI.map((parte, p) => {
+    const cati = partiLa(n)[p];
+    let corp = "";
+    if (!seScrie(n, p)) {
+      /* Gata scrisă: enunțurile de pe treapta dinainte, numerotate aici. */
+      corp = Array.from({ length: cati }, (_, j) => fix(enuntul(n, p, j).text, ++nr)).join("");
+    } else if (!sus) {
+      /* Prima treaptă: câte un câmp. */
+      corp = Array.from({ length: cati }, (_, j) => camp(n, inceputul(n, p) + j, ++nr)).join("");
+    } else {
+      /* Partea crește: pe grupuri, câte unul pentru fiecare enunț de mai jos.
+         Câți copii are fiecare: cât mai egal, cu unul în plus la cele dintâi
+         (la dublare iese exact doi). */
+      const parinti = partiLa(sus)[p];
+      const baza = Math.floor(cati / parinti);
+      const inPlus = cati % parinti;
+      let j = 0;
+      corp = Array.from({ length: parinti }, (_, k) => {
+        const copii = baza + (k < inPlus ? 1 : 0);
+        const parinte = enuntul(sus, p, k).text.trim();
+        const html = `<div class="tr-subgrup">
+            <p class="tr-parinte">${parinte ? esc(parinte) : "<em>enunțul de mai jos e încă gol</em>"}</p>
+            ${Array.from({ length: copii }, () => camp(n, inceputul(n, p) + j++, ++nr)).join("")}
+          </div>`;
+        return html;
+      }).join("");
+    }
+    return `<section class="tr-grup tr-grup--${parte.cheie}${seScrie(n, p) ? "" : " tr-grup--fix"}">
+        <span class="tr-eticheta">${esc(parte.eticheta)}</span>
+        ${corp}
+      </section>`;
+  }).join("");
   document.querySelectorAll(".tr-treapta").forEach((b) => {
     const e = Number(b.dataset.n) === n;
     b.classList.toggle("is-on", e);
@@ -138,31 +189,18 @@ function deseneaza() {
   deseneazaFisa();
 }
 
-/** La cititor, o schimbare venită live: se pun doar textele, fără redesen,
- *  ca pagina să nu clipească și să nu sară derularea la fiecare literă. */
-function improspateazaTextele() {
-  foaie.querySelectorAll(".tr-camp").forEach((t) => {
-    const v = enunturi[t.dataset.n][Number(t.dataset.i)];
-    if (t.value !== v) { t.value = v; potriveste(t); }
-  });
-  if (treapta > 5) {
-    foaie.querySelectorAll(".tr-parinte").forEach((p) => {
-      const h = textParinte(treaptaDinainte(treapta), Number(p.dataset.k));
-      const t = p.querySelector(".tr-parinte__t");
-      if (t.innerHTML !== h) t.innerHTML = h;
-    });
-  }
-  numara();
-}
-
 /* Câmpul crește odată cu enunțul, fără bară de derulare în el. */
 function potriveste(t) {
   t.style.height = "auto";
   t.style.height = `${t.scrollHeight}px`;
 }
 
+/** Câte enunțuri ale treptei au text, cu tot cu cele gata scrise. */
 function numara() {
-  const gata = enunturi[treapta].filter((x) => x.trim()).length;
+  let gata = 0;
+  PARTI.forEach((_, p) => {
+    for (let j = 0; j < partiLa(treapta)[p]; j++) if (enuntul(treapta, p, j).text.trim()) gata++;
+  });
   scrise.textContent = `${gata} / ${treapta} scrise`;
 }
 
@@ -240,7 +278,7 @@ document.getElementById("goleste").addEventListener("click", async () => {
   if (!confirm("Ștergi enunțurile de pe toate cele patru trepte? Se șterg și la elevi. Fișa Word rămâne.")) return;
   clearTimeout(ceas);
   enunturi = gol();
-  treapta = 5;
+  treapta = TREPTE[0];
   deseneaza();
   arataStarea("se golește…", "trimite");
   await trimite();
@@ -373,10 +411,14 @@ urmaresteTabla(SLUG, (d) => {
   if (scriu) return;
   const nou = normalizeaza(d);
   const altaTreapta = nou.treapta !== treapta;
-  const altaFisa = (nou.fisa?.fisier || "") !== (fisa?.fisier || "");
   ({ treapta, enunturi, fisa } = nou);
-  if (altaTreapta) { deseneaza(); document.querySelector(".tr-zona").scrollTop = 0; }
-  else { improspateazaTextele(); if (altaFisa) deseneazaFisa(); }
+  /* Cititorul nu scrie nimic, deci tabla se poate desena din nou la fiecare
+     schimbare, fără să-i strice vreun câmp. Derularea rămâne unde era, afară
+     de trecerea pe altă treaptă. Fișa nu se redesenează dacă e aceeași. */
+  const zona = document.querySelector(".tr-zona");
+  const unde = zona.scrollTop;
+  deseneaza();
+  zona.scrollTop = altaTreapta ? 0 : unde;
 }, (conectat) => {
   if (scriu) { if (conectat && stareEl.dataset.fel === "trimite" && !inZbor) arataStarea("live", "live"); return; }
   arataStarea(conectat ? "live" : "fără legătură live", conectat ? "live" : "eroare");
