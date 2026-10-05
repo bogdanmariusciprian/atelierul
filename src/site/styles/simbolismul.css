@@ -476,3 +476,115 @@
   .sb-curent__col, .sb-curent__plus { padding-inline: 0.85rem; }
   .sb-vers { white-space: normal; }
 }
+
+/* ---- exercițiile: grilă cu lămuriri (grila.js) ----
+   Nu notează. O variantă apăsată se colorează și își deschide lămurirea
+   chiar sub ea, ca elevul să citească de ce, nu doar dacă. */
+.gx-intro { margin: 0 0 0.6rem; }
+.gx-contor {
+  display: inline-block;
+  margin: 0 0 0.4rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lesson-color) 9%, transparent);
+  color: var(--lesson-color);
+  font-size: 0.88rem;
+}
+.gx-contor b { color: var(--lesson-color); font-variant-numeric: tabular-nums; }
+.gx-grup {
+  margin: 1.8rem 0 0.3rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lesson-color);
+}
+.gx-grup__sub { margin: 0 0 0.8rem; color: var(--color-text-muted); font-size: 0.92rem; }
+.gx-lista { display: grid; gap: 0.8rem; margin-top: 0.6rem; }
+
+.gx {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+.gx.is-gasita { border-color: color-mix(in srgb, var(--sb-retine) 45%, var(--color-border)); }
+.sb .gx__q { position: relative; margin: 0 0 0.7rem; padding-left: 2.4rem; font-weight: 600; line-height: 1.5; text-align: left; hyphens: manual; }
+.gx__nr {
+  position: absolute;
+  left: 0;
+  top: -0.05rem;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: var(--lesson-color);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.gx.is-gasita .gx__nr { background: var(--sb-retine); }
+
+.gx__var { display: grid; gap: 0.4rem; margin: 0; padding: 0; list-style: none; counter-reset: gx; }
+.gx__var > li { counter-increment: gx; }
+.gx__opt {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.8rem 0.55rem 2.2rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.gx__opt::before {
+  content: counter(gx, lower-alpha) ")";
+  position: absolute;
+  left: 0.8rem;
+  top: 0.55rem;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+.gx__opt:hover { border-color: var(--lesson-color); }
+.gx__opt.is-buna { border-color: var(--sb-retine); background: color-mix(in srgb, var(--sb-retine) 8%, #fff); }
+.gx__opt.is-buna::before { content: "✓"; color: var(--sb-retine); }
+.gx__opt.is-gresita { border-color: color-mix(in srgb, var(--sb-respinge) 60%, transparent); background: color-mix(in srgb, var(--sb-respinge) 5%, #fff); }
+.gx__opt.is-gresita::before { content: "✗"; color: var(--sb-respinge); }
+
+.gx__lam {
+  margin: 0.35rem 0 0.3rem 1.6rem;
+  padding: 0.55rem 0.8rem;
+  border-left: 3px solid var(--sb-respinge);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--sb-respinge) 5%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  text-align: justify;
+  hyphens: auto;
+  animation: sb-bula 0.18s ease-out;
+}
+.gx__lam::before { content: "De ce nu: "; font-weight: 700; color: var(--sb-respinge); }
+.gx__opt.is-buna + .gx__lam { border-left-color: var(--sb-retine); background: color-mix(in srgb, var(--sb-retine) 6%, transparent); }
+.gx__opt.is-buna + .gx__lam::before { content: "Corect. "; color: var(--sb-retine); }
+
+/* După ce s-a găsit răspunsul, celelalte variante rămân de deschis. */
+.gx.is-gasita .gx__opt:not(.is-buna):not(.is-gresita)::after {
+  content: "de ce nu?";
+  margin-left: 0.6rem;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .gx { padding: 0.85rem 0.8rem; }
+  .gx__lam { margin-left: 0.6rem; text-align: left; }   /* rând îngust: fără goluri între cuvinte */
+}
