@@ -165,6 +165,14 @@ export const LESSONS = [
     summary: "Poemul întreg, pe tablouri, cu adnotări și zece imagini.",
     ready: true,
   },
+  {
+    domain: "literatura-liceu",
+    slug: "literatura-simbolismul",
+    title: "Simbolismul",
+    href: "lectii/literatura-liceu/simbolismul/",
+    summary: "De la manifestul lui Moréas la trăsăturile curentului.",
+    ready: true,
+  },
 ];
 
 /** The lesson entry for a STABLE slug (or null). Use this instead of

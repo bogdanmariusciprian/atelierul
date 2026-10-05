@@ -1,0 +1,462 @@
+/* =========================================================
+   Lecția „Simbolismul" (Literatură, liceu).
+
+   Lecția e multă teorie, scrisă în notițe scurte. Stilul de aici n-adaugă
+   nimic la ea: o face să se citească pe bucăți, cu ochiul. Ce se compară
+   (curentele, cele trei boli) stă alăturat, ce se înșiră în timp (poeții)
+   stă pe o linie, iar povestea lungă stă închisă până o ceri.
+   Culoarea vine din `--lesson-color` (ardezia domeniului).
+   ========================================================= */
+
+.sb { --sb-retine: #15803d; --sb-respinge: #b4232a; }
+.sb .lesson-section { scroll-margin-top: 5rem; }
+.sb .lesson-section__title { margin-bottom: 1rem; }
+.sb b, .sb strong { color: var(--color-text); }
+
+/* ---- cuprinsul: un rând de pastile spre secțiuni ---- */
+.sb-cuprins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1.2rem 0 0.4rem;
+  padding: 0;
+  list-style: none;
+}
+.sb-cuprins a {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--lesson-color) 30%, transparent);
+  border-radius: 999px;
+  color: var(--lesson-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.sb-cuprins a:hover { background: color-mix(in srgb, var(--lesson-color) 9%, transparent); }
+.sb-indiciu { margin: 0.6rem 0 0; font-size: 0.84rem; color: var(--color-text-muted); }
+
+/* ---- săgeata din notițe („→"), ținută în culoarea lecției ---- */
+.sb-sag { color: var(--lesson-color); font-weight: 700; padding-inline: 0.15em; }
+
+/* ---- cuvântul cu lămurire ---- */
+.glosa {
+  border-bottom: 2px dotted color-mix(in srgb, var(--lesson-color) 70%, transparent);
+  cursor: help;
+  border-radius: 2px;
+  transition: background 0.12s;
+}
+.glosa:hover, .glosa.is-open, .glosa:focus-visible {
+  background: color-mix(in srgb, var(--lesson-color) 11%, transparent);
+  outline: none;
+}
+.glosa--pastila {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.02rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--lesson-color) 35%, transparent);
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--lesson-color);
+  vertical-align: 0.1em;
+}
+.glosa--pastila:hover, .glosa--pastila.is-open { background: var(--lesson-color); color: #fff; }
+
+.glosa-bula {
+  position: absolute;
+  z-index: 60;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--lesson-color, #334155) 35%, transparent);
+  border-top: 3px solid var(--lesson-color, #334155);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-text);
+  box-shadow: 0 10px 30px rgb(15 23 42 / 0.16);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  animation: sb-bula 0.14s ease-out;
+}
+.glosa-bula[data-parte="sus"] { border-top-width: 1px; border-bottom: 3px solid var(--lesson-color, #334155); }
+.glosa-bula:focus { outline: none; }
+.glosa-bula[hidden] { display: none; }
+@keyframes sb-bula { from { opacity: 0; transform: translateY(-3px); } }
+
+/* ---- citatele ---- */
+.sb-citat {
+  position: relative;
+  margin: 1rem 0;
+  padding: 0.9rem 1.1rem 0.9rem 2.6rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--lesson-color) 5%, var(--color-bg));
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+.sb-citat::before {
+  content: "„";
+  position: absolute;
+  left: 0.75rem;
+  top: 0.1rem;
+  font-family: Georgia, serif;
+  font-size: 2.6rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--lesson-color) 45%, transparent);
+}
+.sb-citat p { margin: 0; font-style: italic; }
+.sb-citat footer { margin-top: 0.45rem; font-size: 0.84rem; color: var(--color-text-muted); }
+
+/* ---- notițele obișnuite ---- */
+.sb-note { margin: 0.6rem 0; padding-left: 1.2rem; line-height: 1.7; }
+.sb-note > li { margin-bottom: 0.5rem; }
+.sb-note > li::marker { color: var(--lesson-color); }
+
+/* ---- „ce definește curentul": cinci cartonașe ---- */
+.sb-defineste {
+  margin: 1.4rem 0 0.4rem;
+  font-weight: 700;
+}
+.sb-cinci {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: sb-cinci;
+}
+.sb-cinci li {
+  counter-increment: sb-cinci;
+  position: relative;
+  padding: 0.75rem 0.9rem 0.75rem 2.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+.sb-cinci li::before {
+  content: counter(sb-cinci);
+  position: absolute;
+  left: 0.8rem;
+  top: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lesson-color) 12%, transparent);
+  color: var(--lesson-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.sb-cinci b, .sb-cheie { color: var(--lesson-color); }
+
+/* ---- ce reține și ce respinge: un cartonaș pe curent ---- */
+.sb-curente { display: grid; gap: 0.9rem; margin-top: 1rem; }
+.sb-curent {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+.sb-curent__cap {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--lesson-color) 6%, var(--color-bg));
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.sb-curent__cap b { color: var(--lesson-color); font-size: 1.08rem; }
+.sb-curent__doua { display: grid; grid-template-columns: 1fr 1fr; }
+.sb-curent__col { padding: 0.75rem 1rem 0.85rem; font-size: 0.93rem; line-height: 1.6; }
+.sb-curent__col + .sb-curent__col { border-left: 1px dashed var(--color-border); }
+.sb-curent__col p { margin: 0; }
+.sb-eticheta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sb-eticheta::before {
+  display: grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  line-height: 1;
+}
+.sb-eticheta--retine { color: var(--sb-retine); }
+.sb-eticheta--retine::before { content: "+"; background: var(--sb-retine); }
+.sb-eticheta--respinge { color: var(--sb-respinge); }
+.sb-eticheta--respinge::before { content: "−"; background: var(--sb-respinge); }
+.sb-eticheta--propune { color: var(--lesson-color); }
+.sb-eticheta--propune::before { content: "→"; background: var(--lesson-color); font-size: 0.7rem; }
+.sb-curent__plus {
+  padding: 0.7rem 1rem 0.8rem;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--lesson-color) 4%, transparent);
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+.sb-curent__plus p { margin: 0; }
+
+/* ---- chenarul evidențiat: fraza de ținut minte ---- */
+.sb-chenar {
+  position: relative;
+  margin: 1.4rem 0;
+  padding: 1.1rem 1.3rem 1.1rem 3.4rem;
+  border: 2px solid var(--lesson-color);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--lesson-color) 7%, #fff);
+  font-size: 1.08rem;
+  font-weight: 600;
+  line-height: 1.55;
+}
+.sb-chenar::before {
+  content: "!";
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--lesson-color);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.sb-chenar p { margin: 0; }
+
+/* ---- cele trei boli ale secolului ---- */
+.sb-boli {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+}
+.sb-boala {
+  position: relative;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+.sb-boala::before {        /* bara de sus: tot mai închisă, de la o boală la alta */
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  border-radius: 14px 14px 0 0;
+  background: color-mix(in srgb, var(--lesson-color) var(--sb-ton, 40%), transparent);
+}
+.sb-boala:nth-child(2) { --sb-ton: 70%; }
+.sb-boala:nth-child(3) { --sb-ton: 100%; }
+.sb-boala__nume {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
+  font-style: italic;
+  color: var(--lesson-color);
+}
+.sb-boala p { margin: 0; }
+
+/* ---- precursorii ---- */
+.sb-precursori { display: grid; gap: 0.9rem; }
+.sb-poet {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr;
+  gap: 0 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+}
+.sb-poet__init {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  background: var(--lesson-color);
+  color: #fff;
+  font-family: Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.sb-poet__nume { margin: 0.2rem 0 0.4rem; font-size: 1.12rem; color: var(--lesson-color); }
+.sb-poet .sb-note { margin: 0; }
+.sb-poet__text { margin: 0; line-height: 1.7; }
+.sb-poet .sb-note > li:last-child { margin-bottom: 0; }
+.sb-pastila {
+  display: inline-block;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lesson-color) 12%, transparent);
+  color: var(--lesson-color);
+  font-weight: 700;
+  font-size: 0.92em;
+}
+.sb-retine {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+  margin-top: 0.9rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--lesson-color);
+  border-radius: 0 12px 12px 0;
+  background: var(--color-surface);
+  font-weight: 600;
+}
+
+/* ---- cronologia: o linie verticală, cu un punct pe poet ---- */
+.sb-cron { position: relative; margin: 0.4rem 0 0; padding: 0; list-style: none; }
+.sb-cron > li { position: relative; padding: 0 0 1.3rem 2.4rem; }
+.sb-cron > li:not(:last-child)::after {   /* bucata de linie până la punctul următor */
+  content: "";
+  position: absolute;
+  left: 0.57rem;
+  top: 1.3rem;
+  bottom: -0.35rem;
+  width: 2px;
+  background: color-mix(in srgb, var(--lesson-color) 45%, transparent);
+}
+.sb-cron > li::before {
+  content: "";
+  position: absolute;
+  left: 0.15rem;
+  top: 0.35rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 3px solid var(--lesson-color);
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+.sb-cron__nume { display: block; margin-bottom: 0.15rem; font-size: 1.08rem; font-weight: 700; }
+.sb-cron__ce { margin: 0; font-size: 0.95rem; line-height: 1.65; }
+.sb-cron__mic { color: var(--color-text-muted); font-size: 0.9em; }
+.sb-cron .sb-citat { margin: 0.6rem 0 0; font-size: 0.95rem; }
+.sb-cron > li.sb-cron__sfarsit { padding-bottom: 0; }
+.sb-cron > li.sb-cron__sfarsit::before { background: var(--lesson-color); }
+.sb-cron__sfarsit .sb-cron__ce { padding: 0.75rem 1rem; border-radius: 12px; background: var(--color-surface); }
+
+/* ---- povestea: închisă până o ceri ---- */
+.sb-poveste {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+.sb-poveste > summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  cursor: pointer;
+  list-style: none;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--lesson-color) 10%, #fff), #fff 70%);
+}
+.sb-poveste > summary::-webkit-details-marker { display: none; }
+.sb-poveste__ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 12px;
+  background: var(--lesson-color);
+  color: #fff;
+  font-size: 1.2rem;
+}
+.sb-poveste__titlu { flex: 1; margin: 0; font-size: 1.1rem; }
+.sb-poveste__buton {
+  flex: none;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: var(--lesson-color);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.sb-poveste__buton::after { content: "Citește povestea"; }
+.sb-poveste[open] .sb-poveste__buton { background: transparent; color: var(--lesson-color); border: 1px solid var(--lesson-color); }
+.sb-poveste[open] .sb-poveste__buton::after { content: "Ascunde povestea"; }
+.sb-poveste__corp {
+  padding: 0.4rem 1.4rem 1.4rem;
+  border-top: 1px solid var(--color-border);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+.sb-poveste__corp h3 {
+  margin: 1.6rem 0 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lesson-color);
+}
+.sb-poveste__corp p { margin: 0 0 0.9rem; }
+.sb-poveste__corp .sb-chenar { font-family: var(--font-body); font-size: 1.02rem; }
+
+/* ---- trăsăturile: opt, numerotate ---- */
+.sb-trasaturi { display: grid; gap: 0.7rem; margin: 0; padding: 0; list-style: none; counter-reset: sb-tr; }
+.sb-trasatura {
+  counter-increment: sb-tr;
+  display: grid;
+  grid-template-columns: 2.1rem 1fr;
+  gap: 0 0.9rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+}
+.sb-trasatura::before {
+  content: counter(sb-tr);
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: var(--lesson-color);
+  color: #fff;
+  font-weight: 700;
+}
+.sb-trasatura__nume { margin: 0.25rem 0 0.3rem; font-size: 1.02rem; color: var(--lesson-color); }
+.sb-trasatura p { margin: 0; font-size: 0.95rem; line-height: 1.65; }
+.sb-vers {
+  padding: 0 0.3rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--lesson-color) 9%, transparent);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+/* ---- telefon ---- */
+@media (max-width: 640px) {
+  .sb-curent__doua { grid-template-columns: 1fr; }
+  .sb-curent__col + .sb-curent__col { border-left: none; border-top: 1px dashed var(--color-border); }
+  .sb-boli { grid-template-columns: 1fr; }
+  .sb-poet { grid-template-columns: 1fr; }
+  .sb-poet__init { width: 2.6rem; height: 2.6rem; font-size: 1rem; margin-bottom: 0.4rem; }
+  .sb-poveste > summary { flex-wrap: wrap; }
+  .sb-poveste__corp { padding-inline: 1rem; font-size: 1rem; }
+  .sb-chenar { padding-left: 3rem; font-size: 1rem; }
+  .sb-trasatura { grid-template-columns: 1.8rem 1fr; gap: 0 0.7rem; padding: 0.8rem; }
+  .sb-trasatura::before { width: 1.8rem; height: 1.8rem; font-size: 0.9rem; }
+  .sb-vers { white-space: normal; }
+}
