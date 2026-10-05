@@ -481,25 +481,81 @@
    Nu notează. O variantă apăsată se colorează și își deschide lămurirea
    chiar sub ea, ca elevul să citească de ce, nu doar dacă. */
 .gx-intro { margin: 0 0 0.6rem; }
-.gx-contor {
-  display: inline-block;
-  margin: 0 0 0.4rem;
-  padding: 0.3rem 0.85rem;
+/* Caruselul: o întrebare pe rând. Capul spune din ce grup e și unde ești,
+   jos sunt pașii și câte un punct pe întrebare (verde = lămurită). */
+.gx-carusel { display: grid; gap: 0.8rem; margin-top: 1rem; }
+.gx-carusel:focus { outline: none; }
+.gx-carusel.is-carusel {
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+.gx-car__sus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--lesson-color) 6%, var(--color-bg));
+  font-size: 0.85rem;
+}
+.gx-car__grup {
+  padding: 0.1rem 0.6rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--lesson-color) 9%, transparent);
-  color: var(--lesson-color);
-  font-size: 0.88rem;
-}
-.gx-contor b { color: var(--lesson-color); font-variant-numeric: tabular-nums; }
-.gx-grup {
-  margin: 1.8rem 0 0.3rem;
-  font-size: 0.8rem;
-  letter-spacing: 0.1em;
+  background: var(--lesson-color);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--lesson-color);
 }
-.gx-grup__sub { margin: 0 0 0.8rem; color: var(--color-text-muted); font-size: 0.92rem; }
-.gx-lista { display: grid; gap: 0.8rem; margin-top: 0.6rem; }
+.gx-car__poz { font-weight: 600; font-variant-numeric: tabular-nums; }
+.gx-car__lamurite { margin-left: auto; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.gx-car__lamurite b { color: var(--sb-retine); }
+.is-carusel .gx { border: none; border-radius: 0; padding: 1.1rem 1.2rem 1.2rem; }
+.is-carusel .gx.intra-dreapta { animation: gx-dreapta 0.22s ease-out; }
+.is-carusel .gx.intra-stanga { animation: gx-stanga 0.22s ease-out; }
+@keyframes gx-dreapta { from { opacity: 0; transform: translateX(18px); } }
+@keyframes gx-stanga { from { opacity: 0; transform: translateX(-18px); } }
+.gx-car__jos {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 1.1rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+.gx-car__puncte { flex: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; }
+.gx-car__punct {
+  width: 0.7rem;
+  height: 0.7rem;
+  padding: 0;
+  border: 1.5px solid color-mix(in srgb, var(--lesson-color) 45%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+.gx-car__punct:nth-child(10) { margin-right: 0.45rem; }   /* despărțirea dintre cele două grupuri */
+.gx-car__punct.is-gasita { border-color: var(--sb-retine); background: var(--sb-retine); }
+.gx-car__punct.is-aici { transform: scale(1.45); border-color: var(--lesson-color); box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--lesson-color); }
+.gx-car__btn {
+  flex: none;
+  padding: 0.45rem 0.9rem;
+  border: 1.5px solid var(--lesson-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lesson-color);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gx-car__btn--plin { background: var(--lesson-color); color: #fff; }
+.gx-car__btn:disabled { opacity: 0.3; cursor: default; }
 
 .gx {
   padding: 1rem 1.1rem;
@@ -586,5 +642,12 @@
 
 @media (max-width: 640px) {
   .gx { padding: 0.85rem 0.8rem; }
+  .is-carusel .gx { padding: 0.9rem 0.85rem 1rem; }
+  .gx-car__sus { padding: 0.6rem 0.85rem; }
+  /* pe telefon punctele trec pe rândul lor, deasupra butoanelor */
+  .gx-car__jos { flex-wrap: wrap; justify-content: space-between; padding: 0.7rem 0.85rem; }
+  .gx-car__puncte { order: -1; flex-basis: 100%; margin-bottom: 0.3rem; }
+  .gx-car__puncte { gap: 0.22rem; }
+  .gx-car__punct { width: 0.6rem; height: 0.6rem; }
   .gx__lam { margin-left: 0.6rem; text-align: left; }   /* rând îngust: fără goluri între cuvinte */
 }

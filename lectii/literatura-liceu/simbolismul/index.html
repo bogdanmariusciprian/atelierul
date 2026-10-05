@@ -312,11 +312,11 @@
       <section class="lesson-section" id="exercitii">
         <h2 class="lesson-section__title">Exerciții</h2>
         <p class="gx-intro">Nu e un test. Alege o variantă și citește lămurirea. Dacă n-ai nimerit, încearcă alta. După ce găsești răspunsul, poți deschide și celelalte variante, ca să vezi de ce nu se potrivesc.</p>
-        <p class="gx-contor">Întrebări lămurite: <b data-gx-gasite>0 / 20</b></p>
+        <p class="gx-intro">Primele 10 întrebări sunt din lecție. Următoarele 10 merg mai departe: despre poeții europeni, simbolismul românesc și Bacovia. Lămuririle îți spun tot ce trebuie.</p>
 
-        <h3 class="gx-grup">Din lecție</h3>
-        <div class="gx-lista">
-          <div class="gx">
+        <!-- Caruselul: o întrebare pe rând (grila.js). Fără JS, se văd toate, una sub alta. -->
+        <div class="gx-carusel" data-gx-carusel>
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">1</span>Cine a introdus termenul „simbolism” și în ce text?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt" data-ok>Jean Moréas, în manifestul <i>Le Symbolisme</i> (1886)</button>
@@ -329,7 +329,7 @@
                 <div class="gx__lam" hidden>Petică e primul poet simbolist român și primul teoretician de la noi. Când a scris el, termenul venea deja din Franța.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">2</span>De ce e greșit să spui că simbolismul este „poezia care folosește simboluri”?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Pentru că simboliștii nu folosesc deloc simboluri</button>
@@ -342,7 +342,7 @@
                 <div class="gx__lam" hidden>Invers: eticheta din batjocură era „decadenți”. Numele de „simboliști” l-a ales Moréas tocmai ca să scape de ea.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">3</span>După Lovinescu, muzicalitatea simbolistă este în primul rând muzicalitatea...</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">expresiei: a rimei și a ritmului</button>
@@ -355,7 +355,7 @@
                 <div class="gx__lam" hidden>Refrenul e unul dintre mijloace (îl vezi la „Plumb”, la muzicalitate), dar Lovinescu nu reduce muzicalitatea la un procedeu.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">4</span>Ce reține simbolismul din parnasianism?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">impasibilitatea și descrierea obiectivă</button>
@@ -368,7 +368,7 @@
                 <div class="gx__lam" hidden>Determinismul ține de realism și de naturalism, pe care simbolismul le respinge frontal.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">5</span>Care enunț descrie corect legătura dintre decadentism și simbolism?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Sunt același curent, sub două nume</button>
@@ -381,7 +381,7 @@
                 <div class="gx__lam" hidden>Tehnica înseamnă sugestia, muzicalitatea, corespondența, versul liber. Asta e fraza din chenarul lecției: merită ținută minte.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">6</span>Ce deosebește <i>spleen</i>-ul lui Baudelaire de <i>mal du siècle</i>?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt"><i>Spleen</i>-ul are o cauză istorică precisă, <i>mal du siècle</i> nu are</button>
@@ -394,7 +394,7 @@
                 <div class="gx__lam" hidden>Lecția le desparte tocmai după cauză și după cine suferă: un romantic, omul modern din oraș, o civilizație.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">7</span>Ce a adus E.A. Poe poeziei moderne?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Ideea că poezia e efuziunea liberă a sentimentului</button>
@@ -407,7 +407,7 @@
                 <div class="gx__lam" hidden>Teoria corespondențelor e formulată de Baudelaire, în sonetul „Correspondances”.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">8</span>Ce formulează Baudelaire în sonetul „Correspondances”?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">teoria poeziei pure</button>
@@ -420,7 +420,7 @@
                 <div class="gx__lam" hidden>Muzica „înainte de toate” e programul lui Verlaine, din <i>Art poétique</i>.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">9</span>Ce se pierde, după Mallarmé, atunci când numești un obiect?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">rima și ritmul versului</button>
@@ -433,7 +433,7 @@
                 <div class="gx__lam" hidden>Obiectul rămâne în poem, doar că e sugerat, nu numit. Ce se pierde, spune Mallarmé, e plăcerea de a ghici.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Din lecție">
             <p class="gx__q"><span class="gx__nr">10</span>În „Plumb”, ce sugerează <b>greutatea</b> metalului?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">monotonia</button>
@@ -446,12 +446,7 @@
                 <div class="gx__lam" hidden>Plumbul nu e un metal prețios, ca aurul sau argintul din recuzita parnasiană. E metalul greu și cenușiu al apăsării.</div></li>
             </ol>
           </div>
-        </div>
-
-        <h3 class="gx-grup">Mai departe</h3>
-        <p class="gx-grup__sub">Întrebări care trec dincolo de lecție: despre poeții europeni, simbolismul românesc și Bacovia. Lămuririle îți spun tot ce trebuie.</p>
-        <div class="gx-lista">
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">11</span>După N. Manolescu, ce schimbă cu adevărat simboliștii, deși „a trecut aproape neobservat”?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Folosesc simboluri mai des decât alți poeți</button>
@@ -464,7 +459,7 @@
                 <div class="gx__lam" hidden>Așa credea Ștefan Petică, și exagera. Pentru Manolescu, discuția despre versul liber ascunde ceva mai important: schimbarea criteriului poeziei.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">12</span>La Verlaine, „Il pleure dans mon cœur / Comme il pleut sur la ville” („Plânge în inima mea / cum plouă peste oraș”). Ce noutate aduce „il pleure”?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">O personificare a orașului, care plânge</button>
@@ -477,7 +472,7 @@
                 <div class="gx__lam" hidden>Orașul nu e descris deloc. Ploaia e acolo doar ca stare a sufletului.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">13</span>Rimbaud scrie, la 16 ani: <i>Je est un autre</i> („Eu este un altul”). Ce înseamnă formula?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">E o greșeală gramaticală de tinerețe</button>
@@ -490,7 +485,7 @@
                 <div class="gx__lam" hidden>Nu e o autobiografie deghizată. Eul ca altul e tocmai refuzul de a se povesti.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">14</span>Ce susținea Macedonski în „Despre logica poeziei” (1880)?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Că poezia trebuie să fie limpede și transparentă, fără „beție de cuvinte”</button>
@@ -503,7 +498,7 @@
                 <div class="gx__lam" hidden>Descrierea obiectivă e a parnasienilor și a naturaliștilor. Macedonski cere muzică și imagine.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">15</span>Cine erau principalii adversari ai simbolismului românesc între 1900 și 1916?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt" data-ok>Sămănătorismul lui Iorga și poporanismul lui Ibrăileanu</button>
@@ -516,7 +511,7 @@
                 <div class="gx__lam" hidden>Avangardiștii vin chiar din simbolism: în 1912 scoteau la București revista <i>Simbolul</i>.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">16</span>Ce opunea Ovid Densusianu, în <i>Vieața nouă</i>, poeziei satului?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Idila rurală, mai sinceră decât poezia de salon</button>
@@ -529,7 +524,7 @@
                 <div class="gx__lam" hidden>Pe cei care scriau așa Densusianu îi numea chiar el „decadenți”.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">17</span>Cum îi desparte Tudor Vianu pe simboliștii munteni de cei moldoveni?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt" data-ok>Munteni retorici, exotici, livrești (Minulescu); moldoveni interiori, în tonuri minore (Petică, Bacovia)</button>
@@ -542,7 +537,7 @@
                 <div class="gx__lam" hidden>Vianu face tocmai această despărțire, după felul în care scriu.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">18</span>Ce spune Bacovia despre culori, într-un interviu din 1929?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Că vocalele au culori: A negru, E alb, I roșu</button>
@@ -555,7 +550,7 @@
                 <div class="gx__lam" hidden>Bacovia compară cuvintele cu pictura, dar nu ca să copieze lucrurile: culoarea redă un sentiment, nu un obiect.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">19</span>Despre Bacovia s-a scris: „și în această atmosferă de plumb, o stare sufletească unică”. Cui îi aparține citatul?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">lui G. Călinescu</button>
@@ -568,7 +563,7 @@
                 <div class="gx__lam" hidden>Iorga a fost adversarul simbolismului; pentru el, curentul „nu e decât o farsă”.</div></li>
             </ol>
           </div>
-          <div class="gx">
+          <div class="gx" data-grup="Mai departe">
             <p class="gx__q"><span class="gx__nr">20</span>În 1914, Bacovia scrisese cel puțin 85 de poezii, dar a pus în <i>Plumb</i> doar 50. Ce arată această alegere?</p>
             <ol class="gx__var">
               <li><button type="button" class="gx__opt">Că a publicat tot ce avea gata</button>
