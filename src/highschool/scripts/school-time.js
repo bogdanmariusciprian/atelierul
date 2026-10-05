@@ -9,7 +9,8 @@
 //   pauza    – între două ore; se numără până la următoarea
 //   inainte  – înainte de prima oră a zilei („prima oră")
 //   gata     – s-au terminat orele de azi
-//   liber    – azi n-ai ore; se arată prima oră din următoarea zi de școală
+//   liber    – azi n-ai ore (zi fără ore în orar, zi liberă ori vacanță);
+//              se arată prima oră din următoarea zi de școală
 //
 // SOCOTELILE SUNT ÎN MINUTE DE LA MIEZUL NOPȚII, numere întregi. Cu obiecte
 // `Date` s-ar fi strecurat fusul orar și ora de vară acolo unde n-au ce căuta:
@@ -51,10 +52,38 @@ export const scurt = (min) => {
  * @param {Array}  cfg.oreleZilei   orele de azi, de la `fetchZiua`
  * @param {Array}  [cfg.saptamana]  orarul întreg, pentru zilele fără ore
  * @param {Array}  [cfg.intervale]  ceasurile intervalelor, pentru aceleași zile
- * @returns {{fel, ora?, ramas?, trecut?, durata?, pana?, secPana?, urmZi?, ultima?}}
+ * @param {(d: Date) => {fel, eticheta}} [cfg.felZi]  felul unei zile, din structura
+ *        anului: „curs", „liber", „vacanta" ori „special" (Școala altfel, Săptămâna verde)
+ * @param {(d: Date) => Array} [cfg.saptamanaLa]  orarul în vigoare la o zi; anul are
+ *        mai multe orare, iar următoarea zi de școală poate cădea în altul
+ * @returns {{fel, ora?, ramas?, trecut?, durata?, pana?, secPana?, urmZi?, urmData?,
+ *            urmPeste?, ultima?, motiv?, eticheta?, special?}}
  */
 export function stareaDeAcum({ acum = new Date(), oreleZilei = [],
-                               saptamana = [], intervale = [] } = {}) {
+                               saptamana = [], intervale = [],
+                               felZi = CURS, saptamanaLa = null } = {}) {
+  const oreLa = saptamanaLa || (() => saptamana);
+  const fz = felZi(acum) || { fel: "curs" };
+
+  /* ZI LIBERĂ ORI VACANȚĂ. Orarul nu știe de ele: pe 5 octombrie, zi liberă, el
+     tot spune că luni ai 12D la 8:50. Felul zilei se întreabă înaintea orelor. */
+  if (FARA_ORE.has(fz.fel)) {
+    return { fel: "liber", zi: numeZi(acum), motiv: fz.fel, eticheta: fz.eticheta || "",
+             ...primaDinUrmatoareaZi(acum, oreLa, intervale, felZi) };
+  }
+
+  /* Săptămânile speciale sunt zile de curs: orele rămân, cardul doar le pune
+     eticheta. */
+  const stare = stareaZileiDeCurs(acum, oreleZilei, oreLa, intervale, felZi);
+  if (fz.fel === "special" && fz.eticheta) stare.special = fz.eticheta;
+  return stare;
+}
+
+/** Zilele în care nu se țin ore, oricât ar spune orarul. */
+const FARA_ORE = new Set(["liber", "vacanta"]);
+const CURS = () => ({ fel: "curs", eticheta: "" });
+
+function stareaZileiDeCurs(acum, oreleZilei, oreLa, intervale, felZi) {
   const ore = [...oreleZilei]
     .map((o) => ({ ...o, de: minute(o.start), pana: minute(o.sfarsit) }))
     .filter((o) => o.de !== null && o.pana !== null)
@@ -63,7 +92,7 @@ export function stareaDeAcum({ acum = new Date(), oreleZilei = [],
   /* ZI FĂRĂ ORE. Se caută înainte, zi cu zi, prima oră din următoarea zi de
      școală, ca să se poată spune „urmează luni, la 8:00 cu 11B" în loc de un
      sec „nimic azi". */
-  if (!ore.length) return { fel: "liber", zi: numeZi(acum), ...primaDinUrmatoareaZi(acum, saptamana, intervale) };
+  if (!ore.length) return { fel: "liber", zi: numeZi(acum), ...primaDinUrmatoareaZi(acum, oreLa, intervale, felZi) };
 
   const m = acum.getHours() * 60 + acum.getMinutes();
   const sec = m * 60 + acum.getSeconds();
@@ -96,20 +125,25 @@ export function stareaDeAcum({ acum = new Date(), oreleZilei = [],
   };
 }
 
-/** Prima oră din următoarea zi de școală, căutată înainte, zi cu zi. */
-function primaDinUrmatoareaZi(acum, saptamana, intervale) {
-  if (!saptamana.length) return {};
+/* Cât de departe se caută următoarea zi de școală: cât să treacă de cea mai
+   lungă vacanță (iarna, cu zilele libere lipite de ea), nu doar o săptămână. */
+const CAUT_ZILE = 60;
+
+/** Prima oră din următoarea zi de școală, căutată înainte, zi cu zi. Sare peste
+ *  zilele libere și peste vacanțe, și ia orarul în vigoare în ziua găsită. */
+function primaDinUrmatoareaZi(acum, oreLa, intervale, felZi) {
   const pe = Object.fromEntries(intervale.map((i) => [String(i.id), i]));
-  for (let k = 1; k <= 7; k++) {
+  for (let k = 1; k <= CAUT_ZILE; k++) {
     const d = new Date(acum);
     d.setDate(d.getDate() + k);
+    if (FARA_ORE.has((felZi(d) || {}).fel)) continue;
     const z = numeZi(d);
-    const ale = saptamana
+    const ale = (oreLa(d) || [])
       .filter((o) => o.zi === z)
       .map((o) => ({ ...o, start: pe[String(o.period)]?.start, sfarsit: pe[String(o.period)]?.end }))
       .filter((o) => minute(o.start) !== null)
       .sort((a, b) => minute(a.start) - minute(b.start));
-    if (ale.length) return { urmZi: z, ora: ale[0] };
+    if (ale.length) return { urmZi: z, urmData: d, urmPeste: k, ora: ale[0] };
   }
   return {};
 }

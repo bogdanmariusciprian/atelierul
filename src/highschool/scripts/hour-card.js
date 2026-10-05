@@ -8,7 +8,11 @@
 //   pauza    – „PAUZĂ", numărătoare inversă, și ce urmează
 //   inainte  – prima oră a zilei, peste cât începe
 //   gata     – s-au terminat orele
-//   liber    – azi n-ai ore; se arată prima din ziua următoare de școală
+//   liber    – azi n-ai ore (zi liberă, vacanță ori zi goală în orar); se
+//              arată prima din ziua următoare de școală
+//
+// În Școala altfel și în Săptămâna verde orele rămân, iar cardul poartă
+// deasupra eticheta săptămânii.
 //
 // DOUĂ CEASURI, NU UNUL. Ora din pastila roșie și numărătoarea din pauză se
 // schimbă din secundă în secundă, dar numai ELE, în chiar nodul lor. Cardul
@@ -132,15 +136,26 @@ function fataHtml(s, acum) {
       cifra: "", unitate: "", ramas: 0, durata: 0, acum,
     });
   }
-  /* zi liberă */
+  /* zi fără ore: zi liberă, vacanță ori, pur și simplu, o zi goală în orar */
   return panglica({
-    titluStang: "Zi liberă", interval: ZI_LUNG[s.zi] || "",
-    sub: s.ora
-      ? `urmează <b>${esc(ZI_LUNG[s.urmZi] || s.urmZi)}</b>, ${esc(ora2(s.ora.start))} · ${esc(s.ora.clasa)}${
+    titluStang: s.motiv === "vacanta" ? "Vacanță" : "Zi liberă", interval: ZI_LUNG[s.zi] || "",
+    sub: `${s.eticheta ? `<span class="hc-lectie">${esc(s.eticheta)}</span>` : ""}${s.ora
+      ? `urmează <b>${esc(ziuaUrmatoare(s))}</b>, ${esc(ora2(s.ora.start))} · ${esc(s.ora.clasa)}${
           s.ora.sala ? ` (${esc(String(s.ora.sala).toUpperCase())})` : ""}`
-      : "nicio oră în orar",
+      : "nicio oră în orar"}`,
     cifra: "", unitate: "", ramas: 0, durata: 0, acum,
   });
+}
+
+const LUNI = ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie", "iulie",
+  "august", "septembrie", "octombrie", "noiembrie", "decembrie"];
+
+/** „luni" când e în săptămâna asta; „luni, 2 noiembrie" după o vacanță, când
+ *  numele zilei singur ar fi trimis la lunea care vine. */
+function ziuaUrmatoare(s) {
+  const zi = ZI_LUNG[s.urmZi] || s.urmZi;
+  if (!(s.urmData instanceof Date) || (s.urmPeste || 0) <= 6) return zi;
+  return `${zi}, ${s.urmData.getDate()} ${LUNI[s.urmData.getMonth()]}`;
 }
 
 /* SPATELE, cât ține pauza. Cifra mare de pe față spune „peste cât", dar în
@@ -183,8 +198,8 @@ function vorbaScurta(s) {
     return {
       fel: "",
       text: s.ora
-        ? `azi n-ai ore · ${ZI_LUNG[s.urmZi] || s.urmZi}, ${ora2(s.ora.start)} cu ${s.ora.clasa}`
-        : "azi n-ai ore",
+        ? `${s.motiv === "vacanta" ? "vacanță" : "azi n-ai ore"} · ${ziuaUrmatoare(s)}, ${ora2(s.ora.start)} cu ${s.ora.clasa}`
+        : (s.motiv === "vacanta" ? "vacanță" : "azi n-ai ore"),
     };
   }
   return null;
@@ -279,6 +294,7 @@ export function hourCard(gazda, stareaDeDat = () => null, felulCardului = () => 
     gazda.innerHTML = `
       <div class="hc hc--${esc(s.fel)}" role="status">
         <button type="button" class="hc__x" data-act="hc-ascunde" aria-label="Ascunde">${X_SVG}</button>
+        ${s.special ? `<span class="hc-special">${esc(s.special)}</span>` : ""}
         ${pauza ? spateHtml(s) : fataHtml(s, acum)}
       </div>`;
     if (pauza) bateTimerul(s);

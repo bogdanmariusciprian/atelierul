@@ -1823,6 +1823,11 @@ function oraDeArata() {
        cel al săptămânii arătate în grilă. */
     saptamana: orarulLa(azi).ore,
     intervale: orarul.intervale,
+    /* Felul zilei vine din structura anului, ca la grilă: fără el, cardul ar fi
+       numărat orele din orar și într-o zi liberă ori în vacanță. Iar următoarea
+       zi de școală poate cădea după o vacanță, sub alt orar. */
+    felZi: (d) => felulZilei(ziuaISO(d)),
+    saptamanaLa: (d) => orarulLa(ziuaISO(d)).ore,
   });
 }
 
