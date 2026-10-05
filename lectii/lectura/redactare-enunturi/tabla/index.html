@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>#LaTablă: de la 5 la 40 de enunțuri – Atelierul-LRO</title>
+<meta name="robots" content="noindex">
+<!-- Ascunsă până răspunde poarta de prelansare, ca la celelalte table. -->
+<style>html:not(.gate-ready) body { visibility: hidden; }</style>
+<link rel="stylesheet" href="../../../../src/site/styles/tabla-redactare.css">
+</head>
+<body>
+<header class="tr-cap">
+  <div class="tr-cap__in">
+    <a class="tr-inapoi" href="../" title="Înapoi la lecție" aria-label="Înapoi la lecție"><span aria-hidden="true">←</span></a>
+    <span class="tr-marca"><span class="tr-marca__icon" aria-hidden="true"></span>#LaTablă</span>
+    <span class="tr-lectie">De la 5 la 40 de enunțuri</span>
+
+    <div class="tr-trepte" role="tablist" aria-label="Câte enunțuri">
+      <button type="button" role="tab" class="tr-treapta" data-n="5">5</button>
+      <button type="button" role="tab" class="tr-treapta" data-n="10">10</button>
+      <button type="button" role="tab" class="tr-treapta" data-n="20">20</button>
+      <button type="button" role="tab" class="tr-treapta" data-n="40">40</button>
+    </div>
+
+    <div class="tr-unelte">
+      <span class="tr-scrise" id="scrise" aria-live="polite"></span>
+      <button type="button" class="tr-btn" id="mic" title="Scris mai mic">A−</button>
+      <button type="button" class="tr-btn" id="mare" title="Scris mai mare">A+</button>
+      <button type="button" class="tr-btn tr-btn--sterge" id="goleste" title="Șterge tot ce e scris, pe toate treptele">Golește</button>
+    </div>
+  </div>
+</header>
+
+<main class="tr-zona">
+  <div class="tr-foaie" id="foaie"></div>
+</main>
+
+<script type="module">
+  // Tabla nu cheamă bara sitului, deci poarta o cheamă ea. Unealta se încarcă
+  // abia după răspuns: un vizitator nechemat nici n-o descarcă.
+  import { enforceGate, revealGate } from "../../../../src/shared/scripts/site-gate.js";
+  if (await enforceGate()) {
+    await import("../../../../src/site/scripts/tabla-redactare.js");
+    revealGate();
+  }
+</script>
+</body>
+</html>

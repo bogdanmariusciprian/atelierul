@@ -1,0 +1,187 @@
+/* =========================================================
+   #LaTablă, redactare: de la 5 la 40 de enunțuri.
+
+   Spațiu de lucru pe tot ecranul, ca celelalte table: fundal deschis, foaie
+   albă, nimic în jur. Nu încarcă `main.css`. Culoarea e a domeniului
+   Lectură (portocaliu).
+   ========================================================= */
+
+:root {
+  --bg: #f7f4f1;
+  --card: #ffffff;
+  --ink: #1f2430;
+  --muted: #8a8378;
+  --line: #ebe4dc;
+  --accent: #ea580c;
+  --accent-soft: #fff1e8;
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --tr-marime: 1;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;            /* derulează doar foaia */
+  background: linear-gradient(180deg, #f3ede7 0%, var(--bg) 240px);
+  color: var(--ink);
+  font-family: var(--ui);
+}
+button { font: inherit; }
+
+/* ---- capul ---- */
+.tr-cap {
+  flex: none;
+  z-index: 5;
+  background: rgba(255, 255, 255, .88);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.tr-cap__in {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 9px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.tr-inapoi {
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  margin-right: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--muted);
+  text-decoration: none;
+  transition: transform .15s, color .15s, border-color .15s;
+}
+.tr-inapoi:hover { color: var(--accent); border-color: var(--accent); transform: translateX(-2px); }
+.tr-marca {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: #c2410c;
+  font-size: 13px; font-weight: 600;
+  user-select: none;
+}
+.tr-marca__icon {
+  width: 15px; height: 15px;
+  background: currentColor;
+  -webkit-mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
+  mask: url("/assets/icons/tabla-scrisa.svg") no-repeat center / contain;
+}
+.tr-lectie { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* Treptele: 5 / 10 / 20 / 40, ca un comutator. */
+.tr-trepte {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 3px;
+  border-radius: 11px;
+  background: #f1ebe4;
+}
+.tr-treapta {
+  min-width: 46px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.tr-treapta:hover { color: var(--ink); }
+.tr-treapta.is-on { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(234, 88, 12, .3); }
+
+.tr-unelte { display: inline-flex; align-items: center; gap: 6px; }
+.tr-scrise { margin-right: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tr-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.tr-btn:hover { border-color: var(--accent); color: var(--accent); }
+.tr-btn--sterge:hover { border-color: #b91c1c; color: #b91c1c; }
+
+/* ---- foaia ---- */
+.tr-zona { flex: 1; overflow-y: auto; padding: 24px 20px 60px; }
+.tr-foaie {
+  max-width: 980px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+  font-size: calc(19px * var(--tr-marime));
+}
+.tr-grup {
+  padding: 14px 18px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 8px 24px -16px rgba(31, 36, 48, .25);
+}
+.tr-grup--prima { display: grid; gap: 6px; padding-block: 16px; }
+
+/* Enunțul de pe treapta dinainte: stins, ca să știi ce rescrii. */
+.tr-parinte {
+  display: flex;
+  gap: .5em;
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: .88em;
+  line-height: 1.45;
+}
+.tr-parinte em { font-style: italic; opacity: .8; }
+.tr-parinte .tr-nr { color: var(--muted); }
+
+.tr-rand { display: flex; align-items: flex-start; gap: .5em; }
+.tr-nr {
+  flex: none;
+  min-width: 2.1em;
+  padding-top: .38em;
+  color: var(--accent);
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tr-camp {
+  flex: 1;
+  min-height: 2.1em;
+  padding: .32em .55em;
+  border: 1px solid transparent;
+  border-bottom-color: var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+  resize: none;
+  overflow: hidden;
+  transition: background .15s, border-color .15s;
+}
+.tr-camp::placeholder { color: #c9c1b7; }
+.tr-camp:hover { background: #fdfaf7; }
+.tr-camp:focus { outline: none; border-color: var(--accent); background: var(--accent-soft); }
+
+@media (max-width: 640px) {
+  .tr-cap__in { padding: 8px 12px; }
+  .tr-lectie { display: none; }
+  .tr-trepte { margin-left: 0; }
+  .tr-zona { padding: 14px 12px 40px; }
+  .tr-grup { padding: 10px 12px; }
+}
+@media print {
+  .tr-cap { display: none; }
+  body { height: auto; overflow: visible; }
+  .tr-zona { overflow: visible; }
+}
