@@ -1000,7 +1000,36 @@ const telec = {
   deRefacut: null,   // lista de refăcut după ce se reîncarcă fișa
   dinNou: false,     // prima aliniere după „Urmez" ia fișa de la capăt
   slideCerut: 0,
+
+  /* Derulările: la „conduc", unde e acum fiecare casetă derulată a fișei
+     (drum → procent); la „urmez", unde trebuie să fie. */
+  derulari: {},
+  derulariFisa: "",
+  derulariCerute: {},
+  ceasDerulare: null,
+  ultimaDerulare: 0,
 };
+
+/* O derulare pleacă cel mult o dată la atâtea milisecunde. Destul de des ca
+   textul de pe tablă să curgă după tine, destul de rar ca rotița mouse-ului să
+   nu umple canalul cu zeci de mesaje pe secundă. Ultima poziție pleacă mereu. */
+const PAS_DERULARE = 120;
+function trimiteDerularea() {
+  if (telec.rol !== "conduc") return;
+  clearTimeout(telec.ceasDerulare);
+  const acum = Date.now();
+  const pleaca = () => { telec.ultimaDerulare = Date.now(); telec.fir?.trimite(true); };
+  const ramas = PAS_DERULARE - (acum - telec.ultimaDerulare);
+  if (ramas <= 0) pleaca();
+  else telec.ceasDerulare = setTimeout(pleaca, ramas);
+}
+
+/** La „urmez": pune casetele fișei unde le-a lăsat cel care conduce. */
+function aplicaDerularile() {
+  const p = telec.punte;
+  if (!p?.deruleaza) return;
+  for (const [cale, procent] of Object.entries(telec.derulariCerute || {})) p.deruleaza(cale, procent);
+}
 
 /** Conduce cineva chiar acum? Numai pentru cel care urmează. */
 const seConduce = () => telec.venit > 0 && Date.now() - telec.venit < TACERE;
@@ -1049,6 +1078,26 @@ function potrivestePuntea() {
     /* Silit, ca să plece pe loc: o apăsare care ajunge la tablă peste o
        treime de secundă se vede ca întârziere, de față cu clasa. */
     if (telec.rol === "conduc") telec.fir?.trimite(true);
+  });
+
+  /* Gesturile (markerul, creionul): la ridicarea degetului, gestul întreg
+     intră în același jurnal, ca o apăsare, și pleacă pe loc. */
+  p.pePunereGest?.((gest) => {
+    const fisa = rutaId();
+    if (telec.jurnalFisa !== fisa) { telec.jurnal = []; telec.jurnalFisa = fisa; }
+    if (telec.jurnal.length >= MAX_JURNAL) return;
+    telec.jurnal.push(gest);
+    if (telec.rol === "conduc") telec.fir?.trimite(true);
+  });
+
+  /* Derulările, la fel: ținute minte și când nu conduce nimeni, ca tabla
+     pornită mai târziu să afle unde e textul. Se pun DUPĂ `pePunere`, care
+     începe prin a dezlega tot. */
+  p.pePunereDerulare?.((cale, procent) => {
+    const fisa = rutaId();
+    if (telec.derulariFisa !== fisa) { telec.derulari = {}; telec.derulariFisa = fisa; }
+    telec.derulari[cale] = procent;
+    trimiteDerularea();
   });
 }
 
@@ -1101,6 +1150,7 @@ function pornesteTelecomanda() {
         fisa,
         slide: p ? p.slide() : 0,
         jurnal: telec.jurnalFisa === fisa ? telec.jurnal : [],
+        derulari: telec.derulariFisa === fisa ? telec.derulari : {},
       };
     },
     peStare: (s) => {
@@ -1122,13 +1172,14 @@ function pornesteTelecomanda() {
       if (s.fisa && s.fisa !== rutaId()) { navigheaza(`f/${s.fisa}`); return; }
 
       telec.slideCerut = s.slide;
+      telec.derulariCerute = s.derulari || {};
       impacaJurnalul(s.fisa, s.jurnal);
       /* Dacă tocmai s-a pornit o reîncărcare, puntea de acum se duce odată cu
          fereastra veche: slide-ul îl pune `refaApasarile`, după ce fișa revine. */
       if (telec.deRefacut) return;
 
       const p = telec.punte;
-      if (!p || p.fel === "fara") return;
+      if (!p) return;
       /* ÎNTREBĂM FIȘA UNDE E, nu ne ținem minte unde am pus-o. Cel care conduce
          repetă starea din trei în trei secunde, și n-are rost să-i dăm de
          fiecare dată același „du-te la 5" – ar reporni animațiile slide-ului.
@@ -1136,8 +1187,12 @@ function pornesteTelecomanda() {
          aici se ridică singură, fiindcă întrebarea spune adevărul.
          SE PUNE LA URMĂ, după apăsări: printre ele sunt și cele pe săgețile de
          navigare, iar slide-ul e cuvântul care încheie. */
-      if (p.slide() === s.slide) return;
-      p.laSlide(s.slide);
+      const altSlide = p.fel !== "fara" && p.slide() !== s.slide;
+      if (altSlide) p.laSlide(s.slide);
+      /* Derulările, ultimele: o casetă de pe un slide abia arătat poate să nu se
+         fi așezat încă, deci se mai încearcă o dată, puțin mai târziu. */
+      aplicaDerularile();
+      if (altSlide) setTimeout(aplicaDerularile, 350);
     },
   });
 
@@ -1202,6 +1257,8 @@ function refaApasarile() {
   lista.forEach((cale) => p.apasa(cale));
   telec.aplicate = lista.slice();
   if (p.fel !== "fara" && p.slide() !== telec.slideCerut) p.laSlide(telec.slideCerut);
+  aplicaDerularile();
+  setTimeout(aplicaDerularile, 350);
 }
 
 function alegeRolul(rol) {

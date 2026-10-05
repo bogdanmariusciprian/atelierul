@@ -35,11 +35,32 @@
 //    capăt și reface apăsările în ordine. Tot de-aici se pune la punct și o
 //    tablă pornită la mijlocul orei: prinde toată ora din primul mesaj.
 //    O oră are zeci de apăsări, nu mii; un drum are vreo cincisprezece litere.
+//
+// 6. DERULĂRILE MERG CA LOCURI, NU CA MIȘCĂRI. Pentru fiecare casetă derulată
+//    (textul de citit, pagina) pleacă doar unde e acum, ca procent din cât se
+//    poate derula: `{ drum: 0.42 }`. Un mesaj pierdut nu strică nimic, fiindcă
+//    următorul spune iar unde e; tabla pornită târziu ajunge direct acolo.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { supabase } from "../../shared/scripts/supabase-client.js";
 
 const SUBIECT = "liceu:telecomanda";
+
+/* Câte casete derulate pleacă într-un mesaj. O lecție are una, două; restul
+   ar fi un aparat luat razna. */
+const MAX_DERULARI = 30;
+
+/** Derulările venite pe canal, curățate: drum text scurt, procent între 0 și 1. */
+function curataDerularile(d) {
+  if (!d || typeof d !== "object" || Array.isArray(d)) return {};
+  const iesire = {};
+  for (const [cale, p] of Object.entries(d).slice(0, MAX_DERULARI)) {
+    if (typeof cale !== "string" || cale.length > 200 || !/^[0-9.]*$/.test(cale)) continue;
+    const n = Number(p);
+    if (Number.isFinite(n)) iesire[cale] = Math.min(1, Math.max(0, n));
+  }
+  return iesire;
+}
 
 /* Oprire de siguranță pentru jurnal. Nicio oră n-are atâtea apăsări; e pusă ca
    un mesaj să nu crească niciodată spre pragul de 256 KB al canalului, orice
@@ -51,8 +72,8 @@ export const MAX_JURNAL = 2000;
  *
  * @param {object} cfg
  * @param {"conduc"|"urmez"} cfg.rol
- * @param {(s: {fisa: string, slide: number, jurnal: string[]}) => void} cfg.peStare  numai la „urmez"
- * @param {() => ({fisa: string, slide: number, jurnal: string[]} | null)} cfg.stareaMea  numai la „conduc"
+ * @param {(s: {fisa: string, slide: number, jurnal: string[], derulari: Object<string, number>}) => void} cfg.peStare  numai la „urmez"
+ * @param {() => ({fisa: string, slide: number, jurnal: string[], derulari?: Object<string, number>} | null)} cfg.stareaMea  numai la „conduc"
  * @param {(cum: "leg"|"legat"|"rupt", vina?: string) => void} cfg.peLegatura
  */
 export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
@@ -86,6 +107,7 @@ export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
           jurnal: Array.isArray(payload.jurnal)
             ? payload.jurnal.filter((c) => typeof c === "string")
             : [],
+          derulari: curataDerularile(payload.derulari),
         });
       });
     }
@@ -122,14 +144,18 @@ export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
     /* În amprentă intră și CÂTE apăsări sunt, nu și care: o apăsare nouă se
        vede în număr, iar numărul e de o mie de ori mai ieftin de comparat de
        trei ori pe secundă decât toată lista. */
-    const amprenta = `${s.fisa}|${s.slide}|${jurnal.length}`;
+    const derulari = curataDerularile(s.derulari);
+    /* Derulările intră în amprentă rotunjite: o mișcare de o miime nu merită
+       un mesaj, una vizibilă da. */
+    const semnDerulari = Object.entries(derulari).map(([c, p]) => `${c}:${p.toFixed(3)}`).join(",");
+    const amprenta = `${s.fisa}|${s.slide}|${jurnal.length}|${semnDerulari}`;
     const seRepeta = acum - ultimaClipa >= REPETA;
     if (!silit && !seRepeta && amprenta === ultimaTrimisa) return;
     ultimaTrimisa = amprenta;
     ultimaClipa = acum;
     canal.send({
       type: "broadcast", event: "stare",
-      payload: { fisa: s.fisa, slide: s.slide, jurnal, ceas: acum },
+      payload: { fisa: s.fisa, slide: s.slide, jurnal, derulari, ceas: acum },
     }).catch(() => {});
   }
 
