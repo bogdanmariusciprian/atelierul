@@ -2,12 +2,16 @@
 // #LaTablă, redactare: de la 5 la 40 de enunțuri.
 //
 // Patru trepte: 5, 10, 20, 40. Pe prima scrii cinci enunțuri. Pe fiecare
-// treaptă următoare, fiecare enunț de pe treapta dinainte se rescrie în două,
-// cu mai multe detalii: enunțul 1 de la 5 devine 1 și 2 la 10, enunțul 2
-// devine 3 și 4, și tot așa. Deci enunțul k de pe o treaptă are „copiii"
-// 2k-1 și 2k pe treapta următoare.
+// treaptă următoare, enunțurile de pe treapta dinainte se rescriu cu mai multe
+// detalii, în mai multe enunțuri.
 //
-// O TREAPTĂ PE ECRAN. Deasupra fiecărei perechi stă, stins, enunțul din care
+// PRIMUL ȘI ULTIMUL NU SE DUBLEAZĂ, niciodată (regula lui Marius): pe fiecare
+// treaptă se rescriu într-un singur enunț. Totalurile rămân totuși 5, 10, 20,
+// 40, deci cele din mijloc se împart cât să iasă: la 10, cele 3 din mijloc dau
+// 3 + 3 + 2; la 20, cele 8 dau 3 + 3 + 2 + … + 2; la 40, cele 18 la fel. Mai
+// mult primesc întâi cele dintâi (vezi `grupuri`).
+//
+// O TREAPTĂ PE ECRAN. Deasupra fiecărui grup stă, stins, enunțul din care
 // pornește, ca să știi ce rescrii. Așa încape și pe proiector.
 //
 // LIVE (0106). Scrie doar adminul; tot ce scrie, plus treapta pe care e, pleacă
@@ -71,6 +75,32 @@ function textParinte(sus, k) {
   return p ? esc(p) : `<em>enunțul ${k + 1} de la ${sus} e încă gol</em>`;
 }
 
+/** Treapta dinainte (10 → 5, 20 → 10, 40 → 20). */
+const treaptaDinainte = (n) => TREPTE[TREPTE.indexOf(n) - 1];
+
+/**
+ * Cum se împart enunțurile treptei `n` pe enunțurile treptei dinainte.
+ * Primul și ultimul au câte un singur „copil"; cele din mijloc își împart
+ * restul, cât mai egal, cu un enunț în plus la cele dintâi.
+ * @returns {Array<{parinte: number, copii: number[], capat: "" | "primul" | "ultimul"}>}
+ */
+function grupuri(n) {
+  const sus = treaptaDinainte(n);
+  const mijlocSus = sus - 2;          // părinții din mijloc
+  const mijlocJos = n - 2;            // copiii din mijloc
+  const baza = Math.floor(mijlocJos / mijlocSus);
+  const inPlus = mijlocJos % mijlocSus;
+  const g = [{ parinte: 0, copii: [0], capat: "primul" }];
+  let i = 1;
+  for (let k = 0; k < mijlocSus; k++) {
+    const cati = baza + (k < inPlus ? 1 : 0);
+    g.push({ parinte: k + 1, copii: Array.from({ length: cati }, (_, j) => i + j), capat: "" });
+    i += cati;
+  }
+  g.push({ parinte: sus - 1, copii: [n - 1], capat: "ultimul" });
+  return g;
+}
+
 function deseneaza() {
   const n = treapta;
   document.body.classList.toggle("tr--citeste", !scriu);
@@ -78,11 +108,11 @@ function deseneaza() {
     foaie.innerHTML = `<div class="tr-grup tr-grup--prima">${
       Array.from({ length: 5 }, (_, i) => camp(5, i)).join("")}</div>`;
   } else {
-    const sus = n / 2;
-    foaie.innerHTML = Array.from({ length: sus }, (_, k) => `<div class="tr-grup">
-          <p class="tr-parinte" data-k="${k}"><span class="tr-nr">${k + 1}.</span><span class="tr-parinte__t">${textParinte(sus, k)}</span></p>
-          ${camp(n, 2 * k)}
-          ${camp(n, 2 * k + 1)}
+    const sus = treaptaDinainte(n);
+    foaie.innerHTML = grupuri(n).map((g) => `<div class="tr-grup${g.capat ? " tr-grup--capat" : ""}">
+          ${g.capat ? `<span class="tr-capat">${g.capat === "primul" ? "primul enunț" : "ultimul enunț"} · rămâne unul</span>` : ""}
+          <p class="tr-parinte" data-k="${g.parinte}"><span class="tr-nr">${g.parinte + 1}.</span><span class="tr-parinte__t">${textParinte(sus, g.parinte)}</span></p>
+          ${g.copii.map((i) => camp(n, i)).join("")}
         </div>`).join("");
   }
   document.querySelectorAll(".tr-treapta").forEach((b) => {
@@ -106,7 +136,7 @@ function improspateazaTextele() {
   });
   if (treapta > 5) {
     foaie.querySelectorAll(".tr-parinte").forEach((p) => {
-      const h = textParinte(treapta / 2, Number(p.dataset.k));
+      const h = textParinte(treaptaDinainte(treapta), Number(p.dataset.k));
       const t = p.querySelector(".tr-parinte__t");
       if (t.innerHTML !== h) t.innerHTML = h;
     });

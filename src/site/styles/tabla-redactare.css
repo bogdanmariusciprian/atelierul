@@ -157,6 +157,21 @@ button { font: inherit; }
 }
 .tr-grup--prima { display: grid; gap: 6px; padding-block: 16px; }
 
+/* Primul și ultimul enunț nu se dublează: grupul lor e mai discret, cu o
+   etichetă mică, ca să se vadă că acolo se scrie un singur rând. */
+.tr-grup--capat { background: #fffcf9; border-style: dashed; }
+.tr-capat {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #c2410c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+
 /* Enunțul de pe treapta dinainte: stins, ca să știi ce rescrii. */
 .tr-parinte {
   display: flex;
