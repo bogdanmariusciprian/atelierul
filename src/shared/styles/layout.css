@@ -360,6 +360,12 @@ body:has(.admin-quick__panel:not([hidden])) .liceu-fab {
   color: var(--color-text-muted);
 }
 
+/* Banner strâns, cam la jumătate din înălțime: pe paginile unde ce contează
+   e dedesubt (lista de lecții), nu titlul. Celelalte pagini rămân cu cel mare. */
+.page-hero--strans { padding-block: var(--space-md); }
+.page-hero--strans h1 { margin-bottom: var(--space-xs); }
+.page-hero--strans .page-hero__lead { margin-block: 0; font-size: 1.05rem; }
+
 /* Hero action buttons */
 .hero__actions {
   display: flex;
