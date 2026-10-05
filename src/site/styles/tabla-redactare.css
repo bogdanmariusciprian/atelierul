@@ -1,5 +1,5 @@
 /* =========================================================
-   #LaTablă, redactare: de la 5 la 40 de enunțuri.
+   #LaTablă, redactare: de la 5 la 26 de enunțuri.
 
    Spațiu de lucru pe tot ecranul, ca celelalte table: fundal deschis, foaie
    albă, nimic în jur. Nu încarcă `main.css`. Culoarea e a domeniului
@@ -76,7 +76,7 @@ button { font: inherit; }
 }
 .tr-lectie { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
-/* Treptele: 5 / 10 / 20 / 40, ca un comutator. */
+/* Treptele: 5 / 8 / 14 / 26, ca un comutator. */
 .tr-trepte {
   display: inline-flex;
   margin-left: auto;

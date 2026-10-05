@@ -142,9 +142,9 @@ export const LESSONS = [
   {
     domain: "lectura",
     slug: "lectura-redactare-enunturi",
-    title: "Redactare: de la 5 la 40 de enunțuri",
+    title: "Redactare: de la 5 la 26 de enunțuri",
     href: "lectii/lectura/redactare-enunturi/",
-    summary: "Cinci enunțuri, rescrise cu tot mai multe detalii: 10, 20, 40.",
+    summary: "Cinci enunțuri, rescrise cu tot mai multe detalii: 8, 14, 26.",
     ready: true,
     board: true,
   },

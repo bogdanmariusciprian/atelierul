@@ -1,15 +1,15 @@
 // =========================================================
-// #LaTablă, redactare: de la 5 la 40 de enunțuri.
+// #LaTablă, redactare: de la 5 la 26 de enunțuri.
 //
-// Patru trepte: 5, 10, 20, 40. Pe prima scrii cinci enunțuri. Pe fiecare
+// Patru trepte: 5, 8, 14, 26. Pe prima scrii cinci enunțuri. Pe fiecare
 // treaptă următoare, enunțurile de pe treapta dinainte se rescriu cu mai multe
-// detalii, în mai multe enunțuri.
+// detalii.
 //
 // PRIMUL ȘI ULTIMUL NU SE DUBLEAZĂ, niciodată (regula lui Marius): pe fiecare
-// treaptă se rescriu într-un singur enunț. Totalurile rămân totuși 5, 10, 20,
-// 40, deci cele din mijloc se împart cât să iasă: la 10, cele 3 din mijloc dau
-// 3 + 3 + 2; la 20, cele 8 dau 3 + 3 + 2 + … + 2; la 40, cele 18 la fel. Mai
-// mult primesc întâi cele dintâi (vezi `grupuri`).
+// treaptă se rescriu într-un singur enunț. Fiecare enunț din mijloc se
+// dublează. De-aici numerele treptelor: 1 + 3×2 + 1 = 8, 1 + 6×2 + 1 = 14,
+// 1 + 12×2 + 1 = 26. (O vreme totalurile au fost 10, 20, 40, cu mijlocul
+// împărțit inegal; Marius a ales înapoi dublarea curată.)
 //
 // O TREAPTĂ PE ECRAN. Deasupra fiecărui grup stă, stins, enunțul din care
 // pornește, ca să știi ce rescrii. Așa încape și pe proiector.
@@ -28,7 +28,7 @@ import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeF
   from "../../shared/scripts/tabla-live-repo.js";
 
 const SLUG = "redactare-enunturi";
-const TREPTE = [5, 10, 20, 40];
+const TREPTE = [5, 8, 14, 26];
 const CHEIE_MARIME = "tabla-redactare:marime";
 /* Cât se așteaptă după ultima tastă până se trimite. Destul de scurt ca să
    pară live, destul de lung ca să nu plece o cerere la fiecare literă. */
@@ -75,27 +75,19 @@ function textParinte(sus, k) {
   return p ? esc(p) : `<em>enunțul ${k + 1} de la ${sus} e încă gol</em>`;
 }
 
-/** Treapta dinainte (10 → 5, 20 → 10, 40 → 20). */
+/** Treapta dinainte (8 → 5, 14 → 8, 26 → 14). */
 const treaptaDinainte = (n) => TREPTE[TREPTE.indexOf(n) - 1];
 
 /**
- * Cum se împart enunțurile treptei `n` pe enunțurile treptei dinainte.
- * Primul și ultimul au câte un singur „copil"; cele din mijloc își împart
- * restul, cât mai egal, cu un enunț în plus la cele dintâi.
+ * Cum se împart enunțurile treptei `n` pe enunțurile treptei dinainte:
+ * primul și ultimul au câte un singur „copil", fiecare din mijloc câte doi.
  * @returns {Array<{parinte: number, copii: number[], capat: "" | "primul" | "ultimul"}>}
  */
 function grupuri(n) {
   const sus = treaptaDinainte(n);
-  const mijlocSus = sus - 2;          // părinții din mijloc
-  const mijlocJos = n - 2;            // copiii din mijloc
-  const baza = Math.floor(mijlocJos / mijlocSus);
-  const inPlus = mijlocJos % mijlocSus;
   const g = [{ parinte: 0, copii: [0], capat: "primul" }];
-  let i = 1;
-  for (let k = 0; k < mijlocSus; k++) {
-    const cati = baza + (k < inPlus ? 1 : 0);
-    g.push({ parinte: k + 1, copii: Array.from({ length: cati }, (_, j) => i + j), capat: "" });
-    i += cati;
+  for (let k = 1; k < sus - 1; k++) {
+    g.push({ parinte: k, copii: [2 * k - 1, 2 * k], capat: "" });
   }
   g.push({ parinte: sus - 1, copii: [n - 1], capat: "ultimul" });
   return g;
