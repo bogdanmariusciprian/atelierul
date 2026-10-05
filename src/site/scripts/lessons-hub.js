@@ -713,13 +713,16 @@ export function renderLessonsHub(basePath = "") {
     })
   );
 
-  // Cap each panel to the height of the tabs column so its bottom lines up
-  // with the last tab. Re-measured on resize (tab wrapping, font changes…).
+  // Panoul e cât ecranul, minus loc pentru meniul de sus și o margine, ca
+  // lista să se vadă cât mai lungă. Niciodată mai scurt decât coloana de
+  // domenii, ca să nu se termine deasupra ultimului domeniu. Se măsoară din
+  // nou la redimensionare (domenii rupte pe două rânduri, alt font…).
   const explorer = mount.querySelector(".lessons-explorer");
   const tabsNav = mount.querySelector(".domain-tabs");
   const syncPanelHeight = () => {
     if (!explorer || !tabsNav) return;
-    explorer.style.setProperty("--panel-h", `${tabsNav.offsetHeight}px`);
+    const ecran = window.innerHeight - 120;
+    explorer.style.setProperty("--panel-h", `${Math.max(tabsNav.offsetHeight, ecran)}px`);
   };
   syncPanelHeight();
   window.addEventListener("resize", syncPanelHeight);
