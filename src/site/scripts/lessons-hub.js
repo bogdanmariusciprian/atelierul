@@ -71,8 +71,12 @@ const semnulBac = () =>
          aria-label="Lecție pentru bacalaureat">BAC</span>`;
 
 /** Catalogul din cod, lecțiile PDF și lecțiile publicate de elevi, în aceeași formă. */
+/* Fișele PDF stau în ordine alfabetică, nu în ordinea urcării. Cu `numeric`,
+   „L. 9" vine înaintea lui „L. 10", ca la numere, nu ca la litere. */
+const alfabetic = (a, b) => a.titlu.localeCompare(b.titlu, "ro", { numeric: true, sensitivity: "base" });
+
 function toateLectiile() {
-  const pdf = _pdf.map((p) => ({
+  const pdf = [..._pdf].sort(alfabetic).map((p) => ({
     domain: p.domeniu,
     slug: p.slug,
     title: p.titlu,
