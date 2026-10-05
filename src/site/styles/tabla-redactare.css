@@ -212,3 +212,31 @@ button { font: inherit; }
   body { height: auto; overflow: visible; }
   .tr-zona { overflow: visible; }
 }
+
+/* ---- fișa Word de sub enunțuri (0107) ----
+   Paginile le desenează docx-preview, ca în Word: albe, de lățimea A4, una
+   sub alta. Fundalul cenușiu al bibliotecii se scoate, ca fișa să stea pe
+   foaia tablei. Pe un ecran mai îngust decât pagina, fișa se derulează în
+   lateral, în cutia ei, nu toată pagina. */
+.tr-fisa { max-width: 980px; margin: 28px auto 0; }
+.tr-fisa[hidden] { display: none; }
+.tr-fisa__cap {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-top: 18px;
+  border-top: 2px solid var(--line);
+}
+.tr-fisa__titlu { margin: 0; font-size: 17px; }
+.tr-fisa__titlu small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.tr-fisa__unelte { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tr-fisa__mesaj { font-size: 12px; color: var(--muted); }
+.tr-fisa__stare { margin: 0; padding: 24px; text-align: center; color: var(--muted); }
+.tr-fisa__stare a { color: var(--accent); font-weight: 600; }
+.tr-fisa__pagini { overflow-x: auto; }
+.tr-fisa__pagini .docx-wrapper { background: transparent; padding: 0; }
+.tr-fisa__pagini .docx-wrapper > section.docx {
+  margin: 0 auto 18px;
+  box-shadow: 0 10px 30px -14px rgba(31, 36, 48, .35);
+  border-radius: 4px;
+}

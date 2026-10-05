@@ -14,10 +14,14 @@
 // în bază și ajunge pe loc la toți cei care au tabla deschisă. Ceilalți citesc
 // doar și îl urmează de pe o treaptă pe alta. Tabla rămâne scrisă până apasă
 // adminul „Golește", ca un elev intrat mai târziu să vadă ce e deja pe ea.
+//
+// FIȘA WORD (0107). Sub enunțuri, adminul poate urca o fișă .docx; se vede ca
+// în Word, cu pagini, la toți. Golirea curăță enunțurile, nu și fișa.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { isAdmin } from "../../shared/scripts/session.js";
-import { citesteTabla, scrieTabla, golesteTabla, urmaresteTabla } from "../../shared/scripts/tabla-live-repo.js";
+import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeFisierFisa }
+  from "../../shared/scripts/tabla-live-repo.js";
 
 const SLUG = "redactare-enunturi";
 const TREPTE = [5, 10, 20, 40];
@@ -40,11 +44,16 @@ function normalizeaza(d) {
     const v = Array.isArray(din[n]) ? din[n] : [];
     e[n] = Array.from({ length: n }, (_, i) => String(v[i] ?? ""));
   }
-  return { treapta: TREPTE.includes(Number(d?.treapta)) ? Number(d.treapta) : 5, enunturi: e };
+  /* Fișa se ia doar dacă numele fișierului arată cum îl dă urcarea: altfel
+     adresa ar putea trimite oriunde. */
+  const f = d?.fisa;
+  const fisa = f && /^[a-z0-9-]+\.docx$/.test(String(f.fisier || ""))
+    ? { fisier: f.fisier, nume: String(f.nume || "fișa.docx"), marime: Number(f.marime) || 0 } : null;
+  return { treapta: TREPTE.includes(Number(d?.treapta)) ? Number(d.treapta) : 5, enunturi: e, fisa };
 }
 
 let scriu = isAdmin();
-let { treapta, enunturi } = normalizeaza(null);
+let { treapta, enunturi, fisa } = normalizeaza(null);
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -85,6 +94,7 @@ function deseneaza() {
   document.getElementById("goleste").hidden = !scriu;
   foaie.querySelectorAll(".tr-camp").forEach(potriveste);
   numara();
+  deseneazaFisa();
 }
 
 /** La cititor, o schimbare venită live: se pun doar textele, fără redesen,
@@ -135,7 +145,7 @@ async function trimite() {
      o dată la sosire, cu tot ce e nou: ultima versiune ajunge mereu. */
   if (inZbor) { maiAm = true; return; }
   inZbor = true;
-  const ok = await scrieTabla(SLUG, { treapta, enunturi });
+  const ok = await scrieTabla(SLUG, { treapta, enunturi, fisa });
   inZbor = false;
   if (maiAm) { maiAm = false; trimite(); return; }
   arataStarea(ok ? "live · trimis" : "netrimis: verifică netul", ok ? "live" : "eroare");
@@ -186,15 +196,122 @@ document.getElementById("mare").addEventListener("click", () => { marime += 0.1;
 document.getElementById("goleste").addEventListener("click", async () => {
   if (!scriu) return;
   if (!TREPTE.some((n) => enunturi[n].some((x) => x.trim()))) return;
-  if (!confirm("Ștergi tot ce e scris, pe toate cele patru trepte? Se șterge și la elevi.")) return;
+  if (!confirm("Ștergi enunțurile de pe toate cele patru trepte? Se șterg și la elevi. Fișa Word rămâne.")) return;
   clearTimeout(ceas);
   enunturi = gol();
   treapta = 5;
   deseneaza();
   arataStarea("se golește…", "trimite");
-  const ok = await golesteTabla(SLUG);
-  arataStarea(ok ? "live · golit" : "negolit: verifică netul", ok ? "live" : "eroare");
+  await trimite();
   foaie.querySelector(".tr-camp")?.focus();
+});
+
+/* ---------- fișa Word de sub tablă ---------- */
+const sectiuneFisa = document.getElementById("fisa");
+const alegeFisa = document.getElementById("alege-fisa");
+let fisaAfisata = "";        // fișierul desenat acum, ca să nu se redeseneze degeaba
+let docxPreview = null;
+
+const marimeMB = (o) => {
+  if (!o) return "";
+  if (o < 1024 * 1024) return ` · ${Math.max(1, Math.round(o / 1024))} KB`;
+  return ` · ${(o / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+};
+
+function deseneazaFisa(mesaj = "") {
+  const unelte = scriu
+    ? `<div class="tr-fisa__unelte">
+         <button type="button" class="tr-btn" data-fisa="urca">${fisa ? "Înlocuiește fișa" : "+ Urcă fișa Word"}</button>
+         ${fisa ? `<button type="button" class="tr-btn tr-btn--sterge" data-fisa="scoate">Scoate fișa</button>` : ""}
+         ${mesaj ? `<span class="tr-fisa__mesaj">${esc(mesaj)}</span>` : ""}
+       </div>` : "";
+  if (!fisa) {
+    sectiuneFisa.hidden = !scriu;
+    sectiuneFisa.innerHTML = `<div class="tr-fisa__cap">${unelte}</div>`;
+    fisaAfisata = "";
+    return;
+  }
+  sectiuneFisa.hidden = false;
+  const cap = `<h2 class="tr-fisa__titlu">Fișa de lucru <small>${esc(fisa.nume)}${marimeMB(fisa.marime)}</small></h2>${unelte}`;
+  /* Aceeași fișă: se schimbă doar capul (un mesaj, butoanele); paginile rămân,
+     nedesenate din nou. */
+  if (fisaAfisata === fisa.fisier && sectiuneFisa.querySelector(".tr-fisa__pagini")) {
+    sectiuneFisa.querySelector(".tr-fisa__cap").innerHTML = cap;
+    return;
+  }
+  sectiuneFisa.innerHTML = `
+    <div class="tr-fisa__cap">${cap}</div>
+    <div class="tr-fisa__pagini"><p class="tr-fisa__stare">Se deschide fișa…</p></div>`;
+  fisaAfisata = fisa.fisier;
+  arataFisa(fisa.fisier, sectiuneFisa.querySelector(".tr-fisa__pagini"));
+}
+
+/** Aduce fișierul și îl desenează ca în Word, pagină cu pagină (docx-preview). */
+async function arataFisa(fisier, unde) {
+  try {
+    docxPreview ||= await import("https://esm.sh/docx-preview@0.4.1?deps=jszip@3.10.1");
+    const r = await fetch(adresaFisa(fisier));
+    if (!r.ok) throw new Error(`fișa n-a venit (${r.status})`);
+    const octeti = await r.arrayBuffer();
+    if (fisaAfisata !== fisier) return;   // între timp a venit alta
+    unde.innerHTML = "";
+    await docxPreview.renderAsync(octeti, unde, null, {
+      className: "docx", inWrapper: true, breakPages: true,
+      /* Paginile se rup unde le-a rupt Word ultima dată, ca fișa să arate ca
+         pe ecranul tău, nu ca o singură foaie lungă. */
+      ignoreLastRenderedPageBreak: false, experimental: true,
+    });
+    incadreazaFisa();
+  } catch (e) {
+    console.warn("tabla-redactare, fișa:", e);
+    if (fisaAfisata !== fisier) return;
+    unde.innerHTML = `<p class="tr-fisa__stare">Fișa n-a putut fi arătată aici.
+      <a href="${esc(adresaFisa(fisier))}" download>Descarc-o</a> și deschide-o în Word.</p>`;
+  }
+}
+
+/* O pagină A4 are cam 794 px. Pe un ecran mai îngust (telefon, fereastră
+   pe jumătate), pagina se micșorează cât să încapă, în loc să se deruleze în
+   lateral. Pe ecran lat rămâne la mărimea ei. */
+function incadreazaFisa() {
+  const pagini = sectiuneFisa.querySelector(".tr-fisa__pagini");
+  const invelis = pagini?.querySelector(".docx-wrapper");
+  const pagina = invelis?.querySelector("section.docx");
+  if (!pagina) return;
+  invelis.style.zoom = "";
+  const scara = Math.min(1, pagini.clientWidth / pagina.offsetWidth);
+  if (scara < 1) invelis.style.zoom = String(Math.floor(scara * 1000) / 1000);
+}
+addEventListener("resize", incadreazaFisa);
+
+sectiuneFisa.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-fisa]");
+  if (!b || !scriu) return;
+  if (b.dataset.fisa === "urca") { alegeFisa.click(); return; }
+  if (b.dataset.fisa === "scoate") {
+    if (!confirm("Scoți fișa de sub tablă? Dispare și la elevi.")) return;
+    const veche = fisa?.fisier;
+    fisa = null;
+    deseneazaFisa();
+    clearTimeout(ceas);
+    await trimite();
+    stergeFisierFisa(veche);
+  }
+});
+
+alegeFisa.addEventListener("change", async () => {
+  const file = alegeFisa.files?.[0];
+  alegeFisa.value = "";
+  if (!file || !scriu) return;
+  deseneazaFisa("se urcă fișa…");
+  const r = await urcaFisa(SLUG, file);
+  if (r.eroare) { deseneazaFisa(r.eroare); return; }
+  const veche = fisa?.fisier;
+  fisa = r.fisa;
+  deseneazaFisa();
+  clearTimeout(ceas);
+  await trimite();
+  if (veche && veche !== fisa.fisier) stergeFisierFisa(veche);
 });
 
 addEventListener("resize", () => foaie.querySelectorAll(".tr-camp").forEach(potriveste));
@@ -205,7 +322,7 @@ deseneaza();
 arataStarea("se încarcă…", "trimite");
 
 const deLaBaza = await citesteTabla(SLUG);
-({ treapta, enunturi } = normalizeaza(deLaBaza));
+({ treapta, enunturi, fisa } = normalizeaza(deLaBaza));
 deseneaza();
 if (scriu) foaie.querySelector(".tr-camp")?.focus();
 
@@ -215,9 +332,10 @@ urmaresteTabla(SLUG, (d) => {
   if (scriu) return;
   const nou = normalizeaza(d);
   const altaTreapta = nou.treapta !== treapta;
-  ({ treapta, enunturi } = nou);
+  const altaFisa = (nou.fisa?.fisier || "") !== (fisa?.fisier || "");
+  ({ treapta, enunturi, fisa } = nou);
   if (altaTreapta) { deseneaza(); document.querySelector(".tr-zona").scrollTop = 0; }
-  else improspateazaTextele();
+  else { improspateazaTextele(); if (altaFisa) deseneazaFisa(); }
 }, (conectat) => {
   if (scriu) { if (conectat && stareEl.dataset.fel === "trimite" && !inZbor) arataStarea("live", "live"); return; }
   arataStarea(conectat ? "live" : "fără legătură live", conectat ? "live" : "eroare");
