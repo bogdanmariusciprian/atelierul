@@ -28,7 +28,16 @@ import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeF
   from "../../shared/scripts/tabla-live-repo.js";
 
 const SLUG = "redactare-enunturi";
-const TREPTE = [5, 8, 14, 26];
+/* TREPTELE SE CITESC DIN BUTOANELE PAGINII, nu se scriu și aici. Pagina și
+   scriptul sunt ținute de browser fiecare pe socoteala lui, până la 10 minute
+   după un push (GitHub Pages); cu numerele scrise în două locuri, o pagină
+   nouă cu un script vechi ar fi avut butoane care nu fac nimic. Așa, butonul
+   apăsat e mereu o treaptă pe care scriptul o cunoaște. */
+const TREPTE = (() => {
+  const din = [...document.querySelectorAll(".tr-treapta")]
+    .map((b) => Number(b.dataset.n)).filter((n) => n > 0);
+  return din.length ? din : [5, 8, 14, 26];
+})();
 const CHEIE_MARIME = "tabla-redactare:marime";
 /* Cât se așteaptă după ultima tastă până se trimite. Destul de scurt ca să
    pară live, destul de lung ca să nu plece o cerere la fiecare literă. */
@@ -79,15 +88,25 @@ function textParinte(sus, k) {
 const treaptaDinainte = (n) => TREPTE[TREPTE.indexOf(n) - 1];
 
 /**
- * Cum se împart enunțurile treptei `n` pe enunțurile treptei dinainte:
- * primul și ultimul au câte un singur „copil", fiecare din mijloc câte doi.
+ * Cum se împart enunțurile treptei `n` pe enunțurile treptei dinainte.
+ * Primul și ultimul au câte un singur „copil"; cele din mijloc își împart
+ * restul. La 5 / 8 / 14 / 26 iese exact câte doi fiecare; dacă pagina ar avea
+ * alte numere, restul se împarte cât mai egal, cu unul în plus la cele dintâi,
+ * ca tabla să meargă oricum.
  * @returns {Array<{parinte: number, copii: number[], capat: "" | "primul" | "ultimul"}>}
  */
 function grupuri(n) {
   const sus = treaptaDinainte(n);
+  const mijlocSus = sus - 2;
+  const mijlocJos = n - 2;
+  const baza = Math.floor(mijlocJos / mijlocSus);
+  const inPlus = mijlocJos % mijlocSus;
   const g = [{ parinte: 0, copii: [0], capat: "primul" }];
-  for (let k = 1; k < sus - 1; k++) {
-    g.push({ parinte: k, copii: [2 * k - 1, 2 * k], capat: "" });
+  let i = 1;
+  for (let k = 0; k < mijlocSus; k++) {
+    const cati = baza + (k < inPlus ? 1 : 0);
+    g.push({ parinte: k + 1, copii: Array.from({ length: cati }, (_, j) => i + j), capat: "" });
+    i += cati;
   }
   g.push({ parinte: sus - 1, copii: [n - 1], capat: "ultimul" });
   return g;
