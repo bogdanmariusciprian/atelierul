@@ -9,8 +9,15 @@
 //      loc. Merge și pe o fișă care nu vorbește deloc.
 //   3. CÂT S-A DERULAT. Tot din afară, ca apăsările: orice casetă care se
 //      derulează (textul unei lecturi, pagina întreagă) se ține minte după
-//      drumul ei, cu locul ca procent din cât se poate derula. Pe tablă se
-//      derulează la același procent, chiar dacă ecranul ei e altfel.
+//      drumul ei și după CE SE VEDE ÎN MIJLOCUL EI: elementul de acolo (un
+//      cuvânt, un alineat) și cât din el e deasupra mijlocului. Pe tablă se
+//      derulează până când același element ajunge tot în mijloc.
+//
+//      DE CE NU UN PROCENT. Așa a fost întâi, și pe ecrane diferite nu se
+//      potrivea: pe tabla lată rândurile sunt mai lungi, textul se așază pe
+//      mai puține rânduri, iar același procent din înălțime cade pe alt rând.
+//      Cuvântul din mijloc e același oriunde. Procentul pleacă și el, ca
+//      rezervă, dacă pe tablă cuvântul nu se găsește.
 //   4. CE S-A TRAS CU DEGETUL. Markerul care colorează cuvintele, creionul
 //      care desenează peste slide: nu sunt apăsări, ci mișcări (`pointerdown`,
 //      `pointermove`, `pointerup`). Se ascultă tot din afară, iar la ridicarea
@@ -18,11 +25,13 @@
 //      reface mișcare cu mișcare, deci codul lecției colorează și desenează
 //      singur, ca la tine.
 //
-//      UNDE, PE UN ALT ECRAN. Lecția se scalează cât ecranul, deci punctele nu
-//      pot pleca în pixeli. Pleacă față de un element din slide aflat sub
-//      deget la începutul gestului (un cuvânt, un alineat): pe tablă, același
-//      element e în același loc al slide-ului, doar mai mare ori mai mic, iar
-//      punctul se pune la fel față de el.
+//      UNDE, PE UN ALT ECRAN. Lecția se scalează cât ecranul, iar textul se
+//      poate așeza pe alte rânduri, deci punctele nu pot pleca în pixeli.
+//      Fiecare punct pleacă față de ELEMENTUL DE SUB EL (cuvântul peste care
+//      trece markerul): pe tablă se pune pe același cuvânt, oriunde ar fi
+//      ajuns el pe rând. Când sub deget e un strat cât tot ecranul (creionul
+//      desenează pe unul), punctele pleacă toate față de un singur reper luat
+//      la începutul gestului, ca linia să nu se rupă în bucăți.
 //
 // DE CE APĂSAREA, NU URMA EI. S-ar fi putut copia urma: ce clase s-au pus pe
 // elemente, ce s-a ascuns, ce s-a aprins. Dar jumătate din ce face o lecție nu
@@ -152,6 +161,39 @@ function comandaSlideurilor(w) {
   return fara;
 }
 
+/** Cât din pixelii ecranului face un pixel al casetei. Lecțiile se scalează cu
+ *  `transform` cât ecranul, iar `scrollTop` e în pixelii casetei, nu ai ecranului. */
+function scara(el) {
+  const h = el.offsetHeight || el.clientHeight;
+  const r = el.getBoundingClientRect().height;
+  return h > 0 && r > 0 ? r / h : 1;
+}
+
+/**
+ * Ce se vede în mijlocul casetei: `{ a: drum, f: cât din element e deasupra
+ * mijlocului }`, ori `null` dacă acolo nu e nimic bun (un gol între alineate se
+ * ocolește încercând puțin mai sus și mai jos).
+ */
+function ancoraDinMijloc(w, el) {
+  const doc = w.document;
+  const r = el === doc.scrollingElement || el === doc.documentElement
+    ? { left: 0, top: 0, width: w.innerWidth, height: w.innerHeight }
+    : el.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  const x = r.left + r.width / 2;
+  const mijloc = r.top + r.height / 2;
+  for (const dy of [0, -12, 12, -28, 28, -50, 50]) {
+    const t = doc.elementFromPoint(x, mijloc + dy);
+    if (!t || t === el || !el.contains(t)) continue;
+    const tr = t.getBoundingClientRect();
+    if (!tr.height) continue;
+    const cale = caleaCatre(t);
+    if (cale === null) continue;
+    return { a: cale, f: Math.round(((mijloc - tr.top) / tr.height) * 1000) / 1000 };
+  }
+  return null;
+}
+
 /** Cât se poate derula un element: `null` dacă nu se derulează deloc. */
 function cursa(el) {
   const max = el.scrollHeight - el.clientHeight;
@@ -170,13 +212,18 @@ const MAX_PUNCTE = 400;
 
 /** Un element „din slide", bun de luat ca reper: nu cât tot ecranul (stratul de
  *  desen, scena întreagă), ci ceva mai mic, care se mută odată cu slide-ul. */
+/** Un element mic, care se mută odată cu slide-ul: nu cât tot ecranul. */
+function eMic(w, el) {
+  if (!el || el.nodeType !== 1) return false;
+  const doc = w.document;
+  if (el === doc.documentElement || el === doc.body) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && (r.width < w.innerWidth * 0.9 || r.height < w.innerHeight * 0.9);
+}
+
 function reperSub(w, x, y, tinta) {
   const doc = w.document;
-  const L = w.innerWidth * 0.9, H = w.innerHeight * 0.9;
-  const bun = (el) => {
-    const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && (r.width < L || r.height < H);
-  };
+  const bun = (el) => eMic(w, el);
   if (tinta && tinta.nodeType === 1 && bun(tinta)) return tinta;
   for (const el of doc.elementsFromPoint?.(x, y) || []) {
     if (el !== tinta && el !== doc.documentElement && el !== doc.body && bun(el)) return el;
@@ -235,22 +282,45 @@ export function puntea(cadru) {
         if (max === null) return;
         const cale = ev.target === doc ? "" : caleaCatre(el);
         if (cale === null) return;
-        spune(cale, Math.min(1, Math.max(0, el.scrollTop / max)));
+        const p = Math.round(Math.min(1, Math.max(0, el.scrollTop / max)) * 10000) / 10000;
+        spune(cale, { p, ...(ancoraDinMijloc(w, el) || {}) });
       };
       try { w.document.addEventListener("scroll", ascultatorDerulare, { capture: true, passive: true }); }
       catch { ascultatorDerulare = null; }
     },
 
-    /** Derulează caseta de la capătul drumului la procentul dat (0–1).
-     *  Nu face nimic dacă e deja acolo, ca să nu tremure la fiecare mesaj. */
-    deruleaza(cale, procent) {
+    /**
+     * Derulează caseta de la capătul drumului cum a spus cel care conduce:
+     * `{ p, a, f }` – elementul `a` adus în mijloc (cu partea `f` din el
+     * deasupra mijlocului), ori, dacă nu se găsește, procentul `p`. Un număr
+     * simplu e procentul (mesajele de dinainte de ancoră).
+     * Nu face nimic dacă e deja acolo, ca să nu tremure la fiecare mesaj.
+     */
+    deruleaza(cale, loc) {
       const doc = w?.document;
       if (!doc) return;
       const el = cale === "" ? (doc.scrollingElement || doc.documentElement) : elementulDe(doc, cale);
       if (!el) return;
       const max = cursa(el);
       if (max === null) return;
-      const tinta = Math.round(Math.min(1, Math.max(0, Number(procent) || 0)) * max);
+      const l = typeof loc === "number" ? { p: loc } : (loc || {});
+
+      let tinta = null;
+      const ancora = typeof l.a === "string" ? elementulDe(doc, l.a) : null;
+      if (ancora && el.contains(ancora) && ancora !== el) {
+        const pagina = el === doc.scrollingElement || el === doc.documentElement;
+        const r = pagina ? { top: 0, height: w.innerHeight } : el.getBoundingClientRect();
+        const ar = ancora.getBoundingClientRect();
+        if (ar.height > 0) {
+          const f = Math.min(1, Math.max(0, Number(l.f) || 0));
+          /* Cât trebuie mutat, în pixeli de ecran, ca punctul ancorei să ajungă
+             în mijloc; apoi în pixelii casetei, care pot fi scalați. */
+          const mutare = (ar.top + f * ar.height) - (r.top + r.height / 2);
+          tinta = el.scrollTop + mutare / (pagina ? 1 : scara(el));
+        }
+      }
+      if (tinta === null) tinta = Math.min(1, Math.max(0, Number(l.p) || 0)) * max;
+      tinta = Math.round(Math.min(max, Math.max(0, tinta)));
       if (Math.abs(el.scrollTop - tinta) > 2) el.scrollTop = tinta;
     },
 
@@ -263,7 +333,15 @@ export function puntea(cadru) {
       this.uitaGesturile();
       if (!w) return;
       let gest = null;            // { r, t: [drumuri], p: [[fel, ți, x, y]], ultim: {x,y}, ref }
+      /* Locul unui punct: față de elementul mic de sub el, dacă există (al
+         cincilea număr spune care, din `t`); altfel față de reperul gestului. */
       const loc = (ev) => {
+        const sub = w.document.elementFromPoint(ev.clientX, ev.clientY);
+        if (eMic(w, sub)) {
+          const j = tinta(sub);
+          const r = sub.getBoundingClientRect();
+          if (j >= 0) return [rotund((ev.clientX - r.left) / r.width), rotund((ev.clientY - r.top) / r.height), j];
+        }
         const r = gest.ref?.getBoundingClientRect();
         if (r && r.width > 0 && r.height > 0) {
           return [rotund((ev.clientX - r.left) / r.width), rotund((ev.clientY - r.top) / r.height)];
@@ -331,12 +409,17 @@ export function puntea(cadru) {
       this.lasaCapturile();
       try {
         w.__licDeLaDistanta = true;
-        for (const [fel, i, x, y] of g.p) {
+        for (const [fel, i, x, y, j] of g.p) {
           const tip = tipuri[fel];
           const el = typeof g.t[i] === "string" ? elementulDe(doc, g.t[i]) : null;
           if (!tip || !el || !Number.isFinite(x) || !Number.isFinite(y)) continue;
-          const clientX = bun ? r.left + x * r.width : x * w.innerWidth;
-          const clientY = bun ? r.top + y * r.height : y * w.innerHeight;
+          /* Punctul se pune față de elementul lui, dacă are unul și se găsește
+             aici; altfel față de reperul gestului; altfel față de ecran. */
+          const sub = Number.isInteger(j) && typeof g.t[j] === "string" ? elementulDe(doc, g.t[j]) : null;
+          const rs = sub?.getBoundingClientRect();
+          const cuSub = rs && rs.width > 0 && rs.height > 0;
+          const clientX = cuSub ? rs.left + x * rs.width : bun ? r.left + x * r.width : x * w.innerWidth;
+          const clientY = cuSub ? rs.top + y * rs.height : bun ? r.top + y * r.height : y * w.innerHeight;
           const e = new w.PointerEvent(tip, {
             bubbles: true, cancelable: true, composed: true, view: w,
             clientX, clientY, pointerId: 1, pointerType: "mouse", isPrimary: true,

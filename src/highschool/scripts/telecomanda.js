@@ -37,9 +37,11 @@
 //    O oră are zeci de apăsări, nu mii; un drum are vreo cincisprezece litere.
 //
 // 6. DERULĂRILE MERG CA LOCURI, NU CA MIȘCĂRI. Pentru fiecare casetă derulată
-//    (textul de citit, pagina) pleacă doar unde e acum, ca procent din cât se
-//    poate derula: `{ drum: 0.42 }`. Un mesaj pierdut nu strică nimic, fiindcă
-//    următorul spune iar unde e; tabla pornită târziu ajunge direct acolo.
+//    (textul de citit, pagina) pleacă doar unde e acum: ce element e în
+//    mijlocul ei și, de rezervă, procentul (vezi `fisa-punte.js`):
+//    `{ drum: { p: 0.42, a: "1.2.3.1.0.57.3", f: 0.5 } }`. Un mesaj pierdut nu
+//    strică nimic, fiindcă următorul spune iar unde e; tabla pornită târziu
+//    ajunge direct acolo.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { supabase } from "../../shared/scripts/supabase-client.js";
@@ -50,14 +52,23 @@ const SUBIECT = "liceu:telecomanda";
    ar fi un aparat luat razna. */
 const MAX_DERULARI = 30;
 
-/** Derulările venite pe canal, curățate: drum text scurt, procent între 0 și 1. */
+const eDrum = (c) => typeof c === "string" && c.length <= 200 && /^[0-9.]*$/.test(c);
+const intre01 = (n) => Math.min(1, Math.max(0, n));
+
+/** Derulările venite pe canal, curățate: drumuri scurte din cifre și puncte,
+ *  procente între 0 și 1. Un număr simplu (mesaj vechi) e procentul. */
 function curataDerularile(d) {
   if (!d || typeof d !== "object" || Array.isArray(d)) return {};
   const iesire = {};
-  for (const [cale, p] of Object.entries(d).slice(0, MAX_DERULARI)) {
-    if (typeof cale !== "string" || cale.length > 200 || !/^[0-9.]*$/.test(cale)) continue;
-    const n = Number(p);
-    if (Number.isFinite(n)) iesire[cale] = Math.min(1, Math.max(0, n));
+  for (const [cale, v] of Object.entries(d).slice(0, MAX_DERULARI)) {
+    if (!eDrum(cale)) continue;
+    const loc = typeof v === "number" ? { p: v } : v;
+    if (!loc || typeof loc !== "object") continue;
+    const p = Number(loc.p);
+    if (!Number.isFinite(p)) continue;
+    const curat = { p: intre01(p) };
+    if (eDrum(loc.a) && Number.isFinite(Number(loc.f))) { curat.a = loc.a; curat.f = intre01(Number(loc.f)); }
+    iesire[cale] = curat;
   }
   return iesire;
 }
@@ -147,7 +158,8 @@ export function telecomanda({ rol, peStare, stareaMea, peLegatura }) {
     const derulari = curataDerularile(s.derulari);
     /* Derulările intră în amprentă rotunjite: o mișcare de o miime nu merită
        un mesaj, una vizibilă da. */
-    const semnDerulari = Object.entries(derulari).map(([c, p]) => `${c}:${p.toFixed(3)}`).join(",");
+    const semnDerulari = Object.entries(derulari)
+      .map(([c, l]) => `${c}:${l.p.toFixed(3)}:${l.a || ""}:${(l.f ?? 0).toFixed(2)}`).join(",");
     const amprenta = `${s.fisa}|${s.slide}|${jurnal.length}|${semnDerulari}`;
     const seRepeta = acum - ultimaClipa >= REPETA;
     if (!silit && !seRepeta && amprenta === ultimaTrimisa) return;

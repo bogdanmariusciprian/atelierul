@@ -1002,7 +1002,7 @@ const telec = {
   slideCerut: 0,
 
   /* Derulările: la „conduc", unde e acum fiecare casetă derulată a fișei
-     (drum → procent); la „urmez", unde trebuie să fie. */
+     (drum → { procent, elementul din mijloc }); la „urmez", unde trebuie să fie. */
   derulari: {},
   derulariFisa: "",
   derulariCerute: {},
@@ -1028,7 +1028,7 @@ function trimiteDerularea() {
 function aplicaDerularile() {
   const p = telec.punte;
   if (!p?.deruleaza) return;
-  for (const [cale, procent] of Object.entries(telec.derulariCerute || {})) p.deruleaza(cale, procent);
+  for (const [cale, loc] of Object.entries(telec.derulariCerute || {})) p.deruleaza(cale, loc);
 }
 
 /** Conduce cineva chiar acum? Numai pentru cel care urmează. */
@@ -1093,10 +1093,10 @@ function potrivestePuntea() {
   /* Derulările, la fel: ținute minte și când nu conduce nimeni, ca tabla
      pornită mai târziu să afle unde e textul. Se pun DUPĂ `pePunere`, care
      începe prin a dezlega tot. */
-  p.pePunereDerulare?.((cale, procent) => {
+  p.pePunereDerulare?.((cale, loc) => {
     const fisa = rutaId();
     if (telec.derulariFisa !== fisa) { telec.derulari = {}; telec.derulariFisa = fisa; }
-    telec.derulari[cale] = procent;
+    telec.derulari[cale] = loc;
     trimiteDerularea();
   });
 }
