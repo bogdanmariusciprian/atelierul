@@ -13,6 +13,17 @@
 .sb .lesson-section__title { margin-bottom: 1rem; }
 .sb b, .sb strong { color: var(--color-text); }
 
+/* Textul lecției, la stânga și la dreapta. Despărțirea în silabe ține
+   rândurile înguste (cartonașele, telefonul) fără găuri mari între cuvinte. */
+.sb p, .sb li {
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+.sb .sb-cuprins li, .sb .sb-indiciu, .sb .sb-chenar p, .sb h3 { text-align: left; hyphens: manual; }
+
+.sb-sursa { margin: 0 0 0.9rem; color: var(--color-text-muted); font-style: italic; }
+
 /* ---- cuprinsul: un rând de pastile spre secțiuni ---- */
 .sb-cuprins {
   display: flex;
@@ -456,7 +467,12 @@
   .sb-poveste > summary { flex-wrap: wrap; }
   .sb-poveste__corp { padding-inline: 1rem; font-size: 1rem; }
   .sb-chenar { padding-left: 3rem; font-size: 1rem; }
-  .sb-trasatura { grid-template-columns: 1.8rem 1fr; gap: 0 0.7rem; padding: 0.8rem; }
-  .sb-trasatura::before { width: 1.8rem; height: 1.8rem; font-size: 0.9rem; }
+  /* Pe telefon numărul urcă lângă titlu, iar textul ia toată lățimea:
+     pe un rând îngust, textul aliniat la ambele margini lasă goluri. */
+  .sb-trasatura { display: block; padding: 0.85rem 0.9rem; }
+  .sb-trasatura::before { float: left; width: 1.6rem; height: 1.6rem; margin: 0.1rem 0.55rem 0 0; font-size: 0.85rem; }
+  .sb-trasatura__nume { min-height: 1.6rem; }
+  .sb-cinci li { padding: 0.75rem 0.9rem 0.75rem 2.4rem; }
+  .sb-curent__col, .sb-curent__plus { padding-inline: 0.85rem; }
   .sb-vers { white-space: normal; }
 }
