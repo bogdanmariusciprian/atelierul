@@ -98,6 +98,32 @@ button { font: inherit; }
 .tr-treapta:hover { color: var(--ink); }
 .tr-treapta.is-on { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(234, 88, 12, .3); }
 
+/* Tipul eseului: același comutator, mai discret decât treptele. */
+.tr-tipuri {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: #f1ebe4;
+}
+.tr-tip {
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tr-tip:hover { color: var(--ink); }
+.tr-tip.is-on { background: var(--card); color: #c2410c; box-shadow: 0 1px 4px rgba(31, 36, 48, .12); }
+.tr--citeste .tr-tip:disabled { opacity: .45; cursor: default; }
+.tr--citeste .tr-tip.is-on { cursor: default; }
+/* Cu tipurile pe bară, treptele nu mai împing spre dreapta: stau lângă ele. */
+.tr-tipuri { margin-left: auto; }
+.tr-trepte { margin-left: 0; }
+
 .tr-unelte { display: inline-flex; align-items: center; gap: 6px; }
 .tr-scrise { margin-right: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tr-btn {

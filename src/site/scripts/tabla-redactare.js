@@ -1,8 +1,14 @@
 // =========================================================
 // #LaTablă, redactare: de la 5 la 18 enunțuri.
 //
-// Cinci părți, mereu aceleași, în ordinea asta: Intro, Reper 1 - trăsături,
-// Reper 2 - scene semnificative, Reper 3 - structură și compoziție, Concluzie.
+// TIPURI DE ESEU. Tabla știe mai multe eseuri, fiecare cu etichetele și cu
+// treptele lui; le alegi sus. Fiecare are tabla lui: ce scrii la unul rămâne
+// acolo când treci la altul. Acum sunt două, cu aceeași împărțire, doar cu
+// alte etichete la repere:
+//   încadrare în curent  – trăsături · scene semnificative · structură și compoziție
+//   particularități (liric) – trăsături · două imagini poetice · compoziție și limbaj
+//
+// Cinci părți, în ordinea asta: Intro, Reper 1, Reper 2, Reper 3, Concluzie.
 // Pe prima treaptă e câte un enunț pe parte. Pe treptele următoare, unele părți
 // se rescriu în mai multe enunțuri, cu mai multe detalii, altele rămân cum erau.
 //
@@ -22,8 +28,8 @@
 // Toate enunțurile unei trepte sunt numerotate de la 1 la capăt, și cele gata
 // scrise; fără număr rămâne doar enunțul stins de deasupra unui grup.
 //
-// PĂRȚILE FIECĂREI TREPTE STAU ÎN PAGINĂ, pe butoane (`data-parti`), nu și
-// aici. Pagina și scriptul sunt ținute de browser fiecare pe socoteala lui,
+// TIPURILE, ETICHETELE ȘI TREPTELE STAU ÎN PAGINĂ, pe butoanele tipurilor
+// (`data-etichete`, `data-trepte`), nu și aici. Pagina și scriptul sunt ținute de browser fiecare pe socoteala lui,
 // până la 10 minute după un push (GitHub Pages); cu numerele scrise în două
 // locuri, o pagină nouă cu un script vechi ar fi avut butoane care nu fac nimic.
 //
@@ -42,30 +48,37 @@ import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeF
 
 const SLUG = "redactare-enunturi";
 
-/* Cele cinci părți, cu etichetele lor. */
-const PARTI = [
-  { cheie: "intro", eticheta: "Intro" },
-  { cheie: "r1", eticheta: "Reper 1 - trăsături" },
-  { cheie: "r2", eticheta: "Reper 2 - scene semnificative" },
-  { cheie: "r3", eticheta: "Reper 3 - structură și compoziție" },
-  { cheie: "concluzie", eticheta: "Concluzie" },
-];
-
-/* Treptele și câte enunțuri are fiecare parte pe ele, citite din butoane. */
-const STRUCTURA = (() => {
-  const din = [...document.querySelectorAll(".tr-treapta")].map((b) => {
-    const parti = String(b.dataset.parti || "").split(",").map(Number);
-    return { n: Number(b.dataset.n), parti };
-  }).filter((t) => t.n > 0 && t.parti.length === PARTI.length
-    && t.parti.every((x) => x > 0) && t.parti.reduce((a, x) => a + x, 0) === t.n);
-  return din.length ? din : [
-    { n: 5, parti: [1, 1, 1, 1, 1] }, { n: 8, parti: [1, 2, 2, 2, 1] },
-    { n: 14, parti: [1, 4, 4, 4, 1] }, { n: 18, parti: [1, 4, 8, 4, 1] },
-  ];
+/* Tipurile de eseu, citite din butoanele lor:
+     data-etichete="Intro|Reper 1 - …|…|Concluzie"
+     data-trepte="5:1,1,1,1,1;8:1,2,2,2,1;…"   (treapta: câte enunțuri pe parte)
+   O treaptă se ia doar dacă are câte un număr pe parte și suma lor e chiar
+   numărul treptei. */
+const TIPURI = (() => {
+  const din = [...document.querySelectorAll(".tr-tip")].map((b) => {
+    const etichete = String(b.dataset.etichete || "").split("|").map((x) => x.trim()).filter(Boolean);
+    const trepte = String(b.dataset.trepte || "").split(";").map((t) => {
+      const [n, parti] = t.split(":");
+      return { n: Number(n), parti: String(parti || "").split(",").map(Number) };
+    }).filter((t) => t.n > 0 && t.parti.length === etichete.length && t.parti.every((x) => x > 0)
+      && t.parti.reduce((x, y) => x + y, 0) === t.n);
+    return { cheie: b.dataset.tip, etichete, trepte };
+  }).filter((t) => t.cheie && t.etichete.length >= 2 && t.trepte.length);
+  return din.length ? din : [{
+    cheie: "incadrare",
+    etichete: ["Intro", "Reper 1 - trăsături", "Reper 2 - scene semnificative",
+      "Reper 3 - structură și compoziție", "Concluzie"],
+    trepte: [{ n: 5, parti: [1, 1, 1, 1, 1] }, { n: 8, parti: [1, 2, 2, 2, 1] },
+      { n: 14, parti: [1, 4, 4, 4, 1] }, { n: 18, parti: [1, 4, 8, 4, 1] }],
+  }];
 })();
-const TREPTE = STRUCTURA.map((t) => t.n);
-const partiLa = (n) => STRUCTURA.find((t) => t.n === n).parti;
-const treaptaDinainte = (n) => TREPTE[TREPTE.indexOf(n) - 1];
+
+let tip = TIPURI[0].cheie;
+const tipul = (c = tip) => TIPURI.find((t) => t.cheie === c) || TIPURI[0];
+const trepteLe = () => tipul().trepte.map((t) => t.n);
+const partiLa = (n) => tipul().trepte.find((t) => t.n === n).parti;
+const treaptaDinainte = (n) => { const t = trepteLe(); return t[t.indexOf(n) - 1]; };
+/** Clasa grupului: primul e Intro, ultimul Concluzie, între ele reperele. */
+const claseParte = (p, cate) => (p === 0 ? "intro" : p === cate - 1 ? "concluzie" : `r${p}`);
 /** Unde începe partea `p` în enunțurile treptei `n`. */
 const inceputul = (n, p) => partiLa(n).slice(0, p).reduce((a, x) => a + x, 0);
 
@@ -99,26 +112,52 @@ const foaie = document.getElementById("foaie");
 const scrise = document.getElementById("scrise");
 const stareEl = document.getElementById("stare");
 
-const gol = () => Object.fromEntries(TREPTE.map((n) => [n, Array(n).fill("")]));
+/** Enunțuri goale pe toate treptele unui eseu. */
+const gol = (t = tipul()) => Object.fromEntries(t.trepte.map(({ n }) => [n, Array(n).fill("")]));
 
-/** Ce vine din bază, adus la forma pe care o știe pagina (orice lipsă = gol). */
-function normalizeaza(d) {
-  const e = gol();
+/** Starea unui eseu (treapta și enunțurile), adusă la forma lui. */
+function normalizeazaTip(t, d) {
+  const e = gol(t);
   const din = d?.enunturi || {};
-  for (const n of TREPTE) {
+  for (const { n } of t.trepte) {
     const v = Array.isArray(din[n]) ? din[n] : [];
     e[n] = Array.from({ length: n }, (_, i) => String(v[i] ?? ""));
   }
+  const trepte = t.trepte.map((x) => x.n);
+  return { treapta: trepte.includes(Number(d?.treapta)) ? Number(d.treapta) : trepte[0], enunturi: e };
+}
+
+/**
+ * Ce vine din bază, adus la forma pe care o știe pagina (orice lipsă = gol):
+ * `{ tip, stari: { <tip>: {treapta, enunturi} }, fisa }`.
+ * O tablă scrisă înainte de tipuri (`{treapta, enunturi}` direct) e eseul de
+ * încadrare, singurul care exista atunci.
+ */
+function normalizeaza(d) {
+  const tipuri = d?.tipuri
+    || (d?.enunturi ? { incadrare: { treapta: d.treapta, enunturi: d.enunturi } } : {});
+  const stari = Object.fromEntries(TIPURI.map((t) => [t.cheie, normalizeazaTip(t, tipuri[t.cheie])]));
   /* Fișa se ia doar dacă numele fișierului arată cum îl dă urcarea: altfel
      adresa ar putea trimite oriunde. */
   const f = d?.fisa;
   const fisa = f && /^[a-z0-9-]+\.docx$/.test(String(f.fisier || ""))
     ? { fisier: f.fisier, nume: String(f.nume || "fișa.docx"), marime: Number(f.marime) || 0 } : null;
-  return { treapta: TREPTE.includes(Number(d?.treapta)) ? Number(d.treapta) : TREPTE[0], enunturi: e, fisa };
+  return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa };
 }
 
 let scriu = isAdmin();
-let { treapta, enunturi, fisa } = normalizeaza(null);
+/* Starea fiecărui eseu stă în `stari`; cea a eseului deschis e ținută la
+   îndemână în `treapta` și `enunturi`, și pusă înapoi la schimbare ori trimitere. */
+let stari = {};
+let treapta = 0;
+let enunturi = {};
+let fisa = null;
+function incarca(nou) {
+  ({ tip, stari, fisa } = nou);
+  ({ treapta, enunturi } = stari[tip]);
+}
+const pastreazaTipul = () => { stari[tip] = { treapta, enunturi }; };
+incarca(normalizeaza(null));
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -145,7 +184,8 @@ function deseneaza() {
   const sus = treaptaDinainte(n);
   document.body.classList.toggle("tr--citeste", !scriu);
   let nr = 0;
-  foaie.innerHTML = PARTI.map((parte, p) => {
+  const etichete = tipul().etichete;
+  foaie.innerHTML = etichete.map((eticheta, p) => {
     const cati = partiLa(n)[p];
     let corp = "";
     if (!seScrie(n, p)) {
@@ -172,13 +212,17 @@ function deseneaza() {
         return html;
       }).join("");
     }
-    return `<section class="tr-grup tr-grup--${parte.cheie}${seScrie(n, p) ? "" : " tr-grup--fix"}">
-        <span class="tr-eticheta">${esc(parte.eticheta)}</span>
+    return `<section class="tr-grup tr-grup--${claseParte(p, etichete.length)}${seScrie(n, p) ? "" : " tr-grup--fix"}">
+        <span class="tr-eticheta">${esc(eticheta)}</span>
         ${corp}
       </section>`;
   }).join("");
-  document.querySelectorAll(".tr-treapta").forEach((b) => {
-    const e = Number(b.dataset.n) === n;
+  /* Treptele se desenează din eseul deschis: alt eseu poate avea alte trepte. */
+  document.getElementById("trepte").innerHTML = trepteLe().map((t) => `<button type="button"
+      role="tab" class="tr-treapta${t === n ? " is-on" : ""}" data-n="${t}" aria-selected="${t === n}"${
+      !scriu && t !== n ? " disabled" : ""}>${t}</button>`).join("");
+  document.querySelectorAll(".tr-tip").forEach((b) => {
+    const e = b.dataset.tip === tip;
     b.classList.toggle("is-on", e);
     b.setAttribute("aria-selected", String(e));
     b.disabled = !scriu && !e;
@@ -198,7 +242,7 @@ function potriveste(t) {
 /** Câte enunțuri ale treptei au text, cu tot cu cele gata scrise. */
 function numara() {
   let gata = 0;
-  PARTI.forEach((_, p) => {
+  tipul().etichete.forEach((_, p) => {
     for (let j = 0; j < partiLa(treapta)[p]; j++) if (enuntul(treapta, p, j).text.trim()) gata++;
   });
   scrise.textContent = `${gata} / ${treapta} scrise`;
@@ -224,14 +268,15 @@ async function trimite() {
      o dată la sosire, cu tot ce e nou: ultima versiune ajunge mereu. */
   if (inZbor) { maiAm = true; return; }
   inZbor = true;
-  const ok = await scrieTabla(SLUG, { treapta, enunturi, fisa });
+  pastreazaTipul();
+  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa });
   inZbor = false;
   if (maiAm) { maiAm = false; trimite(); return; }
   arataStarea(ok ? "live · trimis" : "netrimis: verifică netul", ok ? "live" : "eroare");
 }
 
 function mergiLa(n) {
-  if (!scriu || !TREPTE.includes(n) || n === treapta) return;
+  if (!scriu || !trepteLe().includes(n) || n === treapta) return;
   treapta = n;
   deseneaza();
   document.querySelector(".tr-zona").scrollTop = 0;
@@ -257,8 +302,24 @@ foaie.addEventListener("keydown", (e) => {
   toate[toate.indexOf(t) + 1]?.focus();
 });
 
-document.querySelectorAll(".tr-treapta").forEach((b) =>
-  b.addEventListener("click", () => mergiLa(Number(b.dataset.n))));
+document.getElementById("trepte").addEventListener("click", (e) => {
+  const b = e.target.closest(".tr-treapta");
+  if (b) mergiLa(Number(b.dataset.n));
+});
+
+/** Treci la alt eseu: cel de acum își păstrează enunțurile și treapta. */
+function schimbaTipul(c) {
+  if (!scriu || c === tip || !TIPURI.some((t) => t.cheie === c)) return;
+  pastreazaTipul();
+  tip = c;
+  ({ treapta, enunturi } = stari[tip]);
+  deseneaza();
+  document.querySelector(".tr-zona").scrollTop = 0;
+  foaie.querySelector(".tr-camp")?.focus();
+  trimiteCurand();
+}
+document.querySelectorAll(".tr-tip").forEach((b) =>
+  b.addEventListener("click", () => schimbaTipul(b.dataset.tip)));
 
 /* Scrisul mai mare ori mai mic, pentru proiector. Al fiecăruia, în browserul lui. */
 let marime = 1;
@@ -274,11 +335,12 @@ document.getElementById("mare").addEventListener("click", () => { marime += 0.1;
 
 document.getElementById("goleste").addEventListener("click", async () => {
   if (!scriu) return;
-  if (!TREPTE.some((n) => enunturi[n].some((x) => x.trim()))) return;
-  if (!confirm("Ștergi enunțurile de pe toate cele patru trepte? Se șterg și la elevi. Fișa Word rămâne.")) return;
+  if (!trepteLe().some((n) => enunturi[n].some((x) => x.trim()))) return;
+  const nume = document.querySelector(`.tr-tip[data-tip="${tip}"]`)?.textContent.trim() || "acesta";
+  if (!confirm(`Ștergi enunțurile eseului „${nume}", de pe toate treptele? Se șterg și la elevi. Celelalte eseuri și fișa Word rămân.`)) return;
   clearTimeout(ceas);
   enunturi = gol();
-  treapta = TREPTE[0];
+  treapta = trepteLe()[0];
   deseneaza();
   arataStarea("se golește…", "trimite");
   await trimite();
@@ -401,7 +463,7 @@ deseneaza();
 arataStarea("se încarcă…", "trimite");
 
 const deLaBaza = await citesteTabla(SLUG);
-({ treapta, enunturi, fisa } = normalizeaza(deLaBaza));
+incarca(normalizeaza(deLaBaza));
 deseneaza();
 if (scriu) foaie.querySelector(".tr-camp")?.focus();
 
@@ -410,8 +472,8 @@ if (scriu) foaie.querySelector(".tr-camp")?.focus();
 urmaresteTabla(SLUG, (d) => {
   if (scriu) return;
   const nou = normalizeaza(d);
-  const altaTreapta = nou.treapta !== treapta;
-  ({ treapta, enunturi, fisa } = nou);
+  const altaTreapta = nou.tip !== tip || nou.stari[nou.tip].treapta !== treapta;
+  incarca(nou);
   /* Cititorul nu scrie nimic, deci tabla se poate desena din nou la fiecare
      schimbare, fără să-i strice vreun câmp. Derularea rămâne unde era, afară
      de trecerea pe altă treaptă. Fișa nu se redesenează dacă e aceeași. */

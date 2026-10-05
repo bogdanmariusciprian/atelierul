@@ -17,15 +17,21 @@
     <span class="tr-marca"><span class="tr-marca__icon" aria-hidden="true"></span>#LaTablă</span>
     <span class="tr-lectie">De la 5 la 18 enunțuri</span>
 
-    <!-- Treptele și câte enunțuri are fiecare parte pe ele: Intro, Reper 1,
-         Reper 2, Reper 3, Concluzie. Stau AICI, nu și în script (vezi
-         tabla-redactare.js): suma lor e numărul de pe buton. -->
-    <div class="tr-trepte" role="tablist" aria-label="Câte enunțuri">
-      <button type="button" role="tab" class="tr-treapta" data-n="5" data-parti="1,1,1,1,1">5</button>
-      <button type="button" role="tab" class="tr-treapta" data-n="8" data-parti="1,2,2,2,1">8</button>
-      <button type="button" role="tab" class="tr-treapta" data-n="14" data-parti="1,4,4,4,1">14</button>
-      <button type="button" role="tab" class="tr-treapta" data-n="18" data-parti="1,4,8,4,1">18</button>
+    <!-- TIPURILE DE ESEU, cu etichetele părților (Intro | Reper 1 | Reper 2 |
+         Reper 3 | Concluzie) și treptele lor („treapta:câte enunțuri pe
+         parte"). Stau AICI, nu și în script (vezi tabla-redactare.js). Un eseu
+         nou = încă un buton. -->
+    <div class="tr-tipuri" role="tablist" aria-label="Tipul eseului">
+      <button type="button" role="tab" class="tr-tip" data-tip="incadrare"
+        data-etichete="Intro|Reper 1 - trăsături|Reper 2 - scene semnificative|Reper 3 - structură și compoziție|Concluzie"
+        data-trepte="5:1,1,1,1,1;8:1,2,2,2,1;14:1,4,4,4,1;18:1,4,8,4,1">Încadrare în curent</button>
+      <button type="button" role="tab" class="tr-tip" data-tip="liric"
+        data-etichete="Intro|Reper 1 - trăsături|Reper 2 - două imagini poetice|Reper 3 - compoziție și limbaj|Concluzie"
+        data-trepte="5:1,1,1,1,1;8:1,2,2,2,1;14:1,4,4,4,1;18:1,4,8,4,1">Particularități (liric)</button>
     </div>
+
+    <!-- Treptele eseului deschis; le desenează scriptul. -->
+    <div class="tr-trepte" id="trepte" role="tablist" aria-label="Câte enunțuri"></div>
 
     <div class="tr-unelte">
       <span class="tr-stare" id="stare" aria-live="polite"></span>
