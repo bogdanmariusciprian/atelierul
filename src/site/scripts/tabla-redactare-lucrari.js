@@ -70,6 +70,8 @@ export const numeOpera = (o) => o?.nume || "Operă nenumită";
  * @param {(cheie:string)=>string} c.numeTip
  * @param {(row)=>void} c.laPunePeTabla      creionul profesorului
  * @param {(row)=>void} c.laLucreazaSingur   creionul elevului
+ * @param {({opera, tip})=>void} [c.laLucrareNoua]  „Lucrare nouă", la elev
+ * @param {string} [c.operaImplicita]         opera de pe tablă, propusă la „Lucrare nouă"
  */
 export function deschideLucrarile(c) {
   document.querySelector(".tl-voal")?.remove();
@@ -78,6 +80,7 @@ export function deschideLucrarile(c) {
   voal.innerHTML = `<div class="tl-fereastra" role="dialog" aria-modal="true" aria-label="Lucrările">
       <div class="tl-cap"><h2>${c.admin ? "📁 Lucrările elevilor" : "📁 Lucrările mele"}</h2>
         <span class="tl-numar"></span><span class="tl-g"></span>
+        ${!c.admin && c.laLucrareNoua ? `<button type="button" class="tl-creion" data-tl="nou">✎ Lucrare nouă</button>` : ""}
         <button type="button" class="tl-x" data-tl="inchide" aria-label="Închide">×</button></div>
       <div class="tl-elevi" hidden></div>
       <div class="tl-corp"><p class="tl-gol">Se aduc lucrările…</p></div>
@@ -90,6 +93,7 @@ export function deschideLucrarile(c) {
   const nume = new Map();    // user_id → numele elevului
   let elevAles = "toti";
   let deschis = null, treapta = 0, mod = "una";
+  let formular = false;      // „Lucrare nouă": opera și tipul eseului
 
   const tipul = (k) => c.tipuri.find((t) => t.cheie === k) || c.tipuri[0];
   const treptele = (k) => tipul(k).trepte.map((t) => t.n);
@@ -191,9 +195,25 @@ export function deschideLucrarile(c) {
       <div class="tl-cititor-corp tl-${esc(d.tip)}">${corpul}</div>`;
   }
 
+  /* LUCRARE NOUĂ (elevul, singur, de acasă): opera și tipul eseului, apoi tabla
+     trece pe lucrarea lui, ca la „Lucrează pe ea". */
+  function lucrareNoua() {
+    return `<div class="tl-nou">
+        <h3>✎ Lucrare nouă</h3>
+        <p class="tl-nota">Lucrezi singur, pe tabla obișnuită: ce scrii se salvează în contul tău și nu apare pe tabla live.</p>
+        <label class="tl-nou__camp">Opera, cu autorul în paranteză
+          <input type="text" data-tl-opera maxlength="160" placeholder="de exemplu: Moromeții (Marin Preda)" value="${esc(c.operaImplicita || "")}"></label>
+        <div class="tl-nou__camp">Tipul eseului
+          <div class="tl-comut">${c.tipuri.map((t, i) => `<button type="button" data-tl-tip="${esc(t.cheie)}" class="${i === 0 ? "is-on" : ""}">${esc(c.numeTip(t.cheie))}</button>`).join("")}</div></div>
+        <div class="tl-nou__butoane"><button type="button" class="tl-creion" data-tl="incepe">Începe lucrarea</button>
+          <button type="button" class="tl-inapoi" data-tl="grila">Renunță</button></div>
+      </div>`;
+  }
+
   function deseneaza() {
     deseneazaElevii();
-    corp.innerHTML = deschis ? cititor() : grila();
+    corp.innerHTML = formular ? lucrareNoua() : deschis ? cititor() : grila();
+    if (formular) corp.querySelector("[data-tl-opera]")?.focus();
   }
 
   voal.addEventListener("click", (e) => {
@@ -206,7 +226,17 @@ export function deschideLucrarile(c) {
       if (deschis) { treapta = ultima(deschis); mod = "una"; }
       deseneaza(); return;
     }
-    if (e.target.closest('[data-tl="grila"]')) { deschis = null; deseneaza(); return; }
+    if (e.target.closest('[data-tl="grila"]')) { deschis = null; formular = false; deseneaza(); return; }
+    if (e.target.closest('[data-tl="nou"]')) { deschis = null; formular = true; deseneaza(); return; }
+    const tp = e.target.closest("[data-tl-tip]");
+    if (tp) { corp.querySelectorAll("[data-tl-tip]").forEach((b) => b.classList.toggle("is-on", b === tp)); return; }
+    if (e.target.closest('[data-tl="incepe"]')) {
+      const opera = operaDinText(corp.querySelector("[data-tl-opera]")?.value || "");
+      const tip = corp.querySelector("[data-tl-tip].is-on")?.dataset.tlTip || c.tipuri[0].cheie;
+      inchide();
+      c.laLucrareNoua({ opera, tip });
+      return;
+    }
     const t = e.target.closest("[data-tl-treapta]");
     if (t && !t.disabled) { treapta = Number(t.dataset.tlTreapta); mod = "una"; deseneaza(); return; }
     const m = e.target.closest("[data-tl-mod]");

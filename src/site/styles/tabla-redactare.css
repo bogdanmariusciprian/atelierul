@@ -458,3 +458,11 @@ div.tl-celula { cursor: default; }
 .tr-dialog__butoane { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .tr-btn--plin { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .tr-btn--plin:hover { color: #fff; filter: brightness(.95); }
+
+/* „Lucrare nouă", la elev: opera și tipul eseului */
+.tl-nou { max-width: 520px; margin: 4px auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 12px; }
+.tl-nou h3 { margin: 0; font-size: 18px; }
+.tl-nou__camp { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: #4b463e; }
+.tl-nou__camp input { font: inherit; font-size: 15px; font-weight: 400; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; }
+.tl-nou__camp input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.tl-nou__butoane { display: flex; gap: 8px; align-items: center; }

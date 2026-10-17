@@ -718,6 +718,7 @@ btnLucrari.hidden = true;
 document.getElementById("goleste").before(btnLucrari);
 btnLucrari.addEventListener("click", () => deschideLucrarile({
   admin, tipuri: TIPURI, numeTip, laPunePeTabla: punePeTabla, laLucreazaSingur: lucreazaSingur,
+  laLucrareNoua: lucrareNoua, operaImplicita: textOpera(operaAcum()),
 }));
 
 /* Unde s-a salvat, sub bară, lângă starea live. */
@@ -926,6 +927,29 @@ function lucreazaSingur(row) {
   document.querySelector(".tr-zona").scrollTop = 0;
   foaie.querySelector(".tr-camp")?.focus();
 }
+/** „Lucrare nouă": elevul începe singur un eseu. Lucrarea se face în contul lui
+ *  abia la primul enunț scris, ca o deschidere fără nimic scris să nu lase urme. */
+function lucrareNoua({ opera: op, tip: k }) {
+  if (!CURRENT_USER.authId || !TIPURI.some((t) => t.cheie === k)) return;
+  const d = new Date();
+  const zi = ziDeAzi();
+  const ora = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  pastreazaTipul();
+  privat = {
+    id: null,
+    titlu: `${numeOpera(op)} · ${numeTip(k)} · ${ziFrumoasa(zi)}, ${ora}`,
+    data: { versiune: 1, opera: op, tip: k, zi, ora, treapta: 0, trepte: {} },
+  };
+  tip = k;
+  stari[tip] = normalizeazaTip(tipul(tip), null);
+  ({ treapta, enunturi } = stari[tip]);
+  scriu = true;
+  deseneaza();
+  arataStarea(vorbaRolului(), "live");
+  arataSalvarea("lucrare nouă · se salvează de la primul enunț");
+  document.querySelector(".tr-zona").scrollTop = 0;
+  foaie.querySelector(".tr-camp")?.focus();
+}
 let ceasPrivat = null;
 function salveazaPrivatCurand() {
   arataSalvarea("se salvează…");
@@ -935,10 +959,14 @@ function salveazaPrivatCurand() {
 async function salveazaPrivat() {
   if (!privat) return;
   pastreazaTipul();
-  const continut = continutLucrare(privat.data.opera, privat.data.zi);
+  const continut = continutLucrare(privat.data.opera, privat.data.zi, privat.data.ora || "");
   if (!continut) return;
-  const { row, motiv } = await saveSheet({ id: privat.id, lessonSlug: LECTIE, title: privat.titlu, data: continut });
-  if (row && privat) privat.data = continut;
+  let { row, motiv } = await saveSheet({ id: privat.id, lessonSlug: LECTIE, title: privat.titlu, data: continut });
+  /* Lucrare nouă cu un titlu deja luat (două începute în același minut): „(2)", „(3)". */
+  for (let k = 2; !row && !privat.id && /numele/.test(String(motiv)) && k < 10; k++) {
+    ({ row, motiv } = await saveSheet({ lessonSlug: LECTIE, title: `${privat.titlu} (${k})`, data: continut }));
+  }
+  if (row && privat) { privat.id = row.id; privat.titlu = row.title; privat.data = continut; }
   arataSalvarea(row ? "salvat în lucrarea ta" : `nesalvat: ${motiv}`, !row);
 }
 async function ieseDinPrivat() {
