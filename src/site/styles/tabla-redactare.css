@@ -326,3 +326,8 @@ button { font: inherit; }
 /* ---- A− / A+ pe fișa Word: ale fiecăruia, în browserul lui ---- */
 .tr-fisa__zoom { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
 .tr-fisa__procent { min-width: 54px; font-variant-numeric: tabular-nums; }
+/* Mărită, fișa iese din coloana de 980 px și ia toată lățimea ferestrei; capul
+   ei rămâne aliniat cu tabla. Paginile stau la mijloc fără să fie tăiate pe stânga. */
+.tr-fisa--lat { max-width: none; }
+.tr-fisa--lat .tr-fisa__cap { max-width: 980px; margin-inline: auto; }
+.tr-fisa__pagini .docx-wrapper { align-items: safe center; }

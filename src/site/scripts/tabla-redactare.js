@@ -461,21 +461,29 @@ async function arataFisa(fisier, unde) {
 const CHEIE_ZOOM_FISA = "tabla-redactare:zoom-fisa";
 let zoomFisa = 1;
 try { zoomFisa = Number(localStorage.getItem(CHEIE_ZOOM_FISA)) || 1; } catch { /* nimic */ }
+/* MĂRITĂ, FIȘA IESE DIN COLOANA TABLEI și se întinde pe toată lățimea ferestrei
+   (cerut de Marius, 17 octombrie 2026: „să se întindă pe toată lățimea
+   ferestrei, nu trunchiat"). Nu crește niciodată peste lățimea ferestrei:
+   A+ se oprește acolo, ca pagina să nu fie tăiată pe margine. */
 function puneZoomFisa(pas) {
   zoomFisa = pas === 0 ? 1 : Math.min(3, Math.max(0.5, Math.round((zoomFisa + pas * 0.25) * 100) / 100));
-  try { localStorage.setItem(CHEIE_ZOOM_FISA, String(zoomFisa)); } catch { /* nimic */ }
-  const procent = sectiuneFisa.querySelector(".tr-fisa__procent");
-  if (procent) procent.textContent = `${Math.round(zoomFisa * 100)}%`;
   incadreazaFisa();
+  try { localStorage.setItem(CHEIE_ZOOM_FISA, String(zoomFisa)); } catch { /* nimic */ }
 }
 function incadreazaFisa() {
+  sectiuneFisa.classList.toggle("tr-fisa--lat", zoomFisa > 1);
   const pagini = sectiuneFisa.querySelector(".tr-fisa__pagini");
   const invelis = pagini?.querySelector(".docx-wrapper");
   const pagina = invelis?.querySelector("section.docx");
-  if (!pagina) return;
+  const procent = sectiuneFisa.querySelector(".tr-fisa__procent");
+  if (!pagina) { if (procent) procent.textContent = `${Math.round(zoomFisa * 100)}%`; return; }
   invelis.style.zoom = "";
-  const scara = Math.min(1, pagini.clientWidth / pagina.offsetWidth) * zoomFisa;
+  /* Cât încape: lățimea locului împărțită la lățimea paginii, în mărimea ei. */
+  const incape = pagini.clientWidth / pagina.offsetWidth;
+  if (zoomFisa > incape && zoomFisa > 1) zoomFisa = Math.max(1, Math.floor(incape * 100) / 100);
+  const scara = zoomFisa > 1 ? zoomFisa : Math.min(1, incape) * zoomFisa;
   if (scara !== 1) invelis.style.zoom = String(Math.floor(scara * 1000) / 1000);
+  if (procent) procent.textContent = `${Math.round(zoomFisa * 100)}%`;
 }
 addEventListener("resize", incadreazaFisa);
 
