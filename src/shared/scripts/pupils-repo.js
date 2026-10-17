@@ -42,14 +42,15 @@ const PROFILE_JOIN = "profiles!planner_pupils_user_id_fkey(display_name)";
 export const INGADUINTE = {
   explicatii: "can_propose",   // 0087 — îmi transmit explicații la itemii de la Câmpina
   etichetare: "can_tag",       // 0088 — pun etichete pe cuvinte la #LaTablă
+  tabla: "can_board",          // 0108 — scriu enunțuri pe tabla de redactare
 };
 
-/** Elevii de la meditații, cu amândouă îngăduințele. Numai profesorul îi vede.
+/** Elevii de la meditații, cu toate îngăduințele. Numai profesorul îi vede.
  *  ARUNCĂ dacă serverul refuză, ca cel care întreabă să poată spune de ce. */
 export async function tutoringPupils() {
   const { data, error } = await supabase
     .from("planner_pupils")
-    .select(`user_id, planner_name, can_propose, can_tag, ${PROFILE_JOIN}`);
+    .select(`user_id, planner_name, can_propose, can_tag, can_board, ${PROFILE_JOIN}`);
   /* Nu întorc o listă goală la eroare. „Goală" și „n-am putut întreba" arată la
      fel pe ecran, dar înseamnă lucruri opuse, iar o dată chiar ne-a costat:
      panoul i-a spus lui Marius că n-are elevi la meditații, în timp ce în bază
@@ -59,7 +60,7 @@ export async function tutoringPupils() {
     userId: r.user_id,
     name: (r.planner_name || "").trim()
       || (r.profiles?.display_name || "").trim() || "elev",
-    can: { explicatii: !!r.can_propose, etichetare: !!r.can_tag },
+    can: { explicatii: !!r.can_propose, etichetare: !!r.can_tag, tabla: !!r.can_board },
   })).sort((a, b) => a.name.localeCompare(b.name, "ro"));
 }
 

@@ -10,6 +10,7 @@
 // (0107) rămâne, deci golirea e tot o scriere.
 // =========================================================
 import { supabase } from "./supabase-client.js";
+import { CURRENT_USER } from "./session.js";
 
 /** Ce e acum pe tablă; `null` dacă e goală ori nu se poate citi. */
 export async function citesteTabla(slug) {
@@ -25,6 +26,46 @@ export async function scrieTabla(slug, continut) {
     .upsert({ slug, data: continut, actualizat_la: new Date().toISOString() }, { onConflict: "slug" });
   if (error) { console.warn("scrieTabla:", error.message); return false; }
   return true;
+}
+
+/* ---------- un enunț, scris singur (0108) ----------
+   Și elevul pornit de profesor scrie, deci doi oameni pot scrie deodată. Un
+   enunț pleacă singur, prin funcția din bază, care schimbă doar locul lui:
+   scris întreg, cum se scrie treapta, ar fi șters ce a scris celălalt între
+   timp. Funcția verifică ea cine are voie; de aici nu se verifică nimic. */
+
+/** `'gata'`, `'inchis'` (n-ai voie acum), `'gresit'` ori `'eroare'` (netul). */
+export async function scrieEnunt(slug, tip, n, i, text) {
+  const { data, error } = await supabase.rpc("scrie_enunt", {
+    p_slug: slug, p_tip: tip, p_n: n, p_i: i, p_text: text,
+  });
+  if (error) { console.warn("scrieEnunt:", error.message); return "eroare"; }
+  return String(data || "eroare");
+}
+
+/** Pot EU scrie enunțuri pe tablă? Profesorul da; elevul, dacă e pornit. */
+export async function poateScrieTabla() {
+  if (!CURRENT_USER.authId) return false;
+  const { data, error } = await supabase.rpc("poate_scrie_tabla");
+  if (error) { console.warn("poateScrieTabla:", error.message); return false; }
+  return !!data;
+}
+
+/**
+ * Ascultă comutatorul MEU (`planner_pupils.can_board`), în timp real: când
+ * profesorul te pornește ori te oprește, tabla se deschide ori se închide pe
+ * loc, fără reîncărcare. Întoarce funcția care oprește ascultarea.
+ */
+export function ascultaIngaduinta(cand) {
+  const eu = CURRENT_USER.authId;
+  if (!eu) return () => {};
+  const canal = supabase
+    .channel(`tabla-ingaduinta:${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "planner_pupils", filter: `user_id=eq.${eu}` },
+        (m) => { try { cand(!!m?.new?.can_board); } catch (e) { console.warn("ascultaIngaduinta:", e?.message); } })
+    .subscribe();
+  return () => { try { supabase.removeChannel(canal); } catch { /* deja tăiat */ } };
 }
 
 /* ---------- fișa Word de sub tablă (0107) ----------

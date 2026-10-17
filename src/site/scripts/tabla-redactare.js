@@ -33,18 +33,27 @@
 // până la 10 minute după un push (GitHub Pages); cu numerele scrise în două
 // locuri, o pagină nouă cu un script vechi ar fi avut butoane care nu fac nimic.
 //
-// LIVE (0106). Scrie doar adminul; tot ce scrie, plus treapta pe care e, pleacă
-// în bază și ajunge pe loc la toți cei care au tabla deschisă. Ceilalți citesc
-// doar și îl urmează de pe o treaptă pe alta. Tabla rămâne scrisă până apasă
-// adminul „Golește", ca un elev intrat mai târziu să vadă ce e deja pe ea.
+// LIVE (0106). Ce scrie adminul, plus treapta pe care e, pleacă în bază și
+// ajunge pe loc la toți cei care au tabla deschisă. Ceilalți îl urmează de pe o
+// treaptă pe alta. Tabla rămâne scrisă până apasă adminul „Golește", ca un elev
+// intrat mai târziu să vadă ce e deja pe ea.
+//
+// ȘI ELEVUL SCRIE (0108, cerut de Marius pe 17 octombrie 2026). Profesorul
+// pornește din tablă („Elevi care scriu") un anumit elev de la meditații;
+// acela poate scrie în câmpurile enunțurilor, nimic altceva: treapta, tipul de
+// eseu, fișa și golirea rămân ale profesorului. Fiindcă acum pot scrie doi
+// oameni deodată, un enunț pleacă SINGUR (`scrieEnunt`), nu toată tabla, iar
+// fiecare scriitor primește și ce scrie celălalt, fără să-i fie atins câmpul
+// în care scrie chiar atunci.
 //
 // FIȘA WORD (0107). Sub enunțuri, adminul poate urca o fișă .docx; se vede ca
 // în Word, cu pagini, la toți. Golirea curăță enunțurile, nu și fișa.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { isAdmin } from "../../shared/scripts/session.js";
-import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeFisierFisa }
-  from "../../shared/scripts/tabla-live-repo.js";
+import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeFisierFisa,
+  scrieEnunt, poateScrieTabla, ascultaIngaduinta } from "../../shared/scripts/tabla-live-repo.js";
+import { tutoringPupils, setPupilPermission } from "../../shared/scripts/pupils-repo.js";
 
 const SLUG = "redactare-enunturi";
 
@@ -145,7 +154,11 @@ function normalizeaza(d) {
   return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa };
 }
 
-let scriu = isAdmin();
+/* `admin` conduce tabla (treapta, tipul, fișa, golirea); `scriu` = poate scrie
+   în câmpuri: adminul și elevul pornit de el (0108). */
+let admin = isAdmin();
+let ingaduit = false;
+let scriu = admin;
 /* Starea fiecărui eseu stă în `stari`; cea a eseului deschis e ținută la
    îndemână în `treapta` și `enunturi`, și pusă înapoi la schimbare ori trimitere. */
 let stari = {};
@@ -220,14 +233,15 @@ function deseneaza() {
   /* Treptele se desenează din eseul deschis: alt eseu poate avea alte trepte. */
   document.getElementById("trepte").innerHTML = trepteLe().map((t) => `<button type="button"
       role="tab" class="tr-treapta${t === n ? " is-on" : ""}" data-n="${t}" aria-selected="${t === n}"${
-      !scriu && t !== n ? " disabled" : ""}>${t}</button>`).join("");
+      !admin && t !== n ? " disabled" : ""}>${t}</button>`).join("");
   document.querySelectorAll(".tr-tip").forEach((b) => {
     const e = b.dataset.tip === tip;
     b.classList.toggle("is-on", e);
     b.setAttribute("aria-selected", String(e));
-    b.disabled = !scriu && !e;
+    b.disabled = !admin && !e;
   });
-  document.getElementById("goleste").hidden = !scriu;
+  document.getElementById("goleste").hidden = !admin;
+  if (btnElevi) btnElevi.hidden = !admin;
   foaie.querySelectorAll(".tr-camp").forEach(potriveste);
   numara();
   deseneazaFisa();
@@ -253,12 +267,14 @@ function arataStarea(text, fel = "") {
   stareEl.dataset.fel = fel;
 }
 
-/* ---------- trimiterea (doar adminul) ---------- */
+/* ---------- trimiterea ----------
+   Toată tabla (treapta, tipul, fișa, golirea) o trimite doar adminul. Un enunț
+   pleacă singur, de la oricine scrie (vezi `trimiteEnuntul`). */
 let ceas = null;
 let inZbor = false;
 let maiAm = false;
 function trimiteCurand() {
-  if (!scriu) return;
+  if (!admin) return;
   arataStarea("se trimite…", "trimite");
   clearTimeout(ceas);
   ceas = setTimeout(trimite, PAUZA_TRIMITERE);
@@ -275,8 +291,28 @@ async function trimite() {
   arataStarea(ok ? "live · trimis" : "netrimis: verifică netul", ok ? "live" : "eroare");
 }
 
+/* Enunțurile scrise aici și încă neconfirmate de bază, pe chei „tip|n|i”. Ce
+   vine din bază între timp nu le atinge: ultima vorbă e a celui care scrie. */
+const murdare = new Map();
+const ceasuri = new Map();
+function trimiteEnuntul(n, i) {
+  const cheie = `${tip}|${n}|${i}`;
+  const t0 = tip;
+  murdare.set(cheie, enunturi[n][i]);
+  arataStarea("se trimite…", "trimite");
+  clearTimeout(ceasuri.get(cheie));
+  ceasuri.set(cheie, setTimeout(async () => {
+    const text = murdare.get(cheie);
+    const r = await scrieEnunt(SLUG, t0, Number(n), Number(i), text);
+    if (murdare.get(cheie) === text) murdare.delete(cheie);
+    if (r === "gata") { if (!murdare.size) arataStarea(admin ? "live · trimis" : "live · scrii și tu", "live"); }
+    else if (r === "inchis") arataStarea("nu mai poți scrie acum", "eroare");
+    else arataStarea("netrimis: verifică netul", "eroare");
+  }, PAUZA_TRIMITERE));
+}
+
 function mergiLa(n) {
-  if (!scriu || !trepteLe().includes(n) || n === treapta) return;
+  if (!admin || !trepteLe().includes(n) || n === treapta) return;
   treapta = n;
   deseneaza();
   document.querySelector(".tr-zona").scrollTop = 0;
@@ -290,7 +326,7 @@ foaie.addEventListener("input", (e) => {
   enunturi[t.dataset.n][Number(t.dataset.i)] = t.value;
   potriveste(t);
   numara();
-  trimiteCurand();
+  trimiteEnuntul(t.dataset.n, t.dataset.i);
 });
 
 /* Enter trece la enunțul următor; un enunț nu are nevoie de rând nou. */
@@ -309,7 +345,7 @@ document.getElementById("trepte").addEventListener("click", (e) => {
 
 /** Treci la alt eseu: cel de acum își păstrează enunțurile și treapta. */
 function schimbaTipul(c) {
-  if (!scriu || c === tip || !TIPURI.some((t) => t.cheie === c)) return;
+  if (!admin || c === tip || !TIPURI.some((t) => t.cheie === c)) return;
   pastreazaTipul();
   tip = c;
   ({ treapta, enunturi } = stari[tip]);
@@ -334,7 +370,7 @@ document.getElementById("mic").addEventListener("click", () => { marime -= 0.1; 
 document.getElementById("mare").addEventListener("click", () => { marime += 0.1; punMarimea(); });
 
 document.getElementById("goleste").addEventListener("click", async () => {
-  if (!scriu) return;
+  if (!admin) return;
   if (!trepteLe().some((n) => enunturi[n].some((x) => x.trim()))) return;
   const nume = document.querySelector(`.tr-tip[data-tip="${tip}"]`)?.textContent.trim() || "acesta";
   if (!confirm(`Ștergi enunțurile eseului „${nume}", de pe toate treptele? Se șterg și la elevi. Celelalte eseuri și fișa Word rămân.`)) return;
@@ -360,20 +396,27 @@ const marimeMB = (o) => {
 };
 
 function deseneazaFisa(mesaj = "") {
-  const unelte = scriu
+  const unelte = admin
     ? `<div class="tr-fisa__unelte">
          <button type="button" class="tr-btn" data-fisa="urca">${fisa ? "Înlocuiește fișa" : "+ Urcă fișa Word"}</button>
          ${fisa ? `<button type="button" class="tr-btn tr-btn--sterge" data-fisa="scoate">Scoate fișa</button>` : ""}
          ${mesaj ? `<span class="tr-fisa__mesaj">${esc(mesaj)}</span>` : ""}
        </div>` : "";
   if (!fisa) {
-    sectiuneFisa.hidden = !scriu;
+    sectiuneFisa.hidden = !admin;
     sectiuneFisa.innerHTML = `<div class="tr-fisa__cap">${unelte}</div>`;
     fisaAfisata = "";
     return;
   }
   sectiuneFisa.hidden = false;
-  const cap = `<h2 class="tr-fisa__titlu">Fișa de lucru <small>${esc(fisa.nume)}${marimeMB(fisa.marime)}</small></h2>${unelte}`;
+  /* A− și A+ sunt ale fiecăruia, nu ale tablei: elevul își mărește fișa pe
+     ecranul lui, fără să i-o mărească și colegului. */
+  const zoom = `<div class="tr-fisa__zoom" role="group" aria-label="Mărimea fișei">
+      <button type="button" class="tr-btn" data-zoom="-1" title="Fișa mai mică">A−</button>
+      <button type="button" class="tr-btn tr-fisa__procent" data-zoom="0" title="Înapoi cât ecranul">${Math.round(zoomFisa * 100)}%</button>
+      <button type="button" class="tr-btn" data-zoom="1" title="Fișa mai mare">A+</button>
+    </div>`;
+  const cap = `<h2 class="tr-fisa__titlu">Fișa de lucru <small>${esc(fisa.nume)}${marimeMB(fisa.marime)}</small></h2>${zoom}${unelte}`;
   /* Aceeași fișă: se schimbă doar capul (un mesaj, butoanele); paginile rămân,
      nedesenate din nou. */
   if (fisaAfisata === fisa.fisier && sectiuneFisa.querySelector(".tr-fisa__pagini")) {
@@ -413,21 +456,34 @@ async function arataFisa(fisier, unde) {
 
 /* O pagină A4 are cam 794 px. Pe un ecran mai îngust (telefon, fereastră
    pe jumătate), pagina se micșorează cât să încapă, în loc să se deruleze în
-   lateral. Pe ecran lat rămâne la mărimea ei. */
+   lateral. Pe ecran lat rămâne la mărimea ei. Peste asta vine mărirea aleasă
+   cu A+ / A− (`zoomFisa`); mai mare decât ecranul, fișa se derulează în lateral. */
+const CHEIE_ZOOM_FISA = "tabla-redactare:zoom-fisa";
+let zoomFisa = 1;
+try { zoomFisa = Number(localStorage.getItem(CHEIE_ZOOM_FISA)) || 1; } catch { /* nimic */ }
+function puneZoomFisa(pas) {
+  zoomFisa = pas === 0 ? 1 : Math.min(3, Math.max(0.5, Math.round((zoomFisa + pas * 0.25) * 100) / 100));
+  try { localStorage.setItem(CHEIE_ZOOM_FISA, String(zoomFisa)); } catch { /* nimic */ }
+  const procent = sectiuneFisa.querySelector(".tr-fisa__procent");
+  if (procent) procent.textContent = `${Math.round(zoomFisa * 100)}%`;
+  incadreazaFisa();
+}
 function incadreazaFisa() {
   const pagini = sectiuneFisa.querySelector(".tr-fisa__pagini");
   const invelis = pagini?.querySelector(".docx-wrapper");
   const pagina = invelis?.querySelector("section.docx");
   if (!pagina) return;
   invelis.style.zoom = "";
-  const scara = Math.min(1, pagini.clientWidth / pagina.offsetWidth);
-  if (scara < 1) invelis.style.zoom = String(Math.floor(scara * 1000) / 1000);
+  const scara = Math.min(1, pagini.clientWidth / pagina.offsetWidth) * zoomFisa;
+  if (scara !== 1) invelis.style.zoom = String(Math.floor(scara * 1000) / 1000);
 }
 addEventListener("resize", incadreazaFisa);
 
 sectiuneFisa.addEventListener("click", async (e) => {
+  const z = e.target.closest("[data-zoom]");
+  if (z) { puneZoomFisa(Number(z.dataset.zoom)); return; }
   const b = e.target.closest("[data-fisa]");
-  if (!b || !scriu) return;
+  if (!b || !admin) return;
   if (b.dataset.fisa === "urca") { alegeFisa.click(); return; }
   if (b.dataset.fisa === "scoate") {
     if (!confirm("Scoți fișa de sub tablă? Dispare și la elevi.")) return;
@@ -443,7 +499,7 @@ sectiuneFisa.addEventListener("click", async (e) => {
 alegeFisa.addEventListener("change", async () => {
   const file = alegeFisa.files?.[0];
   alegeFisa.value = "";
-  if (!file || !scriu) return;
+  if (!file || !admin) return;
   deseneazaFisa("se urcă fișa…");
   const r = await urcaFisa(SLUG, file);
   if (r.eroare) { deseneazaFisa(r.eroare); return; }
@@ -457,6 +513,81 @@ alegeFisa.addEventListener("change", async () => {
 
 addEventListener("resize", () => foaie.querySelectorAll(".tr-camp").forEach(potriveste));
 
+/* ---------- „Elevi care scriu” (doar adminul) ----------
+   Lista elevilor de la meditații, fiecare cu comutatorul lui, ca la „Etichetare”
+   și „EleviMED”. Butonul se face aici, nu în pagină: pagina și scriptul pot fi
+   ținute de browser pe socoteli diferite până la 10 minute după un push. */
+const btnElevi = document.createElement("button");
+btnElevi.type = "button";
+btnElevi.className = "tr-btn tr-elevi__btn";
+btnElevi.hidden = true;
+btnElevi.setAttribute("aria-expanded", "false");
+const panouElevi = document.createElement("div");
+panouElevi.className = "tr-elevi";
+panouElevi.hidden = true;
+document.getElementById("goleste").before(btnElevi);
+document.body.append(panouElevi);
+let elevi = null;            // null = încă neadusă
+let eleviProblema = "";
+const eleviInZbor = new Set();
+
+const catiScriu = () => (elevi || []).filter((p) => p.can.tabla).length;
+function deseneazaElevii() {
+  const n = catiScriu();
+  btnElevi.innerHTML = `Elevi care scriu <b>${elevi ? n : "…"}</b>`;
+  btnElevi.classList.toggle("is-on", n > 0);
+  btnElevi.title = n > 0 ? "Elevii porniți pot scrie enunțuri pe tablă. Apasă ca să vezi lista."
+    : "Niciun elev nu scrie acum. Apasă ca să pornești pe cine lucrează cu tine.";
+  if (panouElevi.hidden) return;
+  if (eleviProblema) {
+    panouElevi.innerHTML = `<p class="tr-elevi__gol">N-am putut citi lista de la meditații.<br><code>${esc(eleviProblema)}</code></p>`;
+    return;
+  }
+  if (!elevi) { panouElevi.innerHTML = `<p class="tr-elevi__gol">Se aduce lista…</p>`; return; }
+  panouElevi.innerHTML = `<p class="tr-elevi__cap">Pot scrie enunțuri pe tablă</p>` + (elevi.length
+    ? elevi.map((p) => `<div class="tr-elevi__rand">
+        <span>${esc(p.name)}</span>
+        <button type="button" class="tr-sw${p.can.tabla ? " is-on" : ""}" role="switch"
+          aria-checked="${p.can.tabla}" data-elev="${esc(p.userId)}"${eleviInZbor.has(p.userId) ? " disabled" : ""}
+          aria-label="${esc(p.name)}: ${p.can.tabla ? "scrie" : "nu scrie"}"><i aria-hidden="true"></i></button>
+      </div>`).join("")
+    : `<p class="tr-elevi__gol">N-ai încă elevi la meditații. Îi adaugi din planificator.</p>`);
+}
+async function aduElevii() {
+  try { elevi = await tutoringPupils(); eleviProblema = ""; }
+  catch (e) { eleviProblema = e?.message || String(e); console.warn("tabla, elevii:", eleviProblema); }
+  deseneazaElevii();
+}
+btnElevi.addEventListener("click", (e) => {
+  e.stopPropagation();
+  panouElevi.hidden = !panouElevi.hidden;
+  btnElevi.setAttribute("aria-expanded", String(!panouElevi.hidden));
+  if (!panouElevi.hidden) {
+    const r = btnElevi.getBoundingClientRect();
+    panouElevi.style.top = `${r.bottom + 8}px`;
+    panouElevi.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+    aduElevii();
+  }
+  deseneazaElevii();
+});
+panouElevi.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  const sw = e.target.closest(".tr-sw");
+  const p = sw && elevi?.find((x) => x.userId === sw.dataset.elev);
+  if (!p || eleviInZbor.has(p.userId)) return;
+  eleviInZbor.add(p.userId); deseneazaElevii();
+  const vrut = !p.can.tabla;
+  /* Dacă baza n-a primit, comutatorul nu se mișcă. */
+  if (await setPupilPermission(p.userId, "tabla", vrut)) p.can = { ...p.can, tabla: vrut };
+  eleviInZbor.delete(p.userId); deseneazaElevii();
+});
+document.addEventListener("click", () => {
+  if (panouElevi.hidden) return;
+  panouElevi.hidden = true;
+  btnElevi.setAttribute("aria-expanded", "false");
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panouElevi.hidden) document.body.click(); });
+
 /* ---------- pornirea ---------- */
 punMarimea();
 deseneaza();
@@ -467,17 +598,39 @@ incarca(normalizeaza(deLaBaza));
 deseneaza();
 if (scriu) foaie.querySelector(".tr-camp")?.focus();
 
-/* Cititorul primește fiecare schimbare. Adminul nu: ce vine e chiar ce a
-   trimis el, iar aplicat peste ce scrie în clipa asta i-ar fi mâncat literele. */
+/* Fiecare primește fiecare schimbare, și cine scrie (0108): celălalt scriitor
+   poate fi la alt enunț. Ce n-a plecat încă de aici (`murdare`) rămâne cum e,
+   iar câmpul în care scrii acum nu e atins deloc. */
 urmaresteTabla(SLUG, (d) => {
-  if (scriu) return;
   const nou = normalizeaza(d);
+  for (const [cheie, text] of murdare) {
+    const [t, n, i] = cheie.split("|");
+    if (nou.stari[t]?.enunturi[n]) nou.stari[t].enunturi[n][Number(i)] = text;
+  }
+  /* Treapta, tipul și fișa le schimbă doar adminul. La el rămân cum le are:
+     un ecou mai vechi al propriei trimiteri nu-l mută înapoi. */
+  if (admin) {
+    pastreazaTipul();
+    for (const t of TIPURI) nou.stari[t.cheie].treapta = stari[t.cheie].treapta;
+    nou.tip = tip;
+    nou.fisa = fisa;
+  }
   const altaTreapta = nou.tip !== tip || nou.stari[nou.tip].treapta !== treapta;
+  const altaFisa = (nou.fisa?.fisier || "") !== (fisa?.fisier || "");
   incarca(nou);
-  /* Cititorul nu scrie nimic, deci tabla se poate desena din nou la fiecare
-     schimbare, fără să-i strice vreun câmp. Derularea rămâne unde era, afară
-     de trecerea pe altă treaptă. Fișa nu se redesenează dacă e aceeași. */
   const zona = document.querySelector(".tr-zona");
+  if (scriu && !altaTreapta && !altaFisa) {
+    /* Pe aceeași treaptă se schimbă doar textele: se pun în câmpuri, pe loc,
+       fără să se redeseneze tabla (care ți-ar lua cursorul). */
+    foaie.querySelectorAll(".tr-camp").forEach((el) => {
+      const v = enunturi[el.dataset.n][Number(el.dataset.i)];
+      if (el !== document.activeElement && el.value !== v) { el.value = v; potriveste(el); }
+    });
+    numara();
+    return;
+  }
+  /* Altfel tabla se desenează din nou. Derularea rămâne unde era, afară de
+     trecerea pe altă treaptă. Fișa nu se redesenează dacă e aceeași. */
   const unde = zona.scrollTop;
   deseneaza();
   zona.scrollTop = altaTreapta ? 0 : unde;
@@ -486,10 +639,35 @@ urmaresteTabla(SLUG, (d) => {
   arataStarea(conectat ? "live" : "fără legătură live", conectat ? "live" : "eroare");
 });
 
+/* ---------- cine scrie ----------
+   Elevul: profesorul îl pornește ori îl oprește, iar tabla i se deschide ori
+   i se închide pe loc. */
+function aplicaRolul() {
+  const acum = admin || ingaduit;
+  if (acum === scriu) { deseneaza(); return; }
+  scriu = acum;
+  deseneaza();
+  if (!admin) arataStarea(scriu ? "live · poți scrie și tu" : "live", "live");
+  if (scriu) foaie.querySelector(".tr-camp")?.focus();
+}
+let opresteAscultarea = () => {};
+async function aflaIngaduinta() {
+  opresteAscultarea();
+  opresteAscultarea = () => {};
+  if (admin) { ingaduit = false; aplicaRolul(); return; }
+  ingaduit = await poateScrieTabla();
+  aplicaRolul();
+  opresteAscultarea = ascultaIngaduinta((val) => { ingaduit = val; aplicaRolul(); });
+}
+
 /* Rolul se poate schimba sub pagină (intrare ori ieșire din cont). */
 addEventListener("atelier:role", () => {
   const acum = isAdmin();
-  if (acum === scriu) return;
-  scriu = acum;
-  deseneaza();
+  if (acum === admin) return;
+  admin = acum;
+  aflaIngaduinta();
 });
+
+/* La capăt, după ce tot ce folosesc există: cine are voie să scrie și lista elevilor. */
+aflaIngaduinta();
+if (admin) aduElevii(); else deseneazaElevii();
