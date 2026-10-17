@@ -331,3 +331,18 @@ button { font: inherit; }
 .tr-fisa--lat { max-width: none; }
 .tr-fisa--lat .tr-fisa__cap { max-width: 980px; margin-inline: auto; }
 .tr-fisa__pagini .docx-wrapper { align-items: safe center; }
+
+/* Rândul de sub bară: starea legăturii și câte enunțuri sunt scrise. Pe rândul
+   lui, ca textul care se schimbă să nu împingă butoanele. */
+.tr-cap__jos {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px 7px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+}
+.tr-cap__jos .tr-scrise { margin-right: 0; }
+@media (max-width: 640px) { .tr-cap__jos { padding: 0 12px 6px; } }
