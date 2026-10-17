@@ -50,7 +50,7 @@
 // în Word, cu pagini, la toți. Golirea curăță enunțurile, nu și fișa.
 // Cuprins în română, nume în engleză.
 // =========================================================
-import { isAdmin } from "../../shared/scripts/session.js";
+import { isAdmin, CURRENT_USER } from "../../shared/scripts/session.js";
 import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeFisierFisa,
   scrieEnunt, poateScrieTabla, ascultaIngaduinta } from "../../shared/scripts/tabla-live-repo.js";
 import { tutoringPupils, setPupilPermission } from "../../shared/scripts/pupils-repo.js";
@@ -635,35 +635,58 @@ urmaresteTabla(SLUG, (d) => {
   deseneaza();
   zona.scrollTop = altaTreapta ? 0 : unde;
 }, (conectat) => {
-  if (scriu) { if (conectat && stareEl.dataset.fel === "trimite" && !inZbor) arataStarea("live", "live"); return; }
-  arataStarea(conectat ? "live" : "fără legătură live", conectat ? "live" : "eroare");
+  if (scriu) { if (conectat && stareEl.dataset.fel === "trimite" && !inZbor) arataStarea(vorbaRolului(), "live"); return; }
+  arataStarea(conectat ? vorbaRolului() : "fără legătură live", conectat ? "live" : "eroare");
 });
 
 /* ---------- cine scrie ----------
    Elevul: profesorul îl pornește ori îl oprește, iar tabla i se deschide ori
    i se închide pe loc. */
+/* Vorba de lângă punctul verde spune și cine ce poate, ca să se vadă dintr-o
+   privire de ce un elev nu are câmpuri: nu e în cont, ori nu e pornit. */
+function vorbaRolului() {
+  if (admin) return "live";
+  if (scriu) return "live · poți scrie și tu";
+  return CURRENT_USER.authId ? "live · doar citești" : "live · intră în cont ca să poți scrie";
+}
 function aplicaRolul() {
   const acum = admin || ingaduit;
-  if (acum === scriu) { deseneaza(); return; }
-  scriu = acum;
-  deseneaza();
-  if (!admin) arataStarea(scriu ? "live · poți scrie și tu" : "live", "live");
-  if (scriu) foaie.querySelector(".tr-camp")?.focus();
+  if (acum !== scriu) {
+    scriu = acum;
+    deseneaza();
+    if (scriu) foaie.querySelector(".tr-camp")?.focus();
+  }
+  if (!admin && stareEl.dataset.fel !== "eroare") arataStarea(vorbaRolului(), "live");
 }
 let opresteAscultarea = () => {};
+let cineAmIntrebat = null;   // contul pentru care s-a întrebat ultima oară
+async function intreabaIngaduinta() {
+  if (admin) return;
+  const v = await poateScrieTabla();
+  if (v !== ingaduit) { ingaduit = v; aplicaRolul(); }
+}
 async function aflaIngaduinta() {
   opresteAscultarea();
   opresteAscultarea = () => {};
+  cineAmIntrebat = CURRENT_USER.authId;
   if (admin) { ingaduit = false; aplicaRolul(); return; }
   ingaduit = await poateScrieTabla();
   aplicaRolul();
   opresteAscultarea = ascultaIngaduinta((val) => { ingaduit = val; aplicaRolul(); });
 }
 
-/* Rolul se poate schimba sub pagină (intrare ori ieșire din cont). */
+/* PLASA. Vestea live că profesorul te-a pornit poate să nu ajungă (legătură
+   căzută, pagină deschisă de mult). Atunci tabla întreabă și singură: din 10 în
+   10 secunde cât e la vedere și ori de câte ori revii pe ea. Întrebarea e un
+   singur „da/nu”, nu costă nimic. */
+setInterval(() => { if (!document.hidden) intreabaIngaduinta(); }, 10000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) intreabaIngaduinta(); });
+
+/* Rolul ori contul se pot schimba sub pagină (intrare ori ieșire din cont,
+   sesiunea care sosește după pornire): atunci se întreabă din nou. */
 addEventListener("atelier:role", () => {
   const acum = isAdmin();
-  if (acum === admin) return;
+  if (acum === admin && CURRENT_USER.authId === cineAmIntrebat) return;
   admin = acum;
   aflaIngaduinta();
 });
