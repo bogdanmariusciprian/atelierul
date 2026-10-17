@@ -55,13 +55,20 @@
 // luată din numele fișei Word, ori scrisă de profesor (✎). Din grilă,
 // creionul profesorului aduce o lucrare pe tabla live (și elevul ei scrie mai
 // departe în aceeași lucrare), iar creionul elevului i-o deschide doar lui.
+//
+// PENTRU CINE E LUCRUL (0109). Lucrarea de pe tabla live o salvează pagina
+// PROFESORULUI, în contul elevilor aleși, nu pagina elevului: așa nu se pierde
+// nimic dacă elevul închide tabla, dacă golirea vine prea repede ori dacă nu
+// e nimeni pornit. La prima schimbare pe o lucrare nouă tabla îl întreabă pe
+// profesor „pentru cine e lucrul acesta?" (elevi anume ori „doar live"), iar
+// alegerea stă la vedere pe bară. Golirea salvează întâi.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { isAdmin, CURRENT_USER } from "../../shared/scripts/session.js";
 import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeFisierFisa,
   scrieEnunt, poateScrieTabla, ascultaIngaduinta } from "../../shared/scripts/tabla-live-repo.js";
 import { tutoringPupils, setPupilPermission } from "../../shared/scripts/pupils-repo.js";
-import { saveSheet, listLessonSheets } from "../../shared/scripts/board-repo.js";
+import { saveSheet, salveazaLucrareaElevului } from "../../shared/scripts/board-repo.js";
 import { deschideLucrarile, LECTIE, ziDeAzi, ziFrumoasa, operaDinFisa, operaDinText, textOpera, numeOpera }
   from "./tabla-redactare-lucrari.js";
 
@@ -171,7 +178,25 @@ function normalizeaza(d) {
   const sursa = s && UUID.test(String(s.id)) && UUID.test(String(s.elev)) && TIPURI.some((t) => t.cheie === s.tip)
     ? { id: s.id, elev: s.elev, tip: s.tip, titlu: String(s.titlu || "").slice(0, 200),
         zi: /^\d{4}-\d{2}-\d{2}$/.test(String(s.zi)) ? s.zi : ziDeAzi() } : null;
-  return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa, opera, sursa };
+  /* Pentru cine e lucrul: elevii în contul cărora se salvează lucrarea, ori
+     „doar live" (decis, fără elevi). Nedecis = încă n-a întrebat nimeni. */
+  const pe = d?.pentru;
+  const pentru = {
+    decis: !!pe?.decis,
+    elevi: (Array.isArray(pe?.elevi) ? pe.elevi : []).filter((e) => UUID.test(String(e?.id)))
+      .slice(0, 20).map((e) => ({ id: e.id, nume: String(e.nume || "elev").slice(0, 80) })),
+  };
+  /* Când a început lucrarea de acum („2026-10-17T11:45"): intră în titlul ei, ca
+     două lucrări la aceeași operă, în aceeași zi, să nu se calce. */
+  const inceput = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(d?.inceput)) ? d.inceput : null;
+  /* Lucrarea fiecărui elev, după prima salvare: „tip|elev" → id. De aici încolo
+     se scrie doar în ea, oricât s-ar schimba titlul. */
+  const ids = {};
+  for (const [k, v] of Object.entries(d?.ids || {}).slice(0, 60)) {
+    const [t, e] = String(k).split("|");
+    if (TIPURI.some((x) => x.cheie === t) && UUID.test(String(e)) && UUID.test(String(v))) ids[`${t}|${e}`] = v;
+  }
+  return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa, opera, sursa, pentru, inceput, ids };
 }
 
 /* `admin` conduce tabla (treapta, tipul, fișa, golirea); `scriu` = poate scrie
@@ -188,8 +213,11 @@ let fisa = null;
 let opera = null;      // opera scrisă de profesor; altfel, cea din numele fișei
 let sursa = null;      // lucrarea adusă din grilă: { id, elev, tip, titlu, zi }
 let privat = null;     // lucrarea deschisă doar pentru elev: { id, titlu, data }
+let pentru = { decis: false, elevi: [] };   // în contul cui se salvează lucrul live
+let inceput = null;    // când a început lucrarea live de acum
+let ids = {};          // lucrarea fiecărui elev: „tip|elev" → id
 function incarca(nou) {
-  ({ tip, stari, fisa, opera, sursa } = nou);
+  ({ tip, stari, fisa, opera, sursa, pentru, inceput, ids } = nou);
   ({ treapta, enunturi } = stari[tip]);
 }
 const pastreazaTipul = () => { stari[tip] = { treapta, enunturi }; };
@@ -303,6 +331,7 @@ function trimiteCurand() {
   arataStarea("se trimite…", "trimite");
   clearTimeout(ceas);
   ceas = setTimeout(trimite, PAUZA_TRIMITERE);
+  lucrareaSeSchimba();
 }
 async function trimite() {
   /* O singură cerere pe drum. Dacă între timp s-a mai scris, se trimite încă
@@ -310,7 +339,7 @@ async function trimite() {
   if (inZbor) { maiAm = true; return; }
   inZbor = true;
   pastreazaTipul();
-  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa, opera, sursa });
+  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa, opera, sursa, pentru, inceput, ids });
   inZbor = false;
   if (maiAm) { maiAm = false; trimite(); return; }
   arataStarea(ok ? "live · trimis" : "netrimis: verifică netul", ok ? "live" : "eroare");
@@ -320,14 +349,25 @@ async function trimite() {
    vine din bază între timp nu le atinge: ultima vorbă e a celui care scrie. */
 const murdare = new Map();
 const ceasuri = new Map();
+/* Golirea mută „generația": un enunț pornit înainte de golire nu mai pleacă după
+   ea, altfel s-ar întoarce pe tabla abia golită. */
+let generatie = 0;
+function uitaTrimiterile() {
+  generatie++;
+  for (const c of ceasuri.values()) clearTimeout(c);
+  ceasuri.clear();
+  murdare.clear();
+}
 function trimiteEnuntul(n, i) {
   const cheie = `${tip}|${n}|${i}`;
   const t0 = tip;
+  const g0 = generatie;
   murdare.set(cheie, enunturi[n][i]);
   arataStarea("se trimite…", "trimite");
   clearTimeout(ceasuri.get(cheie));
   ceasuri.set(cheie, setTimeout(async () => {
     const text = murdare.get(cheie);
+    if (g0 !== generatie || text === undefined) return;
     const r = await scrieEnunt(SLUG, t0, Number(n), Number(i), text);
     if (murdare.get(cheie) === text) murdare.delete(cheie);
     if (r === "gata") { if (!murdare.size) arataStarea(admin ? "live · trimis" : "live · scrii și tu", "live"); }
@@ -400,11 +440,35 @@ document.getElementById("goleste").addEventListener("click", async () => {
   if (!admin) return;
   if (!trepteLe().some((n) => enunturi[n].some((x) => x.trim()))) return;
   const nume = document.querySelector(`.tr-tip[data-tip="${tip}"]`)?.textContent.trim() || "acesta";
-  if (!confirm(`Ștergi enunțurile eseului „${nume}", de pe toate treptele? Se șterg și la elevi. Celelalte eseuri și fișa Word rămân.`)) return;
+  /* ÎNTÂI SE SALVEAZĂ. Lucrarea pleacă în contul elevilor ei chiar acum, nu
+     peste câteva secunde, ca golirea să nu-i ia ultimele rânduri. Dacă n-are
+     niciun elev, tabla întreabă dacă o trimiți cuiva. */
+  if (pentru.elevi.length) {
+    arataSalvarea("se salvează înainte de golire…");
+    if (!(await salveazaLaElevi())) {
+      if (!confirm("Lucrarea NU s-a putut salva la elev (vezi mesajul de sub bară). Golești totuși tabla? Ce e scris se pierde.")) return;
+    } else if (!confirm(`Lucrarea s-a salvat la ${pentru.elevi.map((e) => e.nume).join(", ")}.\n\nGolești eseul „${nume}" pentru un lucru nou? Celălalt eseu și fișa rămân.`)) return;
+  } else {
+    const ales = await intreaba("Lucrarea nu e salvată la niciun elev",
+      `Ce e scris acum la „${nume}" se pierde la golire. O trimiți întâi în contul unui elev?`,
+      [["trimite", "Aleg elevul și salvez", "plin"], ["goleste", "Golește fără salvare", "sterge"], ["nu", "Anulează", ""]]);
+    if (ales === "nu" || !ales) return;
+    if (ales === "trimite") {
+      if (!(await alegePentru())) return;
+      if (!pentru.elevi.length || !(await salveazaLaElevi())) return;
+      if (!confirm(`Lucrarea s-a salvat la ${pentru.elevi.map((e) => e.nume).join(", ")}.\n\nGolești acum eseul „${nume}"?`)) return;
+    }
+  }
   clearTimeout(ceas);
+  uitaTrimiterile();
   enunturi = gol();
   treapta = trepteLe()[0];
   sursa = null;           // tabla golită începe o lucrare nouă
+  pentru = { decis: false, elevi: [] };
+  inceput = null;
+  ids = {};
+  intrebatPentru = false;
+  arataSalvarea("");
   deseneaza();
   arataStarea("se golește…", "trimite");
   await trimite();
@@ -639,6 +703,9 @@ chipOpera.addEventListener("click", async (e) => {
   if (r === null) return;
   opera = operaDinText(r);
   sursa = null;            // altă operă = altă lucrare
+  pentru = { decis: pentru.decis, elevi: pentru.elevi };   // aceiași elevi, lucrare nouă
+  inceput = null;
+  ids = {};
   deseneaza();
   clearTimeout(ceas);
   await trimite();
@@ -669,7 +736,25 @@ bandaPrivat.hidden = true;
 document.querySelector(".tr-zona").prepend(bandaPrivat);
 bandaPrivat.addEventListener("click", (e) => { if (e.target.closest("[data-iesi]")) ieseDinPrivat(); });
 
+const chipPentru = document.createElement("button");
+chipPentru.type = "button";
+chipPentru.className = "tr-pentru";
+chipPentru.hidden = true;
+chipOpera.after(chipPentru);
+chipPentru.addEventListener("click", () => { if (admin) alegePentru(); });
+
 function deseneazaLucrarile() {
+  chipPentru.hidden = !admin || !!privat;
+  chipPentru.classList.toggle("is-live", pentru.decis && !pentru.elevi.length);
+  chipPentru.classList.toggle("is-nedecis", !pentru.decis);
+  chipPentru.innerHTML = !pentru.decis ? "❔ Pentru cine e lucrul?"
+    : pentru.elevi.length ? `💾 Se salvează la: <b>${esc(pentru.elevi.map((e) => e.nume).join(", "))}</b>`
+      : "⚠ Doar live, nesalvat";
+  chipPentru.title = "Alege în contul cui se salvează lucrarea de pe tablă";
+  if (!admin && !privat) {
+    const eu = pentru.elevi.some((e) => e.id === CURRENT_USER.authId);
+    arataSalvarea(eu ? "lucrarea se salvează în contul tău" : "");
+  }
   const o = operaAcum();
   chipOpera.hidden = !o && !admin;
   chipOpera.innerHTML = `<span>Opera: <b>${esc(numeOpera(o))}</b>${o?.autor ? ` · ${esc(o.autor)}` : ""}</span>`
@@ -685,7 +770,7 @@ function deseneazaLucrarile() {
 
 /** Eseul deschis, ca lucrare: fiecare treaptă cu ceva scris, întreagă (și
  *  părțile luate de pe treapta dinainte), ca să se poată citi singură. */
-function continutLucrare(op, zi) {
+function continutLucrare(op, zi, ora = "") {
   const trepte = {};
   for (const n of trepteLe()) {
     if (!enunturi[n]?.some((x) => String(x).trim())) continue;
@@ -693,58 +778,116 @@ function continutLucrare(op, zi) {
       Array.from({ length: partiLa(n)[p] }, (_, j) => enuntul(n, p, j).text));
   }
   if (!Object.keys(trepte).length) return null;
-  return { versiune: 1, opera: op ? { nume: op.nume, autor: op.autor || "" } : null, tip, zi, treapta, trepte };
+  return { versiune: 1, opera: op ? { nume: op.nume, autor: op.autor || "" } : null, tip, zi, ...(ora ? { ora } : {}), treapta, trepte };
 }
 const treaptaAtinsa = (d) => Math.max(...Object.keys(d.trepte || {}).map(Number).filter((n) => trepteLe(d.tip).includes(n)), trepteLe(d.tip)[0]);
 
-/* SALVAREA SINGURĂ, la elevul pornit: la câteva secunde după fiecare schimbare
-   de pe tablă (a lui ori a profesorului), lucrarea lui primește eseul deschis.
-   O cerere pe drum; ce se schimbă între timp pleacă la sosirea ei. */
-let ceasLucrare = null;
-let idLucrari = null;          // titlul lucrărilor mele → id, adus o dată
-let salvezAcum = false, iarSalvez = false;
+/* SALVAREA, DIN PAGINA PROFESORULUI (0109): la câteva secunde după fiecare
+   schimbare (a lui ori a elevului), lucrarea pleacă în contul elevilor aleși.
+   Salvările merg una după alta, niciodată două deodată. */
+let ceasLaElevi = null;
+let lantSalvari = Promise.resolve(true);
+let intrebatPentru = false;     // s-a pus deja întrebarea la lucrarea asta
+const areCeva = () => trepteLe().some((n) => enunturi[n]?.some((x) => String(x).trim()));
 function lucrareaSeSchimba() {
-  if (admin || privat || !scriu || !CURRENT_USER.authId) return;
-  clearTimeout(ceasLucrare);
-  ceasLucrare = setTimeout(salveazaLucrarea, 2500);
-}
-async function salveazaLucrarea(aDouaOara = false) {
-  if (admin || privat || !scriu) return;
-  if (salvezAcum) { iarSalvez = true; return; }
-  salvezAcum = true;
-  try {
-    pastreazaTipul();
-    const op = operaAcum();
-    /* Lucrarea adusă de profesor din grilă e chiar a mea: scriu mai departe în ea. */
-    const aMea = sursa && sursa.elev === CURRENT_USER.authId && sursa.tip === tip;
-    const zi = aMea ? sursa.zi : ziDeAzi();
-    const continut = continutLucrare(op, zi);
-    if (!continut) return;
-    const titlu = aMea && sursa.titlu ? sursa.titlu : `${numeOpera(op)} · ${numeTip(tip)} · ${ziFrumoasa(zi)}`;
-    let id = aMea ? sursa.id : null;
-    if (!id) {
-      if (!idLucrari) {
-        try { idLucrari = new Map((await listLessonSheets(LECTIE)).map((r) => [r.title.trim().toLowerCase(), r.id])); }
-        catch { idLucrari = new Map(); }
-      }
-      id = idLucrari.get(titlu.trim().toLowerCase()) || null;
-    }
-    const { row, motiv } = await saveSheet({ id, lessonSlug: LECTIE, title: titlu, data: continut });
-    if (row) {
-      idLucrari?.set(titlu.trim().toLowerCase(), row.id);
-      arataSalvarea(`salvat în contul tău · ${numeOpera(op)} · ${numeTip(tip)}`);
-    } else if (!aDouaOara && /numele/.test(String(motiv))) {
-      /* A apucat o altă fereastră să facă lucrarea: o aflu și scriu în ea. */
-      idLucrari = null;
-      salvezAcum = false;
-      return salveazaLucrarea(true);
-    } else {
-      arataSalvarea(`nesalvat: ${motiv}`, true);
-    }
-  } finally {
-    salvezAcum = false;
-    if (iarSalvez) { iarSalvez = false; salveazaLucrarea(); }
+  if (!admin || privat) return;
+  if (!pentru.decis) {
+    /* AVERTIZAREA: lucru nou, nimeni ales încă. Se întreabă o singură dată. */
+    if (!intrebatPentru && areCeva()) { intrebatPentru = true; alegePentru(true); }
+    return;
   }
+  if (!pentru.elevi.length) return;
+  arataSalvarea("se salvează…");
+  clearTimeout(ceasLaElevi);
+  ceasLaElevi = setTimeout(salveazaLaElevi, 2000);
+}
+function salveazaLaElevi() {
+  clearTimeout(ceasLaElevi);
+  lantSalvari = lantSalvari.then(salveazaAcum, salveazaAcum);
+  return lantSalvari;
+}
+async function salveazaAcum() {
+  if (!admin || privat || !pentru.elevi.length) return true;
+  pastreazaTipul();
+  const op = operaAcum();
+  const rele = [];
+  /* Prima salvare a unei lucrări îi fixează începutul (ziua și ora din titlu). */
+  let deTrimis = false;
+  if (!inceput) {
+    const d = new Date();
+    inceput = `${ziDeAzi()}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    deTrimis = true;
+  }
+  for (const e of pentru.elevi) {
+    /* Lucrarea adusă din grilă e chiar a elevului ei: se scrie mai departe în ea. */
+    const aLui = sursa && sursa.elev === e.id && sursa.tip === tip;
+    const zi = aLui ? sursa.zi : inceput.slice(0, 10);
+    const ora = aLui ? "" : inceput.slice(11);
+    const continut = continutLucrare(op, zi, ora);
+    if (!continut) return true;
+    const titlu = aLui && sursa.titlu ? sursa.titlu : `${numeOpera(op)} · ${numeTip(tip)} · ${ziFrumoasa(zi)}, ${ora}`;
+    const cheie = `${tip}|${e.id}`;
+    const id = aLui ? sursa.id : ids[cheie] || null;
+    /* Fără id e prima salvare: baza face mereu o lucrare nouă, chiar dacă titlul
+       e luat, iar id-ul ei rămâne pe tablă pentru salvările următoare. */
+    const r = await salveazaLucrareaElevului({ elev: e.id, lectie: LECTIE, titlu, data: continut, id, nou: !id });
+    if (!r.id) rele.push(`${e.nume}: ${r.eroare}`);
+    else if (!aLui && ids[cheie] !== r.id) { ids = { ...ids, [cheie]: r.id }; deTrimis = true; }
+  }
+  if (deTrimis) { clearTimeout(ceas); trimite(); }
+  arataSalvarea(rele.length ? `nesalvat · ${rele.join(" · ")}` : `salvat la ${pentru.elevi.map((e) => e.nume).join(", ")}`, rele.length > 0);
+  return !rele.length;
+}
+
+/* ---------- întrebările tablei ---------- */
+const dialog = document.createElement("div");
+dialog.className = "tr-dialog";
+dialog.hidden = true;
+document.body.append(dialog);
+/** O întrebare cu butoane: `[cheie, text, fel]`. Întoarce cheia aleasă (null = închis). */
+function intreaba(titlu, text, butoane, corp = "") {
+  return new Promise((gata) => {
+    dialog.innerHTML = `<div class="tr-dialog__card" role="dialog" aria-modal="true">
+        <h3>${esc(titlu)}</h3>${text ? `<p>${esc(text)}</p>` : ""}${corp}
+        <div class="tr-dialog__butoane">${butoane.map(([k, t, fel]) =>
+          `<button type="button" class="tr-btn${fel ? ` tr-btn--${fel}` : ""}" data-alege="${esc(k)}">${esc(t)}</button>`).join("")}</div>
+      </div>`;
+    dialog.hidden = false;
+    const inchide = (k) => { dialog.hidden = true; dialog.onclick = null; gata(k); };
+    dialog.onclick = (e) => {
+      if (e.target === dialog) return inchide(null);
+      const b = e.target.closest("[data-alege]");
+      if (b) inchide(b.dataset.alege);
+    };
+    dialog.querySelector("[data-alege]")?.focus();
+  });
+}
+/** „Pentru cine e lucrul acesta?" Întoarce `true` dacă s-a hotărât ceva. */
+async function alegePentru(laInceput = false) {
+  let lista = [];
+  try { lista = await tutoringPupils(); } catch { /* fără listă: rămâne „doar live" */ }
+  const bifati = new Set(pentru.decis ? pentru.elevi.map((e) => e.id) : lista.filter((x) => x.can.tabla).map((x) => x.userId));
+  const corp = lista.length
+    ? `<div class="tr-dialog__elevi">${lista.map((x) => `<label><input type="checkbox" value="${esc(x.userId)}"${bifati.has(x.userId) ? " checked" : ""}>
+        <span>${esc(x.name)}</span>${x.can.tabla ? `<small>scrie acum pe tablă</small>` : ""}</label>`).join("")}</div>`
+    : `<p class="tr-dialog__nota">N-ai elevi la meditații, deci lucrarea poate fi doar live.</p>`;
+  const ales = await intreaba("Pentru cine e lucrul acesta?",
+    laInceput ? "Ai început o lucrare nouă pe tablă. Bifează elevul (ori elevii) în contul căruia se salvează, ori alege „Doar live”: atunci nu se salvează nicăieri."
+      : "Lucrarea de pe tablă se salvează singură în contul elevilor bifați, la fiecare schimbare.",
+    [["salveaza", "Salvează la cei bifați", "plin"], ["live", "Doar live, fără salvare", ""], ["nu", "Mai târziu", ""]], corp);
+  if (ales === "salveaza") {
+    const ids = [...dialog.querySelectorAll(".tr-dialog__elevi input:checked")].map((i) => i.value);
+    if (!ids.length) { arataSalvarea("n-ai bifat niciun elev · lucrarea e doar live", true); pentru = { decis: true, elevi: [] }; }
+    else pentru = { decis: true, elevi: ids.map((id) => ({ id, nume: lista.find((x) => x.userId === id)?.name || "elev" })) };
+  } else if (ales === "live") {
+    pentru = { decis: true, elevi: [] };
+    arataSalvarea("");
+  } else return false;
+  deseneaza();
+  clearTimeout(ceas);
+  await trimite();
+  if (pentru.elevi.length) await salveazaLaElevi();
+  return true;
 }
 
 /** Creionul profesorului: lucrarea unui elev vine pe tabla live, pe tipul ei. */
@@ -759,6 +902,8 @@ async function punePeTabla(row, numeElev) {
   ({ treapta, enunturi } = stari[tip]);
   opera = d.opera || null;
   sursa = { id: row.id, elev: row.user_id, tip, titlu: row.title, zi: d.zi };
+  pentru = { decis: true, elevi: [{ id: row.user_id, nume: numeElev }] };
+  intrebatPentru = true;
   deseneaza();
   document.querySelector(".tr-zona").scrollTop = 0;
   clearTimeout(ceas);
@@ -837,6 +982,9 @@ urmaresteTabla(SLUG, (d) => {
     nou.fisa = fisa;
     nou.opera = opera;
     nou.sursa = sursa;
+    nou.pentru = pentru;
+    nou.inceput = inceput;
+    nou.ids = ids;
   }
   const altaTreapta = nou.tip !== tip || nou.stari[nou.tip].treapta !== treapta;
   const altaFisa = (nou.fisa?.fisier || "") !== (fisa?.fisier || "");

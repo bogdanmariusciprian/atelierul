@@ -63,6 +63,22 @@ export async function listLessonSheets(lessonSlug, { aleTuturor = false } = {}) 
   return data || [];
 }
 
+/**
+ * Profesorul scrie o lucrare în contul unui elev (0109), prin funcția din bază:
+ * regula lui 0074 nu-l lasă să scrie direct. Cu `id` scrie în lucrarea aceea;
+ * cu `nou` face mereu una nouă. Întoarce `{ id }` ori `{ eroare }`.
+ */
+export async function salveazaLucrareaElevului({ elev, lectie, titlu, data, id = null, nou = false }) {
+  const { data: rez, error } = await supabase.rpc("salveaza_lucrarea_elevului", {
+    p_elev: elev, p_lectie: lectie, p_titlu: titlu, p_data: data, p_id: id, p_nou: !!nou,
+  });
+  if (error) {
+    console.warn("salveazaLucrareaElevului:", error.message);
+    return { eroare: /does not exist|schema cache/i.test(error.message) ? "rulează migrarea 0109" : motivul(error) };
+  }
+  return { id: rez };
+}
+
 /** Conținutul unei table. */
 export async function loadSheet(id) {
   const { data, error } = await supabase

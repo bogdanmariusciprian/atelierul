@@ -433,3 +433,28 @@ div.tl-celula { cursor: default; }
 .tl-coloana h4 { margin: 0 0 8px; font-size: 13px; }
 .tl-coloana .tl-parte { padding: 8px 10px; }
 .tl-coloana .tl-enunt { font-size: 12.5px; grid-template-columns: 20px 1fr; }
+
+/* ---- pentru cine e lucrul (0109): alegerea, la vedere pe bară ---- */
+.tr-pentru {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 9px; cursor: pointer;
+  border: 1.5px solid #86efac; background: #f0fdf4; color: #166534;
+  font: inherit; font-size: 12.5px; white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
+}
+.tr-pentru[hidden] { display: none; }
+.tr-pentru.is-live { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+.tr-pentru.is-nedecis { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+.tr-dialog { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(31, 36, 48, .45); }
+.tr-dialog[hidden] { display: none; }
+.tr-dialog__card { width: min(460px, 100%); background: var(--card); border-radius: 16px; padding: 18px 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .35); }
+.tr-dialog__card h3 { margin: 0 0 6px; font-size: 18px; }
+.tr-dialog__card p { margin: 0 0 12px; color: #4b463e; font-size: 14px; }
+.tr-dialog__elevi { display: grid; gap: 2px; max-height: 45vh; overflow: auto; margin-bottom: 12px; }
+.tr-dialog__elevi label { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 14.5px; }
+.tr-dialog__elevi label:hover { background: var(--accent-soft); }
+.tr-dialog__elevi input { accent-color: var(--accent); width: 17px; height: 17px; }
+.tr-dialog__elevi small { margin-left: auto; color: #15803d; font-size: 12px; }
+.tr-dialog__nota { color: var(--muted); font-size: 13px; }
+.tr-dialog__butoane { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.tr-btn--plin { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.tr-btn--plin:hover { color: #fff; filter: brightness(.95); }

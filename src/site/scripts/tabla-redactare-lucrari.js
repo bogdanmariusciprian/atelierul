@@ -136,14 +136,14 @@ export function deschideLucrarile(c) {
       ${sir.map(([k, o]) => `<tr><td>📖 ${esc(numeOpera(o))}${o.autor ? `<small>${esc(o.autor)}</small>` : ""}</td>
         ${c.tipuri.map((t) => {
           const ale = v.filter((r) => cheieOpera(r) === k && r.data.tip === t.cheie)
-            .sort((a, b) => String(b.data.zi).localeCompare(String(a.data.zi)) || String(b.updated_at).localeCompare(String(a.updated_at)));
+            .sort((a, b) => `${b.data.zi}${b.data.ora || ""}`.localeCompare(`${a.data.zi}${a.data.ora || ""}`) || String(b.updated_at).localeCompare(String(a.updated_at)));
           if (!ale.length) return `<td><span class="tl-celula tl-celula--goala">nelucrat încă</span></td>`;
           if (cuNume()) {
             const pe = [...new Set(ale.map((r) => r.user_id))].map((id) => ale.find((r) => r.user_id === id));
             return `<td><div class="tl-celula">${pe.map((r) => `<button type="button" class="tl-elev-rand" data-tl-deschide="${esc(r.id)}">${av(r.user_id)}<span>${esc(numeElev(r.user_id).split(" ")[0])}</span>${trepteMici(r)}</button>`).join("")}</div></td>`;
           }
           return `<td><button type="button" class="tl-celula" data-tl-deschide="${esc(ale[0].id)}">${trepteMici(ale[0])}
-            <span class="tl-nota">${esc(ziFrumoasa(ale[0].data.zi, true))}${ale.length > 1 ? ` · ${ale.length} încercări` : ""}</span></button></td>`;
+            <span class="tl-nota">${esc(ziFrumoasa(ale[0].data.zi, true))}${ale[0].data.ora ? `, ${esc(ale[0].data.ora)}` : ""}${ale.length > 1 ? ` · ${ale.length} încercări` : ""}</span></button></td>`;
         }).join("")}</tr>`).join("")}
     </tbody></table>
     <p class="tl-nota">O căsuță deschide lucrarea cea mai nouă; încercările mai vechi le alegi din ea.</p>`;
@@ -166,7 +166,7 @@ export function deschideLucrarile(c) {
       }).join("");
     };
     const incercari = randuri.filter((x) => x.user_id === r.user_id && cheieOpera(x) === cheieOpera(r) && x.data.tip === d.tip)
-      .sort((a, b) => String(b.data.zi).localeCompare(String(a.data.zi)));
+      .sort((a, b) => `${b.data.zi}${b.data.ora || ""}`.localeCompare(`${a.data.zi}${a.data.ora || ""}`));
     const alCui = r.user_id === CURRENT_USER.authId;
     const creion = c.admin
       ? `<button type="button" class="tl-creion" data-tl="pune" title="Aduce lucrarea pe tabla live, ca s-o continuați">✎ Pune pe tablă</button>`
@@ -180,8 +180,8 @@ export function deschideLucrarile(c) {
         <div><h3>${esc(numeOpera(d.opera))} · ${esc(c.numeTip(d.tip))}</h3>
           <div class="tl-etichete">${c.admin ? `<span class="tl-et tl-et--elev">${esc(numeElev(r.user_id))}</span>` : ""}
             ${d.opera?.autor ? `<span class="tl-et">📖 ${esc(d.opera.autor)}</span>` : ""}
-            <span class="tl-et tl-et--zi">${esc(ziFrumoasa(d.zi))}</span>
-            ${incercari.length > 1 ? `<span class="tl-nota">încercări:</span>${incercari.map((x) => `<button type="button" class="tl-et tl-incercare${x.id === r.id ? " is-on" : ""}" data-tl-deschide="${esc(x.id)}">${esc(ziFrumoasa(x.data.zi, true))}</button>`).join("")}` : ""}
+            <span class="tl-et tl-et--zi">${esc(ziFrumoasa(d.zi))}${d.ora ? `, ${esc(d.ora)}` : ""}</span>
+            ${incercari.length > 1 ? `<span class="tl-nota">încercări:</span>${incercari.map((x) => `<button type="button" class="tl-et tl-incercare${x.id === r.id ? " is-on" : ""}" data-tl-deschide="${esc(x.id)}">${esc(ziFrumoasa(x.data.zi, true))}${x.data.ora ? `, ${esc(x.data.ora)}` : ""}</button>`).join("")}` : ""}
           </div></div>
         <span class="tl-g"></span>
         <div class="tl-comut">${treptele(d.tip).map((n) => `<button type="button" data-tl-treapta="${n}" class="${mod === "una" && n === treapta ? "is-on" : ""}"${d.trepte[n] ? "" : " disabled"}>${n}</button>`).join("")}</div>
