@@ -44,6 +44,25 @@ export async function listSheets(lessonSlug) {
   return data || [];
 }
 
+/**
+ * Tablele de la o lecție, CU tot ce e scris pe ele (pentru grila de lucrări de
+ * la tabla de redactare). Fără `aleTuturor`, doar ale mele; cu el, ale tuturor,
+ * cât lasă baza: profesorul le citește pe toate (0074), elevul tot pe ale lui.
+ * Aruncă dacă baza refuză, ca cine întreabă să poată spune de ce.
+ */
+export async function listLessonSheets(lessonSlug, { aleTuturor = false } = {}) {
+  const u = await utilizator();
+  if (!u) return [];
+  let cerere = supabase
+    .from("learn_lessons_boards")
+    .select("id, user_id, title, data, updated_at")
+    .eq("lesson_slug", lessonSlug);
+  if (!aleTuturor) cerere = cerere.eq("user_id", u.id);
+  const { data, error } = await cerere.order("updated_at", { ascending: false });
+  if (error) throw new Error(error.message || "nu s-au putut citi lucrările");
+  return data || [];
+}
+
 /** Conținutul unei table. */
 export async function loadSheet(id) {
   const { data, error } = await supabase

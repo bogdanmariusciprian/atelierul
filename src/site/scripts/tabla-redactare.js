@@ -48,12 +48,22 @@
 //
 // FIȘA WORD (0107). Sub enunțuri, adminul poate urca o fișă .docx; se vede ca
 // în Word, cu pagini, la toți. Golirea curăță enunțurile, nu și fișa.
+//
+// LUCRĂRILE (17 octombrie 2026, modelul „Grilă"). Elevul pornit își păstrează
+// în cont eseul lucrat: o lucrare = o operă + un tip de eseu, într-o zi, cu
+// toate treptele ei (vezi `tabla-redactare-lucrari.js`). Opera e pe bară:
+// luată din numele fișei Word, ori scrisă de profesor (✎). Din grilă,
+// creionul profesorului aduce o lucrare pe tabla live (și elevul ei scrie mai
+// departe în aceeași lucrare), iar creionul elevului i-o deschide doar lui.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { isAdmin, CURRENT_USER } from "../../shared/scripts/session.js";
 import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeFisierFisa,
   scrieEnunt, poateScrieTabla, ascultaIngaduinta } from "../../shared/scripts/tabla-live-repo.js";
 import { tutoringPupils, setPupilPermission } from "../../shared/scripts/pupils-repo.js";
+import { saveSheet, listLessonSheets } from "../../shared/scripts/board-repo.js";
+import { deschideLucrarile, LECTIE, ziDeAzi, ziFrumoasa, operaDinFisa, operaDinText, textOpera, numeOpera }
+  from "./tabla-redactare-lucrari.js";
 
 const SLUG = "redactare-enunturi";
 
@@ -151,7 +161,17 @@ function normalizeaza(d) {
   const f = d?.fisa;
   const fisa = f && /^[a-z0-9-]+\.docx$/.test(String(f.fisier || ""))
     ? { fisier: f.fisier, nume: String(f.nume || "fișa.docx"), marime: Number(f.marime) || 0 } : null;
-  return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa };
+  /* Opera scrisă de profesor (altfel se ia din numele fișei) și lucrarea adusă
+     din grilă, în care scrie mai departe elevul ei. */
+  const o = d?.opera;
+  const opera = o && typeof o.nume === "string" && o.nume.trim()
+    ? { nume: o.nume.trim().slice(0, 120), autor: String(o.autor || "").trim().slice(0, 120) } : null;
+  const s = d?.sursa;
+  const UUID = /^[0-9a-f-]{36}$/i;
+  const sursa = s && UUID.test(String(s.id)) && UUID.test(String(s.elev)) && TIPURI.some((t) => t.cheie === s.tip)
+    ? { id: s.id, elev: s.elev, tip: s.tip, titlu: String(s.titlu || "").slice(0, 200),
+        zi: /^\d{4}-\d{2}-\d{2}$/.test(String(s.zi)) ? s.zi : ziDeAzi() } : null;
+  return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa, opera, sursa };
 }
 
 /* `admin` conduce tabla (treapta, tipul, fișa, golirea); `scriu` = poate scrie
@@ -165,8 +185,11 @@ let stari = {};
 let treapta = 0;
 let enunturi = {};
 let fisa = null;
+let opera = null;      // opera scrisă de profesor; altfel, cea din numele fișei
+let sursa = null;      // lucrarea adusă din grilă: { id, elev, tip, titlu, zi }
+let privat = null;     // lucrarea deschisă doar pentru elev: { id, titlu, data }
 function incarca(nou) {
-  ({ tip, stari, fisa } = nou);
+  ({ tip, stari, fisa, opera, sursa } = nou);
   ({ treapta, enunturi } = stari[tip]);
 }
 const pastreazaTipul = () => { stari[tip] = { treapta, enunturi }; };
@@ -233,15 +256,16 @@ function deseneaza() {
   /* Treptele se desenează din eseul deschis: alt eseu poate avea alte trepte. */
   document.getElementById("trepte").innerHTML = trepteLe().map((t) => `<button type="button"
       role="tab" class="tr-treapta${t === n ? " is-on" : ""}" data-n="${t}" aria-selected="${t === n}"${
-      !admin && t !== n ? " disabled" : ""}>${t}</button>`).join("");
+      !admin && !privat && t !== n ? " disabled" : ""}>${t}</button>`).join("");
   document.querySelectorAll(".tr-tip").forEach((b) => {
     const e = b.dataset.tip === tip;
     b.classList.toggle("is-on", e);
     b.setAttribute("aria-selected", String(e));
-    b.disabled = !admin && !e;
+    b.disabled = privat ? !e : !admin && !e;
   });
   document.getElementById("goleste").hidden = !admin;
   if (btnElevi) btnElevi.hidden = !admin;
+  deseneazaLucrarile();
   foaie.querySelectorAll(".tr-camp").forEach(potriveste);
   numara();
   deseneazaFisa();
@@ -274,6 +298,7 @@ let ceas = null;
 let inZbor = false;
 let maiAm = false;
 function trimiteCurand() {
+  if (privat) { salveazaPrivatCurand(); return; }
   if (!admin) return;
   arataStarea("se trimite…", "trimite");
   clearTimeout(ceas);
@@ -285,7 +310,7 @@ async function trimite() {
   if (inZbor) { maiAm = true; return; }
   inZbor = true;
   pastreazaTipul();
-  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa });
+  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa, opera, sursa });
   inZbor = false;
   if (maiAm) { maiAm = false; trimite(); return; }
   arataStarea(ok ? "live · trimis" : "netrimis: verifică netul", ok ? "live" : "eroare");
@@ -312,7 +337,7 @@ function trimiteEnuntul(n, i) {
 }
 
 function mergiLa(n) {
-  if (!admin || !trepteLe().includes(n) || n === treapta) return;
+  if (!(admin || privat) || !trepteLe().includes(n) || n === treapta) return;
   treapta = n;
   deseneaza();
   document.querySelector(".tr-zona").scrollTop = 0;
@@ -326,7 +351,9 @@ foaie.addEventListener("input", (e) => {
   enunturi[t.dataset.n][Number(t.dataset.i)] = t.value;
   potriveste(t);
   numara();
+  if (privat) { salveazaPrivatCurand(); return; }
   trimiteEnuntul(t.dataset.n, t.dataset.i);
+  lucrareaSeSchimba();
 });
 
 /* Enter trece la enunțul următor; un enunț nu are nevoie de rând nou. */
@@ -377,6 +404,7 @@ document.getElementById("goleste").addEventListener("click", async () => {
   clearTimeout(ceas);
   enunturi = gol();
   treapta = trepteLe()[0];
+  sursa = null;           // tabla golită începe o lucrare nouă
   deseneaza();
   arataStarea("se golește…", "trimite");
   await trimite();
@@ -596,6 +624,190 @@ document.addEventListener("click", () => {
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panouElevi.hidden) document.body.click(); });
 
+/* ---------- opera și lucrările ----------
+   Opera stă pe bară, la toți. O scrie profesorul (✎); până atunci se ia din
+   numele fișei Word. Ea și tipul eseului sunt etichetele lucrărilor din grilă. */
+const operaAcum = () => (privat ? privat.data.opera : opera || operaDinFisa(fisa?.nume)) || null;
+const numeTip = (k) => document.querySelector(`.tr-tip[data-tip="${k}"]`)?.textContent.trim() || k;
+
+const chipOpera = document.createElement("span");
+chipOpera.className = "tr-opera";
+(document.querySelector(".tr-lectie") || document.querySelector(".tr-marca"))?.after(chipOpera);
+chipOpera.addEventListener("click", async (e) => {
+  if (!e.target.closest("[data-opera]") || !admin) return;
+  const r = prompt("Opera de pe tablă, cu autorul în paranteză, de exemplu: Moromeții (Marin Preda).\nLasă gol ca s-o ia din numele fișei Word.", textOpera(operaAcum()));
+  if (r === null) return;
+  opera = operaDinText(r);
+  sursa = null;            // altă operă = altă lucrare
+  deseneaza();
+  clearTimeout(ceas);
+  await trimite();
+});
+
+const btnLucrari = document.createElement("button");
+btnLucrari.type = "button";
+btnLucrari.className = "tr-btn tr-lucrari__btn";
+btnLucrari.hidden = true;
+document.getElementById("goleste").before(btnLucrari);
+btnLucrari.addEventListener("click", () => deschideLucrarile({
+  admin, tipuri: TIPURI, numeTip, laPunePeTabla: punePeTabla, laLucreazaSingur: lucreazaSingur,
+}));
+
+/* Unde s-a salvat, sub bară, lângă starea live. */
+const salvatEl = document.createElement("span");
+salvatEl.className = "tr-salvat";
+(document.querySelector(".tr-cap__jos") || stareEl.parentElement).prepend(salvatEl);
+function arataSalvarea(text, eroare = false) {
+  salvatEl.textContent = text;
+  salvatEl.classList.toggle("is-eroare", eroare);
+}
+
+/* Banda de sus cât elevul lucrează singur pe o lucrare a lui. */
+const bandaPrivat = document.createElement("div");
+bandaPrivat.className = "tr-privat";
+bandaPrivat.hidden = true;
+document.querySelector(".tr-zona").prepend(bandaPrivat);
+bandaPrivat.addEventListener("click", (e) => { if (e.target.closest("[data-iesi]")) ieseDinPrivat(); });
+
+function deseneazaLucrarile() {
+  const o = operaAcum();
+  chipOpera.hidden = !o && !admin;
+  chipOpera.innerHTML = `<span>Opera: <b>${esc(numeOpera(o))}</b>${o?.autor ? ` · ${esc(o.autor)}` : ""}</span>`
+    + (admin ? `<button type="button" class="tr-opera__creion" data-opera title="Schimbă opera">✎</button>` : "");
+  btnLucrari.hidden = !!privat || !(admin || CURRENT_USER.authId);
+  btnLucrari.textContent = admin ? "📁 Lucrările elevilor" : "📁 Lucrările mele";
+  bandaPrivat.hidden = !privat;
+  if (privat) {
+    bandaPrivat.innerHTML = `<span>✎ Lucrezi singur pe lucrarea ta: <b>${esc(numeOpera(privat.data.opera))} · ${esc(numeTip(privat.data.tip))}</b> · ${esc(ziFrumoasa(privat.data.zi))}. Ce scrii aici se salvează doar în contul tău; nu apare pe tabla live.</span>
+      <button type="button" class="tr-btn" data-iesi>Înapoi la tabla live</button>`;
+  }
+}
+
+/** Eseul deschis, ca lucrare: fiecare treaptă cu ceva scris, întreagă (și
+ *  părțile luate de pe treapta dinainte), ca să se poată citi singură. */
+function continutLucrare(op, zi) {
+  const trepte = {};
+  for (const n of trepteLe()) {
+    if (!enunturi[n]?.some((x) => String(x).trim())) continue;
+    trepte[n] = tipul().etichete.flatMap((_, p) =>
+      Array.from({ length: partiLa(n)[p] }, (_, j) => enuntul(n, p, j).text));
+  }
+  if (!Object.keys(trepte).length) return null;
+  return { versiune: 1, opera: op ? { nume: op.nume, autor: op.autor || "" } : null, tip, zi, treapta, trepte };
+}
+const treaptaAtinsa = (d) => Math.max(...Object.keys(d.trepte || {}).map(Number).filter((n) => trepteLe(d.tip).includes(n)), trepteLe(d.tip)[0]);
+
+/* SALVAREA SINGURĂ, la elevul pornit: la câteva secunde după fiecare schimbare
+   de pe tablă (a lui ori a profesorului), lucrarea lui primește eseul deschis.
+   O cerere pe drum; ce se schimbă între timp pleacă la sosirea ei. */
+let ceasLucrare = null;
+let idLucrari = null;          // titlul lucrărilor mele → id, adus o dată
+let salvezAcum = false, iarSalvez = false;
+function lucrareaSeSchimba() {
+  if (admin || privat || !scriu || !CURRENT_USER.authId) return;
+  clearTimeout(ceasLucrare);
+  ceasLucrare = setTimeout(salveazaLucrarea, 2500);
+}
+async function salveazaLucrarea(aDouaOara = false) {
+  if (admin || privat || !scriu) return;
+  if (salvezAcum) { iarSalvez = true; return; }
+  salvezAcum = true;
+  try {
+    pastreazaTipul();
+    const op = operaAcum();
+    /* Lucrarea adusă de profesor din grilă e chiar a mea: scriu mai departe în ea. */
+    const aMea = sursa && sursa.elev === CURRENT_USER.authId && sursa.tip === tip;
+    const zi = aMea ? sursa.zi : ziDeAzi();
+    const continut = continutLucrare(op, zi);
+    if (!continut) return;
+    const titlu = aMea && sursa.titlu ? sursa.titlu : `${numeOpera(op)} · ${numeTip(tip)} · ${ziFrumoasa(zi)}`;
+    let id = aMea ? sursa.id : null;
+    if (!id) {
+      if (!idLucrari) {
+        try { idLucrari = new Map((await listLessonSheets(LECTIE)).map((r) => [r.title.trim().toLowerCase(), r.id])); }
+        catch { idLucrari = new Map(); }
+      }
+      id = idLucrari.get(titlu.trim().toLowerCase()) || null;
+    }
+    const { row, motiv } = await saveSheet({ id, lessonSlug: LECTIE, title: titlu, data: continut });
+    if (row) {
+      idLucrari?.set(titlu.trim().toLowerCase(), row.id);
+      arataSalvarea(`salvat în contul tău · ${numeOpera(op)} · ${numeTip(tip)}`);
+    } else if (!aDouaOara && /numele/.test(String(motiv))) {
+      /* A apucat o altă fereastră să facă lucrarea: o aflu și scriu în ea. */
+      idLucrari = null;
+      salvezAcum = false;
+      return salveazaLucrarea(true);
+    } else {
+      arataSalvarea(`nesalvat: ${motiv}`, true);
+    }
+  } finally {
+    salvezAcum = false;
+    if (iarSalvez) { iarSalvez = false; salveazaLucrarea(); }
+  }
+}
+
+/** Creionul profesorului: lucrarea unui elev vine pe tabla live, pe tipul ei. */
+async function punePeTabla(row, numeElev) {
+  if (!admin) return;
+  const d = row.data;
+  if (!TIPURI.some((t) => t.cheie === d.tip)) return;
+  if (!confirm(`Pui pe tabla live lucrarea lui ${numeElev}: „${row.title}"?\n\nCe e acum pe tablă la „${numeTip(d.tip)}" se înlocuiește. Celălalt tip de eseu și fișa rămân. Elevul, dacă e pornit, scrie mai departe în aceeași lucrare.`)) return;
+  pastreazaTipul();
+  tip = d.tip;
+  stari[tip] = normalizeazaTip(tipul(tip), { treapta: d.treapta || treaptaAtinsa(d), enunturi: d.trepte });
+  ({ treapta, enunturi } = stari[tip]);
+  opera = d.opera || null;
+  sursa = { id: row.id, elev: row.user_id, tip, titlu: row.title, zi: d.zi };
+  deseneaza();
+  document.querySelector(".tr-zona").scrollTop = 0;
+  clearTimeout(ceas);
+  await trimite();
+}
+
+/** Creionul elevului: lucrarea lui, deschisă doar pentru el, în aceeași tablă. */
+function lucreazaSingur(row) {
+  const d = row.data;
+  if (!TIPURI.some((t) => t.cheie === d.tip) || row.user_id !== CURRENT_USER.authId) return;
+  pastreazaTipul();
+  privat = { id: row.id, titlu: row.title, data: d };
+  tip = d.tip;
+  stari[tip] = normalizeazaTip(tipul(tip), { treapta: d.treapta || treaptaAtinsa(d), enunturi: d.trepte });
+  ({ treapta, enunturi } = stari[tip]);
+  scriu = true;
+  deseneaza();
+  arataStarea(vorbaRolului(), "live");
+  arataSalvarea("");
+  document.querySelector(".tr-zona").scrollTop = 0;
+  foaie.querySelector(".tr-camp")?.focus();
+}
+let ceasPrivat = null;
+function salveazaPrivatCurand() {
+  arataSalvarea("se salvează…");
+  clearTimeout(ceasPrivat);
+  ceasPrivat = setTimeout(salveazaPrivat, 1200);
+}
+async function salveazaPrivat() {
+  if (!privat) return;
+  pastreazaTipul();
+  const continut = continutLucrare(privat.data.opera, privat.data.zi);
+  if (!continut) return;
+  const { row, motiv } = await saveSheet({ id: privat.id, lessonSlug: LECTIE, title: privat.titlu, data: continut });
+  if (row && privat) privat.data = continut;
+  arataSalvarea(row ? "salvat în lucrarea ta" : `nesalvat: ${motiv}`, !row);
+}
+async function ieseDinPrivat() {
+  clearTimeout(ceasPrivat);
+  await salveazaPrivat();
+  privat = null;
+  incarca(normalizeaza(await citesteTabla(SLUG)));
+  scriu = admin || ingaduit;
+  arataSalvarea("");
+  deseneaza();
+  arataStarea(vorbaRolului(), "live");
+  document.querySelector(".tr-zona").scrollTop = 0;
+}
+
 /* ---------- pornirea ---------- */
 punMarimea();
 deseneaza();
@@ -610,6 +822,7 @@ if (scriu) foaie.querySelector(".tr-camp")?.focus();
    poate fi la alt enunț. Ce n-a plecat încă de aici (`murdare`) rămâne cum e,
    iar câmpul în care scrii acum nu e atins deloc. */
 urmaresteTabla(SLUG, (d) => {
+  if (privat) return;     // cât lucrează singur, elevul nu e atins de tabla live
   const nou = normalizeaza(d);
   for (const [cheie, text] of murdare) {
     const [t, n, i] = cheie.split("|");
@@ -622,6 +835,8 @@ urmaresteTabla(SLUG, (d) => {
     for (const t of TIPURI) nou.stari[t.cheie].treapta = stari[t.cheie].treapta;
     nou.tip = tip;
     nou.fisa = fisa;
+    nou.opera = opera;
+    nou.sursa = sursa;
   }
   const altaTreapta = nou.tip !== tip || nou.stari[nou.tip].treapta !== treapta;
   const altaFisa = (nou.fisa?.fisier || "") !== (fisa?.fisier || "");
@@ -635,6 +850,7 @@ urmaresteTabla(SLUG, (d) => {
       if (el !== document.activeElement && el.value !== v) { el.value = v; potriveste(el); }
     });
     numara();
+    lucrareaSeSchimba();
     return;
   }
   /* Altfel tabla se desenează din nou. Derularea rămâne unde era, afară de
@@ -642,6 +858,7 @@ urmaresteTabla(SLUG, (d) => {
   const unde = zona.scrollTop;
   deseneaza();
   zona.scrollTop = altaTreapta ? 0 : unde;
+  lucrareaSeSchimba();
 }, (conectat) => {
   if (scriu) { if (conectat && stareEl.dataset.fel === "trimite" && !inZbor) arataStarea(vorbaRolului(), "live"); return; }
   arataStarea(conectat ? vorbaRolului() : "fără legătură live", conectat ? "live" : "eroare");
@@ -653,12 +870,13 @@ urmaresteTabla(SLUG, (d) => {
 /* Vorba de lângă punctul verde spune și cine ce poate, ca să se vadă dintr-o
    privire de ce un elev nu are câmpuri: nu e în cont, ori nu e pornit. */
 function vorbaRolului() {
+  if (privat) return "lucrezi singur · nu e live";
   if (admin) return "live";
   if (scriu) return "live · poți scrie și tu";
   return CURRENT_USER.authId ? "live · doar citești" : "live · intră în cont ca să poți scrie";
 }
 function aplicaRolul() {
-  const acum = admin || ingaduit;
+  const acum = admin || ingaduit || !!privat;
   if (acum !== scriu) {
     scriu = acum;
     deseneaza();
