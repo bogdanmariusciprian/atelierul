@@ -56,7 +56,8 @@ export function operaDinText(text) {
   const s = String(text || "").trim().slice(0, 160);
   if (!s) return null;
   const m = /^(.*?)\s*\(([^()]+)\)\s*$/.exec(s);
-  return m && m[1].trim() ? { nume: m[1].trim(), autor: m[2].trim() } : { nume: s, autor: "" };
+  /* „(de Ioan Slavici)": „de" din fața autorului nu e din nume. */
+  return m && m[1].trim() ? { nume: m[1].trim(), autor: m[2].trim().replace(/^de\s+/i, "") } : { nume: s, autor: "" };
 }
 export const textOpera = (o) => (o?.nume ? (o.autor ? `${o.nume} (${o.autor})` : o.nume) : "");
 export const numeOpera = (o) => o?.nume || "Operă nenumită";
