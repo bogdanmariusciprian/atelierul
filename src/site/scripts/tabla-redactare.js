@@ -7,6 +7,9 @@
 // alte etichete la repere:
 //   încadrare în curent  – trăsături · scene semnificative · structură și compoziție
 //   particularități (liric) – trăsături · două imagini poetice · compoziție și limbaj
+// Al treilea are alte trepte (cerut de Marius pe 25 octombrie 2026):
+//   construcția personajului – 5, 9, 16, 20: Reper 1 (statutul) se face din
+//   unul trei pe treapta a doua (social, psihologic, moral), apoi fiecare se dublează.
 //
 // Cinci părți, în ordinea asta: Intro, Reper 1, Reper 2, Reper 3, Concluzie.
 // Pe prima treaptă e câte un enunț pe parte. Pe treptele următoare, unele părți
@@ -77,6 +80,8 @@ const SLUG = "redactare-enunturi";
 /* Tipurile de eseu, citite din butoanele lor:
      data-etichete="Intro|Reper 1 - …|…|Concluzie"
      data-trepte="5:1,1,1,1,1;8:1,2,2,2,1;…"   (treapta: câte enunțuri pe parte)
+     data-indicii="1:statutul social|…"        (opțional: ce scrie, stins, în
+                                                câmpurile în care se desface partea 1)
    O treaptă se ia doar dacă are câte un număr pe parte și suma lor e chiar
    numărul treptei. */
 const TIPURI = (() => {
@@ -87,7 +92,12 @@ const TIPURI = (() => {
       return { n: Number(n), parti: String(parti || "").split(",").map(Number) };
     }).filter((t) => t.n > 0 && t.parti.length === etichete.length && t.parti.every((x) => x > 0)
       && t.parti.reduce((x, y) => x + y, 0) === t.n);
-    return { cheie: b.dataset.tip, etichete, trepte };
+    const indicii = {};
+    String(b.dataset.indicii || "").split(";").forEach((x) => {
+      const [p, lista] = x.split(":");
+      if (lista) indicii[Number(p)] = lista.split("|").map((y) => y.trim());
+    });
+    return { cheie: b.dataset.tip, etichete, trepte, indicii };
   }).filter((t) => t.cheie && t.etichete.length >= 2 && t.trepte.length);
   return din.length ? din : [{
     cheie: "incadrare",
@@ -95,12 +105,13 @@ const TIPURI = (() => {
       "Reper 3 - structură și compoziție", "Concluzie"],
     trepte: [{ n: 5, parti: [1, 1, 1, 1, 1] }, { n: 8, parti: [1, 2, 2, 2, 1] },
       { n: 14, parti: [1, 4, 4, 4, 1] }, { n: 18, parti: [1, 4, 8, 4, 1] }],
+    indicii: {},
   }];
 })();
 
 let tip = TIPURI[0].cheie;
 const tipul = (c = tip) => TIPURI.find((t) => t.cheie === c) || TIPURI[0];
-const trepteLe = () => tipul().trepte.map((t) => t.n);
+const trepteLe = (c = tip) => tipul(c).trepte.map((t) => t.n);
 const partiLa = (n) => tipul().trepte.find((t) => t.n === n).parti;
 const treaptaDinainte = (n) => { const t = trepteLe(); return t[t.indexOf(n) - 1]; };
 /** Clasa grupului: primul e Intro, ultimul Concluzie, între ele reperele. */
@@ -227,11 +238,11 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /** Un enunț de scris: numărul lui pe treaptă și câmpul. */
-function camp(n, i, nr) {
+function camp(n, i, nr, indiciu = "") {
   return `<div class="tr-rand">
       <span class="tr-nr">${nr}.</span>
       <textarea class="tr-camp" rows="1" data-n="${n}" data-i="${i}"${scriu ? "" : " readonly tabindex=\"-1\""}
-        aria-label="Enunțul ${nr} din ${n}" placeholder="${scriu ? `Enunțul ${nr}` : ""}">${esc(enunturi[n][i])}</textarea>
+        aria-label="Enunțul ${nr} din ${n}" placeholder="${scriu ? esc(indiciu ? `Enunțul ${nr}: ${indiciu}` : `Enunțul ${nr}`) : ""}">${esc(enunturi[n][i])}</textarea>
     </div>`;
 }
 
@@ -265,13 +276,17 @@ function deseneaza() {
       const parinti = partiLa(sus)[p];
       const baza = Math.floor(cati / parinti);
       const inPlus = cati % parinti;
+      /* Indiciile (statutul social, psihologic, moral) se pun acolo unde un
+         singur enunț se desface în atâtea câmpuri câte indicii sunt. */
+      const ind = tipul().indicii?.[p];
+      const cuIndicii = parinti === 1 && ind?.length === cati ? ind : null;
       let j = 0;
       corp = Array.from({ length: parinti }, (_, k) => {
         const copii = baza + (k < inPlus ? 1 : 0);
         const parinte = enuntul(sus, p, k).text.trim();
         const html = `<div class="tr-subgrup">
             <p class="tr-parinte">${parinte ? esc(parinte) : "<em>enunțul de mai jos e încă gol</em>"}</p>
-            ${Array.from({ length: copii }, () => camp(n, inceputul(n, p) + j++, ++nr)).join("")}
+            ${Array.from({ length: copii }, () => { const x = j++; return camp(n, inceputul(n, p) + x, ++nr, cuIndicii?.[x] || ""); }).join("")}
           </div>`;
         return html;
       }).join("");

@@ -403,6 +403,7 @@ div.tl-celula { cursor: default; }
 .tl-trepte i { font-style: normal; font-size: 10.5px; font-weight: 700; width: 24px; height: 18px; border-radius: 5px; display: grid; place-items: center; background: #f1ebe4; color: #b9ad9f; }
 .tl-trepte i.on { background: var(--accent); color: #fff; }
 .tl-liric i.on { background: #7c3aed; }
+.tl-personaj i.on { background: #0f766e; }
 .tl-cititor-cap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
 .tl-cititor-cap h3 { margin: 0; font-size: 18px; }
 .tl-inapoi { border: 1px solid var(--line); background: var(--card); border-radius: 9px; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 13px; }
@@ -422,12 +423,15 @@ div.tl-celula { cursor: default; }
 .tl-parte__et { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 8px; background: #f1ebe4; color: #6b645a; margin-bottom: 6px; }
 .tl-parte--r .tl-parte__et { background: var(--accent-soft); color: #c2410c; }
 .tl-liric .tl-parte--r .tl-parte__et { background: #f3edff; color: #7c3aed; }
+.tl-personaj .tl-parte--r .tl-parte__et { background: #e6f6f4; color: #0f766e; }
 .tl-enunt { display: grid; grid-template-columns: 28px 1fr; gap: 6px; padding: 3px 0; font-size: 16px; }
 .tl-enunt b { color: var(--accent); text-align: right; }
 .tl-liric .tl-enunt b { color: #7c3aed; }
+.tl-personaj .tl-enunt b { color: #0f766e; }
 .tl-enunt em { color: var(--muted); }
 .tl-enunt--nou { background: linear-gradient(90deg, rgba(234, 88, 12, .09), transparent 70%); border-radius: 6px; }
 .tl-liric .tl-enunt--nou { background: linear-gradient(90deg, rgba(124, 58, 237, .09), transparent 70%); }
+.tl-personaj .tl-enunt--nou { background: linear-gradient(90deg, rgba(15, 118, 110, .09), transparent 70%); }
 .tl-mostra { display: inline-block; width: 26px; height: 10px; border-radius: 3px; margin-right: 6px; background: linear-gradient(90deg, rgba(234, 88, 12, .25), transparent); }
 .tl-alaturi { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 10px; overflow-x: auto; }
 .tl-coloana h4 { margin: 0 0 8px; font-size: 13px; }
