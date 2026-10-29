@@ -466,6 +466,7 @@
   }
   function salveaza() {
     try { localStorage.setItem(CHEIE_MEMORIE, JSON.stringify({ setari, date, vederi })); } catch { /* fără memorie: merge cât e pagina deschisă */ }
+    window.Prezenta?.candSalvez?.({ setari, date, vederi });   // situl o duce și în cont (vezi jos)
   }
 
   const memorie = citesteMemoria();
@@ -2130,6 +2131,17 @@
     mesaj(titlu, text) {
       cadru.innerHTML = `<div class="gol"><h2>${escapa(titlu)}</h2><p>${escapa(text)}</p></div>`;
     },
+    /** Memoria adusă din cont (de pe alt calculator): o pune în locul celei din browser. */
+    incarcaMemoria(m) {
+      setari = completeaza(m?.setari ?? {});
+      date = { ...dateImplicite(), ...(m?.date ?? {}) };
+      vederi = m?.vederi ?? {};
+      istoric.inapoi = []; istoric.inainte = [];
+      try { localStorage.setItem(CHEIE_MEMORIE, JSON.stringify({ setari, date, vederi })); } catch {}
+      aplicaTema(); totul();
+    },
+    /** Memoria de acum, ca s-o poată duce situl în cont. */
+    memoria: () => ({ setari, date, vederi }),
   };
 
   const ePentruProba = location.protocol === 'file:' || new URLSearchParams(location.search).has('proba');
@@ -2137,13 +2149,60 @@
   else if (ePentruProba) window.Prezenta.afiseaza(DATE_DE_PROBA);
   else { totul(); window.Prezenta.mesaj('Se încarcă prezența…', 'Datele vin din tabelul Google, prin baza de date a site-ului.'); }
   </script>
-  <!-- ===== LEGĂTURA CU SITUL (singurul lucru adăugat peste prezenta.html) =====
-       Numai profesorul primește datele: baza le dă doar adminului (RLS, migrarea
-       0110), aici doar alegem mesajul. Datele vin din tabelul Google, prin
-       funcția `primeste-prezenta`. Cu `?proba` rămân datele de probă inventate. -->
+  <!-- ===== LEGĂTURA CU SITUL (adăugată peste prezenta.html) =====
+       Numai profesorul primește datele: baza le dă doar adminului (RLS, migrările
+       0110 și 0111), aici doar alegem mesajul. Prezența vine din tabelul Google,
+       prin funcția `primeste-prezenta`. Cu `?proba` rămân datele de probă inventate.
+
+       MEMORIA ÎN CONT. Tot ce ține pagina (setări, simboluri, coloane, vederi,
+       note, motivări) stă în browser ȘI în `prezenta_memorie`. La deschidere
+       câștigă varianta mai nouă: dacă ai lucrat pe alt calculator, o iei de
+       acolo; dacă aici e ceva încă netrimis, se trimite. Fiecare salvare a
+       paginii pleacă în cont după o clipă de liniște. -->
   <script type="module">
     import { supabase } from "../../src/shared/scripts/supabase-client.js";
     import { roleForEmail } from "../../src/shared/scripts/session.js";
+
+    const CHEIE_MEMORIE = "prezenta-tabel-v3";
+    const CHEIE_CAND = "prezenta-tabel-v3:cand";   // când s-a schimbat ultima oară memoria din browserul ăsta
+    const ia = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    const pune = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+    /* ---------- Trimiterea în cont, cu o clipă de așteptare între salvări ---------- */
+    let deTrimis = null;
+    let ceas = null;
+    async function trimite() {
+      clearTimeout(ceas); ceas = null;
+      if (!deTrimis) return;
+      const { memorie, cand } = deTrimis;
+      deTrimis = null;
+      const { error } = await supabase.from("prezenta_memorie")
+        .upsert({ id: 1, memorie, actualizat: new Date(cand).toISOString() });
+      if (error) console.warn("prezenta: memoria n-a ajuns în cont:", error.message);
+    }
+    function programeaza(memorie, cand = Date.now()) {
+      pune(CHEIE_CAND, String(cand));
+      deTrimis = { memorie, cand };
+      clearTimeout(ceas);
+      ceas = setTimeout(trimite, 1200);
+    }
+    /* Pleci de pe pagină: ce era pe drum pleacă acum, nu după pauză. */
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") trimite(); });
+
+    async function potrivesteMemoria() {
+      const { data, error } = await supabase.from("prezenta_memorie").select("memorie, actualizat").eq("id", 1).maybeSingle();
+      if (error) { console.warn("prezenta: n-am putut citi memoria din cont:", error.message); return; }
+      const aici = Number(ia(CHEIE_CAND)) || 0;
+      const inCont = data ? Date.parse(data.actualizat) : 0;
+      if (data && inCont >= aici) {
+        Prezenta.incarcaMemoria(data.memorie);
+        pune(CHEIE_CAND, String(inCont));
+      } else if (ia(CHEIE_MEMORIE) != null) {
+        programeaza(Prezenta.memoria(), aici || Date.now());
+        trimite();
+      }
+      Prezenta.candSalvez = (m) => programeaza(m);
+    }
 
     if (!new URLSearchParams(location.search).has("proba")) {
       try {
@@ -2151,9 +2210,12 @@
         if (roleForEmail(session?.user?.email) !== "admin") {
           Prezenta.mesaj("Nu ai acces", "Pagina e doar pentru profesor.");
         } else {
-          const { data, error } = await supabase.from("prezenta_export").select("date").eq("id", 1).maybeSingle();
+          const [, { data, error }] = await Promise.all([
+            potrivesteMemoria(),
+            supabase.from("prezenta_export").select("date").eq("id", 1).maybeSingle(),
+          ]);
           if (error) Prezenta.mesaj("Nu am putut încărca prezența", error.message);
-          else if (!data) Prezenta.mesaj("Încă nicio oră", "Trimite datele din tabel: Prezență → Trimite datele pe site acum.");
+          else if (!data) Prezenta.mesaj("Încă nicio oră", "Din tabelul Google: Prezență → Adu prezența.");
           else Prezenta.afiseaza(data.date);
         }
       } catch (err) {
