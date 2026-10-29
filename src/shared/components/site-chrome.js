@@ -24,6 +24,7 @@ import { initTodo } from "./todo-fab.js";
 import { initTagging } from "./tagging-fab.js";
 import { initExplanationProposals } from "./explanations-fab.js";
 import { initLiceuToggle } from "./liceu-toggle-fab.js";
+import { initPrezenta } from "./prezenta-fab.js";
 import { aduLiceuDeschis, liceuDeschisStiut } from "../scripts/liceu-gate.js";
 import { fetchOpenModerationCount } from "../scripts/forum-repo.js";
 import { fetchPendingCount, fetchPendingCountForLesson } from "../scripts/exercises-repo.js";
@@ -99,6 +100,7 @@ export async function renderChrome(basePath = "") {
   safe(() => initTagging(basePath), "tagging");
   safe(() => initExplanationProposals(basePath), "explanationProposals");
   safe(() => initLiceuToggle(basePath), "liceuToggle"); // „Liceu: afișat / ascuns" (admin)
+  safe(() => initPrezenta(basePath), "prezenta"); // „Pregătire BAC" → prezența de la Meet (admin)
   safe(initGuestOneTap, "guestOneTap"); // Google One Tap for signed-out visitors
   safe(startPresence, "presence"); // heartbeat → last_seen (presence dots)
   safe(addPlannerLink, "plannerLink"); // „Meditații" — added only if allowed

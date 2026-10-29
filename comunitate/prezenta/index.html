@@ -1,0 +1,2165 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex, nofollow">
+  <script>
+    // Tema aleasă se pune înainte să apară pagina, ca să nu clipească în altă culoare.
+    try {
+      const m = JSON.parse(localStorage.getItem('prezenta-tabel-v3') ?? localStorage.getItem('prezenta-tabel-v2') ?? '{}');
+      const t = m?.setari?.tema;
+      if (t && t !== 'auto') document.documentElement.dataset.tema = t;
+    } catch {}
+  </script>
+  <title>Prezență</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Source+Sans+3:wght@400;600;700&display=swap">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --fundal:   light-dark(#f4f6f9, #10141d);
+      --foaie:    light-dark(#ffffff, #181d2a);
+      --foaie-2:  light-dark(#f3f5f8, #1f2535);
+      --linie:    light-dark(#e1e5eb, #2b3244);
+      --text:     light-dark(#1b2130, #e7eaf0);
+      --slab:     light-dark(#667085, #9aa3b5);
+      --albastru: light-dark(#1f3f99, #93b1ff);
+      --pe-albastru: light-dark(#ffffff, #10141d);
+      --rosu:     light-dark(#b42318, #ff8f80);
+      --galben:   light-dark(#8a5a00, #f3c46b);
+      --verde:    light-dark(#0f7a4a, #7fd6a4);
+      --mov:      light-dark(#6b3fa0, #c8a8f0);
+      --titlu: "Literata", Georgia, serif;
+      --corp:  "Source Sans 3", system-ui, sans-serif;
+    }
+    /* =========================================================
+       Temele (alese din „Temă”, sus). „Automat” = urmează sistemul.
+       ========================================================= */
+    :root[data-tema="luminoasa"] { color-scheme: light; }
+    :root[data-tema="intunecata"] { color-scheme: dark; }
+    :root[data-tema="hartie"] {
+      color-scheme: light;
+      --fundal: #f3eee2; --foaie: #fffdf7; --foaie-2: #f6f0e1; --linie: #e2d9c6; --text: #2a2418; --slab: #74685a;
+      --albastru: #1d3a7a; --pe-albastru: #fffdf7; --rosu: #a3261b; --galben: #8a5a00; --verde: #2f6b3c;
+    }
+    :root[data-tema="verde"] {
+      color-scheme: light;
+      --fundal: #f1f6f2; --foaie: #ffffff; --foaie-2: #edf4ef; --linie: #d6e3da; --text: #16231b; --slab: #5a6c60;
+      --albastru: #1e6a42; --pe-albastru: #ffffff; --rosu: #b42318; --galben: #8a5a00; --verde: #1e6a42;
+    }
+    :root[data-tema="bordo"] {
+      color-scheme: light;
+      --fundal: #f7f2f3; --foaie: #ffffff; --foaie-2: #f6edf0; --linie: #e7d8dd; --text: #2a191f; --slab: #745f69;
+      --albastru: #7a1f3d; --pe-albastru: #ffffff; --rosu: #b42318; --galben: #8a5a00; --verde: #2f6b3c;
+    }
+    :root[data-tema="contrast"] {
+      color-scheme: light;
+      --fundal: #ffffff; --foaie: #ffffff; --foaie-2: #eeeeee; --linie: #000000; --text: #000000; --slab: #1a1a1a;
+      --albastru: #0030c0; --pe-albastru: #ffffff; --rosu: #c00000; --galben: #6b4100; --verde: #005a1e;
+    }
+    :root[data-tema="contrast"] body { font-weight: 600; }
+    :root[data-tema="noapte"] {
+      color-scheme: dark;
+      --fundal: #0a1530; --foaie: #112048; --foaie-2: #16295a; --linie: #274077; --text: #e8eeff; --slab: #a9b7dd;
+      --albastru: #8fb4ff; --pe-albastru: #0a1530; --rosu: #ff9a8c; --galben: #f6cf7a; --verde: #8be0b0;
+    }
+    .alege-tema { display: inline-flex; align-items: center; gap: 6px; margin-block-start: 6px; font-size: 0.85rem; color: var(--slab); }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 var(--corp); color: var(--text); background: var(--fundal); }
+    h1, h2, h3 { font-family: var(--titlu); font-weight: 600; margin: 0; line-height: 1.2; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    :focus-visible { outline: 3px solid var(--albastru); outline-offset: 2px; }
+    [hidden] { display: none !important; }
+    .ascuns-vizual { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-block-size: 32px; padding: 4px 10px; border: 1px solid var(--linie); border-radius: 7px; background: var(--foaie); cursor: pointer; white-space: nowrap; }
+    .btn:hover { border-color: var(--slab); }
+    .btn.icon { min-inline-size: 32px; padding: 4px 6px; }
+    .btn.principal { background: var(--albastru); border-color: var(--albastru); color: var(--pe-albastru); font-weight: 700; }
+    .btn[aria-pressed="true"] { border-color: var(--albastru); background: color-mix(in srgb, var(--albastru) 16%, var(--foaie)); color: var(--albastru); font-weight: 700; }
+    select, input[type=search], input[type=text], input[type=number] { min-block-size: 32px; padding: 4px 8px; border: 1px solid var(--linie); border-radius: 7px; background: var(--foaie); min-inline-size: 0; }
+    input[type=checkbox], input[type=radio], input[type=range] { accent-color: var(--albastru); }
+
+    .pagina { padding: 12px clamp(8px, 2vw, 22px) 56px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .rapoarte select, .lista-mare select { max-inline-size: 100%; }
+
+    /* ---------- Capul paginii ---------- */
+    .cap { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: stretch; }
+    .titlu { display: grid; align-content: center; gap: 4px; }
+    .titlu-rand { display: flex; align-items: center; gap: 8px; }
+    .titlu h1 { font-size: 1.6rem; }
+    .titlu p { color: var(--slab); font-size: 0.86rem; margin: 0; }
+    .lista-mare { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 14px; background: var(--albastru); color: var(--pe-albastru); border-radius: 14px; }
+    .lista-mare label { font-weight: 700; }
+    .lista-mare select { background: var(--pe-albastru); color: var(--text); border-color: transparent; font-size: 1rem; }
+    .copiaza-lista { margin-inline-start: auto; padding: 10px 22px; border: 2px solid var(--pe-albastru); border-radius: 10px; cursor: pointer; background: var(--pe-albastru); color: var(--albastru); font-size: 1.15rem; font-weight: 700; }
+    .copiaza-lista:hover { filter: brightness(0.95); }
+    .lista-mare .confirmare { flex-basis: 100%; font-size: 0.9rem; margin: 0; min-block-size: 1.3em; }
+    .rapoarte { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; background: var(--foaie); border: 1px solid var(--linie); border-radius: 14px; }
+    .rapoarte strong { font-family: var(--titlu); }
+    .confirmare { color: var(--slab); font-size: 0.86rem; }
+
+    /* ---------- Panglica (ca în Office) ---------- */
+    .panglica { background: var(--foaie); border: 1px solid var(--linie); border-radius: 12px; }
+    .file { display: flex; gap: 2px; padding: 4px 6px 0; border-block-end: 1px solid var(--linie); overflow-x: auto; scrollbar-width: thin; }
+    .file button { padding: 7px 12px; border: 0; border-block-end: 3px solid transparent; background: none; cursor: pointer; white-space: nowrap; color: var(--slab); font-weight: 600; }
+    .file button[aria-selected="true"] { color: var(--albastru); border-block-end-color: var(--albastru); }
+    .file .dreapta { margin-inline-start: auto; }
+    .continut-fila { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; align-items: stretch; }
+    .grup-p { display: grid; grid-template-rows: 1fr auto; gap: 4px; padding: 2px 10px 0; border-inline-end: 1px solid var(--linie); }
+    .grup-p:last-child { border-inline-end: 0; }
+    .grup-p > .eticheta-grup { text-align: center; font-size: 0.75rem; color: var(--slab); }
+    .grup-p > .unelte { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; align-content: center; max-inline-size: 560px; }
+    .grup-p .coloana { display: grid; gap: 5px; }
+    .mic { font-size: 0.82rem; color: var(--slab); }
+    label.inline { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+
+    /* alegere de culoare: pătrățel + ↺ (automat / fără) */
+    .culoare { display: inline-flex; align-items: center; gap: 3px; font-size: 0.85rem; }
+    .culoare input[type=color] { inline-size: 30px; block-size: 28px; padding: 1px; border: 1px solid var(--linie); border-radius: 6px; background: none; cursor: pointer; }
+    .culoare.auto input[type=color] { opacity: 0.4; }
+    .culoare button { padding: 0 5px; border: 1px solid var(--linie); border-radius: 5px; background: none; cursor: pointer; font-size: 0.75rem; color: var(--slab); min-block-size: 22px; }
+    .culoare.auto button { visibility: hidden; }
+
+    /* liste din panglică: reguli, niveluri de sortare, clase, coloane */
+    .lista-p { display: grid; gap: 4px; }
+    .grup-p > .unelte:has(.lista-p) { max-inline-size: none; }
+    .lista-p > .rand-p { flex-wrap: nowrap; }
+    .rand-p { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+    .etichete-coloane { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; margin: 0; padding: 0; }
+    .eticheta-coloana { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--albastru); background: var(--foaie-2); font-size: 0.85rem; }
+    .eticheta-coloana[aria-pressed="false"] { border-style: dashed; border-color: var(--linie); color: var(--slab); text-decoration: line-through; background: none; }
+    .eticheta-coloana.trasa { opacity: 0.35; }
+    .simbol-p { display: grid; grid-template-columns: 70px 56px 34px auto; align-items: center; gap: 6px; }
+    .simbol-p input[type=text] { inline-size: 56px; text-align: center; font-size: 1.05rem; }
+    .mostra { display: inline-grid; place-items: center; min-inline-size: 32px; block-size: 28px; border: 1px solid var(--linie); border-radius: 6px; }
+
+    /* ---------- Tabelul ---------- */
+    .cadru { overflow: auto; max-block-size: calc(100dvh - 120px); border: 1px solid var(--c-linii, var(--linie)); border-radius: var(--rotunjire, 10px); background: var(--c-fundal, var(--foaie)); }
+    table.tabel { border-collapse: separate; border-spacing: 0; table-layout: fixed; inline-size: max-content; font-family: var(--font-tabel, var(--corp)); font-size: var(--marime, 15px); color: var(--c-text, var(--text)); background: var(--c-fundal, var(--foaie)); }
+    .tabel th, .tabel td { padding: var(--spatiu, 8px) 9px; text-align: var(--aliniere, center); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; position: relative; }
+    .tabel.grila-o th, .tabel.grila-o td { border-block-end: 1px solid var(--c-linii, var(--linie)); }
+    .tabel.grila-v th + th, .tabel.grila-v td + td, .tabel.grila-v th + td, .tabel.grila-v td + th { border-inline-start: 1px solid var(--c-linii, var(--linie)); }
+    .tabel tbody > tr > * { background-color: var(--c-fundal, var(--foaie)); }
+    .tabel.dungi tbody > tr.par > * { background-color: var(--c-dungi, var(--foaie-2)); }
+    .tabel tbody > tr:not(.grup-rand):hover > * { background-image: linear-gradient(var(--c-hover, color-mix(in srgb, var(--albastru) 8%, transparent)), var(--c-hover, color-mix(in srgb, var(--albastru) 8%, transparent))); }
+    .tabel thead th { position: sticky; inset-block-start: 0; z-index: 3; block-size: var(--inaltime-antet, auto); background: var(--c-antet-fundal, var(--foaie)); color: var(--c-antet-text, var(--slab)); font-size: 0.85em; font-weight: 700; user-select: none; touch-action: none; cursor: default; vertical-align: bottom; }
+    .tabel thead th.inghetat { z-index: 4; }
+    .tabel td.inghetat, .tabel tbody th.inghetat { position: sticky; z-index: 2; }
+    .tabel thead th small { font-weight: 400; }
+    .antet { display: flex; align-items: flex-end; gap: 4px; }
+    .antet .titlu-col { flex: 1; overflow: hidden; text-overflow: ellipsis; text-align: var(--aliniere, center); }
+    .buton-filtru { flex: none; inline-size: 20px; block-size: 20px; padding: 0; border: 1px solid var(--linie); border-radius: 4px; background: var(--foaie); color: var(--slab); font-size: 0.7rem; line-height: 1; cursor: pointer; }
+    .buton-filtru.activ { background: var(--albastru); border-color: var(--albastru); color: var(--pe-albastru); }
+    .sortare { color: var(--albastru); font-size: 1.05em; }
+    .sortare sup { font-size: 0.6em; }
+    .maner-latime { position: absolute; inset-block: 0; inset-inline-end: -4px; inline-size: 9px; cursor: col-resize; touch-action: none; z-index: 5; }
+    .maner-latime:hover, .maner-latime.activ { background: color-mix(in srgb, var(--albastru) 35%, transparent); }
+    .tabel .sel { background-image: linear-gradient(color-mix(in srgb, var(--albastru) 18%, transparent), color-mix(in srgb, var(--albastru) 18%, transparent)) !important; outline: 2px solid var(--albastru); outline-offset: -2px; }
+    .tabel thead th.sel { outline: 2px solid var(--albastru); outline-offset: -2px; }
+    .tabel th.trasa { opacity: 0.35; }
+    .tabel th.tinta-stanga { box-shadow: inset 3px 0 0 var(--albastru); }
+    .tabel th.tinta-dreapta { box-shadow: inset -3px 0 0 var(--albastru); }
+    .tabel .nume-col { text-align: start; font-weight: 600; }
+    .tabel thead th.nume-col .titlu-col { text-align: start; }
+    .tabel .nota-celula::after { content: ""; position: absolute; inset-block-start: 0; inset-inline-end: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--rosu) transparent transparent; }
+    .tabel .sub-prag { color: var(--rosu); }
+    .tabel tr.grup-rand > td { text-align: start; font-weight: 700; cursor: pointer; padding-block: 6px; }
+    .tabel td input.editare { inline-size: 100%; border: 0; padding: 0; background: transparent; outline: 2px solid var(--albastru); font: inherit; color: inherit; text-align: inherit; }
+    .minute-mici { opacity: 0.7; font-size: 0.85em; margin-inline-start: 4px; }
+    .gol { padding: 40px 16px; text-align: center; color: var(--slab); }
+    .legenda { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; color: var(--slab); font-size: 0.88rem; }
+
+    /* bara de jos: zoom, ca în Excel */
+    .bara-jos { position: fixed; inset-block-end: 0; inset-inline: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 14px; background: var(--foaie); border-block-start: 1px solid var(--linie); font-size: 0.85rem; color: var(--slab); }
+    .bara-jos .zoom { display: inline-flex; align-items: center; gap: 6px; }
+    .bara-jos input[type=range] { inline-size: 130px; }
+
+    /* meniul de click dreapta și fereastra de filtru */
+    .meniu-context, .popover-filtru { position: fixed; z-index: 50; min-inline-size: 220px; max-block-size: 70dvh; overflow-y: auto; padding: 5px; background: var(--foaie); color: var(--text); border: 1px solid var(--linie); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / 0.22); }
+    .meniu-context button { display: flex; align-items: center; gap: 8px; inline-size: 100%; padding: 6px 10px; border: 0; border-radius: 6px; background: none; cursor: pointer; text-align: start; }
+    .meniu-context button:hover, .meniu-context button:focus-visible { background: var(--foaie-2); }
+    .meniu-context hr { border: 0; border-block-start: 1px solid var(--linie); margin: 4px 2px; }
+    .meniu-context .paleta { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px; }
+    .meniu-context .paleta button { inline-size: 22px; block-size: 22px; padding: 0; border: 1px solid var(--linie); border-radius: 4px; }
+    .popover-filtru { inline-size: 270px; display: grid; gap: 6px; padding: 10px; }
+    .popover-filtru .valori { display: grid; gap: 2px; max-block-size: 260px; overflow-y: auto; padding: 4px; border: 1px solid var(--linie); border-radius: 6px; }
+    .popover-filtru label { display: flex; gap: 6px; align-items: center; }
+    dialog.intrebare { inline-size: min(420px, calc(100vw - 24px)); padding: 16px; border: 1px solid var(--linie); border-radius: 12px; background: var(--foaie); color: var(--text); }
+    dialog.intrebare::backdrop { background: rgb(0 0 0 / 0.35); }
+    dialog.intrebare form { display: grid; gap: 10px; }
+    dialog.intrebare textarea, dialog.intrebare input { inline-size: 100%; padding: 6px 8px; border: 1px solid var(--linie); border-radius: 7px; background: var(--foaie); }
+    dialog.intrebare textarea { min-block-size: 90px; }
+    dialog.intrebare .butoane { display: flex; justify-content: flex-end; gap: 8px; }
+    dialog.raport { inline-size: min(1240px, calc(100vw - 24px)); max-block-size: calc(100dvh - 24px); padding: 0; border: 1px solid var(--linie); border-radius: 14px; background: var(--foaie); color: var(--text); }
+    .raport-corp { display: grid; grid-template-columns: 330px minmax(0, 1fr); align-items: start; }
+    .raport-setari { position: sticky; inset-block-start: 61px; max-block-size: calc(100dvh - 110px); overflow-y: auto; padding: 14px 16px 24px; border-inline-end: 1px solid var(--linie); display: grid; gap: 14px; }
+    .raport-setari h3 { font-size: 0.95rem; }
+    .raport-setari section { display: grid; gap: 6px; }
+    .raport-setari label.camp { display: grid; gap: 3px; font-size: 0.86rem; color: var(--slab); }
+    .raport-setari input[type=text], .raport-setari textarea { inline-size: 100%; padding: 6px 8px; border: 1px solid var(--linie); border-radius: 8px; background: var(--foaie); color: var(--text); font: inherit; }
+    .raport-setari textarea { min-block-size: 80px; resize: vertical; }
+    .raport-setari .bifa { display: flex; gap: 8px; align-items: center; }
+    .raport-setari code { font-size: 0.8rem; background: var(--foaie-2); padding: 0 4px; border-radius: 4px; }
+    .raport-previzualizare { padding: 14px 18px 24px; background: var(--fundal); display: grid; gap: 8px; }
+    .raport-previzualizare .foaie-raport { box-shadow: 0 2px 12px rgb(0 0 0 / 0.12); border-radius: 4px; max-inline-size: 820px; margin-inline: auto; inline-size: 100%; }
+    .foaie-raport[contenteditable="true"]:focus { outline: 2px dashed var(--albastru); outline-offset: 4px; }
+    .foaie-raport .scoala { text-align: center; color: #5b6577; font-size: 0.85em; letter-spacing: 0.02em; padding-block-end: 8px; margin-block-end: 14px; border-block-end: 1px solid #e3e6eb; }
+    .foaie-raport .observatii { margin-block-start: 16px; padding: 10px 12px; border-inline-start: 3px solid var(--accent-raport, #1f3f99); background: #f6f7f9; white-space: pre-wrap; }
+    @media (width < 900px) { .raport-corp { grid-template-columns: 1fr; } .raport-setari { position: static; max-block-size: none; border-inline-end: none; border-block-end: 1px solid var(--linie); } }
+    dialog.raport::backdrop { background: rgb(0 0 0 / 0.45); }
+    .raport-bara { position: sticky; inset-block-start: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; background: var(--foaie); border-block-end: 1px solid var(--linie); }
+    .raport-bara .confirmare { margin-inline-end: auto; }
+    .foaie-raport { padding: 28px 32px 36px; font-family: var(--corp); font-size: var(--marime-raport, 14px); line-height: 1.5; color: #1b2130; background: #fff; color-scheme: light; }
+    .foaie-raport h2 { font-size: 1.6em; color: var(--accent-raport, #1b2130); }
+    .foaie-raport .sub { color: #5b6577; margin: 4px 0 16px; }
+    .foaie-raport h3 { font-size: 1.1em; margin: 18px 0 6px; color: var(--accent-raport, #1b2130); }
+    .foaie-raport .cifre { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-block-end: 6px; }
+    .foaie-raport .cifra { padding: 8px 10px; border: 1px solid #dfe3ea; border-radius: 8px; }
+    .foaie-raport .cifra b { display: block; font: 600 1.35rem var(--titlu); }
+    .foaie-raport .cifra span { color: #5b6577; font-size: 0.85rem; }
+    .foaie-raport table { inline-size: 100%; border-collapse: collapse; margin-block-start: 4px; }
+    .foaie-raport th, .foaie-raport td { padding: 5px 8px; border-block-end: 1px solid #e3e6eb; text-align: start; }
+    .foaie-raport th { font-size: 0.8rem; color: #5b6577; }
+    .foaie-raport .rosu { color: #b42318; font-weight: 600; }
+    .foaie-raport .galben { color: #8a5a00; font-weight: 600; }
+    .foaie-raport .semnatura { margin-block-start: 28px; color: #5b6577; font-size: 0.85rem; }
+    #zona-tipar { display: none; }
+
+    #zona-tipar { display: none; }
+    @media print {
+      @page { size: A4; margin: 14mm; }
+      body.tipar > :not(#zona-tipar) { display: none !important; }
+      body.tipar #zona-tipar { display: block; }
+      body.tipar { background: #fff; }
+      .foaie-raport { padding: 0; box-shadow: none !important; }
+      .foaie-raport tr { break-inside: avoid; }
+      /* tipărirea tabelului: doar tabelul și legenda */
+      body:not(.tipar) :is(.cap, .panglica, .bara-jos, .meniu-context, .popover-filtru) { display: none !important; }
+      body:not(.tipar) .pagina { padding: 0; }
+      body:not(.tipar) .cadru { overflow: visible; max-block-size: none; border: 0; }
+      body:not(.tipar) .tabel thead th, body:not(.tipar) .tabel .inghetat { position: static; }
+      body:not(.tipar) .tabel .sel { outline: 0; background-image: none !important; }
+      .tabel tr { break-inside: avoid; }
+      * { print-color-adjust: exact; }
+    }
+    @media (width < 1000px) {
+      .cap { grid-template-columns: minmax(0, 1fr); }
+      .copiaza-lista { inline-size: 100%; }
+      .continut-fila { flex-wrap: nowrap; overflow-x: auto; }
+      .grup-p { flex: none; }
+      .cadru { max-block-size: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="pagina">
+    <header class="cap">
+      <div class="titlu">
+        <div class="titlu-rand">
+          <h1>Prezență</h1>
+          <button class="btn icon" type="button" id="anuleaza" title="Anulează (Ctrl+Z)" aria-label="Anulează">↶</button>
+          <button class="btn icon" type="button" id="reface" title="Refă (Ctrl+Y)" aria-label="Refă">↷</button>
+        </div>
+        <p id="actualizat"></p>
+      </div>
+
+      <section class="lista-mare" aria-label="Copiază lista unei ore">
+        <label for="lista-ora">Lista pentru</label>
+        <select id="lista-ora"></select>
+        <select id="lista-clasa" aria-label="Clasa pentru listă"></select>
+        <button class="copiaza-lista" type="button" id="copiaza-lista">📋 Copiază lista</button>
+        <p class="confirmare" id="mesaj-lista" role="status"></p>
+      </section>
+
+      <section class="rapoarte" aria-label="Rapoarte">
+        <strong>Raport</strong>
+        <select id="raport-tip" aria-label="Tipul raportului">
+          <option value="elev">per elev</option>
+          <option value="sedinta">per ședință</option>
+          <option value="clasa">per clasă</option>
+        </select>
+        <select id="raport-tinta" aria-label="Pentru cine"></select>
+        <button class="btn principal" type="button" id="fa-raport">Fă raportul</button>
+      </section>
+    </header>
+
+    <nav class="panglica" aria-label="Unelte">
+      <div class="file" role="tablist" id="file"></div>
+      <div class="continut-fila" id="continut-fila" role="tabpanel"></div>
+    </nav>
+
+    <div class="cadru" id="cadru" tabindex="0" role="region" aria-label="Tabelul de prezență"></div>
+    <div class="legenda" id="legenda"></div>
+  </div>
+
+  <div class="bara-jos">
+    <span id="stare"></span>
+    <span class="zoom">
+      <button class="btn icon" type="button" id="zoom-minus" aria-label="Micșorează">−</button>
+      <input type="range" id="zoom" min="50" max="200" step="10" aria-label="Zoom">
+      <button class="btn icon" type="button" id="zoom-plus" aria-label="Mărește">+</button>
+      <span id="zoom-valoare"></span>
+    </span>
+  </div>
+
+  <div class="meniu-context" id="meniu-context" role="menu" hidden></div>
+  <div class="popover-filtru" id="popover-filtru" role="dialog" aria-label="Filtru" hidden></div>
+
+  <dialog class="intrebare" id="intrebare">
+    <form method="dialog">
+      <label id="intrebare-titlu" for="intrebare-camp"></label>
+      <textarea id="intrebare-camp"></textarea>
+      <div class="butoane">
+        <button class="btn" value="anuleaza" formnovalidate>Anulează</button>
+        <button class="btn principal" value="ok">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="raport" id="raport" aria-labelledby="raport-titlu">
+    <div class="raport-bara">
+      <strong id="raport-nume-tip"></strong>
+      <span class="confirmare" id="mesaj-raport" role="status"></span>
+      <button class="btn principal" type="button" id="raport-pdf">Salvează PDF / Tipărește</button>
+      <button class="btn" type="button" id="raport-copiaza">Copiază textul</button>
+      <button class="btn" type="button" id="raport-reface">Refă raportul</button>
+      <button class="btn" type="button" id="raport-inchide">Închide</button>
+    </div>
+    <div class="raport-corp">
+      <aside class="raport-setari" id="raport-setari" aria-label="Setările raportului"></aside>
+      <div class="raport-previzualizare"><div id="raport-continut"></div></div>
+    </div>
+  </dialog>
+  <div id="zona-tipar"></div>
+
+  <script>
+  'use strict';
+  const DATE_DE_PROBA = (() => {
+    const momentul = (zi, h, m) => new Date(Date.UTC(2026, 9, zi, h - (zi >= 25 ? 2 : 3), m)).toISOString();
+    const catalog = [
+      ['Avram Ioana', '12D'], ['Barbu Teodor', '12D'], ['Ciobanu Mara', '12D'], ['Dobre Andrei-Matei', '12D'],
+      ['Enache Sofia', '12D'], ['Florea Radu', '12D'], ['Grigore Irina', '12D'], ['Husar Paul', '12D'],
+      ['Ilie Bianca', '12C'], ['Jitaru Mihai', '12C'], ['Lazăr Carmen', '12C'], ['Manole Victor', '12C'],
+      ['Nistor Elena', '12C'], ['Oprea Tudor', '12C'], ['Pavel Ilinca', '12C'], ['Rusu Ștefan', '12C'],
+    ];
+    // În Meet numele vin cu majuscule și fără diacritice; pagina le leagă singură de catalog.
+    const meet = (nume) => nume.normalize('NFD').replace(/[̀-ͯ]/g, '').replace('-', ' ').toUpperCase();
+    const ora = (titlu, zi, h, m, durata, minute) => ({
+      id: `proba-${titlu}`, titlu, inceput: momentul(zi, h, m), sfarsit: momentul(zi, h, m + durata), durataMinute: durata,
+      elevi: Object.entries(minute).map(([i, min]) => ({
+        nume: meet(catalog[i][0]), minute: min, procent: Math.round((min / durata) * 100),
+        primaIntrare: momentul(zi, h, m + (min < durata * 0.75 ? 3 : durata - min)), ultimaIesire: momentul(zi, h, m + (min < durata * 0.75 ? 3 + min : durata)), intrari: min < durata * 0.75 ? 2 : 1,
+      })),
+    });
+    return {
+      versiune: 1, actualizat: momentul(28, 18, 35), pragProcent: 75,
+      catalog: catalog.map(([nume, clasa]) => ({ nume, clasa })),
+      ore: [
+        ora('10 oct', 10, 12, 7, 122, { 0: 121, 1: 121, 2: 18, 3: 12, 4: 105, 5: 121, 7: 121, 8: 120, 9: 118, 11: 121, 12: 90, 14: 121 }),
+        ora('14 oct', 14, 15, 0, 50, { 0: 50, 1: 50, 4: 50, 5: 50, 7: 38, 8: 50, 9: 50, 10: 50, 12: 44, 13: 50, 14: 50, 15: 30 }),
+        ora('16 oct', 16, 12, 0, 50, { 0: 50, 1: 47, 2: 12, 3: 20, 4: 50, 5: 50, 6: 49, 7: 50, 8: 35, 9: 50, 10: 50, 11: 50, 13: 50, 15: 48 }),
+        ora('21 oct', 21, 15, 0, 50, { 0: 48, 1: 50, 4: 50, 5: 40, 6: 50, 7: 50, 8: 50, 10: 50, 11: 25, 13: 50, 14: 50 }),
+        ora('23 oct', 23, 12, 0, 50, { 0: 50, 1: 50, 2: 30, 4: 48, 5: 50, 6: 50, 7: 45, 8: 50, 9: 49, 10: 50, 12: 50, 13: 50, 14: 47, 15: 50 }),
+        ora('28 oct', 28, 15, 0, 50, { 0: 50, 1: 49, 4: 44, 5: 46, 7: 27, 8: 50, 10: 50, 11: 50, 13: 50, 14: 49 }),
+      ],
+    };
+  })();
+
+
+  /** Cheia după care recunoaștem un elev: diacriticele, liniuțele și majusculele nu contează. */
+  const cheieDin = (nume) => String(nume ?? '').toLocaleLowerCase('ro').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\((?:tu|you)\)/g, '').replace(/[-‐‑–—_.]/g, ' ').replace(/\s+/g, ' ').trim();
+  const FARA_CLASA = 'fără clasă';
+  const $ = (sel) => document.querySelector(sel);
+
+  /* =========================================================
+     1. SETĂRILE (cum arată) și DATELE TALE (note, motivări, coloane proprii)
+     Se păstrează în browser. Ctrl+Z / Ctrl+Y merg pe amândouă.
+     ========================================================= */
+
+  const CHEIE_MEMORIE = 'prezenta-tabel-v3';
+  const FELURI = ['prezent', 'partial', 'absent', 'motivat'];
+  const NUME_FEL = { prezent: 'Prezent', partial: 'Parțial', absent: 'Absent', motivat: 'Motivat' };
+  const CULORI_AUTOMATE = { prezent: 'var(--albastru)', partial: 'var(--galben)', absent: 'var(--rosu)', motivat: 'var(--mov)' };
+  const SETURI = [['•', '◦', 'a', 'm'], ['✓', '~', '✗', 'M'], ['P', 'Pț', 'A', 'Am'], ['1', '½', '0', 'm'], ['🟢', '🟡', '🔴', '🟣'], ['', '', '', '']];
+  const PALETA = ['#fde68a', '#bbf7d0', '#bfdbfe', '#fecaca', '#e9d5ff', '#fed7aa', '#e5e7eb', '#1f3f99', '#0f7a4a', '#b42318', '#7a1f3d', '#111827'];
+  const CULORI_CLASE = ['#3b82f6', '#16a34a', '#d97706', '#9333ea', '#dc2626', '#0891b2', '#db2777', '#65a30d'];
+  const FONTURI = { corp: 'var(--corp)', titlu: 'var(--titlu)', sistem: 'system-ui, sans-serif', georgia: 'Georgia, serif', arial: 'Arial, sans-serif', times: '"Times New Roman", serif', mono: 'ui-monospace, Consolas, monospace' };
+  const NUME_FONT = { corp: 'Source Sans', titlu: 'Literata', sistem: 'Sistem', georgia: 'Georgia', arial: 'Arial', times: 'Times New Roman', mono: 'Monospațiat' };
+  const CULORI_TABEL = [['fundal', 'Fundal'], ['text', 'Text'], ['antetFundal', 'Fundal antet'], ['antetText', 'Text antet'], ['linii', 'Linii'], ['dungi', 'Dungi'], ['hover', 'Sub mouse']];
+
+  function setariImplicite() {
+    const axa = () => ({ ordine: [], ascunse: [], titluri: {}, format: {}, filtre: {}, reguli: [], sortari: [], randuriAscunse: [], proprii: [] });
+    return {
+      tema: 'auto',
+      axa: 'elevi',                         // „elevi” = elevii pe rânduri; „ore” = orele pe rânduri
+      clasa: 'toate',
+      continut: 'simbol',
+      prag: 75,
+      simboluri: {
+        prezent: { text: '•', marime: 1.4, culoare: '', fundal: '', gros: true },
+        partial: { text: '◦', marime: 1.2, culoare: '', fundal: '', gros: true },
+        absent:  { text: 'a', marime: 1.1, culoare: '', fundal: '', gros: true },
+        motivat: { text: 'm', marime: 1.1, culoare: '', fundal: '', gros: true },
+      },
+      culori: Object.fromEntries(CULORI_TABEL.map(([id]) => [id, ''])),
+      aspect: { font: 'corp', marime: 15, spatiu: 8, inaltimeAntet: 0, latime: 78, rotunjire: 10, aliniere: 'center', dungi: true, grilaO: true, grilaV: false, inghetate: 2, zoom: 100 },
+      clase: { umplere: true, intensitate: 14, dunga: true, nume: false, text: false, culori: {} },
+      grupare: false,
+      grupuriInchise: [],
+      formatTabel: {},
+      formatRanduri: {},
+      formatCelule: {},
+      coloane: { elevi: axa(), ore: axa() },
+      latimi: {},
+      uneltePliate: false,
+      fila: 'acasa',
+      rapoarte: rapoarteImplicite(),
+    };
+  }
+
+  function rapoarteImplicite() {
+    return {
+      comun: { scoala: 'Liceul Teoretic „Ștefan Odobleja”', aratScoala: true, semnatura: 'Prof. Bogdan Marius-Ciprian', aratSemnatura: true, aratGenerat: true, marime: 14, accent: '' },
+      elev: { titlu: 'Raport de prezență – {elev}, clasa {clasa}', subtitlu: 'Orele online de limba și literatura română · {perioada}', observatii: '', sectiuni: { cifre: true, tabel: true, minute: true, procent: true, interval: true } },
+      sedinta: { titlu: 'Prezența la ora din {data}', subtitlu: '{ora} · {durata} · timpul se numără de la intrarea până la ieșirea profesorului', observatii: '', sectiuni: { cifre: true, minute: true, procent: true, intrare: true, absenti: true } },
+      clasa: { titlu: 'Raport de prezență – clasa {clasa}', subtitlu: 'Orele online de limba și literatura română · {perioada} · {elevi}', observatii: '', sectiuni: { cifre: true, elevi: true, minute: true, absente: true, ore: true, urmarit: true } },
+    };
+  }
+
+  const dateImplicite = () => ({ note: {}, motivari: {}, valori: {} });
+
+  /** Pune ce e salvat peste valorile implicite, ca o setare nouă să nu strice nimic. */
+  function completeaza(salvat = {}) {
+    const b = setariImplicite();
+    const axa = (x, y = {}) => ({ ...x, ...y, titluri: { ...(y.titluri ?? {}) }, format: { ...(y.format ?? {}) }, filtre: { ...(y.filtre ?? {}) } });
+    const rap = rapoarteImplicite();
+    const rapoarte = { comun: { ...rap.comun, ...(salvat.rapoarte?.comun ?? {}) } };
+    for (const tip of ['elev', 'sedinta', 'clasa']) rapoarte[tip] = { ...rap[tip], ...(salvat.rapoarte?.[tip] ?? {}), sectiuni: { ...rap[tip].sectiuni, ...(salvat.rapoarte?.[tip]?.sectiuni ?? {}) } };
+    return {
+      ...b, ...salvat,
+      simboluri: Object.fromEntries(FELURI.map((f) => [f, { ...b.simboluri[f], ...(salvat.simboluri?.[f] ?? {}) }])),
+      culori: { ...b.culori, ...(salvat.culori ?? {}) },
+      aspect: { ...b.aspect, ...(salvat.aspect ?? {}) },
+      clase: { ...b.clase, ...(salvat.clase ?? {}), culori: { ...(salvat.clase?.culori ?? {}) } },
+      coloane: { elevi: axa(b.coloane.elevi, salvat.coloane?.elevi), ore: axa(b.coloane.ore, salvat.coloane?.ore) },
+      latimi: { ...(salvat.latimi ?? {}) },
+      rapoarte,
+    };
+  }
+
+  function citesteMemoria() {
+    try {
+      const v3 = localStorage.getItem(CHEIE_MEMORIE);
+      if (v3) return JSON.parse(v3);
+      const v2 = JSON.parse(localStorage.getItem('prezenta-tabel-v2') ?? '{}');   // păstrăm tema și rapoartele din varianta trecută
+      const vechi = { tema: v2.setari?.tema, rapoarte: v2.setari?.rapoarte, simboluri: v2.setari?.simboluri, prag: v2.setari?.prag };
+      return { setari: Object.fromEntries(Object.entries(vechi).filter(([, v]) => v !== undefined)) };
+    } catch {
+      return {};
+    }
+  }
+  function salveaza() {
+    try { localStorage.setItem(CHEIE_MEMORIE, JSON.stringify({ setari, date, vederi })); } catch { /* fără memorie: merge cât e pagina deschisă */ }
+  }
+
+  const memorie = citesteMemoria();
+  let setari = completeaza(memorie.setari ?? {});
+  let date = { ...dateImplicite(), ...(memorie.date ?? {}) };
+  let vederi = memorie.vederi ?? {};
+  let cautare = '';
+
+  /* ---------- Anulează / Refă ---------- */
+  const istoric = { inapoi: [], inainte: [], ultima: { eticheta: null, cand: 0 } };
+  /** Se cheamă înainte de orice schimbare. Mai multe tastări la rând în același câmp = un singur pas. */
+  function inregistreaza(eticheta = '') {
+    const acum = Date.now();
+    if (eticheta && eticheta === istoric.ultima.eticheta && acum - istoric.ultima.cand < 900) { istoric.ultima.cand = acum; return; }
+    istoric.inapoi.push(JSON.stringify({ setari, date }));
+    if (istoric.inapoi.length > 150) istoric.inapoi.shift();
+    istoric.inainte = [];
+    istoric.ultima = { eticheta, cand: acum };
+  }
+  function anuleaza() {
+    if (!istoric.inapoi.length) return;
+    istoric.inainte.push(JSON.stringify({ setari, date }));
+    ({ setari, date } = JSON.parse(istoric.inapoi.pop()));
+    istoric.ultima = { eticheta: null, cand: 0 };
+    aplicaTema(); salveaza(); totul();
+  }
+  function reface() {
+    if (!istoric.inainte.length) return;
+    istoric.inapoi.push(JSON.stringify({ setari, date }));
+    ({ setari, date } = JSON.parse(istoric.inainte.pop()));
+    aplicaTema(); salveaza(); totul();
+  }
+  /** Schimbare cu pas în istoric, salvare și redesenare. */
+  function schimba(fn, eticheta, doarTabel = false) {
+    inregistreaza(eticheta);
+    fn();
+    salveaza();
+    if (doarTabel) deseneazaTabelul(); else totul();
+  }
+
+  /* =========================================================
+     2. MODELUL — elevii (din catalog + cei văzuți în Meet), orele, clasele
+     ========================================================= */
+
+  const formateazaNume = (n) => String(n).toLocaleLowerCase('ro').replace(/(^|[\s\-'’.])(\p{L})/gu, (_, a, l) => a + l.toLocaleUpperCase('ro'));
+
+  function construiesteModel(brut) {
+    const elevi = new Map();
+    const adauga = (nume, clasa) => {
+      const cheie = cheieDin(nume);
+      if (!cheie) return null;
+      if (!elevi.has(cheie)) elevi.set(cheie, { cheie, nume: String(nume).trim(), clasa: clasa || FARA_CLASA });
+      else if (clasa && elevi.get(cheie).clasa === FARA_CLASA) elevi.get(cheie).clasa = clasa;
+      return elevi.get(cheie);
+    };
+    for (const e of brut.catalog ?? []) adauga(e.nume, e.clasa);
+    const ore = [...(brut.ore ?? [])]
+      .map((o) => ({ ...o, inceputMs: Date.parse(o.inceput), sfarsitMs: Date.parse(o.sfarsit) }))
+      .sort((a, b) => a.inceputMs - b.inceputMs);
+    for (const o of ore) {
+      o.prezente = new Map();
+      for (const p of o.elevi ?? []) {
+        const elev = elevi.get(cheieDin(p.cheie || p.nume)) ?? adauga(formateazaNume(p.nume), p.clasa);
+        if (elev) o.prezente.set(elev.cheie, p);
+      }
+    }
+    const lista = [...elevi.values()].sort((a, b) => a.nume.localeCompare(b.nume, 'ro'));
+    const clase = [...new Set(lista.map((e) => e.clasa))].sort((a, b) => (a === FARA_CLASA) - (b === FARA_CLASA) || a.localeCompare(b, 'ro'));
+    return { ore, elevi: lista, clase, actualizat: brut.actualizat ? Date.parse(brut.actualizat) : null };
+  }
+  let model = construiesteModel({ ore: [] });
+
+  const eleviActivi = () => (setari.clasa === 'toate' ? model.elevi : model.elevi.filter((e) => e.clasa === setari.clasa));
+  const culoareClasa = (clasa) => setari.clase.culori[clasa] || CULORI_CLASE[Math.max(0, model.clase.indexOf(clasa)) % CULORI_CLASE.length];
+
+  /** Starea unui elev la o oră: prezent, parțial, absent sau motivat (absență motivată de tine). */
+  function stare(elev, ora) {
+    const p = ora.prezente.get(elev.cheie);
+    if (!p) return { fel: date.motivari[`${elev.cheie}|${ora.id}`] ? 'motivat' : 'absent', minute: null, procent: null };
+    return { fel: p.procent < setari.prag ? 'partial' : 'prezent', minute: p.minute, procent: p.procent, p };
+  }
+  const esteAbsent = (s) => s.fel === 'absent' || s.fel === 'motivat';
+
+  /* =========================================================
+     3. FORMATARE ȘI SIGURANȚĂ
+     ========================================================= */
+
+  const FUS = 'Europe/Bucharest';
+  const ziScurta = new Intl.DateTimeFormat('ro-RO', { timeZone: FUS, weekday: 'short' });
+  const ziLunga = new Intl.DateTimeFormat('ro-RO', { timeZone: FUS, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const ziAn = new Intl.DateTimeFormat('ro-RO', { timeZone: FUS, day: 'numeric', month: 'long', year: 'numeric' });
+  const oraMinut = new Intl.DateTimeFormat('ro-RO', { timeZone: FUS, hour: '2-digit', minute: '2-digit' });
+  const ziSiOra = new Intl.DateTimeFormat('ro-RO', { timeZone: FUS, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const durata = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`);
+  const cuDe = (n) => (n >= 20 && (n % 100 === 0 || n % 100 >= 20) ? 'de ' : '');
+  const nElevi = (n) => (n === 1 ? '1 elev' : `${n} ${cuDe(n)}elevi`);
+  const nOre = (n) => (n === 1 ? 'o oră' : `${n} ${cuDe(n)}ore`);
+  const nMinute = (n) => (n === 1 ? '1 minut' : `${n} ${cuDe(n)}minute`);
+  const intervalOra = (o) => `${oraMinut.format(o.inceputMs)}–${oraMinut.format(o.sfarsitMs)}`;
+  const escapa = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  /** O culoare aleasă de tine intră în CSS doar dacă e un cod hex. */
+  const culoareSigura = (c) => (/^#[0-9a-f]{3,8}$/i.test(c ?? '') ? c : '');
+  const amestec = (culoare, procent) => `color-mix(in srgb, ${culoare} ${Number(procent)}%, transparent)`;
+
+  /* =========================================================
+     4. COLOANELE
+     Fiecare coloană: { id, titlu, subtitlu, grup, valoare(r) pentru sortare, text(r), html(r), stare(r)? }
+     ========================================================= */
+
+  function simbolHtml(fel) {
+    const s = setari.simboluri[fel];
+    const culoare = culoareSigura(s.culoare) || CULORI_AUTOMATE[fel];
+    return `<span style="color:${culoare};font-size:${Number(s.marime) || 1}em;font-weight:${s.gros ? 700 : 400};line-height:1">${escapa(s.text)}</span>`;
+  }
+  function htmlStare(s) {
+    const st = setari.simboluri[s.fel];
+    const culoare = culoareSigura(st.culoare) || CULORI_AUTOMATE[s.fel];
+    const text = (v) => `<span style="color:${culoare};font-weight:${st.gros ? 700 : 400}">${v}</span>`;
+    if (setari.continut === 'minute' && s.minute != null) return text(s.minute);
+    if (setari.continut === 'procent' && s.procent != null) return text(`${s.procent}%`);
+    if (setari.continut === 'simbol-minute' && s.minute != null) return `${simbolHtml(s.fel)}<span class="minute-mici">${s.minute}</span>`;
+    return simbolHtml(s.fel);
+  }
+  function textStare(s) {
+    const simbol = setari.simboluri[s.fel].text;
+    if (setari.continut === 'minute' && s.minute != null) return String(s.minute);
+    if (setari.continut === 'procent' && s.procent != null) return `${s.procent}%`;
+    if (setari.continut === 'simbol-minute' && s.minute != null) return `${simbol} ${s.minute}`;
+    return simbol;
+  }
+  const procentHtml = (p) => `<span class="${p < setari.prag ? 'sub-prag' : ''}">${p}%</span>`;
+
+  function rezumat(id, titlu, calc, arata = (v) => String(v), html = null) {
+    return { id, titlu, grup: 'Rezumat', valoare: calc, text: (r) => arata(calc(r), r), html: (r) => (html ? html(calc(r), r) : escapa(arata(calc(r), r))) };
+  }
+  function coloaneProprii() {
+    return configAxa().proprii.map((c) => ({
+      id: c.id, titlu: c.titlu, grup: 'Proprii', proprie: true,
+      valoare: (r) => (date.valori[c.id]?.[idRand(r)] ?? '').toLocaleLowerCase('ro'),
+      text: (r) => date.valori[c.id]?.[idRand(r)] ?? '',
+      html: (r) => escapa(date.valori[c.id]?.[idRand(r)] ?? ''),
+    }));
+  }
+  const idRand = (r) => r.cheie ?? r.id;
+
+  /** Elevii pe rânduri. */
+  function coloaneElevi() {
+    const ore = model.ore;
+    const stari = (e) => ore.map((o) => stare(e, o));
+    const venit = (e) => stari(e).filter((s) => !esteAbsent(s)).length;
+    const ultima = (e) => [...ore].reverse().find((o) => o.prezente.has(e.cheie));
+    return [
+      { id: 'nrcrt', titlu: 'Nr. crt.', grup: 'Bază', nrcrt: true, valoare: () => 0, text: () => '', html: () => '' },
+      { id: 'nume', titlu: 'Elev', grup: 'Bază', nume: true, valoare: (e) => e.nume, text: (e) => e.nume, html: (e) => escapa(e.nume) },
+      ...ore.map((o) => ({
+        id: `ora:${o.id}`, titlu: o.titlu, subtitlu: ziScurta.format(o.inceputMs), grup: 'Orele', ora: o,
+        stare: (e) => stare(e, o), valoare: (e) => stare(e, o).minute ?? -1, text: (e) => textStare(stare(e, o)), html: (e) => htmlStare(stare(e, o)),
+      })),
+      rezumat('clasa', 'Clasa', (e) => e.clasa),
+      rezumat('ore', 'Ore', venit, (v) => `${v}/${ore.length}`),
+      rezumat('prezenta', 'Prezență', (e) => (ore.length ? Math.round((venit(e) * 100) / ore.length) : 0), (v) => `${v}%`, procentHtml),
+      rezumat('minute', 'Minute', (e) => stari(e).reduce((a, s) => a + (s.minute ?? 0), 0)),
+      rezumat('absente', 'Absențe', (e) => stari(e).filter((s) => s.fel === 'absent').length),
+      rezumat('motivate', 'Motivate', (e) => stari(e).filter((s) => s.fel === 'motivat').length),
+      rezumat('partiale', 'Parțiale', (e) => stari(e).filter((s) => s.fel === 'partial').length),
+      rezumat('medie', 'Cât stă din oră', (e) => { const p = stari(e).filter((s) => s.procent != null); return p.length ? Math.round(p.reduce((a, s) => a + s.procent, 0) / p.length) : 0; }, (v) => `${v}%`),
+      rezumat('ultima', 'Ultima prezență', (e) => ultima(e)?.inceputMs ?? 0, (v, e) => ultima(e)?.titlu ?? '–'),
+      ...coloaneProprii(),
+    ];
+  }
+
+  /** Orele pe rânduri. */
+  function coloaneOre() {
+    const elevi = eleviActivi();
+    const stari = (o) => elevi.map((e) => stare(e, o));
+    return [
+      { id: 'nrcrt', titlu: 'Nr. crt.', grup: 'Bază', nrcrt: true, valoare: () => 0, text: () => '', html: () => '' },
+      { id: 'nume', titlu: 'Ora', grup: 'Bază', nume: true, valoare: (o) => o.inceputMs, text: (o) => o.titlu, html: (o) => escapa(o.titlu) },
+      ...elevi.map((e) => ({
+        id: `elev:${e.cheie}`, titlu: e.nume.split(' ')[0], subtitlu: e.nume.split(' ').slice(1).join(' '), grup: 'Elevii', elev: e,
+        stare: (o) => stare(e, o), valoare: (o) => stare(e, o).minute ?? -1, text: (o) => textStare(stare(e, o)), html: (o) => htmlStare(stare(e, o)),
+      })),
+      rezumat('data', 'Data', (o) => o.inceputMs, (v, o) => ziLunga.format(o.inceputMs)),
+      rezumat('interval', 'Interval', (o) => o.inceputMs, (v, o) => intervalOra(o)),
+      rezumat('durata', 'Durată', (o) => o.durataMinute, (v) => durata(v)),
+      rezumat('venit', 'Au venit', (o) => stari(o).filter((s) => !esteAbsent(s)).length, (v) => `${v}/${elevi.length}`),
+      rezumat('absenti', 'Au lipsit', (o) => stari(o).filter((s) => esteAbsent(s)).length),
+      rezumat('partiali', 'Parțial', (o) => stari(o).filter((s) => s.fel === 'partial').length),
+      rezumat('medie', 'Cât au stat', (o) => { const p = stari(o).filter((s) => s.procent != null); return p.length ? Math.round(p.reduce((a, s) => a + s.procent, 0) / p.length) : 0; }, (v) => `${v}%`),
+      ...coloaneProprii(),
+    ];
+  }
+
+  const configAxa = () => setari.coloane[setari.axa];
+  const toateColoanele = () => (setari.axa === 'elevi' ? coloaneElevi() : coloaneOre());
+  const titluColoana = (c) => configAxa().titluri[c.id] ?? c.titlu;
+
+  /** Ordinea ta; o coloană nouă (de ex. o oră nouă) intră după ultima din grupul ei. */
+  function coloaneOrdonate() {
+    const toate = toateColoanele();
+    const dupaId = new Map(toate.map((c) => [c.id, c]));
+    const ordine = configAxa().ordine.filter((id) => dupaId.has(id));
+    for (const c of toate.filter((x) => !ordine.includes(x.id))) {
+      const ultima = ordine.filter((id) => dupaId.get(id).grup === c.grup).pop();
+      const dupaGrup = { Bază: 0, Orele: 2, Elevii: 2, Rezumat: ordine.length, Proprii: ordine.length };
+      ordine.splice(ultima ? ordine.indexOf(ultima) + 1 : Math.min(dupaGrup[c.grup] ?? ordine.length, ordine.length), 0, c.id);
+    }
+    configAxa().ordine = ordine;
+    return ordine.map((id) => dupaId.get(id));
+  }
+  const coloaneVizibile = () => coloaneOrdonate().filter((c) => !configAxa().ascunse.includes(c.id));
+
+  /* =========================================================
+     5. RÂNDURILE — clasă, căutare, filtre pe coloane, ascunse, sortare pe niveluri, grupare
+     ========================================================= */
+
+  const toateRandurile = () => (setari.axa === 'elevi' ? eleviActivi() : [...model.ore].reverse());
+  const titluRand = (r) => r.nume ?? r.titlu;
+
+  function randuriFiltrate(coloane, faraFiltrul = null) {
+    const cfg = configAxa();
+    const text = cheieDin(cautare);
+    const dupaId = new Map(toateColoanele().map((c) => [c.id, c]));
+    return toateRandurile().filter((r) => {
+      if (cfg.randuriAscunse.includes(idRand(r))) return false;
+      if (text && !cheieDin(titluRand(r)).includes(text)) return false;
+      for (const [colId, excluse] of Object.entries(cfg.filtre)) {
+        if (colId === faraFiltrul || !excluse?.length) continue;
+        const c = dupaId.get(colId);
+        if (c && excluse.includes(textFiltru(c, r))) return false;
+      }
+      return true;
+    });
+  }
+  const textFiltru = (c, r) => (c.stare ? NUME_FEL[c.stare(r).fel] : c.text(r)) || '(gol)';
+
+  function randuriSortate(coloane) {
+    const randuri = randuriFiltrate(coloane);
+    const dupaId = new Map(toateColoanele().map((c) => [c.id, c]));
+    const niveluri = configAxa().sortari.filter((s) => dupaId.has(s.coloana));
+    const compara = (x, y) => (typeof x === 'string' || typeof y === 'string' ? String(x).localeCompare(String(y), 'ro', { numeric: true }) : x - y);
+    if (niveluri.length) {
+      randuri.sort((a, b) => {
+        for (const n of niveluri) {
+          const c = dupaId.get(n.coloana);
+          const d = compara(c.valoare(a), c.valoare(b));
+          if (d) return d * n.directie;
+        }
+        return 0;
+      });
+    }
+    return randuri;
+  }
+
+  /** Rândurile de afișat, cu titlurile de grup (pe clasă) dacă gruparea e pornită. */
+  function randuriDeAfisat(coloane) {
+    const randuri = randuriSortate(coloane);
+    if (!setari.grupare || setari.axa !== 'elevi') return randuri.map((r) => ({ r }));
+    const rez = [];
+    for (const clasa of model.clase) {
+      const dinClasa = randuri.filter((e) => e.clasa === clasa);
+      if (!dinClasa.length) continue;
+      const media = model.ore.length ? Math.round(dinClasa.reduce((a, e) => a + model.ore.filter((o) => o.prezente.has(e.cheie)).length, 0) * 100 / (dinClasa.length * model.ore.length)) : 0;
+      const inchis = setari.grupuriInchise.includes(clasa);
+      rez.push({ grup: clasa, numar: dinClasa.length, media, inchis });
+      if (!inchis) rez.push(...dinClasa.map((r) => ({ r })));
+    }
+    return rez;
+  }
+
+  /* =========================================================
+     6. FORMATAREA UNEI CĂSUȚE
+     Ordinea (ultimul câștigă): coloană → clasă → stare → rând → căsuță → formatare condiționată
+     ========================================================= */
+
+  const cheieRand = (rid) => `${setari.axa}|${rid}`;
+  const cheieCel = (rid, cid) => `${setari.axa}|${rid}|${cid}`;
+
+  function formatManual(rid, cid) {
+    return { ...setari.formatTabel, ...(configAxa().format[cid] ?? {}), ...(setari.formatRanduri[cheieRand(rid)] ?? {}), ...(setari.formatCelule[cheieCel(rid, cid)] ?? {}) };
+  }
+
+  const numar = (t) => { const n = parseFloat(String(t).replace('%', '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+  const OPERATORI = [
+    ['lt', '<'], ['le', '≤'], ['eq', '='], ['ne', '≠'], ['ge', '≥'], ['gt', '>'], ['contine', 'conține'], ['nucontine', 'nu conține'], ['gol', 'e gol'],
+    ['este-prezent', 'e prezent'], ['este-partial', 'e parțial'], ['este-absent', 'e absent'], ['este-motivat', 'e motivat'],
+  ];
+
+  function indeplineste(regula, col, r) {
+    const op = regula.operator;
+    if (op.startsWith('este-')) return Boolean(col.stare) && col.stare(r).fel === op.slice(5);
+    const text = col.nrcrt ? '' : col.text(r);
+    if (op === 'gol') return !String(text).trim();
+    if (op === 'contine') return cheieDin(text).includes(cheieDin(regula.valoare));
+    if (op === 'nucontine') return !cheieDin(text).includes(cheieDin(regula.valoare));
+    const a = numar(text); const b = numar(regula.valoare);
+    if (a != null && b != null) return { lt: a < b, le: a <= b, eq: a === b, ne: a !== b, ge: a >= b, gt: a > b }[op];
+    const d = String(text).localeCompare(String(regula.valoare), 'ro', { sensitivity: 'base' });
+    return { lt: d < 0, le: d <= 0, eq: d === 0, ne: d !== 0, ge: d >= 0, gt: d > 0 }[op];
+  }
+
+  /** Regulile care se aplică pe tot rândul (calculate o dată pe rând). */
+  function reguliRand(r, coloane) {
+    const rez = {};
+    for (const reg of configAxa().reguli) {
+      if (reg.tinta !== 'rand') continue;
+      const cols = reg.coloana === '@ore' ? coloane.filter((c) => c.stare) : coloane.filter((c) => c.id === reg.coloana);
+      const tot = reg.coloana === '@ore' ? toateColoanele().filter((c) => c.stare) : toateColoanele().filter((c) => c.id === reg.coloana);
+      if ((cols.length ? cols : tot).some((c) => indeplineste(reg, c, r))) Object.assign(rez, stilRegula(reg));
+    }
+    return rez;
+  }
+  const stilRegula = (reg) => ({ ...(culoareSigura(reg.fundal) ? { fundal: reg.fundal } : {}), ...(culoareSigura(reg.text) ? { text: reg.text } : {}), ...(reg.gros ? { gros: true } : {}) });
+
+  /** Negru sau alb, după cât de deschisă e culoarea de fundal. */
+  function textPeFundal(hex) {
+    let h = hex.slice(1);
+    if (h.length <= 4) h = [...h.slice(0, 3)].map((x) => x + x).join('');
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.25 ? '#1b2130' : '#ffffff';
+  }
+
+  function stilCelula(r, col, regRand) {
+    const rid = idRand(r);
+    const stil = [];
+    let fundal = null;
+    let text = null;
+    const cl = setari.clase;
+    // clasa
+    const clasa = setari.axa === 'elevi' ? r.clasa : col.elev?.clasa;
+    if (clasa) {
+      const c = culoareClasa(clasa);
+      if (cl.umplere && (setari.axa === 'elevi' || col.elev)) fundal = amestec(c, cl.intensitate);
+      if (cl.text && setari.axa === 'elevi') text = c;
+      if (cl.nume && col.nume && setari.axa === 'elevi') text = c;
+      if (cl.dunga && col.nume && setari.axa === 'elevi') stil.push(`box-shadow:inset 5px 0 0 ${c}`);
+    }
+    // coloana (sub clasă doar pentru fundal, ca rândurile colorate pe clasă să rămână vizibile)
+    const fCol = configAxa().format[col.id] ?? {};
+    if (culoareSigura(fCol.fundal) && !fundal) fundal = fCol.fundal;
+    // starea (fundalul simbolului)
+    if (col.stare) { const f = culoareSigura(setari.simboluri[col.stare(r).fel].fundal); if (f) fundal = f; }
+    // manual: tot tabelul, coloana, rândul, căsuța
+    const m = formatManual(rid, col.id);
+    const fRand = setari.formatRanduri[cheieRand(rid)] ?? {}; const fCel = setari.formatCelule[cheieCel(rid, col.id)] ?? {};
+    if (culoareSigura(fRand.fundal)) fundal = fRand.fundal;
+    if (culoareSigura(fCel.fundal)) fundal = fCel.fundal;
+    if (culoareSigura(m.text)) text = m.text;
+    // formatarea condiționată
+    let gros = m.gros;
+    const regCel = {};
+    for (const reg of configAxa().reguli) {
+      if (reg.tinta === 'rand') continue;
+      if (reg.coloana === col.id || (reg.coloana === '@ore' && col.stare)) { if (indeplineste(reg, col, r)) Object.assign(regCel, stilRegula(reg)); }
+    }
+    const reg = { ...regRand, ...regCel };
+    if (reg.fundal) fundal = reg.fundal;
+    if (reg.text) text = reg.text;
+    if (reg.gros) gros = true;
+
+    if (fundal) stil.push(`background-color:${fundal}`);
+    if (!text && culoareSigura(fundal)) text = textPeFundal(fundal);   // pe o umplere aleasă de tine, textul rămâne lizibil în orice temă
+    if (text) stil.push(`color:${text}`);
+    if (gros === true) stil.push('font-weight:700'); else if (gros === false) stil.push('font-weight:400');
+    if (m.cursiv) stil.push('font-style:italic');
+    if (m.subliniat) stil.push('text-decoration:underline');
+    if (['left', 'center', 'right'].includes(m.aliniere)) stil.push(`text-align:${m.aliniere}`);
+    if (FONTURI[m.font]) stil.push(`font-family:${FONTURI[m.font]}`);
+    if (Number(m.marime)) stil.push(`font-size:${Number(m.marime)}px`);
+    if (m.incadrare) stil.push('white-space:normal;overflow-wrap:anywhere');
+    if (m.chenar) { const cc = culoareSigura(m.chenarCuloare) || 'var(--text)'; stil.push(`outline:${m.chenar === 'gros' ? 2 : 1}px solid ${cc};outline-offset:-${m.chenar === 'gros' ? 2 : 1}px`); }
+    return stil.join(';');
+  }
+
+  /* =========================================================
+     7. DESENAREA TABELULUI
+     ========================================================= */
+
+  const cadru = $('#cadru');
+  let afisat = { coloane: [], randuri: [], ids: [] };   // ce e acum pe ecran (pentru selecție și export)
+
+  function variabileTabel() {
+    const a = setari.aspect;
+    const v = { '--spatiu': `${Number(a.spatiu)}px`, '--marime': `${Number(a.marime)}px`, '--aliniere': a.aliniere, '--font-tabel': FONTURI[a.font] ?? FONTURI.corp, '--inaltime-antet': Number(a.inaltimeAntet) ? `${Number(a.inaltimeAntet)}px` : 'auto' };
+    const nume = { fundal: '--c-fundal', text: '--c-text', antetFundal: '--c-antet-fundal', antetText: '--c-antet-text', linii: '--c-linii', dungi: '--c-dungi', hover: '--c-hover' };
+    for (const [id, css] of Object.entries(nume)) { const c = culoareSigura(setari.culori[id]); if (c) v[css] = c; }
+    return Object.entries(v).map(([k, x]) => `${k}:${x}`).join(';');
+  }
+
+  function indicatorSortare(id) {
+    const niveluri = configAxa().sortari;
+    const i = niveluri.findIndex((s) => s.coloana === id);
+    if (i < 0) return '';
+    const n = niveluri[i];
+    // ↓ = A→Z / de la mic la mare (ca în Excel); ↑ = Z→A / de la mare la mic
+    return `<span class="sortare" title="${n.directie > 0 ? 'A→Z, de la mic la mare' : 'Z→A, de la mare la mic'}">${n.directie > 0 ? '↓' : '↑'}${niveluri.length > 1 ? `<sup>${i + 1}</sup>` : ''}</span>`;
+  }
+
+  function deseneazaTabelul() {
+    cadru.style.setProperty('--rotunjire', `${Number(setari.aspect.rotunjire)}px`);
+    for (const id of ['fundal', 'linii']) { const c = culoareSigura(setari.culori[id]); if (c) cadru.style.setProperty(`--c-${id}`, c); else cadru.style.removeProperty(`--c-${id}`); }
+    if (!model.ore.length) { cadru.innerHTML = '<p class="gol">Încă nicio oră.</p>'; afisat = { coloane: [], randuri: [], ids: [] }; deseneazaLegenda(); actualizeazaStarea(); return; }
+
+    const a = setari.aspect;
+    const coloane = coloaneVizibile();
+    const randuri = randuriDeAfisat(coloane);
+    const latime = (c) => setari.latimi[`${setari.axa}|${c.id}`] ?? (c.nrcrt ? 56 : c.nume ? (setari.axa === 'elevi' ? 230 : 110) : c.grup === 'Rezumat' || c.proprie ? 112 : Number(a.latime));
+    const inghetate = Math.min(Number(a.inghetate) || 0, coloane.length);
+    let stanga = 0;
+    const pozitii = coloane.map((c, i) => { const p = i < inghetate ? stanga : null; if (i < inghetate) stanga += latime(c); return p; });
+    const filtre = configAxa().filtre;
+    const reprezentare = randuri.filter((x) => x.r);
+    afisat = { coloane, randuri: reprezentare.map((x) => x.r), ids: reprezentare.map((x) => idRand(x.r)) };
+
+    const antet = coloane.map((c, i) => {
+      const fixat = pozitii[i] != null ? ` inghetat" style="left:${pozitii[i]}px` : '';
+      const sel = esteSelectata(null, c.id) && selectie.tip === 'coloana' ? ' sel' : '';
+      const filtruActiv = filtre[c.id]?.length ? ' activ' : '';
+      const clasaElev = c.elev && setari.clase.umplere ? ` data-clasa-culoare="${escapa(culoareClasa(c.elev.clasa))}"` : '';
+      return `<th scope="col" data-col="${escapa(c.id)}" class="${c.nume ? 'nume-col' : ''}${sel}${fixat}" title="${escapa(titluColoana(c) + (c.subtitlu ? ' ' + c.subtitlu : ''))}"${clasaElev}>
+        <div class="antet"><span class="titlu-col">${escapa(titluColoana(c))}${c.subtitlu ? `<br><small>${escapa(c.subtitlu)}</small>` : ''}</span>${indicatorSortare(c.id)}${c.nrcrt ? '' : `<button type="button" class="buton-filtru${filtruActiv}" data-filtru="${escapa(c.id)}" aria-label="Filtru și sortare: ${escapa(titluColoana(c))}">▾</button>`}</div>
+        <span class="maner-latime" data-latime="${escapa(c.id)}" aria-hidden="true"></span>
+      </th>`;
+    }).join('');
+
+    let nr = 0;
+    const corp = randuri.map((x) => {
+      if (x.grup) {
+        const c = culoareClasa(x.grup);
+        return `<tr class="grup-rand" data-grup="${escapa(x.grup)}"><td colspan="${coloane.length}" style="background-color:${amestec(c, 28)};box-shadow:inset 5px 0 0 ${c}">${x.inchis ? '▸' : '▾'} ${escapa(x.grup === FARA_CLASA ? 'Fără clasă' : `Clasa ${x.grup}`)} · ${nElevi(x.numar)} · media prezenței ${x.media}%</td></tr>`;
+      }
+      const r = x.r; const rid = idRand(r); nr++;
+      const regRand = reguliRand(r, coloane);
+      return `<tr data-rand="${escapa(rid)}" class="${nr % 2 === 0 ? 'par' : ''}">${coloane.map((c, i) => {
+        const tag = c.nume ? 'th' : 'td';
+        const nota = date.note[cheieCel(rid, c.id)];
+        const cls = [c.nume ? 'nume-col' : '', pozitii[i] != null ? 'inghetat' : '', esteSelectata(rid, c.id) ? 'sel' : '', nota ? 'nota-celula' : ''].filter(Boolean).join(' ');
+        const stil = [pozitii[i] != null ? `left:${pozitii[i]}px` : '', stilCelula(r, c, regRand)].filter(Boolean).join(';');
+        return `<${tag}${c.nume ? ' scope="row"' : ''} data-col="${escapa(c.id)}" class="${cls}" style="${stil}"${nota ? ` title="${escapa(nota)}"` : ''}>${c.nrcrt ? nr : c.html(r)}</${tag}>`;
+      }).join('')}</tr>`;
+    }).join('');
+
+    cadru.innerHTML = `
+      <table class="tabel ${a.dungi ? 'dungi' : ''} ${a.grilaO ? 'grila-o' : ''} ${a.grilaV ? 'grila-v' : ''}" style="${variabileTabel()};zoom:${Number(a.zoom) / 100}">
+        <colgroup>${coloane.map((c) => `<col data-col="${escapa(c.id)}" style="width:${latime(c)}px">`).join('')}</colgroup>
+        <thead><tr>${antet}</tr></thead>
+        <tbody>${corp || `<tr><td class="gol" colspan="${coloane.length}">Niciun rând.</td></tr>`}</tbody>
+      </table>`;
+    cadru.querySelectorAll('th[data-clasa-culoare]').forEach((th) => { th.style.boxShadow = `inset 0 -4px 0 ${th.dataset.clasaCuloare}`; });
+    deseneazaLegenda();
+    actualizeazaStarea();
+  }
+
+  function deseneazaLegenda() {
+    const text = { prezent: 'prezent', partial: `parțial (sub ${setari.prag}%)`, absent: 'absent', motivat: 'motivat' };
+    const clase = setari.axa === 'elevi' && (setari.clase.umplere || setari.clase.dunga || setari.clase.nume || setari.clase.text)
+      ? model.clase.map((c) => `<span><span class="mostra" style="background:${amestec(culoareClasa(c), 45)};border-color:${culoareClasa(c)}"></span> ${escapa(c)}</span>`).join('') : '';
+    $('#legenda').innerHTML = FELURI.map((f) => {
+      const fundal = culoareSigura(setari.simboluri[f].fundal);
+      return `<span><span class="mostra" style="${fundal ? `background:${fundal}` : ''}">${simbolHtml(f)}</span> ${text[f]}</span>`;
+    }).join('') + clase;
+  }
+
+  /* =========================================================
+     8. SELECȚIA (ca în Excel)
+     ========================================================= */
+
+  let selectie = { tip: null, chei: new Set(), ancora: null };   // tip: 'celule' | 'rand' | 'coloana'
+  const SEP = '\u0001';
+
+  function esteSelectata(rid, cid) {
+    if (selectie.tip === 'celule') return rid != null && selectie.chei.has(rid + SEP + cid);
+    if (selectie.tip === 'rand') return rid != null && selectie.chei.has(rid);
+    if (selectie.tip === 'coloana') return selectie.chei.has(cid);
+    return false;
+  }
+  function golesteSelectia() { selectie = { tip: null, chei: new Set(), ancora: null }; }
+
+  /** Selectează un dreptunghi de căsuțe între ancoră și (rid, cid), în ordinea de pe ecran. */
+  function selecteazaInterval(rid, cid, adauga) {
+    const ri = afisat.ids; const ci = afisat.coloane.map((c) => c.id);
+    const a = selectie.ancora ?? { rid, cid };
+    const [r1, r2] = [ri.indexOf(a.rid), ri.indexOf(rid)].sort((x, y) => x - y);
+    const [c1, c2] = [ci.indexOf(a.cid), ci.indexOf(cid)].sort((x, y) => x - y);
+    const chei = adauga ? new Set(selectie.chei) : new Set();
+    for (let i = r1; i <= r2; i++) for (let j = c1; j <= c2; j++) chei.add(ri[i] + SEP + ci[j]);
+    selectie = { tip: 'celule', chei, ancora: a, capat: { rid, cid } };
+  }
+
+  function selecteaza(tip, cheie, { shift = false, ctrl = false } = {}) {
+    if (tip === 'celule') {
+      const [rid, cid] = cheie.split(SEP);
+      if (shift && selectie.tip === 'celule' && selectie.ancora) selecteazaInterval(rid, cid, ctrl);
+      else if (ctrl && selectie.tip === 'celule') { const s = new Set(selectie.chei); s.has(cheie) ? s.delete(cheie) : s.add(cheie); selectie = { tip, chei: s, ancora: { rid, cid } }; }
+      else selectie = { tip, chei: new Set([cheie]), ancora: { rid, cid } };
+    } else {
+      const ordine = tip === 'rand' ? afisat.ids : afisat.coloane.map((c) => c.id);
+      if (shift && selectie.tip === tip && selectie.ancora != null) {
+        const [i, j] = [ordine.indexOf(selectie.ancora), ordine.indexOf(cheie)].sort((x, y) => x - y);
+        selectie = { tip, chei: new Set(ordine.slice(i, j + 1)), ancora: selectie.ancora };
+      } else if (ctrl && selectie.tip === tip) { const s = new Set(selectie.chei); s.has(cheie) ? s.delete(cheie) : s.add(cheie); selectie = { tip, chei: s, ancora: cheie }; }
+      else selectie = { tip, chei: new Set([cheie]), ancora: cheie };
+    }
+    if (pensula) { aplicaPensula(); return; }
+    marcheazaSelectia();
+  }
+
+  /** Lista țintelor selecției: unde se scrie formatarea. */
+  function tinteSelectie() {
+    if (selectie.tip === 'coloana') return [...selectie.chei].map((cid) => ({ obiect: configAxa().format, cheie: cid }));
+    if (selectie.tip === 'rand') return [...selectie.chei].map((rid) => ({ obiect: setari.formatRanduri, cheie: cheieRand(rid) }));
+    if (selectie.tip === 'celule') return [...selectie.chei].map((k) => { const [rid, cid] = k.split(SEP); return { obiect: setari.formatCelule, cheie: cheieCel(rid, cid) }; });
+    return [{ obiect: setari, cheie: 'formatTabel', tot: true }];
+  }
+  function formatSelectat() {
+    const t = tinteSelectie()[0];
+    if (t.tot) return { ...setari.formatTabel };
+    if (selectie.tip === 'celule') { const [rid, cid] = [...selectie.chei][0].split(SEP); return formatManual(rid, cid); }
+    return { ...(t.obiect[t.cheie] ?? {}) };
+  }
+  /** Aplică o schimbare de format pe selecție. null = scoate proprietatea. */
+  function aplicaFormat(schimbare, eticheta = 'format', doarTabel = false) {
+    schimba(() => {
+      for (const t of tinteSelectie()) {
+        const f = { ...(t.obiect[t.cheie] ?? {}) };
+        for (const [k, v] of Object.entries(schimbare)) { if (v === null || v === '' || v === undefined) delete f[k]; else f[k] = v; }
+        if (Object.keys(f).length) t.obiect[t.cheie] = f; else if (t.tot) t.obiect[t.cheie] = {}; else delete t.obiect[t.cheie];
+      }
+    }, eticheta, doarTabel);
+  }
+  function comutaFormat(proprietate) { aplicaFormat({ [proprietate]: formatSelectat()[proprietate] ? null : true }); }
+  function stergeFormatarea() {
+    schimba(() => { for (const t of tinteSelectie()) { if (t.tot) setari.formatTabel = {}; else delete t.obiect[t.cheie]; } });
+  }
+
+  // Pensula: copiază formatul primei căsuțe selectate pe următoarea selecție
+  let pensula = null;
+  function aplicaPensula() {
+    const f = pensula; pensula = null;
+    aplicaFormat(f);
+  }
+
+  function descriereSelectie() {
+    const n = selectie.chei.size;
+    if (selectie.tip === 'celule') return n === 1 ? '1 căsuță' : `${n} căsuțe`;
+    if (selectie.tip === 'rand') return n === 1 ? '1 rând' : `${n} rânduri`;
+    if (selectie.tip === 'coloana') return n === 1 ? '1 coloană' : `${n} coloane`;
+    return 'tot tabelul';
+  }
+
+  /** Bara de jos: câte rânduri, ce e selectat și, ca în Excel, media/suma valorilor numerice selectate. */
+  function actualizeazaStarea() {
+    let extra = '';
+    if (selectie.tip === 'celule' && selectie.chei.size > 1) {
+      const dupaId = new Map(afisat.coloane.map((c) => [c.id, c]));
+      const dupaRand = new Map(afisat.randuri.map((r) => [idRand(r), r]));
+      const valori = [...selectie.chei].map((k) => { const [rid, cid] = k.split(SEP); const c = dupaId.get(cid); const r = dupaRand.get(rid); return c && r && !c.nrcrt ? numar(c.text(r)) : null; }).filter((x) => x != null);
+      if (valori.length) { const suma = valori.reduce((a, b) => a + b, 0); extra = ` · Medie: ${String(Math.round((suma / valori.length) * 10) / 10).replace('.', ',')} · Număr: ${valori.length} · Sumă: ${String(Math.round(suma * 10) / 10).replace('.', ',')}`; }
+    }
+    $('#stare').textContent = `${afisat.randuri.length} ${setari.axa === 'elevi' ? 'elevi' : 'ore'} · ${afisat.coloane.length} coloane · selecție: ${descriereSelectie()}${extra}`;
+    $('#zoom').value = setari.aspect.zoom; $('#zoom-valoare').textContent = `${setari.aspect.zoom}%`;
+  }
+
+  /** Pune clasa .sel pe ce e selectat, fără să redeseneze tot tabelul. */
+  function marcheazaSelectia() {
+    cadru.querySelectorAll('.sel').forEach((el) => el.classList.remove('sel'));
+    cadru.querySelectorAll('tbody tr[data-rand]').forEach((tr) => {
+      for (const cel of tr.children) if (esteSelectata(tr.dataset.rand, cel.dataset.col)) cel.classList.add('sel');
+    });
+    if (selectie.tip === 'coloana') cadru.querySelectorAll('thead th').forEach((th) => th.classList.toggle('sel', selectie.chei.has(th.dataset.col)));
+    actualizeazaStarea();
+    if (setari.fila === 'acasa' && !setari.uneltePliate) deseneazaPanglica();
+  }
+
+  /** Perechea elev–oră din spatele unei căsuțe (pentru motivări). */
+  function elevSiOra(rid, cid) {
+    if (setari.axa === 'elevi' && cid.startsWith('ora:')) {
+      const e = model.elevi.find((x) => x.cheie === rid); const o = model.ore.find((x) => `ora:${x.id}` === cid);
+      return e && o ? { e, o } : null;
+    }
+    if (setari.axa === 'ore' && cid.startsWith('elev:')) {
+      const o = model.ore.find((x) => x.id === rid); const e = model.elevi.find((x) => `elev:${x.cheie}` === cid);
+      return e && o ? { e, o } : null;
+    }
+    return null;
+  }
+  const celuleSelectate = () => (selectie.tip === 'celule' ? [...selectie.chei].map((k) => k.split(SEP)) : []);
+
+  /* =========================================================
+     9. MOUSE-UL PE TABEL: selecție, tragere de coloane, lățimi, editare
+     ========================================================= */
+
+  let gest = null;
+  const mod = (ev) => ({ shift: ev.shiftKey, ctrl: ev.ctrlKey || ev.metaKey });
+  const celulaDin = (el) => el?.closest?.('tbody td[data-col], tbody th[data-col]');
+
+  cadru.addEventListener('pointerdown', (ev) => {
+    if (ev.button !== 0 || ev.target.closest('input, .buton-filtru')) return;
+    const maner = ev.target.closest('.maner-latime');
+    if (maner) {
+      ev.preventDefault();
+      const col = cadru.querySelector(`col[data-col="${CSS.escape(maner.dataset.latime)}"]`);
+      gest = { tip: 'latime', id: maner.dataset.latime, x: ev.clientX, latime: col.getBoundingClientRect().width / (Number(setari.aspect.zoom) / 100), col, maner };
+      maner.classList.add('activ');
+      return;
+    }
+    const th = ev.target.closest('thead th');
+    if (th) { gest = { tip: 'coloana', id: th.dataset.col, x: ev.clientX, mutat: false, th, ev: mod(ev) }; return; }
+    const grupRand = ev.target.closest('tr.grup-rand');
+    if (grupRand) {
+      const g = grupRand.dataset.grup;
+      schimba(() => { setari.grupuriInchise = setari.grupuriInchise.includes(g) ? setari.grupuriInchise.filter((x) => x !== g) : [...setari.grupuriInchise, g]; });
+      return;
+    }
+    const cel = celulaDin(ev.target);
+    if (!cel) return;
+    const rid = cel.parentElement.dataset.rand; const cid = cel.dataset.col;
+    const c = afisat.coloane.find((x) => x.id === cid);
+    if (c?.nume || c?.nrcrt) { selecteaza('rand', rid, mod(ev)); gest = { tip: 'randuri' }; }
+    else { selecteaza('celule', rid + SEP + cid, mod(ev)); gest = { tip: 'celule' }; }
+    cadru.focus({ preventScroll: true });
+  });
+
+  window.addEventListener('pointermove', (ev) => {
+    if (!gest) return;
+    if (gest.tip === 'latime') {
+      const noua = Math.max(36, Math.round(gest.latime + (ev.clientX - gest.x) / (Number(setari.aspect.zoom) / 100)));
+      gest.col.style.width = `${noua}px`; gest.noua = noua;
+      return;
+    }
+    if (gest.tip === 'coloana') {
+      if (!gest.mutat && Math.abs(ev.clientX - gest.x) < 6) return;
+      gest.mutat = true;
+      gest.th.classList.add('trasa');
+      const marg = cadru.getBoundingClientRect();     // aproape de margine: tabelul se derulează singur
+      if (ev.clientX > marg.right - 40) cadru.scrollLeft += 24; else if (ev.clientX < marg.left + 40) cadru.scrollLeft -= 24;
+      cadru.querySelectorAll('.tinta-stanga, .tinta-dreapta').forEach((x) => x.classList.remove('tinta-stanga', 'tinta-dreapta'));
+      const peste = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('thead th');
+      if (peste && peste !== gest.th) {
+        const r = peste.getBoundingClientRect();
+        gest.tinta = peste.dataset.col; gest.dupa = ev.clientX > r.left + r.width / 2;
+        peste.classList.add(gest.dupa ? 'tinta-dreapta' : 'tinta-stanga');
+      } else gest.tinta = null;
+      return;
+    }
+    if (ev.buttons !== 1) return;
+    const cel = celulaDin(document.elementFromPoint(ev.clientX, ev.clientY));
+    if (!cel) return;
+    const rid = cel.parentElement.dataset.rand; const cid = cel.dataset.col;
+    if (gest.tip === 'celule' && selectie.tip === 'celule' && gest.ultima !== rid + SEP + cid) {
+      gest.ultima = rid + SEP + cid; selecteazaInterval(rid, cid, false); marcheazaSelectia();
+    } else if (gest.tip === 'randuri' && selectie.tip === 'rand' && gest.ultima !== rid) {
+      gest.ultima = rid;
+      const [i, j] = [afisat.ids.indexOf(selectie.ancora), afisat.ids.indexOf(rid)].sort((a, b) => a - b);
+      selectie.chei = new Set(afisat.ids.slice(i, j + 1)); marcheazaSelectia();
+    }
+  });
+
+  window.addEventListener('pointerup', () => {
+    const g = gest; gest = null;
+    if (!g) return;
+    if (g.tip === 'latime') {
+      g.maner.classList.remove('activ');
+      if (g.noua) schimba(() => { setari.latimi[`${setari.axa}|${g.id}`] = g.noua; }, '', true);
+    } else if (g.tip === 'coloana') {
+      if (!g.mutat) { selecteaza('coloana', g.id, g.ev); return; }
+      if (g.tinta) mutaColoana(g.id, g.tinta, g.dupa);
+      else deseneazaTabelul();
+    }
+  });
+
+  cadru.addEventListener('dblclick', (ev) => {
+    const maner = ev.target.closest('.maner-latime');
+    if (maner) { schimba(() => { delete setari.latimi[`${setari.axa}|${maner.dataset.latime}`]; }); return; }
+    const cel = celulaDin(ev.target);
+    if (cel) editeazaCelula(cel);
+  });
+
+  cadru.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.buton-filtru');
+    if (b) { ev.stopPropagation(); deschideFiltrul(b.dataset.filtru, b); }
+  });
+
+  function mutaColoana(id, tinta, dupa) {
+    schimba(() => {
+      const o = configAxa().ordine.filter((x) => x !== id);
+      o.splice(o.indexOf(tinta) + (dupa ? 1 : 0), 0, id);
+      configAxa().ordine = o;
+    });
+  }
+  /** Mută o coloană cu un pas printre cele vizibile. */
+  function mutaCuUnPas(id, pas) {
+    const vizibile = coloaneVizibile().map((c) => c.id);
+    const vecin = vizibile[vizibile.indexOf(id) + pas];
+    if (vecin) mutaColoana(id, vecin, pas > 0);
+  }
+
+  /** Doar coloanele tale (proprii) se pot scrie de mână. */
+  function editeazaCelula(cel) {
+    const cid = cel.dataset.col; const rid = cel.parentElement.dataset.rand;
+    if (!configAxa().proprii.some((p) => p.id === cid)) return;
+    const vechi = date.valori[cid]?.[rid] ?? '';
+    const input = Object.assign(document.createElement('input'), { type: 'text', className: 'editare', value: vechi });
+    input.setAttribute('aria-label', 'Valoare');
+    cel.replaceChildren(input); input.focus(); input.select();
+    let gata = false;
+    const termina = (pastreaza) => {
+      if (gata) return; gata = true;
+      const v = input.value.trim();
+      if (!pastreaza || v === vechi) { deseneazaTabelul(); return; }
+      schimba(() => { date.valori[cid] ??= {}; if (v) date.valori[cid][rid] = v; else delete date.valori[cid][rid]; });
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') termina(true); if (e.key === 'Escape') termina(false); e.stopPropagation(); });
+    input.addEventListener('blur', () => termina(true));
+  }
+
+  /* =========================================================
+     10. ÎNTREBĂRI, MENIUL DE CLICK DREAPTA, FILTRUL
+     ========================================================= */
+
+  /** Ca prompt(), dar frumos: întoarce textul sau null. */
+  function intreaba(titlu, valoare = '', { rand = true } = {}) {
+    const d = $('#intrebare'); const camp = $('#intrebare-camp');
+    $('#intrebare-titlu').textContent = titlu;
+    camp.value = valoare; camp.rows = rand ? 1 : 4; camp.style.minBlockSize = rand ? '0' : '';
+    camp.onkeydown = (e) => { if (rand && e.key === 'Enter') { e.preventDefault(); d.close('ok'); } };
+    d.returnValue = '';
+    d.showModal(); camp.focus(); camp.select();
+    return new Promise((gata) => d.addEventListener('close', () => gata(d.returnValue === 'ok' ? camp.value.trim() : null), { once: true }));
+  }
+
+  const meniu = $('#meniu-context');
+  let actiuniMeniu = [];
+
+  function inchideMeniurile() { meniu.hidden = true; $('#popover-filtru').hidden = true; }
+  function pozitioneaza(el, x, y) {
+    el.hidden = false;
+    const r = el.getBoundingClientRect();
+    el.style.left = `${Math.max(4, Math.min(x, innerWidth - r.width - 4))}px`;
+    el.style.top = `${Math.max(4, Math.min(y, innerHeight - r.height - 4))}px`;
+  }
+
+  /** Elementele: { text, fa } | '-' | { paleta: (culoare) => …, eticheta } */
+  function arataMeniul(elemente, x, y) {
+    actiuniMeniu = [];
+    meniu.innerHTML = elemente.filter(Boolean).map((el) => {
+      if (el === '-') return '<hr>';
+      if (el.paleta) {
+        const i = actiuniMeniu.push(el.paleta) - 1;
+        return `<div class="mic" style="padding:2px 10px">${escapa(el.eticheta)}</div><div class="paleta">${PALETA.map((c) => `<button type="button" role="menuitem" data-paleta="${i}" data-c="${c}" style="background:${c}" aria-label="${escapa(el.eticheta)} ${c}"></button>`).join('')}<button type="button" role="menuitem" data-paleta="${i}" data-c="" aria-label="Fără culoare" title="Fără culoare">∅</button><button type="button" role="menuitem" data-paleta="${i}" data-c="?" title="Altă culoare…" aria-label="Altă culoare">…</button></div>`;
+      }
+      const i = actiuniMeniu.push(el.fa) - 1;
+      return `<button type="button" role="menuitem" data-meniu="${i}">${escapa(el.text)}${el.scurt ? `<span class="mic" style="margin-inline-start:auto">${el.scurt}</span>` : ''}</button>`;
+    }).join('');
+    pozitioneaza(meniu, x, y);
+    meniu.querySelector('button')?.focus();
+  }
+  meniu.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.paleta != null) {
+      const fa = actiuniMeniu[b.dataset.paleta];
+      if (b.dataset.c === '?') { inchideMeniurile(); alegeCuloare((c) => fa(c)); return; }
+      inchideMeniurile(); fa(b.dataset.c || null); return;
+    }
+    inchideMeniurile();
+    actiuniMeniu[b.dataset.meniu]?.();
+  });
+  /** Deschide selectorul de culoare al sistemului. */
+  function alegeCuloare(fa) {
+    const input = Object.assign(document.createElement('input'), { type: 'color', value: '#fde68a' });
+    input.style.cssText = 'position:fixed;opacity:0;pointer-events:none;inset:50% auto auto 50%';
+    document.body.append(input);
+    input.addEventListener('change', () => { fa(input.value); input.remove(); }, { once: true });
+    input.addEventListener('cancel', () => input.remove(), { once: true });
+    try { input.showPicker(); } catch { input.click(); }
+  }
+
+  document.addEventListener('pointerdown', (ev) => {
+    if (!ev.target.closest('#meniu-context, #popover-filtru')) inchideMeniurile();
+  });
+  cadru.addEventListener('scroll', inchideMeniurile, { passive: true });
+
+  cadru.addEventListener('contextmenu', (ev) => {
+    const th = ev.target.closest('thead th');
+    const cel = celulaDin(ev.target);
+    if (!th && !cel) return;
+    ev.preventDefault();
+    if (th) {
+      if (!(selectie.tip === 'coloana' && selectie.chei.has(th.dataset.col))) selecteaza('coloana', th.dataset.col);
+      arataMeniul(meniuColoana(th.dataset.col), ev.clientX, ev.clientY);
+      return;
+    }
+    const rid = cel.parentElement.dataset.rand; const cid = cel.dataset.col;
+    const c = afisat.coloane.find((x) => x.id === cid);
+    if (c?.nume || c?.nrcrt) {
+      if (!(selectie.tip === 'rand' && selectie.chei.has(rid))) selecteaza('rand', rid);
+      arataMeniul(meniuRand(), ev.clientX, ev.clientY);
+    } else {
+      if (!esteSelectata(rid, cid) || selectie.tip !== 'celule') selecteaza('celule', rid + SEP + cid);
+      arataMeniul(meniuCelula(rid, cid), ev.clientX, ev.clientY);
+    }
+  });
+
+  const paleteFormat = () => [
+    { paleta: (c) => aplicaFormat({ fundal: c }), eticheta: 'Umplere' },
+    { paleta: (c) => aplicaFormat({ text: c }), eticheta: 'Culoarea textului' },
+  ];
+
+  function meniuCelula(rid, cid) {
+    const perechi = celuleSelectate().map(([r, c]) => elevSiOra(r, c)).filter(Boolean);
+    const absente = perechi.filter(({ e, o }) => esteAbsent(stare(e, o)));
+    const motivate = absente.filter(({ e, o }) => date.motivari[`${e.cheie}|${o.id}`]);
+    const nota = date.note[cheieCel(rid, cid)];
+    const proprie = configAxa().proprii.some((p) => p.id === cid);
+    return [
+      { text: '📋 Copiază', scurt: 'Ctrl+C', fa: copiazaSelectia },
+      proprie && { text: '✏️ Scrie în căsuță', scurt: 'F2', fa: () => editeazaCelula(cadru.querySelector(`tr[data-rand="${CSS.escape(rid)}"] [data-col="${CSS.escape(cid)}"]`)) },
+      absente.length > motivate.length && { text: `Marchează absența ca motivată${absente.length > 1 ? ` (${absente.length - motivate.length})` : ''}`, fa: () => schimba(() => absente.forEach(({ e, o }) => { date.motivari[`${e.cheie}|${o.id}`] = true; })) },
+      motivate.length > 0 && { text: 'Anulează motivarea', fa: () => schimba(() => motivate.forEach(({ e, o }) => { delete date.motivari[`${e.cheie}|${o.id}`]; })) },
+      '-',
+      { text: nota ? '🗒 Modifică nota…' : '🗒 Adaugă o notă…', fa: () => scrieNota(rid, cid) },
+      nota && { text: 'Șterge nota', fa: () => schimba(() => { delete date.note[cheieCel(rid, cid)]; }) },
+      '-',
+      { text: 'B  Îngroșat', scurt: 'Ctrl+B', fa: () => comutaFormat('gros') },
+      ...paleteFormat(),
+      '-',
+      { text: '🧹 Șterge formatarea', fa: stergeFormatarea },
+    ];
+  }
+
+  function meniuRand() {
+    const ids = [...selectie.chei];
+    const primul = afisat.randuri.find((r) => idRand(r) === ids[0]);
+    return [
+      { text: '📋 Copiază', scurt: 'Ctrl+C', fa: copiazaSelectia },
+      { text: ids.length > 1 ? `Ascunde rândurile (${ids.length})` : 'Ascunde rândul', fa: () => schimba(() => { configAxa().randuriAscunse.push(...ids); golesteSelectia(); }) },
+      primul && setari.axa === 'elevi' && { text: `📄 Raport pentru ${primul.nume}`, fa: () => deschideRaport('elev', primul.cheie) },
+      primul && setari.axa === 'ore' && { text: `📄 Raport pentru ora din ${primul.titlu}`, fa: () => deschideRaport('sedinta', primul.id) },
+      { text: '🗒 Adaugă o notă…', fa: () => scrieNota(ids[0], 'nume') },
+      '-',
+      { text: 'B  Îngroșat', scurt: 'Ctrl+B', fa: () => comutaFormat('gros') },
+      ...paleteFormat(),
+      '-',
+      { text: '🧹 Șterge formatarea', fa: stergeFormatarea },
+    ];
+  }
+
+  function meniuColoana(id) {
+    const c = toateColoanele().find((x) => x.id === id);
+    if (!c) return [];
+    const vizibile = coloaneVizibile().map((x) => x.id);
+    const proprie = configAxa().proprii.some((p) => p.id === id);
+    const sorteaza = (directie, adauga = false) => schimba(() => {
+      const alte = adauga ? configAxa().sortari.filter((s) => s.coloana !== id) : [];
+      configAxa().sortari = [...alte, { coloana: id, directie }];
+    });
+    return [
+      !c.nrcrt && { text: '↓ Sortează A→Z (de la mic la mare)', fa: () => sorteaza(1) },
+      !c.nrcrt && { text: '↑ Sortează Z→A (de la mare la mic)', fa: () => sorteaza(-1) },
+      !c.nrcrt && configAxa().sortari.length > 0 && !configAxa().sortari.some((s) => s.coloana === id) && { text: '＋ Adaugă ca nivel de sortare', fa: () => sorteaza(1, true) },
+      configAxa().sortari.some((s) => s.coloana === id) && { text: 'Scoate sortarea', fa: () => schimba(() => { configAxa().sortari = configAxa().sortari.filter((s) => s.coloana !== id); }) },
+      !c.nrcrt && { text: '▾ Filtrează…', fa: () => deschideFiltrul(id, cadru.querySelector(`[data-filtru="${CSS.escape(id)}"]`)) },
+      '-',
+      { text: '✏️ Redenumește…', fa: async () => { const t = await intreaba('Titlul coloanei', titluColoana(c)); if (t != null) schimba(() => { if (t && t !== c.titlu) configAxa().titluri[id] = t; else delete configAxa().titluri[id]; if (proprie) configAxa().proprii.find((p) => p.id === id).titlu = t || c.titlu; }); } },
+      { text: selectie.chei.size > 1 ? `Ascunde coloanele (${selectie.chei.size})` : 'Ascunde coloana', fa: () => schimba(() => { configAxa().ascunse.push(...selectie.chei); golesteSelectia(); }) },
+      vizibile.indexOf(id) > 0 && { text: '← Mută la stânga', fa: () => mutaCuUnPas(id, -1) },
+      vizibile.indexOf(id) < vizibile.length - 1 && { text: '→ Mută la dreapta', fa: () => mutaCuUnPas(id, 1) },
+      { text: '❄ Îngheață până aici', fa: () => schimba(() => { setari.aspect.inghetate = vizibile.indexOf(id) + 1; }) },
+      setari.aspect.inghetate > 0 && { text: 'Dezgheață coloanele', fa: () => schimba(() => { setari.aspect.inghetate = 0; }) },
+      setari.latimi[`${setari.axa}|${id}`] && { text: 'Lățimea obișnuită', fa: () => schimba(() => { delete setari.latimi[`${setari.axa}|${id}`]; }) },
+      c.ora && { text: `📄 Raport pentru ora din ${c.ora.titlu}`, fa: () => deschideRaport('sedinta', c.ora.id) },
+      c.elev && { text: `📄 Raport pentru ${c.elev.nume}`, fa: () => deschideRaport('elev', c.elev.cheie) },
+      '-',
+      { text: 'B  Îngroșat', scurt: 'Ctrl+B', fa: () => comutaFormat('gros') },
+      ...paleteFormat(),
+      { text: '🧹 Șterge formatarea coloanei', fa: stergeFormatarea },
+      proprie && '-',
+      proprie && { text: '🗑 Șterge coloana', fa: () => stergeColoanaProprie(id) },
+    ];
+  }
+
+  async function scrieNota(rid, cid) {
+    const t = await intreaba('Notă', date.note[cheieCel(rid, cid)] ?? '', { rand: false });
+    if (t == null) return;
+    schimba(() => { if (t) date.note[cheieCel(rid, cid)] = t; else delete date.note[cheieCel(rid, cid)]; });
+  }
+
+  function stergeColoanaProprie(id) {
+    schimba(() => {
+      const cfg = configAxa();
+      cfg.proprii = cfg.proprii.filter((p) => p.id !== id);
+      cfg.ordine = cfg.ordine.filter((x) => x !== id);
+      cfg.ascunse = cfg.ascunse.filter((x) => x !== id);
+      cfg.sortari = cfg.sortari.filter((s) => s.coloana !== id);
+      delete cfg.filtre[id]; delete cfg.format[id]; delete cfg.titluri[id];
+      delete date.valori[id];
+      golesteSelectia();
+    });
+  }
+
+  async function coloanaNoua() {
+    const titlu = await intreaba('Titlul coloanei noi', 'Observații');
+    if (!titlu) return;
+    schimba(() => { configAxa().proprii.push({ id: `p:${Date.now().toString(36)}`, titlu }); });
+  }
+
+  /* ---------- Fereastra de filtru (ca ▾ din Excel) ---------- */
+  function deschideFiltrul(id, langa) {
+    const c = toateColoanele().find((x) => x.id === id);
+    if (!c) return;
+    const pop = $('#popover-filtru');
+    const excluse = new Set(configAxa().filtre[id] ?? []);
+    const valori = [...new Set([...randuriFiltrate(coloaneVizibile(), id).map((r) => textFiltru(c, r)), ...excluse])]
+      .sort((a, b) => String(a).localeCompare(String(b), 'ro', { numeric: true }));
+    pop.innerHTML = `
+      <strong>${escapa(titluColoana(c))}</strong>
+      <button type="button" class="btn" data-f="sus">↓ Sortează A→Z (de la mic la mare)</button>
+      <button type="button" class="btn" data-f="jos">↑ Sortează Z→A (de la mare la mic)</button>
+      <input type="search" placeholder="🔍 Caută" aria-label="Caută în valori">
+      <div class="valori">
+        <label><input type="checkbox" data-f="tot" ${excluse.size ? '' : 'checked'}> <b>(Selectează tot)</b></label>
+        ${valori.map((v) => `<label data-v="${escapa(cheieDin(v))}"><input type="checkbox" value="${escapa(v)}" ${excluse.has(v) ? '' : 'checked'}> ${escapa(v)}</label>`).join('')}
+      </div>
+      <div class="rand-p" style="justify-content:flex-end">
+        <button type="button" class="btn" data-f="sterge">Șterge filtrul</button>
+        <button type="button" class="btn principal" data-f="ok">OK</button>
+      </div>`;
+    const r = (langa ?? cadru).getBoundingClientRect();
+    pozitioneaza(pop, r.left, r.bottom + 4);
+    const cutii = () => [...pop.querySelectorAll('.valori input[value]')];
+    pop.querySelector('input[type=search]').addEventListener('input', (ev) => {
+      const t = cheieDin(ev.target.value);
+      pop.querySelectorAll('.valori label[data-v]').forEach((l) => { l.hidden = Boolean(t) && !l.dataset.v.includes(t); });
+    });
+    pop.onchange = (ev) => {
+      if (ev.target.dataset.f === 'tot') cutii().forEach((x) => { if (!x.closest('label').hidden) x.checked = ev.target.checked; });
+      else pop.querySelector('[data-f="tot"]').checked = cutii().every((x) => x.checked);
+    };
+    pop.onclick = (ev) => {
+      const f = ev.target.closest('[data-f]')?.dataset.f;
+      if (f === 'sus' || f === 'jos') { inchideMeniurile(); schimba(() => { configAxa().sortari = [{ coloana: id, directie: f === 'sus' ? 1 : -1 }]; }); }
+      if (f === 'sterge') { inchideMeniurile(); schimba(() => { delete configAxa().filtre[id]; }); }
+      if (f === 'ok') {
+        const scoase = cutii().filter((x) => !x.checked).map((x) => x.value);
+        inchideMeniurile();
+        schimba(() => { if (scoase.length) configAxa().filtre[id] = scoase; else delete configAxa().filtre[id]; });
+      }
+    };
+    pop.querySelector('input[type=search]').focus();
+  }
+
+  /* =========================================================
+     11. TASTATURA (ca în Excel)
+     ========================================================= */
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') { if (!meniu.hidden || !$('#popover-filtru').hidden) { inchideMeniurile(); return; } if (pensula) { pensula = null; deseneazaPanglica(); return; } if (selectie.tip) { golesteSelectia(); marcheazaSelectia(); } return; }
+    if (ev.target.closest('input, textarea, select, [contenteditable="true"], dialog')) return;
+    const ctrl = ev.ctrlKey || ev.metaKey;
+    const tasta = ev.key.toLowerCase();
+    if (ctrl && tasta === 'z' && !ev.shiftKey) { ev.preventDefault(); anuleaza(); return; }
+    if (ctrl && (tasta === 'y' || (tasta === 'z' && ev.shiftKey))) { ev.preventDefault(); reface(); return; }
+    if (ctrl && tasta === 'b') { ev.preventDefault(); comutaFormat('gros'); return; }
+    if (ctrl && tasta === 'i') { ev.preventDefault(); comutaFormat('cursiv'); return; }
+    if (ctrl && tasta === 'u') { ev.preventDefault(); comutaFormat('subliniat'); return; }
+    if (ctrl && tasta === 'c' && selectie.tip && !String(getSelection())) { ev.preventDefault(); copiazaSelectia(); return; }
+    if (ctrl && tasta === 'a' && document.activeElement === cadru) { ev.preventDefault(); selectie = { tip: 'celule', chei: new Set(afisat.ids.flatMap((r) => afisat.coloane.map((c) => r + SEP + c.id))), ancora: null }; marcheazaSelectia(); return; }
+    if ((ev.key === 'Delete' || ev.key === 'Backspace') && selectie.tip === 'celule') {
+      const proprii = new Set(configAxa().proprii.map((p) => p.id));
+      const deSters = celuleSelectate().filter(([, c]) => proprii.has(c) );
+      if (deSters.length) { ev.preventDefault(); schimba(() => deSters.forEach(([r, c]) => { if (date.valori[c]) delete date.valori[c][r]; })); }
+      return;
+    }
+    if (ev.key === 'F2' && selectie.tip === 'celule' && selectie.ancora) {
+      const { rid, cid } = selectie.ancora;
+      const cel = cadru.querySelector(`tr[data-rand="${CSS.escape(rid)}"] [data-col="${CSS.escape(cid)}"]`);
+      if (cel) { ev.preventDefault(); editeazaCelula(cel); }
+      return;
+    }
+    const sageti = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (sageti[ev.key] && selectie.tip === 'celule' && selectie.ancora && document.activeElement === cadru) {
+      ev.preventDefault();
+      const [dr, dc] = sageti[ev.key];
+      const ids = afisat.ids; const cols = afisat.coloane.map((c) => c.id);
+      const pornire = ev.shiftKey && selectie.capat ? selectie.capat : selectie.ancora;
+      const rid = ids[Math.max(0, Math.min(ids.length - 1, ids.indexOf(pornire.rid) + dr))];
+      const cid = cols[Math.max(0, Math.min(cols.length - 1, cols.indexOf(pornire.cid) + dc))];
+      if (ev.shiftKey) { selecteazaInterval(rid, cid, false); }
+      else selectie = { tip: 'celule', chei: new Set([rid + SEP + cid]), ancora: { rid, cid } };
+      marcheazaSelectia();
+      cadru.querySelector(`tr[data-rand="${CSS.escape(rid)}"] [data-col="${CSS.escape(cid)}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  });
+
+  /* =========================================================
+     12. PANGLICA (filele de sus, ca în Word și Excel)
+     ========================================================= */
+
+  const FILE = [['acasa', 'Acasă'], ['inserare', 'Inserare'], ['date', 'Date'], ['conditionata', 'Formatare condiționată'], ['clase', 'Clase'], ['simboluri', 'Simboluri'], ['aspect', 'Aspect'], ['vizualizare', 'Vizualizare']];
+  const TEME = [['auto', 'Automată (ca sistemul)'], ['luminoasa', 'Luminoasă'], ['intunecata', 'Întunecată'], ['hartie', 'Hârtie'], ['verde', 'Verde școlar'], ['bordo', 'Bordo'], ['contrast', 'Contrast mare'], ['noapte', 'Noapte albastră']];
+
+  const grup = (eticheta, continut) => `<div class="grup-p"><div class="unelte">${continut}</div><div class="eticheta-grup">${eticheta}</div></div>`;
+  const buton = (act, text, { titlu = '', apasat = null, date: d = '', dezactivat = false, clasa = '' } = {}) =>
+    `<button type="button" class="btn ${clasa}" data-act="${act}" ${d}${titlu ? ` title="${escapa(titlu)}" aria-label="${escapa(titlu)}"` : ''}${apasat != null ? ` aria-pressed="${apasat}"` : ''}${dezactivat ? ' disabled' : ''}>${text}</button>`;
+  const optiuni = (lista, valoare) => lista.map(([v, t]) => `<option value="${escapa(v)}"${String(v) === String(valoare) ? ' selected' : ''}>${escapa(t)}</option>`).join('');
+  const valoareLa = (cale) => cale.split('.').reduce((o, k) => o?.[k], setari);
+  const alege = (cale, lista, eticheta) => `<label class="inline">${eticheta ? `<span class="mic">${eticheta}</span>` : ''}<select data-set="${cale}" aria-label="${escapa(eticheta || cale)}">${optiuni(lista, valoareLa(cale))}</select></label>`;
+  const numar_ = (cale, eticheta, min, max, pas = 1, unitate = '') => `<label class="inline"><span class="mic">${eticheta}</span><input type="number" data-set="${cale}" min="${min}" max="${max}" step="${pas}" value="${escapa(valoareLa(cale))}" style="inline-size:68px" aria-label="${escapa(eticheta)}">${unitate ? `<span class="mic">${unitate}</span>` : ''}</label>`;
+  const glisor = (cale, eticheta, min, max, pas = 1) => `<label class="inline"><span class="mic">${eticheta}</span><input type="range" data-set="${cale}" min="${min}" max="${max}" step="${pas}" value="${escapa(valoareLa(cale))}" aria-label="${escapa(eticheta)}"></label>`;
+  const bifa = (cale, text) => `<label class="inline"><input type="checkbox" data-set="${cale}" ${valoareLa(cale) ? 'checked' : ''}> ${text}</label>`;
+
+  /** Un selector de culoare cu buton ↺ pentru „automat”. Cheia spune ce culoare schimbă. */
+  function alegatorCuloare(cheie, eticheta, valoare, automat) {
+    const c = culoareSigura(valoare);
+    const implicit = c || (automat ? culoareCss(automat) : culoareCss('var(--foaie)'));
+    return `<label class="culoare ${c ? '' : 'auto'}" title="${escapa(eticheta)}${c ? '' : ' (automat)'}">
+      <input type="color" data-culoare="${escapa(cheie)}" value="${escapa(implicit)}" aria-label="${escapa(eticheta)}">
+      <span>${escapa(eticheta)}</span>
+      <button type="button" data-automat="${escapa(cheie)}" aria-label="${escapa(eticheta)}: înapoi la automat">↺</button>
+    </label>`;
+  }
+  const memorieCuloriCss = new Map();
+  /** Transformă o culoare CSS (de ex. var(--albastru)) în hex, doar ca punct de pornire al selectorului. */
+  function culoareCss(css) {
+    const cheie = `${document.documentElement.dataset.tema ?? ''}|${css}`;
+    if (memorieCuloriCss.has(cheie)) return memorieCuloriCss.get(cheie);
+    const proba = document.createElement('span');
+    proba.style.color = css;
+    document.body.append(proba);
+    const [r, g, b] = (getComputedStyle(proba).color.match(/[\d.]+/g) ?? [0, 0, 0]).map(Number);
+    proba.remove();
+    const hex = `#${[r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('')}`;
+    memorieCuloriCss.set(cheie, hex);
+    return hex;
+  }
+
+  function filaAcasa() {
+    const f = formatSelectat();
+    const apasat = (k) => Boolean(f[k]);
+    return [
+      grup('Clipboard', buton('copiaza-sel', '📋 Copiază', { titlu: 'Copiază selecția (Ctrl+C)' }) + buton('pensula', '🖌 Pensulă', { titlu: 'Copiază formatul pe altă selecție', apasat: Boolean(pensula) })),
+      grup('Font', `
+        <select data-fmt="font" aria-label="Font">${optiuni([['', 'Font'], ...Object.entries(NUME_FONT)], f.font ?? '')}</select>
+        <input type="number" data-fmt="marime" min="8" max="48" value="${escapa(f.marime ?? '')}" placeholder="${setari.aspect.marime}" style="inline-size:62px" aria-label="Mărimea textului" title="Mărimea textului">
+        ${buton('fmt', '<b>B</b>', { titlu: 'Îngroșat (Ctrl+B)', apasat: apasat('gros'), date: 'data-p="gros" ', clasa: 'icon' })}
+        ${buton('fmt', '<i>I</i>', { titlu: 'Cursiv (Ctrl+I)', apasat: apasat('cursiv'), date: 'data-p="cursiv" ', clasa: 'icon' })}
+        ${buton('fmt', '<u>U</u>', { titlu: 'Subliniat (Ctrl+U)', apasat: apasat('subliniat'), date: 'data-p="subliniat" ', clasa: 'icon' })}
+        ${alegatorCuloare('sel:text', 'A', f.text, 'var(--text)')}
+        ${alegatorCuloare('sel:fundal', '🪣', f.fundal, null)}`),
+      grup('Aliniere', ['left', 'center', 'right'].map((a, i) => buton('aliniaza', ['⇤', '≡', '⇥'][i], { titlu: ['La stânga', 'La mijloc', 'La dreapta'][i], apasat: f.aliniere === a, date: `data-v="${a}" `, clasa: 'icon' })).join('')
+        + buton('fmt', '↵ Încadrează', { titlu: 'Textul lung trece pe rândul următor', apasat: apasat('incadrare'), date: 'data-p="incadrare" ' })),
+      grup('Chenar', `<select data-fmt="chenar" aria-label="Chenar">${optiuni([['', '▢ Fără chenar'], ['subtire', '▣ Subțire'], ['gros', '■ Gros']], f.chenar ?? '')}</select>${alegatorCuloare('sel:chenarCuloare', 'Chenar', f.chenarCuloare, 'var(--text)')}`),
+      grup('Editare', buton('sterge-format', '🧹 Șterge formatarea') + `<input type="search" id="cautare" placeholder="🔍 Caută ${setari.axa === 'elevi' ? 'un elev' : 'o oră'}" value="${escapa(cautare)}" aria-label="Caută" style="inline-size:170px">`),
+    ].join('');
+  }
+
+  function filaInserare() {
+    const cfg = configAxa();
+    const etichete = coloaneOrdonate().map((c) => `<button type="button" class="eticheta-coloana" data-act="comuta-col" data-id="${escapa(c.id)}" aria-pressed="${!cfg.ascunse.includes(c.id)}">${escapa(titluColoana(c))}</button>`).join('');
+    return [
+      grup('Coloane', buton('coloana-noua', '＋ Coloană nouă', { titlu: 'O coloană în care scrii tu (dublu-click pe căsuță)' })
+        + buton('nr-crt', '# Nr. crt.', { apasat: !cfg.ascunse.includes('nrcrt') })),
+      grup('Arată / ascunde', `<div class="etichete-coloane">${etichete}</div>`),
+      grup('Rânduri', buton('arata-randuri', `👁 Arată rândurile ascunse (${cfg.randuriAscunse.length})`, { dezactivat: !cfg.randuriAscunse.length })
+        + buton('arata-coloane', `👁 Arată toate coloanele (${cfg.ascunse.length})`, { dezactivat: !cfg.ascunse.length })),
+    ].join('');
+  }
+
+  function filaDate() {
+    const cfg = configAxa();
+    const coloane = coloaneOrdonate().filter((c) => !c.nrcrt).map((c) => [c.id, titluColoana(c) + (c.subtitlu ? ` ${c.subtitlu}` : '')]);
+    const niveluri = cfg.sortari.map((s, i) => `<div class="rand-p"><span class="mic">${i ? 'apoi' : 'după'}</span>
+      <select data-sortare="${i}" data-camp="coloana" aria-label="Coloana nivelului ${i + 1}">${optiuni(coloane, s.coloana)}</select>
+      <select data-sortare="${i}" data-camp="directie" aria-label="Ordinea nivelului ${i + 1}">${optiuni([[1, '↓ A→Z, mic→mare'], [-1, '↑ Z→A, mare→mic']], s.directie)}</select>
+      ${buton('sterge-nivel', '✕', { titlu: 'Scoate nivelul', date: `data-i="${i}" `, clasa: 'icon' })}</div>`).join('');
+    const filtre = Object.values(cfg.filtre).filter((x) => x?.length).length;
+    return [
+      grup('Pe rânduri', buton('axa', '👤 Elevii', { apasat: setari.axa === 'elevi', date: 'data-v="elevi" ' }) + buton('axa', '🗓 Orele', { apasat: setari.axa === 'ore', date: 'data-v="ore" ' })),
+      grup('Clasa', alege('clasa', [['toate', 'Toate clasele'], ...model.clase.map((c) => [c, c === FARA_CLASA ? 'Fără clasă' : c])])),
+      grup('Sortare', `<div class="lista-p">${niveluri}<div class="rand-p">${buton('nivel-nou', '＋ Nivel')}${buton('fara-sortare', 'Fără sortare', { dezactivat: !cfg.sortari.length })}</div></div>`),
+      grup('Filtre', buton('sterge-filtrele', `▾ Șterge filtrele (${filtre})`, { dezactivat: !filtre })),
+      setari.axa === 'elevi' ? grup('Grupare', `${bifa('grupare', 'Pe clase, cu subtotal')}${setari.grupare ? buton('restrange', '▸ Restrânge') + buton('extinde', '▾ Extinde') : ''}`) : '',
+      grup('Căsuțele orelor', alege('continut', [['simbol', 'Simbolul'], ['simbol-minute', 'Simbol + minute'], ['minute', 'Minutele'], ['procent', 'Procentul din oră']]) + numar_('prag', 'Parțial sub', 5, 100, 5, '%')),
+    ].join('');
+  }
+
+  function filaConditionata() {
+    const cfg = configAxa();
+    const coloane = [['@ore', setari.axa === 'elevi' ? 'Orice oră' : 'Orice elev'], ...coloaneOrdonate().filter((c) => !c.nrcrt && !c.stare).map((c) => [c.id, titluColoana(c)]), ...coloaneOrdonate().filter((c) => c.stare).map((c) => [c.id, `${titluColoana(c)} ${c.subtitlu ?? ''}`])];
+    const reguli = cfg.reguli.map((r, i) => `<div class="rand-p">
+      <select data-regula="${i}" data-camp="coloana" aria-label="Coloana">${optiuni(coloane, r.coloana)}</select>
+      <select data-regula="${i}" data-camp="operator" aria-label="Condiția">${optiuni(OPERATORI, r.operator)}</select>
+      ${r.operator === 'gol' || r.operator.startsWith('este-') ? '' : `<input type="text" data-regula="${i}" data-camp="valoare" value="${escapa(r.valoare ?? '')}" style="inline-size:80px" aria-label="Valoarea">`}
+      <select data-regula="${i}" data-camp="tinta" aria-label="Unde">${optiuni([['celula', 'căsuța'], ['rand', 'tot rândul']], r.tinta)}</select>
+      ${alegatorCuloare(`regula:${i}:fundal`, '🪣', r.fundal, null)}
+      ${alegatorCuloare(`regula:${i}:text`, 'A', r.text, 'var(--text)')}
+      <label class="inline"><input type="checkbox" data-regula="${i}" data-camp="gros" ${r.gros ? 'checked' : ''}><b>B</b></label>
+      ${buton('sterge-regula', '✕', { titlu: 'Șterge regula', date: `data-i="${i}" `, clasa: 'icon' })}
+    </div>`).join('');
+    const rapide = setari.axa === 'elevi'
+      ? [['absente-rosii', '🔴 Absențele'], ['sub-prag', `🟡 Prezență sub ${setari.prag}%`], ['toata', '🟢 Prezență 100%']]
+      : [['absente-rosii', '🔴 Absențele'], ['ore-slabe', '🟡 Ore cu multe absențe']];
+    return [
+      grup('Reguli', `<div class="lista-p">${reguli}<div class="rand-p">${buton('regula-noua', '＋ Regulă nouă')}${cfg.reguli.length ? buton('sterge-reguli', 'Șterge toate regulile') : ''}</div></div>`),
+      grup('Rapide', rapide.map(([id, t]) => buton('regula-rapida', t, { date: `data-v="${id}" ` })).join('')),
+    ].join('');
+  }
+
+  function filaClase() {
+    return [
+      grup('Cum se vede clasa', `<div class="coloana">${bifa('clase.umplere', 'Umple rândul')}${bifa('clase.dunga', 'Dungă în stânga numelui')}</div>
+        <div class="coloana">${bifa('clase.nume', 'Colorează numele')}${bifa('clase.text', 'Colorează tot textul')}</div>
+        ${glisor('clase.intensitate', 'Intensitate', 4, 60, 2)}`),
+      grup('Culorile claselor', model.clase.map((c, i) => alegatorCuloare(`clasa:${c}`, c === FARA_CLASA ? 'Fără clasă' : c, setari.clase.culori[c], CULORI_CLASE[i % CULORI_CLASE.length])).join('') || '<span class="mic">—</span>'),
+    ].join('');
+  }
+
+  function filaSimboluri() {
+    const seturi = SETURI.map((set, i) => buton('set-simboluri', set.some(Boolean) ? set.join(' ') : 'doar culoare', { date: `data-i="${i}" ` })).join('');
+    const stari = FELURI.map((f) => {
+      const s = setari.simboluri[f];
+      return `<div class="rand-p"><span class="mostra" style="${culoareSigura(s.fundal) ? `background:${s.fundal}` : ''}">${simbolHtml(f)}</span>
+        <b style="inline-size:64px">${NUME_FEL[f]}</b>
+        <input type="text" data-set="simboluri.${f}.text" value="${escapa(s.text)}" maxlength="4" style="inline-size:52px;text-align:center" aria-label="Simbolul pentru ${NUME_FEL[f]}">
+        ${numar_(`simboluri.${f}.marime`, 'mărime', 0.6, 3, 0.1)}
+        <label class="inline"><input type="checkbox" data-set="simboluri.${f}.gros" ${s.gros ? 'checked' : ''}><b>B</b></label>
+        ${alegatorCuloare(`simbol:${f}:culoare`, 'A', s.culoare, CULORI_AUTOMATE[f])}
+        ${alegatorCuloare(`simbol:${f}:fundal`, '🪣', s.fundal, null)}</div>`;
+    }).join('');
+    return [grup('Seturi gata făcute', seturi), grup('Fiecare stare', `<div class="lista-p">${stari}</div>`)].join('');
+  }
+
+  function filaAspect() {
+    return [
+      grup('Temă', alege('tema', TEME)),
+      grup('Text', alege('aspect.font', Object.entries(NUME_FONT)) + numar_('aspect.marime', 'mărime', 10, 28) + alege('aspect.aliniere', [['left', '⇤ stânga'], ['center', '≡ mijloc'], ['right', '⇥ dreapta']])),
+      grup('Dimensiuni', `<div class="coloana">${numar_('aspect.spatiu', 'Spațiere', 0, 24)}${numar_('aspect.latime', 'Lățime coloane', 30, 240, 2)}</div>
+        <div class="coloana">${numar_('aspect.inaltimeAntet', 'Înălțime antet', 0, 200, 2)}${numar_('aspect.rotunjire', 'Colțuri', 0, 24)}</div>
+        ${buton('latimi-reset', '↔ Lățimi obișnuite', { dezactivat: !Object.keys(setari.latimi).some((k) => k.startsWith(`${setari.axa}|`)) })}`),
+      grup('Linii', `<div class="coloana">${bifa('aspect.grilaO', 'Orizontale')}${bifa('aspect.grilaV', 'Verticale')}</div>${bifa('aspect.dungi', 'Rânduri alternate')}`),
+      grup('Îngheață', numar_('aspect.inghetate', 'Coloane fixe', 0, 12)),
+      grup('Culorile tabelului', CULORI_TABEL.map(([id, nume]) => alegatorCuloare(`tabel:${id}`, nume, setari.culori[id], null)).join('')),
+    ].join('');
+  }
+
+  function filaVizualizare() {
+    const nume = Object.keys(vederi).sort((a, b) => a.localeCompare(b, 'ro'));
+    return [
+      grup('Vederi salvate', `${nume.length ? `<select id="vedere" aria-label="Vederea">${optiuni(nume.map((n) => [n, n]), '')}</select>${buton('vedere-aplica', 'Deschide')}${buton('vedere-sterge', '🗑', { titlu: 'Șterge vederea', clasa: 'icon' })}` : ''}${buton('vedere-salveaza', '💾 Salvează vederea…')}`),
+      grup('Export', buton('copiaza-tabel', '📋 Copiază tabelul') + buton('csv', '⬇ CSV (Excel)') + buton('tipareste', '🖨 Tipărește')),
+      grup('Zoom', buton('zoom-100', '100%') + buton('zoom-potrivit', '↔ Potrivește pe lățime')),
+      grup('Început', buton('reset', '↺ Readu tabelul la început', { titlu: 'Tema, rapoartele, notele și coloanele tale rămân' })),
+    ].join('');
+  }
+
+  const FUNCTII_FILE = { acasa: filaAcasa, inserare: filaInserare, date: filaDate, conditionata: filaConditionata, clase: filaClase, simboluri: filaSimboluri, aspect: filaAspect, vizualizare: filaVizualizare };
+
+  function deseneazaPanglica() {
+    if (!FUNCTII_FILE[setari.fila]) setari.fila = 'acasa';
+    $('#file').innerHTML = FILE.map(([id, t]) => `<button type="button" role="tab" data-fila="${id}" aria-selected="${!setari.uneltePliate && setari.fila === id}">${t}</button>`).join('')
+      + `<button type="button" class="dreapta" data-act="plianta" title="${setari.uneltePliate ? 'Arată panglica' : 'Ascunde panglica'}" aria-label="${setari.uneltePliate ? 'Arată panglica' : 'Ascunde panglica'}">${setari.uneltePliate ? '▾' : '▴'}</button>`;
+    const continut = $('#continut-fila');
+    continut.hidden = setari.uneltePliate;
+    if (!setari.uneltePliate) continut.innerHTML = FUNCTII_FILE[setari.fila]();
+  }
+
+  $('#file').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.fila) {
+      if (setari.fila === b.dataset.fila && !setari.uneltePliate) return;
+      setari.fila = b.dataset.fila; setari.uneltePliate = false;
+    } else setari.uneltePliate = !setari.uneltePliate;
+    salveaza(); deseneazaPanglica();
+  });
+
+  /* ---------- Ce fac controalele din panglică ---------- */
+
+  function scrieLa(cale, valoare) {
+    const parti = cale.split('.');
+    const obiect = parti.slice(0, -1).reduce((o, k) => o[k], setari);
+    obiect[parti.at(-1)] = valoare;
+  }
+  function valoareControl(t) {
+    if (t.type === 'checkbox') return t.checked;
+    if (t.type === 'number' || t.type === 'range') { const n = Number(t.value); return Number.isFinite(n) ? n : 0; }
+    return t.value;
+  }
+
+  function scrieCuloare(cheie, valoare, doarTabel) {
+    const [unde, ...rest] = cheie.split(':');
+    if (unde === 'sel') { aplicaFormat({ [rest[0]]: valoare }, cheie, doarTabel); return; }
+    schimba(() => {
+      if (unde === 'simbol') setari.simboluri[rest[0]][rest[1]] = valoare ?? '';
+      else if (unde === 'tabel') setari.culori[rest[0]] = valoare ?? '';
+      else if (unde === 'clasa') { const c = rest.join(':'); if (valoare) setari.clase.culori[c] = valoare; else delete setari.clase.culori[c]; }
+      else if (unde === 'regula') configAxa().reguli[Number(rest[0])][rest[1]] = valoare ?? '';
+    }, cheie, doarTabel);
+  }
+
+  const panglica = $('#continut-fila');
+  panglica.addEventListener('input', (ev) => {
+    const t = ev.target;
+    if (t.id === 'cautare') { cautare = t.value; deseneazaTabelul(); return; }
+    if (t.dataset.culoare) { t.closest('.culoare')?.classList.remove('auto'); scrieCuloare(t.dataset.culoare, t.value, true); return; }
+    if (t.dataset.fmt === 'marime') { aplicaFormat({ marime: Number(t.value) || null }, 'marime', true); return; }
+    if (t.dataset.regula != null && t.type === 'text') { schimba(() => { configAxa().reguli[t.dataset.regula].valoare = t.value; }, `regula-${t.dataset.regula}`, true); return; }
+    if (t.dataset.set && ['text', 'number', 'range'].includes(t.type)) {
+      schimba(() => scrieLa(t.dataset.set, valoareControl(t)), t.dataset.set, true);
+      if (t.dataset.set.startsWith('simboluri')) { const mostra = t.closest('.rand-p')?.querySelector('.mostra'); const f = t.dataset.set.split('.')[1]; if (mostra) mostra.innerHTML = simbolHtml(f); deseneazaLegenda(); }
+    }
+  });
+  panglica.addEventListener('change', (ev) => {
+    const t = ev.target;
+    if (t.dataset.fmt && t.tagName === 'SELECT') { aplicaFormat({ [t.dataset.fmt]: t.value || null }); return; }
+    if (t.dataset.sortare != null) { schimba(() => { const n = configAxa().sortari[t.dataset.sortare]; n[t.dataset.camp] = t.dataset.camp === 'directie' ? Number(t.value) : t.value; }); return; }
+    if (t.dataset.regula != null && t.type !== 'text') { schimba(() => { const r = configAxa().reguli[t.dataset.regula]; r[t.dataset.camp] = t.type === 'checkbox' ? t.checked : t.value; }); return; }
+    if (t.dataset.set && (t.tagName === 'SELECT' || t.type === 'checkbox')) {
+      const cale = t.dataset.set;
+      schimba(() => {
+        scrieLa(cale, valoareControl(t));
+        if (cale === 'clasa') golesteSelectia();
+      });
+      if (cale === 'tema') { aplicaTema(); memorieCuloriCss.clear(); deseneazaPanglica(); }
+    }
+  });
+
+  const REGULI_RAPIDE = {
+    'absente-rosii': () => ({ coloana: '@ore', operator: 'este-absent', valoare: '', tinta: 'celula', fundal: '#fecaca', text: '', gros: false }),
+    'sub-prag': () => ({ coloana: 'prezenta', operator: 'lt', valoare: String(setari.prag), tinta: 'rand', fundal: '#fef3c7', text: '', gros: false }),
+    toata: () => ({ coloana: 'prezenta', operator: 'eq', valoare: '100', tinta: 'celula', fundal: '#bbf7d0', text: '#0f7a4a', gros: true }),
+    'ore-slabe': () => ({ coloana: 'absenti', operator: 'ge', valoare: '5', tinta: 'rand', fundal: '#fef3c7', text: '', gros: false }),
+  };
+
+  const ACTIUNI = {
+    'copiaza-sel': copiazaSelectia,
+    pensula: () => { pensula = pensula ? null : formatSelectat(); deseneazaPanglica(); actualizeazaStarea(); },
+    fmt: (b) => comutaFormat(b.dataset.p),
+    aliniaza: (b) => aplicaFormat({ aliniere: formatSelectat().aliniere === b.dataset.v ? null : b.dataset.v }),
+    'sterge-format': stergeFormatarea,
+    'coloana-noua': coloanaNoua,
+    'nr-crt': () => schimba(() => { const a = configAxa().ascunse; configAxa().ascunse = a.includes('nrcrt') ? a.filter((x) => x !== 'nrcrt') : [...a, 'nrcrt']; }),
+    'comuta-col': (b) => schimba(() => { const a = configAxa().ascunse; const id = b.dataset.id; configAxa().ascunse = a.includes(id) ? a.filter((x) => x !== id) : [...a, id]; }),
+    'arata-randuri': () => schimba(() => { configAxa().randuriAscunse = []; }),
+    'arata-coloane': () => schimba(() => { configAxa().ascunse = []; }),
+    axa: (b) => { if (setari.axa !== b.dataset.v) schimba(() => { setari.axa = b.dataset.v; golesteSelectia(); }); },
+    'nivel-nou': () => schimba(() => { const folosite = new Set(configAxa().sortari.map((s) => s.coloana)); const c = coloaneOrdonate().find((x) => !x.nrcrt && !folosite.has(x.id)); if (c) configAxa().sortari.push({ coloana: c.id, directie: 1 }); }),
+    'sterge-nivel': (b) => schimba(() => { configAxa().sortari.splice(Number(b.dataset.i), 1); }),
+    'fara-sortare': () => schimba(() => { configAxa().sortari = []; }),
+    'sterge-filtrele': () => schimba(() => { configAxa().filtre = {}; }),
+    restrange: () => schimba(() => { setari.grupuriInchise = [...model.clase]; }),
+    extinde: () => schimba(() => { setari.grupuriInchise = []; }),
+    'regula-noua': () => schimba(() => { configAxa().reguli.push({ coloana: setari.axa === 'elevi' ? 'prezenta' : 'venit', operator: 'lt', valoare: '50', tinta: 'celula', fundal: '#fde68a', text: '', gros: false }); }),
+    'regula-rapida': (b) => schimba(() => { configAxa().reguli.push(REGULI_RAPIDE[b.dataset.v]()); }),
+    'sterge-regula': (b) => schimba(() => { configAxa().reguli.splice(Number(b.dataset.i), 1); }),
+    'sterge-reguli': () => schimba(() => { configAxa().reguli = []; }),
+    'set-simboluri': (b) => schimba(() => { SETURI[Number(b.dataset.i)].forEach((t, i) => { setari.simboluri[FELURI[i]].text = t; }); if (!SETURI[Number(b.dataset.i)].some(Boolean)) FELURI.forEach((f, i) => { setari.simboluri[f].fundal = setari.simboluri[f].fundal || ['#bbf7d0', '#fde68a', '#fecaca', '#e9d5ff'][i]; }); }),
+    'latimi-reset': () => schimba(() => { for (const k of Object.keys(setari.latimi)) if (k.startsWith(`${setari.axa}|`)) delete setari.latimi[k]; }),
+    'vedere-salveaza': async () => {
+      const nume = await intreaba('Numele vederii', $('#vedere')?.value ?? 'Vederea mea');
+      if (!nume) return;
+      const { rapoarte, uneltePliate, tema, fila, ...rest } = setari;
+      vederi[nume] = JSON.parse(JSON.stringify(rest));
+      salveaza(); deseneazaPanglica();
+      const s = $('#vedere'); if (s) s.value = nume;
+    },
+    'vedere-aplica': () => { const v = vederi[$('#vedere').value]; if (v) schimba(() => { setari = completeaza({ ...JSON.parse(JSON.stringify(v)), tema: setari.tema, rapoarte: setari.rapoarte, fila: setari.fila }); golesteSelectia(); }); },
+    'vedere-sterge': () => { delete vederi[$('#vedere').value]; salveaza(); deseneazaPanglica(); },
+    'copiaza-tabel': () => copiaza(tabelCaText().map((l) => l.join('\t')).join('\n'), '#stare', 'Tabelul a fost copiat. Îl poți lipi în Excel sau Word.'),
+    csv: descarcaCsv,
+    tipareste: () => { golesteSelectia(); marcheazaSelectia(); window.print(); },
+    'zoom-100': () => schimba(() => { setari.aspect.zoom = 100; }, '', true),
+    'zoom-potrivit': () => { const t = cadru.querySelector('table'); if (!t) return; const z = Math.max(50, Math.min(200, Math.floor((cadru.clientWidth / (t.scrollWidth / (setari.aspect.zoom / 100))) * 10) * 10)); schimba(() => { setari.aspect.zoom = z; }, '', true); },
+    reset: () => schimba(() => { setari = { ...setariImplicite(), tema: setari.tema, rapoarte: setari.rapoarte, fila: setari.fila }; golesteSelectia(); }),
+  };
+
+  panglica.addEventListener('click', (ev) => {
+    const auto = ev.target.closest('[data-automat]');
+    if (auto) { ev.preventDefault(); scrieCuloare(auto.dataset.automat, null); return; }
+    const b = ev.target.closest('[data-act]');
+    if (b && ACTIUNI[b.dataset.act]) ACTIUNI[b.dataset.act](b);
+  });
+
+  /* =========================================================
+     13. COPIERE, CSV, LISTA MARE, RAPOARTE DIRECTE
+     ========================================================= */
+
+  async function copiaza(text, unde, mesaj) {
+    try { await navigator.clipboard.writeText(text); $(unde).textContent = mesaj; }
+    catch { $(unde).textContent = 'Nu am putut copia. Încearcă din nou.'; }
+  }
+
+  const titluExport = (c) => titluColoana(c) + (c.subtitlu && (c.elev || c.ora) ? ` ${c.subtitlu}` : '');
+  /** Tabelul exact cum îl vezi: coloanele vizibile, rândurile filtrate și sortate, cu Nr. crt. */
+  function tabelCaText() {
+    const { coloane, randuri } = afisat;
+    return [coloane.map(titluExport), ...randuri.map((r, i) => coloane.map((c) => (c.nrcrt ? String(i + 1) : c.text(r))))];
+  }
+  function copiazaSelectia() {
+    if (!selectie.tip) { copiaza(tabelCaText().map((l) => l.join('\t')).join('\n'), '#stare', 'Tabelul a fost copiat.'); return; }
+    const { coloane, randuri } = afisat;
+    const ri = randuri.map((r, i) => ({ r, i })).filter(({ r }) => coloane.some((c) => esteSelectata(idRand(r), c.id)));
+    const ci = coloane.filter((c) => randuri.some((r) => esteSelectata(idRand(r), c.id)));
+    const linii = ri.map(({ r, i }) => ci.map((c) => (esteSelectata(idRand(r), c.id) ? (c.nrcrt ? String(i + 1) : c.text(r)) : '')).join('\t'));
+    if (selectie.tip !== 'celule') linii.unshift(ci.map(titluExport).join('\t'));
+    copiaza(linii.join('\n'), '#stare', `Copiat: ${descriereSelectie()}.`);
+  }
+  function descarcaCsv() {
+    const csv = '﻿' + tabelCaText().map((l) => l.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';')).join('\r\n');
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })), download: `prezenta-${new Date().toISOString().slice(0, 10)}.csv` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    $('#stare').textContent = 'Fișierul CSV a fost descărcat.';
+  }
+
+  /** Lista în formatul tău: „1. Avram Ioana – 50 min”, doar cei care au venit. */
+  function listaOrei(ora, clasa) {
+    return model.elevi
+      .filter((e) => (clasa === 'toate' || e.clasa === clasa) && ora.prezente.has(e.cheie))
+      .map((e) => ({ e, p: ora.prezente.get(e.cheie) }))
+      .sort((a, b) => a.e.nume.localeCompare(b.e.nume, 'ro'));
+  }
+  function completeazaListele() {
+    const ora = $('#lista-ora'); const clasa = $('#lista-clasa');
+    const [vo, vc] = [ora.value, clasa.value];
+    ora.innerHTML = [...model.ore].reverse().map((o) => `<option value="${escapa(o.id)}">ora din ${escapa(o.titlu)}</option>`).join('') || '<option value="">—</option>';
+    clasa.innerHTML = optiuni([['toate', 'toate clasele'], ...model.clase.map((c) => [c, c === FARA_CLASA ? 'fără clasă' : c])], '');
+    if ([...ora.options].some((o) => o.value === vo)) ora.value = vo;
+    if ([...clasa.options].some((o) => o.value === vc)) clasa.value = vc;
+    completeazaTintaRaport();
+  }
+  $('#copiaza-lista').addEventListener('click', () => {
+    const ora = model.ore.find((o) => o.id === $('#lista-ora').value);
+    if (!ora) { $('#mesaj-lista').textContent = 'Încă nu există nicio oră.'; return; }
+    const clasa = $('#lista-clasa').value;
+    const lista = listaOrei(ora, clasa);
+    const text = lista.map(({ e, p }, i) => `${i + 1}. ${e.nume} – ${durata(p.minute)}`).join('\n');
+    copiaza(text, '#mesaj-lista', `Copiat: ${nElevi(lista.length)} de la ora din ${ora.titlu}${clasa === 'toate' ? '' : `, ${clasa}`}.`);
+  });
+
+  function deschideRaport(tip, tinta) {
+    $('#raport-tip').value = tip;
+    completeazaTintaRaport();
+    $('#raport-tinta').value = tinta;
+    if ($('#raport-tinta').value !== tinta) { setari.clasa = 'toate'; salveaza(); totul(); $('#raport-tip').value = tip; completeazaTintaRaport(); $('#raport-tinta').value = tinta; }
+    $('#fa-raport').click();
+  }
+
+  /* =========================================================
+     14. ZOOM, TEMA, ANULEAZĂ / REFĂ
+     ========================================================= */
+
+  const laZoom = (z) => schimba(() => { setari.aspect.zoom = Math.max(50, Math.min(200, z)); }, 'zoom', true);
+  $('#zoom').addEventListener('input', (ev) => laZoom(Number(ev.target.value)));
+  $('#zoom-minus').addEventListener('click', () => laZoom(Number(setari.aspect.zoom) - 10));
+  $('#zoom-plus').addEventListener('click', () => laZoom(Number(setari.aspect.zoom) + 10));
+  cadru.addEventListener('wheel', (ev) => { if (ev.ctrlKey) { ev.preventDefault(); laZoom(Number(setari.aspect.zoom) + (ev.deltaY < 0 ? 10 : -10)); } }, { passive: false });
+
+  function aplicaTema() {
+    if (setari.tema && setari.tema !== 'auto') document.documentElement.dataset.tema = setari.tema;
+    else delete document.documentElement.dataset.tema;
+  }
+  $('#anuleaza').addEventListener('click', anuleaza);
+  $('#reface').addEventListener('click', reface);
+  function completeazaTintaRaport() {
+    const tip = $('#raport-tip').value;
+    const veche = $('#raport-tinta').value;
+    const optiuni = tip === 'elev'
+      ? eleviActivi().map((e) => [e.cheie, `${e.nume}${e.clasa !== FARA_CLASA ? ` (${e.clasa})` : ''}`])
+      : tip === 'sedinta'
+        ? [...model.ore].reverse().map((o) => [o.id, `ora din ${o.titlu}`])
+        : model.clase.map((c) => [c, c === FARA_CLASA ? c : `clasa ${c}`]);
+    $('#raport-tinta').innerHTML = optiuni.map(([v, t]) => `<option value="${escapa(v)}">${escapa(t)}</option>`).join('');
+    if (optiuni.some(([v]) => v === veche)) $('#raport-tinta').value = veche;
+  }
+  $('#raport-tip').addEventListener('change', completeazaTintaRaport);
+
+  const perioada = () => (model.ore.length ? `${model.ore[0].titlu} – ${model.ore.at(-1).titlu} ${new Date(model.ore.at(-1).inceputMs).getFullYear()}` : '');
+  const generat = () => `Generat pe ${ziAn.format(Date.now())}, din datele Google Meet${model.actualizat ? ` actualizate pe ${ziSiOra.format(model.actualizat)}` : ''}.`;
+  const cifreHtml = (lista) => `<div class="cifre">${lista.map(([b, s]) => `<div class="cifra"><b>${escapa(b)}</b><span>${escapa(s)}</span></div>`).join('')}</div>`;
+  const NUME_TIP = { elev: 'Raport per elev', sedinta: 'Raport per ședință', clasa: 'Raport per clasă' };
+
+  /** Înlocuiește {elev}, {clasa}, {data} … cu valorile raportului. Ce nu recunoaște rămâne neschimbat. */
+  const completeazaSablon = (text, valori) => String(text ?? '').replace(/\{(\w+)\}/g, (tot, cheie) => (cheie in valori ? valori[cheie] : tot));
+
+  function statisticiElev(e) {
+    const stari = model.ore.map((o) => ({ o, s: stare(e, o) }));
+    const venit = stari.filter((x) => !esteAbsent(x.s));
+    return {
+      stari, venit: venit.length,
+      procent: model.ore.length ? Math.round((venit.length * 100) / model.ore.length) : 0,
+      minute: venit.reduce((a, x) => a + x.s.minute, 0),
+      absente: stari.filter((x) => esteAbsent(x.s)),
+      motivate: stari.filter((x) => x.s.fel === 'motivat'),
+      partiale: stari.filter((x) => x.s.fel === 'partial'),
+    };
+  }
+
+  /** Partea comună a oricărui raport: antetul școlii, titlul, subtitlul; la final observațiile și semnătura. */
+  function invelisRaport(cfg, valori, corp) {
+    const c = setari.rapoarte.comun;
+    const accent = culoareSigura(c.accent);
+    const stil = `--marime-raport:${Number(c.marime) || 14}px;${accent ? `--accent-raport:${accent}` : ''}`;
+    const subtitlu = completeazaSablon(cfg.subtitlu, valori);
+    const observatii = completeazaSablon(cfg.observatii, valori).trim();
+    const html = `<article class="foaie-raport" style="${stil}">
+      ${c.aratScoala && c.scoala.trim() ? `<div class="scoala">${escapa(c.scoala)}</div>` : ''}
+      <h2 id="raport-titlu">${escapa(completeazaSablon(cfg.titlu, valori))}</h2>
+      ${subtitlu ? `<p class="sub">${escapa(subtitlu)}</p>` : ''}
+      ${corp.html}
+      ${observatii ? `<div class="observatii">${escapa(observatii)}</div>` : ''}
+      ${c.aratGenerat || c.aratSemnatura ? `<p class="semnatura">${c.aratGenerat ? escapa(generat()) : ''}${c.aratGenerat && c.aratSemnatura ? '<br>' : ''}${c.aratSemnatura ? escapa(c.semnatura) : ''}</p>` : ''}
+    </article>`;
+    const text = [
+      ...(c.aratScoala && c.scoala.trim() ? [c.scoala, ''] : []),
+      completeazaSablon(cfg.titlu, valori),
+      ...(subtitlu ? [subtitlu] : []),
+      ...corp.text,
+      ...(observatii ? ['', observatii] : []),
+      ...(c.aratSemnatura ? ['', c.semnatura] : []),
+    ].join('\n');
+    return { html, text };
+  }
+
+  function raportElev(cheie) {
+    const e = model.elevi.find((x) => x.cheie === cheie);
+    if (!e) return null;
+    const cfg = setari.rapoarte.elev;
+    const sec = cfg.sectiuni;
+    const st = statisticiElev(e);
+    const valori = { elev: e.nume, clasa: e.clasa, perioada: perioada(), ore: nOre(model.ore.length), procent: `${st.procent}%` };
+    const prezenta = (s, o) => {
+      if (esteAbsent(s)) return s.fel === 'motivat' ? 'a lipsit (motivat)' : 'a lipsit';
+      const parti = [sec.minute ? `${s.minute} din ${o.durataMinute} min` : 'prezent', sec.procent ? `(${s.procent}%)` : ''];
+      return parti.filter(Boolean).join(' ');
+    };
+    const corpHtml = [
+      sec.cifre ? cifreHtml([[`${st.venit} / ${model.ore.length}`, 'ore la care a fost'], [`${st.procent}%`, 'prezență'], [durata(st.minute), 'timp în total'], [String(st.absente.length), st.motivate.length ? `absențe (${st.motivate.length} motivate)` : 'absențe'], [String(st.partiale.length), `ore sub ${setari.prag}%`]]) : '',
+      sec.tabel ? `<h3>Ora cu ora</h3><table><thead><tr><th>Nr.</th><th>Data</th>${sec.interval ? '<th>Ora</th>' : ''}<th>Prezența</th></tr></thead><tbody>
+        ${st.stari.map(({ o, s }, i) => `<tr><td>${i + 1}</td><td>${escapa(ziLunga.format(o.inceputMs))}</td>${sec.interval ? `<td>${intervalOra(o)}</td>` : ''}<td class="${s.fel === 'absent' ? 'rosu' : s.fel === 'partial' ? 'galben' : ''}">${escapa(prezenta(s, o))}</td></tr>`).join('')}
+      </tbody></table>` : '',
+    ].join('');
+    const corpText = [
+      `A fost la ${st.venit} din ${nOre(model.ore.length)} (${st.procent}%), ${nMinute(st.minute)} în total, ${st.absente.length} absențe${st.motivate.length ? ` (${st.motivate.length} motivate)` : ''}, ${st.partiale.length} ore sub ${setari.prag}%.`,
+      ...(sec.tabel ? ['', ...st.stari.map(({ o, s }, i) => `${i + 1}. ${o.titlu} – ${prezenta(s, o)}`)] : []),
+    ];
+    return invelisRaport(cfg, valori, { html: corpHtml, text: corpText });
+  }
+
+  const numeLipsa = (e, o) => (date.motivari[`${e.cheie}|${o.id}`] ? `${e.nume} (motivat)` : e.nume);
+
+  function raportSedinta(oraId) {
+    const o = model.ore.find((x) => x.id === oraId);
+    if (!o) return null;
+    const cfg = setari.rapoarte.sedinta;
+    const sec = cfg.sectiuni;
+    const clase = model.clase.filter((c) => setari.clasa === 'toate' || c === setari.clasa);
+    const blocuri = clase.map((c) => {
+      const elevi = model.elevi.filter((e) => e.clasa === c);
+      const venit = listaOrei(o, c);
+      const lipsa = elevi.filter((e) => !o.prezente.has(e.cheie));
+      if (!venit.length && !lipsa.length) return null;
+      return { c, elevi, venit, lipsa, partial: venit.filter(({ p }) => p.procent < setari.prag) };
+    }).filter(Boolean);
+    const valori = { data: ziLunga.format(o.inceputMs), ora: intervalOra(o), durata: durata(o.durataMinute), clasa: setari.clasa === 'toate' ? clase.join(', ') : setari.clasa };
+    const titluBloc = (b) => `${b.c === FARA_CLASA ? 'Elevi fără clasă' : `Clasa ${b.c}`} – au venit ${b.venit.length} din ${b.elevi.length}`;
+    const minuteText = (p) => [sec.minute ? `${p.minute} din ${o.durataMinute}` : '', sec.procent ? `(${p.procent}%)` : ''].filter(Boolean).join(' ');
+    const corpHtml = [
+      sec.cifre ? cifreHtml([[String(blocuri.reduce((a, b) => a + b.venit.length, 0)), 'au venit'], [String(blocuri.reduce((a, b) => a + b.lipsa.length, 0)), 'au lipsit'], [String(blocuri.reduce((a, b) => a + b.partial.length, 0)), `sub ${setari.prag}% din oră`]]) : '',
+      ...blocuri.map((b) => `
+        <h3>${escapa(titluBloc(b))}</h3>
+        <table><thead><tr><th>Nr.</th><th>Elev</th>${sec.minute || sec.procent ? '<th>Minute</th>' : ''}${sec.intrare ? '<th>Intrare – ieșire</th>' : ''}</tr></thead><tbody>
+        ${b.venit.map(({ e, p }, i) => `<tr><td>${i + 1}</td><td>${escapa(e.nume)}</td>${sec.minute || sec.procent ? `<td class="${p.procent < setari.prag ? 'galben' : ''}">${escapa(minuteText(p))}</td>` : ''}${sec.intrare ? `<td>${p.primaIntrare ? `${oraMinut.format(Date.parse(p.primaIntrare))}–${oraMinut.format(Date.parse(p.ultimaIesire))}` : '–'}</td>` : ''}</tr>`).join('')}
+        </tbody></table>
+        ${sec.absenti ? (b.lipsa.length ? `<p><span class="rosu">Au lipsit (${b.lipsa.length}):</span> ${b.lipsa.map((e) => escapa(numeLipsa(e, o))).join(', ')}</p>` : '<p>Nu a lipsit nimeni.</p>') : ''}`),
+    ].join('');
+    const corpText = blocuri.flatMap((b) => [
+      '', `${titluBloc(b)}:`,
+      ...b.venit.map(({ e, p }, i) => `${i + 1}. ${e.nume}${sec.minute ? ` – ${durata(p.minute)}` : ''}`),
+      ...(sec.absenti ? [b.lipsa.length ? `Au lipsit (${b.lipsa.length}): ${b.lipsa.map((e) => numeLipsa(e, o)).join(', ')}` : 'Nu a lipsit nimeni.'] : []),
+    ]);
+    return invelisRaport(cfg, valori, { html: corpHtml, text: corpText });
+  }
+
+  function raportClasa(clasa) {
+    const elevi = model.elevi.filter((e) => e.clasa === clasa);
+    if (!elevi.length) return null;
+    const cfg = setari.rapoarte.clasa;
+    const sec = cfg.sectiuni;
+    const statistici = elevi.map((e) => ({ e, st: statisticiElev(e) }));
+    const media = Math.round(statistici.reduce((a, x) => a + x.st.procent, 0) / statistici.length);
+    const sub = statistici.filter((x) => x.st.procent < setari.prag);
+    const valori = { clasa, perioada: perioada(), elevi: nElevi(elevi.length), ore: nOre(model.ore.length), media: `${media}%` };
+    const corpHtml = [
+      sec.cifre ? cifreHtml([[`${media}%`, 'media prezenței'], [String(model.ore.length), 'ore ținute'], [String(statistici.filter((x) => x.st.procent === 100).length), 'n-au lipsit deloc'], [String(sub.length), `sub ${setari.prag}% prezență`]]) : '',
+      sec.elevi ? `<h3>Elevii, alfabetic</h3><table><thead><tr><th>Nr.</th><th>Elev</th><th>Ore</th><th>Prezență</th>${sec.minute ? '<th>Minute</th>' : ''}${sec.absente ? '<th>Absențe</th>' : ''}</tr></thead><tbody>
+        ${statistici.map(({ e, st }, i) => `<tr><td>${i + 1}</td><td>${escapa(e.nume)}</td><td>${st.venit}/${model.ore.length}</td><td class="${st.procent < setari.prag ? 'rosu' : ''}">${st.procent}%</td>${sec.minute ? `<td>${st.minute}</td>` : ''}${sec.absente ? `<td>${st.absente.length}</td>` : ''}</tr>`).join('')}
+      </tbody></table>` : '',
+      sec.ore ? `<h3>Orele</h3><table><thead><tr><th>Data</th><th>Ora</th><th>Au venit</th></tr></thead><tbody>
+        ${model.ore.map((o) => `<tr><td>${escapa(ziLunga.format(o.inceputMs))}</td><td>${intervalOra(o)}</td><td>${elevi.filter((e) => o.prezente.has(e.cheie)).length} din ${elevi.length}</td></tr>`).join('')}
+      </tbody></table>` : '',
+      sec.urmarit && sub.length ? `<h3>De urmărit (sub ${setari.prag}% prezență)</h3><p>${sub.map(({ e, st }) => `${escapa(e.nume)} (${st.procent}%)`).join(', ')}</p>` : '',
+    ].join('');
+    const pePrezenta = [...statistici].sort((a, b) => b.st.procent - a.st.procent || b.st.minute - a.st.minute);
+    const corpText = [
+      `Media prezenței: ${media}% (${nOre(model.ore.length)})`,
+      ...(sec.elevi ? ['', ...pePrezenta.map(({ e, st }, i) => `${i + 1}. ${e.nume} – ${st.venit} din ${nOre(model.ore.length)} (${st.procent}%)`)] : []),
+      ...(sec.urmarit && sub.length ? ['', `De urmărit (sub ${setari.prag}%): ${sub.map(({ e }) => e.nume).join(', ')}`] : []),
+    ];
+    return invelisRaport(cfg, valori, { html: corpHtml, text: corpText });
+  }
+
+  /* ---------- Setările raportului (coloana din stânga a ferestrei) ---------- */
+
+  const SECTIUNI = {
+    elev: [['cifre', 'Cifrele de sus'], ['tabel', 'Tabelul ora cu ora'], ['interval', 'Coloana „Ora” (15:00–15:50)'], ['minute', 'Minutele la fiecare oră'], ['procent', 'Procentul din oră']],
+    sedinta: [['cifre', 'Cifrele de sus'], ['minute', 'Minutele fiecărui elev'], ['procent', 'Procentul din oră'], ['intrare', 'Coloana „Intrare – ieșire”'], ['absenti', 'Lista „Au lipsit”']],
+    clasa: [['cifre', 'Cifrele de sus'], ['elevi', 'Tabelul elevilor'], ['minute', 'Coloana „Minute”'], ['absente', 'Coloana „Absențe”'], ['ore', 'Tabelul orelor'], ['urmarit', 'Lista „De urmărit”']],
+  };
+  const CAMPURI = {
+    elev: ['{elev}', '{clasa}', '{perioada}', '{ore}', '{procent}'],
+    sedinta: ['{data}', '{ora}', '{durata}', '{clasa}'],
+    clasa: ['{clasa}', '{perioada}', '{elevi}', '{ore}', '{media}'],
+  };
+
+  let raportDeschis = null;     // { tip, tinta, rezultat, editat }
+
+  function deseneazaSetariRaport(tip) {
+    const cfg = setari.rapoarte[tip];
+    const c = setari.rapoarte.comun;
+    $('#raport-setari').innerHTML = `
+      <section>
+        <h3>Textele</h3>
+        <label class="camp">Titlul <input type="text" data-r="${tip}.titlu" value="${escapa(cfg.titlu)}"></label>
+        <label class="camp">Subtitlul <input type="text" data-r="${tip}.subtitlu" value="${escapa(cfg.subtitlu)}"></label>
+        <label class="camp">Observații (apar la final) <textarea data-r="${tip}.observatii" placeholder="De exemplu: Rog dirigintele să discute cu elevii care lipsesc des.">${escapa(cfg.observatii)}</textarea></label>
+        <p class="nota">Câmpuri care se completează singure: ${CAMPURI[tip].map((x) => `<code>${x}</code>`).join(' ')}</p>
+      </section>
+      <section>
+        <h3>Ce apare în raport</h3>
+        ${SECTIUNI[tip].map(([id, nume]) => `<label class="bifa"><input type="checkbox" data-r="${tip}.sectiuni.${id}" ${cfg.sectiuni[id] ? 'checked' : ''}> ${nume}</label>`).join('')}
+      </section>
+      <section>
+        <h3>Antet și semnătură <span class="nota">(la toate rapoartele)</span></h3>
+        <label class="bifa"><input type="checkbox" data-r="comun.aratScoala" ${c.aratScoala ? 'checked' : ''}> Numele școlii, sus</label>
+        <input type="text" data-r="comun.scoala" value="${escapa(c.scoala)}" aria-label="Numele școlii">
+        <label class="bifa"><input type="checkbox" data-r="comun.aratSemnatura" ${c.aratSemnatura ? 'checked' : ''}> Semnătura, jos</label>
+        <input type="text" data-r="comun.semnatura" value="${escapa(c.semnatura)}" aria-label="Semnătura">
+        <label class="bifa"><input type="checkbox" data-r="comun.aratGenerat" ${c.aratGenerat ? 'checked' : ''}> Data la care a fost generat</label>
+      </section>
+      <section>
+        <h3>Aspect</h3>
+        <label class="bifa">Mărimea textului <input type="number" min="10" max="20" step="1" data-r="comun.marime" value="${Number(c.marime)}" style="inline-size:64px"> px</label>
+        <div class="bifa">Culoarea titlurilor ${alegatorCuloare('raport:accent', 'culoare', c.accent, '#1b2130')}</div>
+      </section>
+      <button class="btn mic" type="button" id="raport-setari-reset">Readu setările acestui raport la început</button>`;
+  }
+
+  function scrieSetareRaport(cale, valoare) {
+    const parti = cale.split('.');
+    let obiect = setari.rapoarte;
+    for (const p of parti.slice(0, -1)) obiect = obiect[p];
+    obiect[parti.at(-1)] = valoare;
+  }
+
+  function genereazaRaport() {
+    const { tip, tinta } = raportDeschis;
+    raportDeschis.rezultat = { elev: raportElev, sedinta: raportSedinta, clasa: raportClasa }[tip](tinta);
+    raportDeschis.editat = false;
+    $('#raport-continut').innerHTML = raportDeschis.rezultat?.html ?? '<p class="gol">Nu am ce pune în raport.</p>';
+    const foaie = $('#raport-continut .foaie-raport');
+    if (foaie) {
+      foaie.contentEditable = 'true';
+      foaie.spellcheck = true;
+      foaie.addEventListener('input', () => { raportDeschis.editat = true; $('#mesaj-raport').textContent = 'Ai modificat raportul direct. „Refă raportul” îl readuce la forma inițială.'; });
+    }
+  }
+
+  $('#raport-setari').addEventListener('input', (ev) => {
+    const t = ev.target;
+    if (t.dataset.culoare === 'raport:accent') { setari.rapoarte.comun.accent = t.value; t.closest('.culoare').classList.remove('auto'); }
+    else if (t.dataset.r && t.type !== 'checkbox') scrieSetareRaport(t.dataset.r, t.type === 'number' ? Number(t.value) || 14 : t.value);
+    else return;
+    salveaza(); genereazaRaport();
+  });
+  $('#raport-setari').addEventListener('change', (ev) => {
+    const t = ev.target;
+    if (!t.dataset.r || t.type !== 'checkbox') return;
+    scrieSetareRaport(t.dataset.r, t.checked);
+    salveaza(); genereazaRaport();
+  });
+  $('#raport-setari').addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-automat="raport:accent"]')) { setari.rapoarte.comun.accent = ''; }
+    else if (ev.target.closest('#raport-setari-reset')) {
+      const b = rapoarteImplicite();
+      setari.rapoarte[raportDeschis.tip] = b[raportDeschis.tip];
+    } else return;
+    salveaza(); deseneazaSetariRaport(raportDeschis.tip); genereazaRaport();
+  });
+
+  $('#fa-raport').addEventListener('click', () => {
+    const tip = $('#raport-tip').value;
+    const tinta = $('#raport-tinta').value;
+    if (!tinta) return;
+    raportDeschis = { tip, tinta };
+    $('#raport-nume-tip').textContent = NUME_TIP[tip];
+    $('#mesaj-raport').textContent = '';
+    deseneazaSetariRaport(tip);
+    genereazaRaport();
+    $('#raport').showModal();
+  });
+  $('#raport-inchide').addEventListener('click', () => $('#raport').close());
+  $('#raport-reface').addEventListener('click', () => { genereazaRaport(); $('#mesaj-raport').textContent = 'Raportul a fost refăcut.'; });
+
+  /** Textul de copiat: dacă ai modificat raportul direct, se copiază exact ce vezi. */
+  function textulRaportului() {
+    if (!raportDeschis.editat) return raportDeschis.rezultat.text;
+    const foaie = $('#raport-continut .foaie-raport');
+    return foaie.innerText.replace(/\n{3,}/g, '\n\n').trim();
+  }
+  $('#raport-copiaza').addEventListener('click', () => {
+    if (!raportDeschis?.rezultat) return;
+    copiaza(textulRaportului(), '#mesaj-raport', 'Textul raportului a fost copiat.');
+  });
+  $('#raport-pdf').addEventListener('click', () => {
+    if (!raportDeschis?.rezultat) return;
+    // Tipărim doar raportul, așa cum arată acum (cu modificările tale); din fereastra de tipărire alegi „Salvează ca PDF”.
+    const copie = $('#raport-continut .foaie-raport').cloneNode(true);
+    copie.removeAttribute('contenteditable');
+    $('#zona-tipar').replaceChildren(copie);
+    $('#raport').close();
+    document.body.classList.add('tipar');
+    window.print();
+  });
+  window.addEventListener('afterprint', () => { document.body.classList.remove('tipar'); $('#zona-tipar').replaceChildren(); });
+
+
+  /* =========================================================
+     15. PORNIREA
+     ========================================================= */
+
+  function totul() {
+    deseneazaPanglica();
+    deseneazaTabelul();
+    completeazaListele();
+    $('#anuleaza').disabled = !istoric.inapoi.length;
+    $('#reface').disabled = !istoric.inainte.length;
+  }
+
+  aplicaTema();
+
+  window.Prezenta = {
+    /** Apelează asta de pe site, după ce ai încărcat datele (de ex. din Supabase). */
+    afiseaza(dateNoi) {
+      model = construiesteModel(dateNoi);
+      if (setari.clasa !== 'toate' && !model.clase.includes(setari.clasa)) setari.clasa = 'toate';
+      $('#actualizat').textContent = model.actualizat ? `Actualizat ${ziSiOra.format(model.actualizat)} · ${nOre(model.ore.length)} · ${nElevi(model.elevi.length)}` : '';
+      totul();
+    },
+    /** Un mesaj în locul tabelului (de ex. „Nu ai acces” sau o eroare la încărcare). */
+    mesaj(titlu, text) {
+      cadru.innerHTML = `<div class="gol"><h2>${escapa(titlu)}</h2><p>${escapa(text)}</p></div>`;
+    },
+  };
+
+  const ePentruProba = location.protocol === 'file:' || new URLSearchParams(location.search).has('proba');
+  if (window.PREZENTA_DATE) window.Prezenta.afiseaza(window.PREZENTA_DATE);
+  else if (ePentruProba) window.Prezenta.afiseaza(DATE_DE_PROBA);
+  else { totul(); window.Prezenta.mesaj('Se încarcă prezența…', 'Datele vin din tabelul Google, prin baza de date a site-ului.'); }
+  </script>
+  <!-- ===== LEGĂTURA CU SITUL (singurul lucru adăugat peste prezenta.html) =====
+       Numai profesorul primește datele: baza le dă doar adminului (RLS, migrarea
+       0110), aici doar alegem mesajul. Datele vin din tabelul Google, prin
+       funcția `primeste-prezenta`. Cu `?proba` rămân datele de probă inventate. -->
+  <script type="module">
+    import { supabase } from "../../src/shared/scripts/supabase-client.js";
+    import { roleForEmail } from "../../src/shared/scripts/session.js";
+
+    if (!new URLSearchParams(location.search).has("proba")) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (roleForEmail(session?.user?.email) !== "admin") {
+          Prezenta.mesaj("Nu ai acces", "Pagina e doar pentru profesor.");
+        } else {
+          const { data, error } = await supabase.from("prezenta_export").select("date").eq("id", 1).maybeSingle();
+          if (error) Prezenta.mesaj("Nu am putut încărca prezența", error.message);
+          else if (!data) Prezenta.mesaj("Încă nicio oră", "Trimite datele din tabel: Prezență → Trimite datele pe site acum.");
+          else Prezenta.afiseaza(data.date);
+        }
+      } catch (err) {
+        Prezenta.mesaj("Nu am putut încărca prezența", err?.message || String(err));
+      }
+    }
+  </script>
+</body>
+</html>
