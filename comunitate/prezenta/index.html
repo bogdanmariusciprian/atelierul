@@ -399,6 +399,7 @@
       tema: 'auto',
       axa: 'elevi',                         // „elevi” = elevii pe rânduri; „ore” = orele pe rânduri
       clasa: 'toate',
+      doarCuPrezenta: false,                // ascunde elevii care n-au venit la nicio oră (parțial = venit)
       continut: 'simbol',
       prag: 75,
       simboluri: {
@@ -539,7 +540,10 @@
   }
   let model = construiesteModel({ ore: [] });
 
-  const eleviActivi = () => (setari.clasa === 'toate' ? model.elevi : model.elevi.filter((e) => e.clasa === setari.clasa));
+  /** A venit la cel puțin o oră, oricât de puțin (o absență motivată nu e venire). */
+  const aVenit = (e) => model.ore.some((o) => o.prezente.has(e.cheie));
+  const eleviActivi = () => model.elevi.filter((e) =>
+    (setari.clasa === 'toate' || e.clasa === setari.clasa) && (!setari.doarCuPrezenta || aVenit(e)));
   const culoareClasa = (clasa) => setari.clase.culori[clasa] || CULORI_CLASE[Math.max(0, model.clase.indexOf(clasa)) % CULORI_CLASE.length];
 
   /** Starea unui elev la o oră: prezent, parțial, absent sau motivat (absență motivată de tine). */
@@ -1546,7 +1550,8 @@
     const filtre = Object.values(cfg.filtre).filter((x) => x?.length).length;
     return [
       grup('Pe rânduri', buton('axa', '👤 Elevii', { apasat: setari.axa === 'elevi', date: 'data-v="elevi" ' }) + buton('axa', '🗓 Orele', { apasat: setari.axa === 'ore', date: 'data-v="ore" ' })),
-      grup('Clasa', alege('clasa', [['toate', 'Toate clasele'], ...model.clase.map((c) => [c, c === FARA_CLASA ? 'Fără clasă' : c])])),
+      grup('Clasa', alege('clasa', [['toate', 'Toate clasele'], ...model.clase.map((c) => [c, c === FARA_CLASA ? 'Fără clasă' : c])])
+        + bifa('doarCuPrezenta', 'Doar elevii veniți la cel puțin o oră')),
       grup('Sortare', `<div class="lista-p">${niveluri}<div class="rand-p">${buton('nivel-nou', '＋ Nivel')}${buton('fara-sortare', 'Fără sortare', { dezactivat: !cfg.sortari.length })}</div></div>`),
       grup('Filtre', buton('sterge-filtrele', `▾ Șterge filtrele (${filtre})`, { dezactivat: !filtre })),
       setari.axa === 'elevi' ? grup('Grupare', `${bifa('grupare', 'Pe clase, cu subtotal')}${setari.grupare ? buton('restrange', '▸ Restrânge') + buton('extinde', '▾ Extinde') : ''}`) : '',
