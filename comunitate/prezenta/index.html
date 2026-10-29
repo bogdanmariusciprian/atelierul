@@ -93,6 +93,10 @@
     .titlu-rand { display: flex; align-items: center; gap: 8px; }
     .titlu h1 { font-size: 1.6rem; }
     .titlu p { color: var(--slab); font-size: 0.86rem; margin: 0; }
+    /* „← Înapoi” spre pagina sitului de unde ai venit: mic, ca să nu tragă ochiul de la tabel. */
+    .inapoi { justify-self: start; color: var(--slab); font-size: 0.82rem; font-weight: 600; text-decoration: none;
+      padding: 2px 8px 2px 6px; margin-inline-start: -6px; border-radius: 999px; }
+    .inapoi:hover, .inapoi:focus-visible { color: var(--albastru); background: var(--foaie-2); }
     .lista-mare { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 14px; background: var(--albastru); color: var(--pe-albastru); border-radius: 14px; }
     .lista-mare label { font-weight: 700; }
     .lista-mare select { background: var(--pe-albastru); color: var(--text); border-color: transparent; font-size: 1rem; }
@@ -260,6 +264,7 @@
   <div class="pagina">
     <header class="cap">
       <div class="titlu">
+        <a class="inapoi" id="inapoi" href="/" title="Înapoi unde erai pe site">← Înapoi</a>
         <div class="titlu-rand">
           <h1>Prezență</h1>
           <button class="btn icon" type="button" id="anuleaza" title="Anulează (Ctrl+Z)" aria-label="Anulează">↶</button>
@@ -2167,6 +2172,14 @@
   <script type="module">
     import { supabase } from "../../src/shared/scripts/supabase-client.js";
     import { roleForEmail } from "../../src/shared/scripts/session.js";
+
+    /* „← Înapoi”: dacă ai venit de pe sit, te duce exact acolo (cu tot cu locul din pagină);
+       dacă ai deschis adresa direct, te duce pe prima pagină. */
+    document.getElementById("inapoi")?.addEventListener("click", (ev) => {
+      let deAici = false;
+      try { deAici = new URL(document.referrer).origin === location.origin; } catch {}
+      if (deAici && history.length > 1) { ev.preventDefault(); history.back(); }
+    });
 
     const CHEIE_MEMORIE = "prezenta-tabel-v3";
     const CHEIE_CAND = "prezenta-tabel-v3:cand";   // când s-a schimbat ultima oară memoria din browserul ăsta
