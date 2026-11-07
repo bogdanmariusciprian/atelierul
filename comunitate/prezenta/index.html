@@ -175,6 +175,7 @@
     .tabel tr.grup-rand > td { text-align: start; font-weight: 700; cursor: pointer; padding-block: 6px; }
     .tabel td input.editare { inline-size: 100%; border: 0; padding: 0; background: transparent; outline: 2px solid var(--albastru); font: inherit; color: inherit; text-align: inherit; }
     .minute-mici { opacity: 0.7; font-size: 0.85em; margin-inline-start: 4px; }
+    .timp-sub { display: block; margin-block-start: 3px; font-size: 0.68em; line-height: 1.1; white-space: nowrap; color: var(--slab); font-weight: 400; }
     .gol { padding: 40px 16px; text-align: center; color: var(--slab); }
     .legenda { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; color: var(--slab); font-size: 0.88rem; }
 
@@ -597,6 +598,8 @@
     if (setari.continut === 'minute' && s.minute != null) return text(s.minute);
     if (setari.continut === 'procent' && s.procent != null) return text(`${s.procent}%`);
     if (setari.continut === 'simbol-minute' && s.minute != null) return `${simbolHtml(s.fel)}<span class="minute-mici">${s.minute}</span>`;
+    /* Simbolul, cu timpul de la oră scris mic dedesubt („1 h 46 min"); absențele n-au timp. */
+    if (setari.continut === 'simbol' && s.minute != null) return `${simbolHtml(s.fel)}<span class="timp-sub">${durata(s.minute)}</span>`;
     return simbolHtml(s.fel);
   }
   function textStare(s) {
@@ -1560,7 +1563,7 @@
       grup('Sortare', `<div class="lista-p">${niveluri}<div class="rand-p">${buton('nivel-nou', '＋ Nivel')}${buton('fara-sortare', 'Fără sortare', { dezactivat: !cfg.sortari.length })}</div></div>`),
       grup('Filtre', buton('sterge-filtrele', `▾ Șterge filtrele (${filtre})`, { dezactivat: !filtre })),
       setari.axa === 'elevi' ? grup('Grupare', `${bifa('grupare', 'Pe clase, cu subtotal')}${setari.grupare ? buton('restrange', '▸ Restrânge') + buton('extinde', '▾ Extinde') : ''}`) : '',
-      grup('Căsuțele orelor', alege('continut', [['simbol', 'Simbolul'], ['simbol-minute', 'Simbol + minute'], ['minute', 'Minutele'], ['procent', 'Procentul din oră']]) + numar_('prag', 'Parțial sub', 5, 100, 5, '%')),
+      grup('Căsuțele orelor', alege('continut', [['simbol', 'Simbolul, cu timpul dedesubt'], ['doar-simbol', 'Doar simbolul'], ['simbol-minute', 'Simbol + minute'], ['minute', 'Minutele'], ['procent', 'Procentul din oră']]) + numar_('prag', 'Parțial sub', 5, 100, 5, '%')),
     ].join('');
   }
 
