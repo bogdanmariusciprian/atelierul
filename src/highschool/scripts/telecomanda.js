@@ -21,9 +21,11 @@
 //    nu s-a schimbat nimic. Costă un mesaj la trei secunde și scapă de
 //    întrebare cu totul.
 //
-// 3. PE CANAL NU TRECE NIMIC DE ASCUNS – fișa, numărul slide-ului și locurile
-//    apăsate („al treilea copil al lui…"). Notițele se citesc din tabelul lor,
-//    de către aparatul care conduce, și nu pleacă mai departe niciodată.
+// 3. PE CANAL NU TRECE NIMIC DE ASCUNS – fișa, numărul slide-ului, locurile
+//    apăsate („al treilea copil al lui…") și numele tastelor apăsate în afara
+//    câmpurilor („ArrowRight"); ce scrii într-un câmp nu pleacă (vezi
+//    `fisa-punte.js`). Notițele se citesc din tabelul lor, de către aparatul
+//    care conduce, și nu pleacă mai departe niciodată.
 //
 // 4. MESAJELE VECHI SE ARUNCĂ. Fiecare poartă ceasul la care a fost trimis; pe
 //    o rețea de școală, două mesaje se pot întoarce pe dos, iar tabla ar fi

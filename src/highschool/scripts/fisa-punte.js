@@ -32,6 +32,22 @@
 //      ajuns el pe rând. Când sub deget e un strat cât tot ecranul (creionul
 //      desenează pe unul), punctele pleacă toate față de un singur reper luat
 //      la începutul gestului, ca linia să nu se rupă în bucăți.
+//   5. CE S-A APĂSAT PE TASTATURĂ. Săgețile, Page Down, Space, Escape: cu ele
+//      treci prin slide-uri și prin pașii unui slide, ca din săgețile de pe
+//      ecran. Se ascultă tot din afară, pe captare: fiecare tastă intră în
+//      jurnal împreună cu elementul pe care stătea focusul, iar pe tablă se
+//      apasă aceeași tastă, pe același element (strofa mărită, de pildă, își
+//      ascultă tastele numai pe ea). Nu intră ce scrii într-un câmp (e al tău),
+//      nici tastele F, care sunt ale browserului (F5 reîncarcă), nici Shift ori
+//      Ctrl apăsate singure. Ctrl+→ intră: dacă lecția îl ia drept →, la tine
+//      a făcut un pas, deci și pe tablă trebuie să-l facă.
+//   6. CE A ÎNCHIS BROWSERUL SINGUR. Escape și o atingere în afara unei
+//      ferestre (`<dialog>`, popover „auto") o închid fără ca lecția să facă
+//      ceva, iar o tastă ori o apăsare refăcută de la distanță n-are puterea
+//      asta: browserul o ascultă numai pe cea adevărată. Așa că cel care
+//      conduce spune singur „s-a închis fereastra asta", iar tabla o închide.
+//      Dacă era deja închisă (a închis-o lecția, la o apăsare refăcută), nu se
+//      mai întâmplă nimic.
 //
 // DE CE APĂSAREA, NU URMA EI. S-ar fi putut copia urma: ce clase s-au pus pe
 // elemente, ce s-a ascuns, ce s-a aprins. Dar jumătate din ce face o lecție nu
@@ -233,6 +249,54 @@ function reperSub(w, x, y, tinta) {
 
 const rotund = (n) => Math.round(n * 10000) / 10000;
 
+/* ---------- tastele și ferestrele închise de browser ---------- */
+
+/** O tastă intră în jurnal ca șir care începe cu „k", o fereastră închisă de
+ *  browser cu „x": niciuna nu se încurcă cu un drum de apăsare (doar cifre și
+ *  puncte) ori cu un gest („g"). */
+const SEMN_TASTA = "k";
+const SEMN_INCHIS = "x";
+
+/* Tastele care nu spun nimic lecției: cele care doar se țin apăsate odată cu
+   altele (Shift, Ctrl singure; ținute apăsate, se repetă de zeci de ori pe
+   secundă), cele ale scrisului compus (căciula lui „â" pe unele tastaturi) și
+   tastele F, care sunt ale browserului (F5 reîncarcă, F11 pune ecranul plin). */
+const TASTE_LASATE = new Set([
+  "Shift", "Control", "Alt", "AltGraph", "Meta", "OS", "Hyper", "Super", "Fn", "FnLock",
+  "CapsLock", "NumLock", "ScrollLock", "Symbol", "SymbolLock",
+  "Dead", "Process", "Compose", "Unidentified",
+]);
+const TASTA_F = /^F\d{1,2}$/;
+/* Un nume de tastă e scurt („ArrowRight", „a"); unul lung e o stricăciune. */
+const LUNG_TASTA = 40;
+/* Tastele ținute odată cu ea, într-un singur număr: 1 Shift, 2 Ctrl, 4 Alt, 8 Cmd. */
+const MODIFICATORI = [["shiftKey", 1], ["ctrlKey", 2], ["altKey", 4], ["metaKey", 8]];
+
+/** Un câmp în care se scrie. Tastele de acolo nu pleacă: ce scrii e al tău și
+ *  n-are ce căuta pe canal, iar o literă apăsată de la distanță nici n-ar
+ *  scrie ceva pe tablă. */
+function eDeScris(el) {
+  if (!el || el.nodeType !== 1) return false;
+  if (el.isContentEditable) return true;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(String(el.tagName).toUpperCase());
+}
+
+/** Rândul de jurnal al unei taste, citit înapoi și curățat; `null` dacă e stricat. */
+function citesteTasta(sir) {
+  let t;
+  try { t = JSON.parse(sir.slice(SEMN_TASTA.length)); } catch { return null; }
+  if (!t || typeof t !== "object" || Array.isArray(t)) return null;
+  if (typeof t.k !== "string" || !t.k || t.k.length > LUNG_TASTA) return null;
+  return {
+    k: t.k,
+    c: typeof t.c === "string" ? t.c.slice(0, LUNG_TASTA) : "",
+    n: Number.isInteger(t.n) && t.n >= 0 && t.n < 256 ? t.n : 0,
+    t: typeof t.t === "string" ? t.t : null,
+    m: Number.isInteger(t.m) && t.m > 0 && t.m < 16 ? t.m : 0,
+    r: t.r === 1,
+  };
+}
+
 /**
  * Face puntea spre fișa dintr-un cadru.
  *
@@ -244,6 +308,8 @@ export function puntea(cadru) {
   let ascultator = null;
   let ascultatorDerulare = null;
   let ascultatoriGest = null;
+  let ascultatorTaste = null;
+  let ascultatoriInchidere = null;
 
   return {
     ...comanda,
@@ -461,10 +527,143 @@ export function puntea(cadru) {
       w.__licCapturiLasate = true;
     },
 
+    /**
+     * Spune-mi, la fiecare tastă apăsată în fișă, ce tastă și pe ce element
+     * stătea focusul, ca șir de pus în jurnal. Pe captare, ca apăsările:
+     * prinsă înainte s-o poată opri lecția. Se ia `keydown`, cel pe care îl
+     * ascultă lecțiile; ridicarea tastei se reface pe tablă odată cu el.
+     */
+    pePunereTasta(spune) {
+      this.uitaTastele();
+      if (!w) return;
+      ascultatorTaste = (ev) => {
+        if (w.__licDeLaDistanta) return;
+        const k = ev.key;
+        if (typeof k !== "string" || !k || k.length > LUNG_TASTA) return;
+        if (ev.isComposing || TASTE_LASATE.has(k) || TASTA_F.test(k)) return;
+        if (eDeScris(ev.target)) return;
+        const rand = {
+          k,
+          c: typeof ev.code === "string" ? ev.code.slice(0, LUNG_TASTA) : "",
+          n: Number(ev.keyCode) || 0,
+          t: caleaCatre(ev.target),
+        };
+        /* Ctrl+C și ceilalți intră și ei, cu tot cu Ctrl: browserul face
+           copierea numai la tine, iar o lecție care nu se uită la Ctrl ia
+           tasta drept „c" simplu, la tine și pe tablă deopotrivă. */
+        const m = MODIFICATORI.reduce((s, [nume, bit]) => (ev[nume] ? s | bit : s), 0);
+        if (m) rand.m = m;
+        if (ev.repeat) rand.r = 1;
+        spune(SEMN_TASTA + JSON.stringify(rand));
+      };
+      try { w.document.addEventListener("keydown", ascultatorTaste, true); }
+      catch { ascultatorTaste = null; }
+    },
+
+    /**
+     * Reface o tastă din jurnal: aceeași tastă, pe același element, cu semnul
+     * de la distanță ridicat (ecranul plin al tablei nu se atinge, ca la
+     * apăsări).
+     *
+     * O tastă făcută de mână nu face nimic de una singură: nu derulează, nu
+     * apasă butonul cu focus, nu închide fereastra. Se aude numai în codul
+     * lecției, și tocmai cât trebuie: ce face browserul singur la tine vine pe
+     * drumul lui (derularea ca derulare, butonul apăsat cu Enter ca apăsare,
+     * fereastra închisă cu Escape ca închidere), deci nimic nu se face de două
+     * ori.
+     */
+    refaTasta(sir) {
+      const doc = w?.document;
+      if (!doc || typeof w.KeyboardEvent !== "function") return false;
+      const t = citesteTasta(sir);
+      if (!t) return false;
+      /* Pe elementul cu focusul de la tine; dacă nu se mai găsește, pe pagină. */
+      const tinta = (t.t !== null && elementulDe(doc, t.t)) || doc.body || doc.documentElement;
+      if (!tinta) return false;
+      const fel = {
+        key: t.k, code: t.c, keyCode: t.n, repeat: t.r,
+        ...Object.fromEntries(MODIFICATORI.map(([nume, bit]) => [nume, (t.m & bit) !== 0])),
+        bubbles: true, cancelable: true, composed: true, view: w,
+      };
+      try {
+        w.__licDeLaDistanta = true;
+        const jos = new w.KeyboardEvent("keydown", fel);
+        tinta.dispatchEvent(jos);
+        /* `keypress` vine, la tine, numai după tastele care scriu ceva și după
+           Enter, și numai dacă lecția n-a oprit tasta. E învechit, dar fișele
+           mai vechi îl ascultă. */
+        if (!jos.defaultPrevented && ([...t.k].length === 1 || t.k === "Enter")) {
+          const cod = t.k === "Enter" ? 13 : t.k.codePointAt(0);
+          tinta.dispatchEvent(new w.KeyboardEvent("keypress", { ...fel, keyCode: cod, charCode: cod }));
+        }
+        /* RIDICAREA, O SINGURĂ DATĂ PE APĂSARE. O tastă ținută apăsată vine ca
+           un șir de `keydown` cu `repeat` și o singură ridicare, la sfârșit.
+           Se pune după primul: o lecție care ascultă ridicarea face un pas, ca
+           la tine, nu câte unul la fiecare repetare. */
+        if (!t.r) tinta.dispatchEvent(new w.KeyboardEvent("keyup", { ...fel, repeat: false }));
+        return true;
+      } catch { return false; }
+      finally { w.__licDeLaDistanta = false; }
+    },
+
+    /**
+     * Spune-mi, de fiecare dată când se închide o fereastră în fișă, care
+     * anume. E pentru ce închide browserul singur (Escape, o atingere în
+     * afară): pe tablă, aceeași tastă ori aceeași apăsare refăcută n-ar
+     * închide-o. `close` și `toggle` nu urcă prin pagină, dar trec prin
+     * captare, deci un singur ascultător pe document le prinde pe toate.
+     */
+    pePunereInchidere(spune) {
+      this.uitaInchiderile();
+      if (!w) return;
+      const inchisa = (ev) => {
+        if (w.__licDeLaDistanta) return;
+        const el = ev.target;
+        if (!el || el.nodeType !== 1) return;
+        if (ev.type === "close") {
+          /* Deschisă la loc între timp (lecția a închis-o și a deschis-o în
+             aceeași clipă): închiderea a fost doar o trecere. */
+          if (el.open) return;
+        } else if (ev.newState !== "closed" || el.popover !== "auto") {
+          /* Numai popover-ele „auto": doar pe ele le închide browserul. Cele
+             „manual" (biletele tale de la trecerea mouse-ului) le închide
+             numai lecția, iar fiecare trecere a mouse-ului ar fi umplut
+             jurnalul. Un `<details>` se deschide și se închide din apăsări. */
+          return;
+        }
+        const cale = caleaCatre(el);
+        if (cale !== null) spune(SEMN_INCHIS + cale);
+      };
+      ascultatoriInchidere = { close: inchisa, toggle: inchisa };
+      try {
+        for (const [tip, f] of Object.entries(ascultatoriInchidere)) w.document.addEventListener(tip, f, true);
+      } catch { ascultatoriInchidere = null; }
+    },
+
+    /** Închide și aici fereastra pe care a închis-o browserul la cel care
+     *  conduce. Una închisă deja rămâne cum e. */
+    refaInchiderea(sir) {
+      const el = elementulDe(w?.document, sir.slice(SEMN_INCHIS.length));
+      if (!el) return false;
+      try {
+        w.__licDeLaDistanta = true;
+        if (String(el.tagName).toUpperCase() === "DIALOG") {
+          if (el.open) el.close();
+        } else if (typeof el.hidePopover === "function" && el.matches(":popover-open")) {
+          el.hidePopover();
+        }
+        return true;
+      } catch { return false; }
+      finally { w.__licDeLaDistanta = false; }
+    },
+
     /** Apasă din nou, în același loc. Întoarce `false` dacă n-a găsit locul.
-     *  Un rând de jurnal care e gest (vezi `pePunereGest`) se reface ca gest. */
+     *  Un rând de jurnal care e gest (vezi `pePunereGest`) se reface ca gest,
+     *  unul care e tastă ca tastă, unul care e fereastră închisă ca închidere. */
     apasa(cale) {
       if (typeof cale === "string" && cale.startsWith(SEMN_GEST)) return this.refaGestul(cale);
+      if (typeof cale === "string" && cale.startsWith(SEMN_TASTA)) return this.refaTasta(cale);
+      if (typeof cale === "string" && cale.startsWith(SEMN_INCHIS)) return this.refaInchiderea(cale);
       const el = elementulDe(w?.document, cale);
       if (!el) return false;
       try {
@@ -528,6 +727,8 @@ export function puntea(cadru) {
     uita() {
       this.uitaDerularea();
       this.uitaGesturile();
+      this.uitaTastele();
+      this.uitaInchiderile();
       if (!ascultator) return;
       try { w?.document.removeEventListener("click", ascultator, true); } catch { /* dusă */ }
       ascultator = null;
@@ -545,6 +746,20 @@ export function puntea(cadru) {
       if (!ascultatorDerulare) return;
       try { w?.document.removeEventListener("scroll", ascultatorDerulare, { capture: true }); } catch { /* dusă */ }
       ascultatorDerulare = null;
+    },
+
+    uitaTastele() {
+      if (!ascultatorTaste) return;
+      try { w?.document.removeEventListener("keydown", ascultatorTaste, true); } catch { /* dusă */ }
+      ascultatorTaste = null;
+    },
+
+    uitaInchiderile() {
+      if (!ascultatoriInchidere) return;
+      try {
+        for (const [tip, f] of Object.entries(ascultatoriInchidere)) w?.document.removeEventListener(tip, f, true);
+      } catch { /* dusă */ }
+      ascultatoriInchidere = null;
     },
   };
 }

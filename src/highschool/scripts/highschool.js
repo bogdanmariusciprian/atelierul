@@ -1001,6 +1001,10 @@ const telec = {
   dinNou: false,     // prima aliniere după „Urmez" ia fișa de la capăt
   slideCerut: 0,
 
+  /* La „conduc": trimiterea de după o apăsare, una singură oricâte apăsări ar
+     veni în aceeași clipă (vezi `trimiteDupaApasare`). */
+  ceasApasare: null,
+
   /* Derulările: la „conduc", unde e acum fiecare casetă derulată a fișei
      (drum → { procent, elementul din mijloc }); la „urmez", unde trebuie să fie. */
   derulari: {},
@@ -1024,11 +1028,49 @@ function trimiteDerularea() {
   else telec.ceasDerulare = setTimeout(pleaca, ramas);
 }
 
+/**
+ * DUPĂ O APĂSARE, STAREA PLEACĂ ABIA CÂND LECȚIA A FĂCUT-O.
+ *
+ * Puntea prinde apăsările pe captare, adică ÎNAINTE ca lecția să apuce să le
+ * facă. Trimisă chiar de acolo, starea ar fi purtat apăsarea nouă, dar slide-ul
+ * de dinainte. Iar tabla face întâi apăsările și pune slide-ul la urmă: ar fi
+ * trecut la slide-ul nou, s-ar fi întors la cel vechi și ar fi trecut iar abia
+ * la mesajul următor. La „înainte", de pe un slide plin, îl golea o clipă; la
+ * „înapoi", rămânea pe slide-ul de dinainte fără răspunsurile care la tine se
+ * văd toate.
+ *
+ * Cu un `setTimeout(0)`, starea pleacă după ce s-a terminat tot drumul
+ * evenimentului, cu slide-ul lui adevărat. Mai multe apăsări din aceeași clipă
+ * (Enter pe un buton dă o tastă și o apăsare) pleacă într-un singur mesaj.
+ */
+function trimiteDupaApasare() {
+  if (telec.ceasApasare !== null) return;
+  telec.ceasApasare = setTimeout(() => {
+    telec.ceasApasare = null;
+    telec.fir?.trimite(true);
+  }, 0);
+}
+
 /** La „urmez": pune casetele fișei unde le-a lăsat cel care conduce. */
 function aplicaDerularile() {
   const p = telec.punte;
   if (!p?.deruleaza) return;
   for (const [cale, loc] of Object.entries(telec.derulariCerute || {})) p.deruleaza(cale, loc);
+}
+
+/**
+ * TASTELE MERG ÎN LECȚIE DIN PRIMA. Altfel, după ce apeși „Conduc" ori după ce
+ * se deschide o fișă, focusul rămâne în pagina modulului (pe butonul apăsat),
+ * iar săgețile tastaturii ajung acolo: lecția nu le primește, nici la tine,
+ * nici pe tablă, până nu dai un click în ea. Nu se ia focusul dintr-un câmp
+ * în care scrii.
+ */
+function daFocusulLectiei() {
+  const cadru = radacina?.querySelector(".lic-fisa__cadru");
+  if (!cadru) return;
+  const aici = document.activeElement;
+  if (aici && aici !== cadru && (aici.isContentEditable || aici.matches?.("input, textarea, select"))) return;
+  try { (cadru.contentWindow || cadru).focus(); } catch { /* fereastră dusă */ }
 }
 
 /** Conduce cineva chiar acum? Numai pentru cel care urmează. */
@@ -1070,25 +1112,25 @@ function potrivestePuntea() {
      trei, iar tabla le prinde din urmă din primul mesaj. Altfel ar fi pornit de
      la o fișă curată și ar fi rămas cu trei lucruri în minus toată ora, fără ca
      cineva să priceapă de ce. */
-  p.pePunere((cale) => {
+  const inJurnal = (rand) => {
     const fisa = rutaId();
     if (telec.jurnalFisa !== fisa) { telec.jurnal = []; telec.jurnalFisa = fisa; }
     if (telec.jurnal.length >= MAX_JURNAL) return;
-    telec.jurnal.push(cale);
+    telec.jurnal.push(rand);
     /* Silit, ca să plece pe loc: o apăsare care ajunge la tablă peste o
-       treime de secundă se vede ca întârziere, de față cu clasa. */
-    if (telec.rol === "conduc") telec.fir?.trimite(true);
-  });
+       treime de secundă se vede ca întârziere, de față cu clasa. Dar după ce
+       a făcut-o lecția, nu în clipa ei (vezi `trimiteDupaApasare`). */
+    if (telec.rol === "conduc") trimiteDupaApasare();
+  };
+  p.pePunere(inJurnal);
 
-  /* Gesturile (markerul, creionul): la ridicarea degetului, gestul întreg
-     intră în același jurnal, ca o apăsare, și pleacă pe loc. */
-  p.pePunereGest?.((gest) => {
-    const fisa = rutaId();
-    if (telec.jurnalFisa !== fisa) { telec.jurnal = []; telec.jurnalFisa = fisa; }
-    if (telec.jurnal.length >= MAX_JURNAL) return;
-    telec.jurnal.push(gest);
-    if (telec.rol === "conduc") telec.fir?.trimite(true);
-  });
+  /* În același jurnal, în ordinea în care s-au întâmplat, și plecate tot pe
+     loc: gesturile (markerul, creionul), întregi, la ridicarea degetului;
+     tastele (săgețile, Page Down, Escape); ferestrele închise de browser
+     singur, fiindcă pe tablă nu le-ar închide nimeni. */
+  p.pePunereGest?.(inJurnal);
+  p.pePunereTasta?.(inJurnal);
+  p.pePunereInchidere?.(inJurnal);
 
   /* Derulările, la fel: ținute minte și când nu conduce nimeni, ca tabla
      pornită mai târziu să afle unde e textul. Se pun DUPĂ `pePunere`, care
@@ -1243,7 +1285,17 @@ function refaDeLaCapat(fisa, lista) {
   telec.aplicateFisa = fisa;
   telec.aplicate = [];
   telec.deRefacut = lista.slice();
-  try { cadru.contentWindow.location.reload(); return true; }
+  /* DE LA CAPĂT ÎNSEAMNĂ ȘI FĂRĂ CE E DUPĂ „#". Fișele își scriu slide-ul în
+     adresă (`#5`), ca să se redeschidă unde le-ai lăsat. O reîncărcare simplă
+     ar fi pornit lecția chiar de la slide-ul acela, iar apăsările refăcute ar
+     fi plecat de acolo, nu de la început: tabla atinsă cu degetul înainte de
+     „Urmez" ar fi ajuns în altă parte decât tine. Adresa fără „#" e altă
+     adresă, deci se încarcă din nou, întreagă. */
+  try {
+    const w = cadru.contentWindow;
+    w.location.replace(w.location.href.split("#")[0]);
+    return true;
+  }
   catch { telec.deRefacut = null; return false; }   // altă origine: n-avem ce reface
 }
 
@@ -1289,6 +1341,8 @@ function alegeRolul(rol) {
      ascultat nimic până la fișa următoare. */
   potrivestePuntea();
   picteazaBaraTelec();
+  /* Cine conduce, conduce și din tastatură: focusul trece în lecție. */
+  if (telec.rol === "conduc") daFocusulLectiei();
 }
 
 /* ---------------- ecranul: o fișă ---------------- */
@@ -1618,7 +1672,10 @@ function deseneaza() {
     /* NU `{ once: true }`. Fișa se mai încarcă o dată, de bunăvoie, când tabla
        rămâne în urmă și o ia de la capăt (`refaDeLaCapat`); cu „o singură
        dată", a doua încărcare ar fi rămas fără punte, deci mută. */
-    const leaga = () => { legPuntea(); refaApasarile(); picteazaBaraTelec(); };
+    const leaga = () => {
+      legPuntea(); refaApasarile(); picteazaBaraTelec();
+      if (telec.rol === "conduc") daFocusulLectiei();
+    };
     cadru.addEventListener("load", leaga);
     /* Dacă s-a încărcat deja (fișă adusă din memorie), `load` nu mai vine. */
     if (cadru.contentDocument?.readyState === "complete") leaga();
