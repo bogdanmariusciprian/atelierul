@@ -217,6 +217,35 @@ button { font: inherit; }
 .tr-parinte em { font-style: italic; opacity: .8; }
 
 .tr-rand { display: flex; align-items: flex-start; gap: .5em; }
+
+/* „✎ Câmpuri" (doar adminul, 0112): un × pe fiecare câmp, un „+ enunț" pe
+   fiecare grup, un + pe fiecare enunț gata scris. */
+.tr-forma__btn.is-on { border-color: var(--accent); background: var(--accent-soft); color: #c2410c; }
+.tr-forma {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  border: 1px dashed var(--accent);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: #7c3a10;
+  font-size: 14px;
+}
+.tr-forma span { flex: 1 1 260px; }
+.tr-forma-x, .tr-forma-plus {
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+}
+.tr-forma-x { width: 1.9em; height: 1.9em; margin-top: .2em; border-radius: 50%; }
+.tr-forma-x:hover { border-color: #b91c1c; color: #b91c1c; }
+.tr-forma-plus { margin: 6px 0 0 calc(2.1em + .5em); padding: 5px 10px; border-style: dashed; border-radius: 8px; }
+.tr-rand--fix .tr-forma-plus { margin: .2em 0 0; padding: 0; width: 1.9em; height: 1.9em; border-radius: 50%; }
+.tr-forma-plus:hover { border-color: var(--accent); color: var(--accent); }
 .tr-nr {
   flex: none;
   min-width: 2.1em;
@@ -404,6 +433,7 @@ div.tl-celula { cursor: default; }
 .tl-trepte i.on { background: var(--accent); color: #fff; }
 .tl-liric i.on { background: #7c3aed; }
 .tl-personaj i.on { background: #0f766e; }
+.tl-relatie i.on { background: #b45309; }
 .tl-cititor-cap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
 .tl-cititor-cap h3 { margin: 0; font-size: 18px; }
 .tl-inapoi { border: 1px solid var(--line); background: var(--card); border-radius: 9px; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 13px; }
@@ -424,14 +454,17 @@ div.tl-celula { cursor: default; }
 .tl-parte--r .tl-parte__et { background: var(--accent-soft); color: #c2410c; }
 .tl-liric .tl-parte--r .tl-parte__et { background: #f3edff; color: #7c3aed; }
 .tl-personaj .tl-parte--r .tl-parte__et { background: #e6f6f4; color: #0f766e; }
+.tl-relatie .tl-parte--r .tl-parte__et { background: #fdf1e3; color: #b45309; }
 .tl-enunt { display: grid; grid-template-columns: 28px 1fr; gap: 6px; padding: 3px 0; font-size: 16px; }
 .tl-enunt b { color: var(--accent); text-align: right; }
 .tl-liric .tl-enunt b { color: #7c3aed; }
 .tl-personaj .tl-enunt b { color: #0f766e; }
+.tl-relatie .tl-enunt b { color: #b45309; }
 .tl-enunt em { color: var(--muted); }
 .tl-enunt--nou { background: linear-gradient(90deg, rgba(234, 88, 12, .09), transparent 70%); border-radius: 6px; }
 .tl-liric .tl-enunt--nou { background: linear-gradient(90deg, rgba(124, 58, 237, .09), transparent 70%); }
 .tl-personaj .tl-enunt--nou { background: linear-gradient(90deg, rgba(15, 118, 110, .09), transparent 70%); }
+.tl-relatie .tl-enunt--nou { background: linear-gradient(90deg, rgba(180, 83, 9, .09), transparent 70%); }
 .tl-mostra { display: inline-block; width: 26px; height: 10px; border-radius: 3px; margin-right: 6px; background: linear-gradient(90deg, rgba(234, 88, 12, .25), transparent); }
 .tl-alaturi { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 10px; overflow-x: auto; }
 .tl-coloana h4 { margin: 0 0 8px; font-size: 13px; }

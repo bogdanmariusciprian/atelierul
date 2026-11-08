@@ -10,6 +10,19 @@
 // Al treilea are alte trepte (cerut de Marius pe 25 octombrie 2026):
 //   construcția personajului – 5, 9, 16, 20: Reper 1 (statutul) se face din
 //   unul trei pe treapta a doua (social, psihologic, moral), apoi fiecare se dublează.
+// Al patrulea (8 noiembrie 2026): relația dintre două personaje – 5, 12, 16, 20:
+//   Reper 1 se face din unul șase (cele trei statute, la fiecare personaj) și
+//   rămâne așa; Reper 2 și Reper 3 se dublează.
+//
+// CÂMPURI ADĂUGATE ORI SCOASE DE ADMIN (0112, cerut pe 8 noiembrie 2026). Cu
+// „✎ Câmpuri", adminul pune ori scoate un câmp pe o treaptă, pentru totdeauna,
+// doar pe treapta aceea. Forma nouă stă în `tabla_forme`; pagina are doar forma
+// de la început. Treapta își păstrează cheia de la început (data-n="9"), dar
+// butonul ei arată câte enunțuri are acum. Pe o parte care se rescrie pe
+// grupuri se ține și câte câmpuri are fiecare grup (`grupe`); altfel câmpurile
+// se împart cât mai egal sub enunțurile de dedesubt. Fiecare lucrare își ține
+// împărțirea cu care a fost scrisă (`forme`), ca să se citească bine oricât
+// s-ar schimba tabla după ea.
 //
 // Cinci părți, în ordinea asta: Intro, Reper 1, Reper 2, Reper 3, Concluzie.
 // Pe prima treaptă e câte un enunț pe parte. Pe treptele următoare, unele părți
@@ -69,7 +82,7 @@
 // =========================================================
 import { isAdmin, CURRENT_USER } from "../../shared/scripts/session.js";
 import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeFisierFisa,
-  scrieEnunt, poateScrieTabla, ascultaIngaduinta } from "../../shared/scripts/tabla-live-repo.js";
+  scrieEnunt, poateScrieTabla, ascultaIngaduinta, citesteFormele, scrieForma } from "../../shared/scripts/tabla-live-repo.js";
 import { tutoringPupils, setPupilPermission } from "../../shared/scripts/pupils-repo.js";
 import { saveSheet, salveazaLucrareaElevului } from "../../shared/scripts/board-repo.js";
 import { deschideLucrarile, LECTIE, ziDeAzi, ziFrumoasa, operaDinFisa, operaDinText, textOpera, numeOpera }
@@ -83,7 +96,13 @@ const SLUG = "redactare-enunturi";
      data-indicii="1:statutul social|…"        (opțional: ce scrie, stins, în
                                                 câmpurile în care se desface partea 1)
    O treaptă se ia doar dacă are câte un număr pe parte și suma lor e chiar
-   numărul treptei. */
+   numărul treptei. `implicit` e forma din pagină; `trepte` e forma de acum
+   (cu ce a schimbat adminul, 0112). */
+const suma = (a) => a.reduce((x, y) => x + y, 0);
+const copieTrepte = (tr) => tr.map((t) => ({ n: t.n, parti: [...t.parti],
+  grupe: Object.fromEntries(Object.entries(t.grupe || {}).map(([p, g]) => [p, [...g]])) }));
+const FARA_PAGINA = [{ n: 5, parti: [1, 1, 1, 1, 1] }, { n: 8, parti: [1, 2, 2, 2, 1] },
+  { n: 14, parti: [1, 4, 4, 4, 1] }, { n: 18, parti: [1, 4, 8, 4, 1] }];
 const TIPURI = (() => {
   const din = [...document.querySelectorAll(".tr-tip")].map((b) => {
     const etichete = String(b.dataset.etichete || "").split("|").map((x) => x.trim()).filter(Boolean);
@@ -94,17 +113,17 @@ const TIPURI = (() => {
       && t.parti.reduce((x, y) => x + y, 0) === t.n);
     const indicii = {};
     String(b.dataset.indicii || "").split(";").forEach((x) => {
-      const [p, lista] = x.split(":");
-      if (lista) indicii[Number(p)] = lista.split("|").map((y) => y.trim());
+      const k = x.indexOf(":");
+      if (k > 0) indicii[Number(x.slice(0, k))] = x.slice(k + 1).split("|").map((y) => y.trim());
     });
-    return { cheie: b.dataset.tip, etichete, trepte, indicii };
+    return { cheie: b.dataset.tip, etichete, trepte: copieTrepte(trepte), implicit: copieTrepte(trepte), indicii };
   }).filter((t) => t.cheie && t.etichete.length >= 2 && t.trepte.length);
   return din.length ? din : [{
     cheie: "incadrare",
     etichete: ["Intro", "Reper 1 - trăsături", "Reper 2 - scene semnificative",
       "Reper 3 - structură și compoziție", "Concluzie"],
-    trepte: [{ n: 5, parti: [1, 1, 1, 1, 1] }, { n: 8, parti: [1, 2, 2, 2, 1] },
-      { n: 14, parti: [1, 4, 4, 4, 1] }, { n: 18, parti: [1, 4, 8, 4, 1] }],
+    trepte: copieTrepte(FARA_PAGINA),
+    implicit: copieTrepte(FARA_PAGINA),
     indicii: {},
   }];
 })();
@@ -112,12 +131,14 @@ const TIPURI = (() => {
 let tip = TIPURI[0].cheie;
 const tipul = (c = tip) => TIPURI.find((t) => t.cheie === c) || TIPURI[0];
 const trepteLe = (c = tip) => tipul(c).trepte.map((t) => t.n);
-const partiLa = (n) => tipul().trepte.find((t) => t.n === n).parti;
+const treaptaLa = (n) => tipul().trepte.find((t) => t.n === n);
+/** Câte locuri are fiecare parte pe treapta `n`, în enunțurile ei. */
+const partiLa = (n) => treaptaLa(n).parti;
 const treaptaDinainte = (n) => { const t = trepteLe(); return t[t.indexOf(n) - 1]; };
 /** Clasa grupului: primul e Intro, ultimul Concluzie, între ele reperele. */
 const claseParte = (p, cate) => (p === 0 ? "intro" : p === cate - 1 ? "concluzie" : `r${p}`);
 /** Unde începe partea `p` în enunțurile treptei `n`. */
-const inceputul = (n, p) => partiLa(n).slice(0, p).reduce((a, x) => a + x, 0);
+const inceputul = (n, p) => suma(partiLa(n).slice(0, p));
 
 /**
  * Partea `p` se scrie pe treapta `n`? Pe prima treaptă, da, toate. Mai sus,
@@ -126,7 +147,81 @@ const inceputul = (n, p) => partiLa(n).slice(0, p).reduce((a, x) => a + x, 0);
  */
 function seScrie(n, p) {
   const sus = treaptaDinainte(n);
-  return !sus || partiLa(n)[p] > partiLa(sus)[p];
+  return !sus || partiLa(n)[p] > catiLa(sus, p);
+}
+
+/** Câte enunțuri are la vedere partea `p` pe treapta `n`: ale ei, ori, dacă
+ *  vine gata scrisă, câte are pe treapta dinainte. */
+function catiLa(n, p) {
+  return seScrie(n, p) ? partiLa(n)[p] : catiLa(treaptaDinainte(n), p);
+}
+/** Câte enunțuri are la vedere treapta `n` (numărul de pe butonul ei). */
+const catePe = (n) => suma(tipul().etichete.map((_, p) => catiLa(n, p)));
+
+/** Câte câmpuri are fiecare grup al părții `p` pe treapta `n` (unul pe enunțul
+ *  de dedesubt). Cum le-a lăsat adminul, dacă se mai potrivesc; altfel cât mai
+ *  egal, cu unul în plus la cele dintâi (la dublare iese exact doi). */
+function grupele(n, p) {
+  const cati = partiLa(n)[p];
+  const parinti = catiLa(treaptaDinainte(n), p);
+  const g = treaptaLa(n).grupe?.[p];
+  if (Array.isArray(g) && g.length === parinti && g.every((x) => x >= 1) && suma(g) === cati) return [...g];
+  const baza = Math.floor(cati / parinti);
+  const inPlus = cati % parinti;
+  return Array.from({ length: parinti }, (_, k) => baza + (k < inPlus ? 1 : 0));
+}
+
+/* ---------- forma (0112) ---------- */
+/** Ține grupele părții `p` doar dacă nu sunt cele cât mai egale, care se
+ *  calculează oricum: o formă readusă de mână la ce era nu rămâne „schimbată". */
+function puneGrupe(x, p, g) {
+  const cati = suma(g);
+  const egal = g.every((c, k) => c === Math.floor(cati / g.length) + (k < cati % g.length ? 1 : 0));
+  if (egal) delete x.grupe[p]; else x.grupe[p] = g;
+}
+/** Pune pe tip forma venită din bază, după ce o verifică: doar treptele
+ *  cunoscute, câte un număr pe parte, cel mult 40 de enunțuri pe treaptă.
+ *  Fără formă (ori stricată), treapta rămâne cum e în pagină. */
+function puneForma(t, forma) {
+  const tr = copieTrepte(t.implicit);
+  const din = forma?.trepte || {};
+  for (const x of tr) {
+    const f = din[x.n];
+    if (!f || !Array.isArray(f.parti) || f.parti.length !== t.etichete.length
+      || !f.parti.every((y) => Number.isInteger(y) && y >= 1) || suma(f.parti) > 40) continue;
+    x.parti = [...f.parti];
+    for (const [p, g] of Object.entries(f.grupe || {})) {
+      if (Array.isArray(g) && g.every((y) => Number.isInteger(y) && y >= 1)) x.grupe[p] = [...g];
+    }
+  }
+  t.trepte = tr;
+}
+/** Ce are tipul altfel decât în pagină, de pus în bază; `null` = nimic. */
+function formaDe(t) {
+  const trepte = {};
+  t.trepte.forEach((x, k) => {
+    const g = Object.keys(x.grupe).length ? x.grupe : null;
+    if (g || x.parti.join() !== t.implicit[k].parti.join()) trepte[x.n] = { parti: x.parti, ...(g ? { grupe: g } : {}) };
+  });
+  return Object.keys(trepte).length ? { trepte } : null;
+}
+const formele = () => Object.fromEntries(TIPURI.map((t) => [t.cheie, formaDe(t)]).filter(([, f]) => f));
+
+/** Enunțurile unei trepte, mutate de pe o împărțire pe alta, parte cu parte.
+ *  Ce nu mai încape într-o parte se lipește la ultimul ei enunț: nu se pierde
+ *  nimic scris. */
+function mutaPeParti(sir, vechi, nou) {
+  const out = [];
+  let a = 0;
+  nou.forEach((cati, p) => {
+    const bucata = (Array.isArray(sir) ? sir : []).slice(a, a + (vechi[p] || 0)).map((x) => String(x ?? ""));
+    a += vechi[p] || 0;
+    const r = bucata.slice(0, cati);
+    if (bucata.length > cati) r[cati - 1] = bucata.slice(cati - 1).map((x) => x.trim()).filter(Boolean).join(" ");
+    while (r.length < cati) r.push("");
+    out.push(...r);
+  });
+  return out;
 }
 
 /**
@@ -150,15 +245,15 @@ const scrise = document.getElementById("scrise");
 const stareEl = document.getElementById("stare");
 
 /** Enunțuri goale pe toate treptele unui eseu. */
-const gol = (t = tipul()) => Object.fromEntries(t.trepte.map(({ n }) => [n, Array(n).fill("")]));
+const gol = (t = tipul()) => Object.fromEntries(t.trepte.map(({ n, parti }) => [n, Array(suma(parti)).fill("")]));
 
 /** Starea unui eseu (treapta și enunțurile), adusă la forma lui. */
 function normalizeazaTip(t, d) {
   const e = gol(t);
   const din = d?.enunturi || {};
-  for (const { n } of t.trepte) {
+  for (const { n, parti } of t.trepte) {
     const v = Array.isArray(din[n]) ? din[n] : [];
-    e[n] = Array.from({ length: n }, (_, i) => String(v[i] ?? ""));
+    e[n] = Array.from({ length: suma(parti) }, (_, i) => String(v[i] ?? ""));
   }
   const trepte = t.trepte.map((x) => x.n);
   return { treapta: trepte.includes(Number(d?.treapta)) ? Number(d.treapta) : trepte[0], enunturi: e };
@@ -238,19 +333,30 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /** Un enunț de scris: numărul lui pe treaptă și câmpul. */
-function camp(n, i, nr, indiciu = "") {
+function camp(n, i, nr, indiciu = "", scoate = "") {
   return `<div class="tr-rand">
       <span class="tr-nr">${nr}.</span>
       <textarea class="tr-camp" rows="1" data-n="${n}" data-i="${i}"${scriu ? "" : " readonly tabindex=\"-1\""}
-        aria-label="Enunțul ${nr} din ${n}" placeholder="${scriu ? esc(indiciu ? `Enunțul ${nr}: ${indiciu}` : `Enunțul ${nr}`) : ""}">${esc(enunturi[n][i])}</textarea>
+        aria-label="Enunțul ${nr} din ${catePe(n)}" placeholder="${scriu ? esc(indiciu ? `Enunțul ${nr}: ${indiciu}` : `Enunțul ${nr}`) : ""}">${esc(enunturi[n][i])}</textarea>
+      ${scoate}
     </div>`;
 }
 
+/* Butoanele lui „✎ Câmpuri" (doar adminul, cât e pornit). `p` e partea, `k`
+   grupul din ea (-1 pe prima treaptă), `i` locul enunțului. */
+let editezForma = false;
+const editez = () => editezForma && admin && !privat;
+const btnScoate = (p, k, i) => `<button type="button" class="tr-forma-x" data-forma="scoate" data-p="${p}" data-k="${k}"
+    data-i="${i}" title="Scoate câmpul acesta" aria-label="Scoate câmpul">×</button>`;
+const btnPune = (p, k, text = "+ enunț", titlu = "Încă un câmp aici") => `<button type="button" class="tr-forma-plus"
+    data-forma="pune" data-p="${p}" data-k="${k}" title="${titlu}">${text}</button>`;
+
 /** Un enunț gata scris, adus de pe o treaptă de mai jos: cu număr, fără câmp. */
-function fix(text, nr) {
+function fix(text, nr, plus = "") {
   return `<div class="tr-rand tr-rand--fix">
       <span class="tr-nr">${nr}.</span>
       <p class="tr-fix">${text.trim() ? esc(text) : "<em>încă nescris</em>"}</p>
+      ${plus}
     </div>`;
 }
 
@@ -260,35 +366,42 @@ function deseneaza() {
   document.body.classList.toggle("tr--citeste", !scriu);
   let nr = 0;
   const etichete = tipul().etichete;
-  foaie.innerHTML = etichete.map((eticheta, p) => {
-    const cati = partiLa(n)[p];
+  const ed = editez();
+  document.body.classList.toggle("tr--editez", ed);
+  const capForma = ed ? `<div class="tr-forma">
+      <span>✎ Adaugi ori scoți câmpuri pe treapta asta, pentru toate lucrările de aici încolo. Treptele de mai sus rămân cum sunt.</span>
+      ${formaDe(tipul()) ? `<button type="button" class="tr-btn" data-forma="inapoi" title="Tipul acesta de eseu revine la treptele ${tipul().implicit.map((x) => x.n).join(", ")}">↺ Forma de la început</button>` : ""}
+      <button type="button" class="tr-btn" data-forma="gata">Gata</button>
+    </div>` : "";
+  foaie.innerHTML = capForma + etichete.map((eticheta, p) => {
+    const cati = catiLa(n, p);
     let corp = "";
     if (!seScrie(n, p)) {
-      /* Gata scrisă: enunțurile de pe treapta dinainte, numerotate aici. */
-      corp = Array.from({ length: cati }, (_, j) => fix(enuntul(n, p, j).text, ++nr)).join("");
+      /* Gata scrisă: enunțurile de pe treapta dinainte, numerotate aici. Cu
+         „✎ Câmpuri", fiecare se poate desface aici în două. */
+      corp = Array.from({ length: cati }, (_, j) => fix(enuntul(n, p, j).text, ++nr,
+        ed ? btnPune(p, j, "+", "Rescrie enunțul acesta în două, pe treapta asta") : "")).join("");
     } else if (!sus) {
       /* Prima treaptă: câte un câmp. */
-      corp = Array.from({ length: cati }, (_, j) => camp(n, inceputul(n, p) + j, ++nr)).join("");
+      corp = Array.from({ length: cati }, (_, j) => camp(n, inceputul(n, p) + j, ++nr, "",
+        ed && cati > 1 ? btnScoate(p, -1, inceputul(n, p) + j) : "")).join("")
+        + (ed ? btnPune(p, -1) : "");
     } else {
-      /* Partea crește: pe grupuri, câte unul pentru fiecare enunț de mai jos.
-         Câți copii are fiecare: cât mai egal, cu unul în plus la cele dintâi
-         (la dublare iese exact doi). */
-      const parinti = partiLa(sus)[p];
-      const baza = Math.floor(cati / parinti);
-      const inPlus = cati % parinti;
+      /* Partea crește: pe grupuri, câte unul pentru fiecare enunț de mai jos. */
+      const g = grupele(n, p);
       /* Indiciile (statutul social, psihologic, moral) se pun acolo unde un
-         singur enunț se desface în atâtea câmpuri câte indicii sunt. */
+         singur enunț se desface în mai multe câmpuri. */
       const ind = tipul().indicii?.[p];
-      const cuIndicii = parinti === 1 && ind?.length === cati ? ind : null;
+      const cuIndicii = g.length === 1 && ind?.length ? ind : null;
       let j = 0;
-      corp = Array.from({ length: parinti }, (_, k) => {
-        const copii = baza + (k < inPlus ? 1 : 0);
+      corp = g.map((copii, k) => {
         const parinte = enuntul(sus, p, k).text.trim();
-        const html = `<div class="tr-subgrup">
+        return `<div class="tr-subgrup">
             <p class="tr-parinte">${parinte ? esc(parinte) : "<em>enunțul de mai jos e încă gol</em>"}</p>
-            ${Array.from({ length: copii }, () => { const x = j++; return camp(n, inceputul(n, p) + x, ++nr, cuIndicii?.[x] || ""); }).join("")}
+            ${Array.from({ length: copii }, () => { const x = j++; const i = inceputul(n, p) + x;
+              return camp(n, i, ++nr, cuIndicii?.[x] || "", ed && copii > 1 ? btnScoate(p, k, i) : ""); }).join("")}
+            ${ed ? btnPune(p, k) : ""}
           </div>`;
-        return html;
       }).join("");
     }
     return `<section class="tr-grup tr-grup--${claseParte(p, etichete.length)}${seScrie(n, p) ? "" : " tr-grup--fix"}">
@@ -299,7 +412,7 @@ function deseneaza() {
   /* Treptele se desenează din eseul deschis: alt eseu poate avea alte trepte. */
   document.getElementById("trepte").innerHTML = trepteLe().map((t) => `<button type="button"
       role="tab" class="tr-treapta${t === n ? " is-on" : ""}" data-n="${t}" aria-selected="${t === n}"${
-      !admin && !privat && t !== n ? " disabled" : ""}>${t}</button>`).join("");
+      !admin && !privat && t !== n ? " disabled" : ""}>${catePe(t)}</button>`).join("");
   document.querySelectorAll(".tr-tip").forEach((b) => {
     const e = b.dataset.tip === tip;
     b.classList.toggle("is-on", e);
@@ -308,6 +421,11 @@ function deseneaza() {
   });
   document.getElementById("goleste").hidden = !admin;
   if (btnElevi) btnElevi.hidden = !admin;
+  if (btnForma) {
+    btnForma.hidden = !admin || !!privat;
+    btnForma.classList.toggle("is-on", ed);
+    btnForma.setAttribute("aria-pressed", String(ed));
+  }
   deseneazaLucrarile();
   foaie.querySelectorAll(".tr-camp").forEach(potriveste);
   numara();
@@ -324,9 +442,9 @@ function potriveste(t) {
 function numara() {
   let gata = 0;
   tipul().etichete.forEach((_, p) => {
-    for (let j = 0; j < partiLa(treapta)[p]; j++) if (enuntul(treapta, p, j).text.trim()) gata++;
+    for (let j = 0; j < catiLa(treapta, p); j++) if (enuntul(treapta, p, j).text.trim()) gata++;
   });
-  scrise.textContent = `${gata} / ${treapta} scrise`;
+  scrise.textContent = `${gata} / ${catePe(treapta)} scrise`;
 }
 
 function arataStarea(text, fel = "") {
@@ -354,7 +472,7 @@ async function trimite() {
   if (inZbor) { maiAm = true; return; }
   inZbor = true;
   pastreazaTipul();
-  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa, opera, sursa, pentru, inceput, ids });
+  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa, opera, sursa, pentru, inceput, ids, forme: formele() });
   inZbor = false;
   if (maiAm) { maiAm = false; trimite(); return; }
   arataStarea(ok ? "live · trimis" : "netrimis: verifică netul", ok ? "live" : "eroare");
@@ -703,6 +821,116 @@ document.addEventListener("click", () => {
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panouElevi.hidden) document.body.click(); });
 
+/* ---------- „✎ Câmpuri" (doar adminul, 0112) ----------
+   Pornit, fiecare câmp are un ×, fiecare grup un „+ enunț", iar fiecare enunț
+   gata scris un + (se rescrie în două pe treapta asta). Schimbarea ține de
+   tipul de eseu și de treapta deschisă, pentru totdeauna. */
+const btnForma = document.createElement("button");
+btnForma.type = "button";
+btnForma.className = "tr-btn tr-forma__btn";
+btnForma.hidden = true;
+btnForma.textContent = "✎ Câmpuri";
+btnForma.title = "Adaugă ori scoate câmpuri de enunț pe treapta asta";
+document.getElementById("goleste").before(btnForma);
+btnForma.addEventListener("click", () => { editezForma = !editezForma; deseneaza(); });
+
+/** Câmp nou în partea `p`: pe prima treaptă la capătul ei; mai sus, la capătul
+ *  grupului `k`; la o parte gata scrisă, sub enunțul `k`, care se rescrie în două. */
+function adaugaCamp(n, p, k) {
+  const x = treaptaLa(n);
+  if (suma(x.parti) >= 40) { arataSalvarea("cel mult 40 de enunțuri pe o treaptă", true); return; }
+  const sir = enunturi[n];
+  const start = inceputul(n, p);
+  const sus = treaptaDinainte(n);
+  if (!sus) {
+    sir.splice(start + x.parti[p], 0, "");
+    x.parti[p]++;
+  } else if (seScrie(n, p)) {
+    const g = grupele(n, p);
+    sir.splice(start + suma(g.slice(0, k + 1)), 0, "");
+    g[k]++;
+    x.parti[p]++;
+    puneGrupe(x, p, g);
+  } else {
+    /* Partea venea gata scrisă: de acum se rescrie. Fiecare enunț de dedesubt
+       își are câmpul lui, cu textul lui în el, iar cel ales încă unul, gol. */
+    const parinti = catiLa(sus, p);
+    const nou = [];
+    for (let j = 0; j < parinti; j++) {
+      nou.push(enuntul(sus, p, j).text);
+      if (j === k) nou.push("");
+    }
+    sir.splice(start, x.parti[p], ...nou);
+    x.parti[p] = parinti + 1;
+    puneGrupe(x, p, Array.from({ length: parinti }, (_, j) => (j === k ? 2 : 1)));
+  }
+  dupaForma();
+}
+
+/** Scoate câmpul de pe locul `i` (partea `p`, grupul `k`). Fiecare grup
+ *  păstrează cel puțin un câmp; o parte rămasă cu câte unul pe grup nu mai
+ *  crește, deci ia iar enunțurile de pe treapta dinainte. */
+function scoateCamp(n, p, k, i) {
+  const x = treaptaLa(n);
+  const sir = enunturi[n];
+  const sus = treaptaDinainte(n);
+  const g = sus ? grupele(n, p) : null;
+  if (sus ? !(g[k] > 1) : !(x.parti[p] > 1)) return;
+  const text = String(sir[i] || "").trim();
+  const seStinge = sus && suma(g) - 1 === g.length;
+  const scris = seStinge && sir.slice(inceputul(n, p), inceputul(n, p) + x.parti[p]).some((y) => String(y).trim());
+  if (seStinge && scris) {
+    if (!confirm("Cu un câmp mai puțin, partea asta nu mai crește pe treapta asta: ia iar enunțurile de pe treapta dinainte, iar ce e scris în câmpurile ei nu se mai vede. Scoți câmpul?")) return;
+  } else if (text && !confirm(`Scoți câmpul acesta? Enunțul din el se pierde:
+
+„${text.length > 120 ? `${text.slice(0, 120)}…` : text}"`)) return;
+  sir.splice(i, 1);
+  x.parti[p]--;
+  if (sus) {
+    g[k]--;
+    if (seStinge) delete x.grupe[p]; else puneGrupe(x, p, g);
+  }
+  dupaForma();
+}
+
+/** Tipul revine la forma din pagină; textele se mută parte cu parte. */
+function formaDeLaInceput() {
+  const t = tipul();
+  if (!formaDe(t)) return;
+  if (!confirm(`Readuci „${numeTip(t.cheie)}" la forma de la început (trepte de ${t.implicit.map((x) => x.n).join(", ")} enunțuri)? Câmpurile adăugate ori scoase se pierd, pentru toate lucrările de aici încolo. Ce e scris pe tablă rămâne, mutat parte cu parte.`)) return;
+  t.trepte.forEach((x, k) => { enunturi[x.n] = mutaPeParti(enunturi[x.n], x.parti, t.implicit[k].parti); });
+  t.trepte = copieTrepte(t.implicit);
+  dupaForma();
+}
+
+/* După o schimbare de formă: tabla se desenează din nou, forma pleacă în
+   bază, iar tabla întreagă la elevi (enunțurile s-au mutat pe alte locuri). */
+async function dupaForma() {
+  const t = tipul();
+  uitaTrimiterile();         // tot ce era de trimis pleacă acum, cu tabla întreagă
+  pastreazaTipul();
+  const unde = document.querySelector(".tr-zona").scrollTop;
+  deseneaza();
+  document.querySelector(".tr-zona").scrollTop = unde;
+  arataSalvarea("se salvează forma…");
+  clearTimeout(ceas);
+  const [ok] = await Promise.all([scrieForma(SLUG, t.cheie, formaDe(t)), trimite()]);
+  arataSalvarea(ok ? `forma „${numeTip(t.cheie)}" s-a salvat, pentru toate lucrările` : "forma NU s-a salvat: verifică netul", !ok);
+  lucrareaSeSchimba();
+}
+
+foaie.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-forma]");
+  if (!b || !editez()) return;
+  const p = Number(b.dataset.p);
+  const k = Number(b.dataset.k);
+  const fel = b.dataset.forma;
+  if (fel === "pune") adaugaCamp(treapta, p, k);
+  else if (fel === "scoate") scoateCamp(treapta, p, k, Number(b.dataset.i));
+  else if (fel === "inapoi") formaDeLaInceput();
+  else if (fel === "gata") { editezForma = false; deseneaza(); }
+});
+
 /* ---------- opera și lucrările ----------
    Opera stă pe bară, la toți. O scrie profesorul (✎); până atunci se ia din
    numele fișei Word. Ea și tipul eseului sunt etichetele lucrărilor din grilă. */
@@ -788,13 +1016,31 @@ function deseneazaLucrarile() {
  *  părțile luate de pe treapta dinainte), ca să se poată citi singură. */
 function continutLucrare(op, zi, ora = "") {
   const trepte = {};
+  const forme = {};      // câte enunțuri are fiecare parte, ca lucrarea să se citească singură (0112)
   for (const n of trepteLe()) {
     if (!enunturi[n]?.some((x) => String(x).trim())) continue;
+    forme[n] = tipul().etichete.map((_, p) => catiLa(n, p));
     trepte[n] = tipul().etichete.flatMap((_, p) =>
-      Array.from({ length: partiLa(n)[p] }, (_, j) => enuntul(n, p, j).text));
+      Array.from({ length: catiLa(n, p) }, (_, j) => enuntul(n, p, j).text));
   }
   if (!Object.keys(trepte).length) return null;
-  return { versiune: 1, opera: op ? { nume: op.nume, autor: op.autor || "" } : null, tip, zi, ...(ora ? { ora } : {}), treapta, trepte };
+  return { versiune: 1, opera: op ? { nume: op.nume, autor: op.autor || "" } : null, tip, zi, ...(ora ? { ora } : {}), treapta, trepte, forme };
+}
+
+/** Enunțurile unei lucrări, mutate pe forma de acum a tablei. Lucrarea are
+ *  împărțirea ei în `forme`; una mai veche decât 0112 are forma din pagină. */
+function dinLucrare(d) {
+  const t = tipul(d.tip);
+  const out = {};
+  t.trepte.forEach((x, k) => {
+    const v = d.trepte?.[x.n];
+    if (!Array.isArray(v)) return;
+    const f = d.forme?.[x.n];
+    const vechi = Array.isArray(f) && f.length === t.etichete.length && f.every((y) => Number.isInteger(y) && y >= 0)
+      ? f : t.implicit[k].parti;
+    out[x.n] = mutaPeParti(v, vechi, x.parti);
+  });
+  return out;
 }
 const treaptaAtinsa = (d) => Math.max(...Object.keys(d.trepte || {}).map(Number).filter((n) => trepteLe(d.tip).includes(n)), trepteLe(d.tip)[0]);
 
@@ -914,7 +1160,7 @@ async function punePeTabla(row, numeElev) {
   if (!confirm(`Pui pe tabla live lucrarea lui ${numeElev}: „${row.title}"?\n\nCe e acum pe tablă la „${numeTip(d.tip)}" se înlocuiește. Celălalt tip de eseu și fișa rămân. Elevul, dacă e pornit, scrie mai departe în aceeași lucrare.`)) return;
   pastreazaTipul();
   tip = d.tip;
-  stari[tip] = normalizeazaTip(tipul(tip), { treapta: d.treapta || treaptaAtinsa(d), enunturi: d.trepte });
+  stari[tip] = normalizeazaTip(tipul(tip), { treapta: d.treapta || treaptaAtinsa(d), enunturi: dinLucrare(d) });
   ({ treapta, enunturi } = stari[tip]);
   opera = d.opera || null;
   sursa = { id: row.id, elev: row.user_id, tip, titlu: row.title, zi: d.zi };
@@ -933,7 +1179,7 @@ function lucreazaSingur(row) {
   pastreazaTipul();
   privat = { id: row.id, titlu: row.title, data: d };
   tip = d.tip;
-  stari[tip] = normalizeazaTip(tipul(tip), { treapta: d.treapta || treaptaAtinsa(d), enunturi: d.trepte });
+  stari[tip] = normalizeazaTip(tipul(tip), { treapta: d.treapta || treaptaAtinsa(d), enunturi: dinLucrare(d) });
   ({ treapta, enunturi } = stari[tip]);
   scriu = true;
   deseneaza();
@@ -1001,7 +1247,8 @@ punMarimea();
 deseneaza();
 arataStarea("se încarcă…", "trimite");
 
-const deLaBaza = await citesteTabla(SLUG);
+const [deLaBaza, formeDinBaza] = await Promise.all([citesteTabla(SLUG), citesteFormele(SLUG)]);
+for (const t of TIPURI) puneForma(t, formeDinBaza[t.cheie]);
 incarca(normalizeaza(deLaBaza));
 deseneaza();
 if (scriu) foaie.querySelector(".tr-camp")?.focus();
@@ -1011,6 +1258,14 @@ if (scriu) foaie.querySelector(".tr-camp")?.focus();
    iar câmpul în care scrii acum nu e atins deloc. */
 urmaresteTabla(SLUG, (d) => {
   if (privat) return;     // cât lucrează singur, elevul nu e atins de tabla live
+  /* Forma o schimbă doar adminul; ceilalți o primesc odată cu enunțurile, ca
+     să se potrivească mereu cu ele. */
+  let altaForma = false;
+  if (!admin && d && "forme" in d) {
+    const inainte = JSON.stringify(formele());
+    for (const t of TIPURI) puneForma(t, d.forme?.[t.cheie]);
+    altaForma = JSON.stringify(formele()) !== inainte;
+  }
   const nou = normalizeaza(d);
   for (const [cheie, text] of murdare) {
     const [t, n, i] = cheie.split("|");
@@ -1033,7 +1288,7 @@ urmaresteTabla(SLUG, (d) => {
   const altaFisa = (nou.fisa?.fisier || "") !== (fisa?.fisier || "");
   incarca(nou);
   const zona = document.querySelector(".tr-zona");
-  if (scriu && !altaTreapta && !altaFisa) {
+  if (scriu && !altaTreapta && !altaFisa && !altaForma) {
     /* Pe aceeași treaptă se schimbă doar textele: se pun în câmpuri, pe loc,
        fără să se redeseneze tabla (care ți-ar lua cursorul). */
     foaie.querySelectorAll(".tr-camp").forEach((el) => {

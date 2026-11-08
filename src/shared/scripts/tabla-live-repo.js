@@ -126,3 +126,25 @@ export function urmaresteTabla(slug, laSchimbare, laStare = () => {}) {
     .subscribe((stare) => laStare(stare === "SUBSCRIBED"));
   return () => { try { supabase.removeChannel(canal); } catch { /* deja închis */ } };
 }
+
+/* ---------- forma tipurilor de eseu (0112) ----------
+   Câmpurile adăugate ori scoase de admin pe o treaptă, pentru totdeauna. Forma
+   de la început stă în pagină; aici stă doar ce s-a schimbat, pe tip de eseu. */
+
+/** `{ <tip>: forma }` pentru tabla `slug`; `{}` dacă nu e nimic ori nu se poate citi. */
+export async function citesteFormele(slug) {
+  const { data, error } = await supabase.from("tabla_forme")
+    .select("tip, forma").eq("slug", slug);
+  if (error) { console.warn("citesteFormele:", error.message); return {}; }
+  return Object.fromEntries((data || []).map((r) => [r.tip, r.forma]));
+}
+
+/** Pune forma unui tip (doar adminul); `null` o șterge (tipul revine la forma din pagină). */
+export async function scrieForma(slug, tip, forma) {
+  const q = forma
+    ? supabase.from("tabla_forme").upsert({ slug, tip, forma, actualizat_la: new Date().toISOString() }, { onConflict: "slug,tip" })
+    : supabase.from("tabla_forme").delete().eq("slug", slug).eq("tip", tip);
+  const { error } = await q;
+  if (error) { console.warn("scrieForma:", error.message); return false; }
+  return true;
+}

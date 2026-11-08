@@ -97,6 +97,14 @@ export function deschideLucrarile(c) {
 
   const tipul = (k) => c.tipuri.find((t) => t.cheie === k) || c.tipuri[0];
   const treptele = (k) => tipul(k).trepte.map((t) => t.n);
+  /* Câte enunțuri are fiecare parte pe treapta `n` a lucrării: cum a fost
+     scrisă (`forme`, 0112), ori, la una mai veche, forma din pagină. */
+  const partile = (d, n) => {
+    const t = tipul(d.tip), f = d.forme?.[n];
+    if (Array.isArray(f) && f.length === t.etichete.length && f.every((y) => Number.isInteger(y) && y >= 0)) return f;
+    return ((t.implicit || t.trepte).find((x) => x.n === n) || t.trepte.find((x) => x.n === n))?.parti || [];
+  };
+  const cate = (d, n) => partile(d, n).reduce((a, x) => a + x, 0);
   const atinse = (r) => treptele(r.data.tip).filter((n) => Array.isArray(r.data.trepte?.[n]));
   const ultima = (r) => Math.max(...atinse(r), 0);
   const numeElev = (id) => nume.get(id) || "elev";
@@ -105,7 +113,7 @@ export function deschideLucrarile(c) {
   const vazute = () => (c.admin && elevAles !== "toti" ? randuri.filter((r) => r.user_id === elevAles) : randuri);
   const cuNume = () => c.admin && elevAles === "toti";
   const trepteMici = (r) => `<span class="tl-trepte tl-${esc(r.data.tip)}">${treptele(r.data.tip)
-    .map((n) => `<i class="${r.data.trepte?.[n] ? "on" : ""}">${n}</i>`).join("")}</span>`;
+    .map((n) => `<i class="${r.data.trepte?.[n] ? "on" : ""}">${cate(r.data, n)}</i>`).join("")}</span>`;
   const av = (id) => `<span class="tl-av">${esc(initiale(id))}</span>`;
 
   function inchide() { voal.remove(); document.removeEventListener("keydown", tasta); }
@@ -156,9 +164,9 @@ export function deschideLucrarile(c) {
   function cititor() {
     const r = deschis, d = r.data, t = tipul(d.tip);
     const parti = (n) => {
-      const pe = t.trepte.find((x) => x.n === n)?.parti || [];
+      const pe = partile(d, n);
       const sus = treptele(d.tip)[treptele(d.tip).indexOf(n) - 1];
-      const peSus = sus ? t.trepte.find((x) => x.n === sus).parti : null;
+      const peSus = sus ? partile(d, sus) : null;
       let nr = 0;
       return t.etichete.map((et, p) => {
         const cati = pe[p] || 0, start = nr;
@@ -177,8 +185,8 @@ export function deschideLucrarile(c) {
       : alCui ? `<button type="button" class="tl-creion" data-tl="singur" title="O deschide doar pentru tine, ca s-o lucrezi mai departe">✎ Lucrează pe ea</button>` : "";
     const corpul = mod === "una"
       ? parti(treapta) + `<p class="tl-nota"><i class="tl-mostra"></i>enunțurile rescrise pe treapta asta; celelalte vin de pe treapta dinainte</p>`
-      : `<div class="tl-alaturi">${treptele(d.tip).map((n) => `<div class="tl-coloana"><h4>${n} enunțuri</h4>${
-        d.trepte[n] ? parti(n) : `<div class="tl-gol">Lucrarea s-a oprit la ${ultima(r)} enunțuri.</div>`}</div>`).join("")}</div>`;
+      : `<div class="tl-alaturi">${treptele(d.tip).map((n) => `<div class="tl-coloana"><h4>${cate(d, n)} enunțuri</h4>${
+        d.trepte[n] ? parti(n) : `<div class="tl-gol">Lucrarea s-a oprit la ${cate(d, ultima(r))} enunțuri.</div>`}</div>`).join("")}</div>`;
     return `<div class="tl-cititor-cap">
         <button type="button" class="tl-inapoi" data-tl="grila">‹ Grila</button>
         <div><h3>${esc(numeOpera(d.opera))} · ${esc(c.numeTip(d.tip))}</h3>
@@ -188,7 +196,7 @@ export function deschideLucrarile(c) {
             ${incercari.length > 1 ? `<span class="tl-nota">încercări:</span>${incercari.map((x) => `<button type="button" class="tl-et tl-incercare${x.id === r.id ? " is-on" : ""}" data-tl-deschide="${esc(x.id)}">${esc(ziFrumoasa(x.data.zi, true))}${x.data.ora ? `, ${esc(x.data.ora)}` : ""}</button>`).join("")}` : ""}
           </div></div>
         <span class="tl-g"></span>
-        <div class="tl-comut">${treptele(d.tip).map((n) => `<button type="button" data-tl-treapta="${n}" class="${mod === "una" && n === treapta ? "is-on" : ""}"${d.trepte[n] ? "" : " disabled"}>${n}</button>`).join("")}</div>
+        <div class="tl-comut">${treptele(d.tip).map((n) => `<button type="button" data-tl-treapta="${n}" class="${mod === "una" && n === treapta ? "is-on" : ""}"${d.trepte[n] ? "" : " disabled"}>${cate(d, n)}</button>`).join("")}</div>
         <div class="tl-comut"><button type="button" data-tl-mod="una" class="${mod === "una" ? "is-on" : ""}">O treaptă</button><button type="button" data-tl-mod="toate" class="${mod === "toate" ? "is-on" : ""}">Toate alături</button></div>
         ${creion}
       </div>
