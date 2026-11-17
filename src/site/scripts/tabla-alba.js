@@ -13,6 +13,9 @@
 //
 // VIZITATORUL (oricine nu e admin, logat ori nu) intră cu codul clasei și doar
 // privește. Pagina NU are poarta de prelansare: codul e cheia ei.
+// DIN LICEU (0114): titlul clasei („10D") duce la `/tabla/?clasa=10D`. Cât e
+// deschis modulul Liceu, elevul intră așa fără cod; adminul ajunge pe clasa
+// cu același nume (ori e întrebat dacă s-o facă).
 //
 // LIVE. Pe canalul clasei pleacă: `stare` (unde e profesorul; repetată la
 // 3 secunde, ca un elev intrat târziu să afle singur), `op` (o schimbare a
@@ -26,7 +29,7 @@ import { isAdmin } from "../../shared/scripts/session.js";
 import {
   clasele, claseNoua, schimbaClasa, stergeClasa, lectieNoua, schimbaLectia, stergeLectia,
   paginileAdmin, paginaNoua, salveazaPagina, stergePagina, materialulAdmin,
-  intraCuCodul, paginileCuCod, materialulCuCod, canalul,
+  intraCuCodul, intraCuClasa, paginileCuCod, materialulCuCod, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
 import { Plansa, FUNDALURI } from "./tabla-alba-plansa.js";
 
@@ -834,8 +837,8 @@ function arataCodul(mesaj = "") {
   });
 }
 
-async function intraCu(c) {
-  const r = await intraCuCodul(c);
+async function intraCu(c, gata = null) {
+  const r = gata ? { clasa: gata } : await intraCuCodul(c);
   if (r.eroare) { arataCodul("Fără legătură. Verifică netul și încearcă iar."); return; }
   if (!r.clasa) { pune(CHEIE_COD, null); arataCodul("Codul nu e bun. Verifică-l și încearcă iar."); return; }
   cod = c;
@@ -867,7 +870,23 @@ if (admin) {
   deseneazaPanoul();
   let unde = null;
   try { unde = JSON.parse(ia(CHEIE_UNDE) || "null"); } catch { /* nimic */ }
-  const k = clase.find((x) => x.id === unde?.clasa);
+  const numeClasa = (parametri.get("clasa") || "").trim().slice(0, 40);
+  let k = clase.find((x) => x.id === unde?.clasa);
+  if (numeClasa) {
+    /* Venit din Liceu: clasa cu același nume; dacă n-o ai pe tablă, întreabă. */
+    const dupaNume = clase.find((x) => x.nume.trim().toLowerCase() === numeClasa.toLowerCase());
+    if (dupaNume) k = dupaNume;
+    else {
+      k = null;
+      const propus = codPropus(numeClasa);
+      if (confirm(`Clasa ${numeClasa} nu are încă tablă. O fac acum, cu codul ${propus}?`)) {
+        const r = await claseNoua(numeClasa, propus, clase.length);
+        if (r.eroare) arataVestea(r.eroare, true);
+        else { clase.push(r.clasa); k = r.clasa; }
+      }
+    }
+    history.replaceState(null, "", "/tabla/");
+  }
   if (k) {
     const l = k.lectii.find((x) => x.id === unde.lectie);
     if (l && k.stare?.lectie !== l.id) k.stare = { ...(k.stare || {}), lectie: l.id };
@@ -875,7 +894,15 @@ if (admin) {
   }
 } else {
   panou.hidden = true;
+  const numeClasa = (parametri.get("clasa") || "").trim();
   const c = (parametri.get("cod") || ia(CHEIE_COD) || "").trim().toLowerCase();
-  if (codBun(c)) { $("#cod").hidden = true; await intraCu(c); }
+  if (numeClasa) {
+    /* Venit din Liceu: clasa după nume, fără cod (cât e deschis Liceul). */
+    $("#cod").hidden = true;
+    const r = await intraCuClasa(numeClasa);
+    if (r.clasa) await intraCu(r.clasa.cod, r.clasa);
+    else arataCodul(r.eroare ? "Fără legătură. Verifică netul și încearcă iar."
+      : `Tabla clasei ${numeClasa} nu e deschisă acum. Intră cu codul primit de la profesor.`);
+  } else if (codBun(c)) { $("#cod").hidden = true; await intraCu(c); }
   else arataCodul();
 }

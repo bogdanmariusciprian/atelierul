@@ -773,6 +773,10 @@
   letter-spacing: -0.04em;
   color: oklch(45% 0.15 var(--h));
 }
+/* Titlul duce la tabla clasei (0114). Arată tot ca titlu; doar se luminează. */
+.lic-clasa__tabla { color: inherit; text-decoration: none; border-radius: 0.2em; }
+.lic-clasa__tabla:hover { color: oklch(55% 0.17 var(--h)); }
+.lic-clasa__tabla:focus-visible { outline: 3px solid oklch(70% 0.12 var(--h)); outline-offset: 4px; }
 .lic-clasa__gol {
   padding: 1.4rem;
   border: 1px dashed var(--color-border);

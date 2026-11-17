@@ -111,6 +111,14 @@ export async function intraCuCodul(cod) {
   return data && UUID.test(String(data.id)) ? { clasa: data } : { clasa: null };
 }
 
+/** Intrarea după numele clasei („10D"), din modulul Liceu (0114). Merge doar
+ *  cât e deschis Liceul; altfel `{ clasa: null }`. Clasa vine cu tot cu cod. */
+export async function intraCuClasa(nume) {
+  const { data, error } = await supabase.rpc("tabla_alba_intra_clasa", { p_nume: nume });
+  if (error) { eroare("intră după clasă", error); return { eroare: "fără legătură" }; }
+  return data && UUID.test(String(data.id)) && /^[0-9a-z]{4}$/.test(String(data.cod)) ? { clasa: data } : { clasa: null };
+}
+
 export async function paginileCuCod(cod, lectieId) {
   const { data, error } = await supabase.rpc("tabla_alba_pagini_lectiei", { p_cod: cod, p_lectie: lectieId });
   if (error) { eroare("paginile", error); return null; }

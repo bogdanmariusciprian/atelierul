@@ -761,7 +761,10 @@ function vedereDeClasa(c) {
      același poem. */
   const peOra = materialelePeOra(fise);
 
-  const cap = `<h1 class="lic-clasa__cod">${esc(c.cod)}</h1>`;
+  /* Titlul clasei duce la tabla ei (0114): elevii intră fără cod cât e
+     deschis Liceul, profesorul ajunge pe clasa cu același nume. */
+  const cap = `<h1 class="lic-clasa__cod"><a class="lic-clasa__tabla" href="/tabla/?clasa=${encodeURIComponent(c.cod)}"
+    title="Tabla clasei ${esc(c.cod)}">${esc(c.cod)}</a></h1>`;
 
   if (c.faraOre) {
     return `
