@@ -1,0 +1,157 @@
+// =========================================================
+// TABLA ALBĂ (0113): clasele, lecțiile, paginile și canalul live.
+//
+// Adminul citește și scrie direct în tabele (le păzește `is_admin_user()`).
+// Vizitatorul, logat ori nu, primește doar prin funcțiile care îi cer codul
+// clasei. Pe canalul `tabla-alba:<id>` scrie numai profesorul; ascultă oricine
+// a dat codul bun (de acolo află id-ul).
+// Cuprins în română, nume în engleză.
+// =========================================================
+import { supabase } from "./supabase-client.js";
+
+const UUID = /^[0-9a-f-]{36}$/i;
+const eroare = (unde, e) => { console.warn(`tabla albă, ${unde}:`, e?.message || e); };
+
+/* ---------- adminul ---------- */
+
+/** Clasele, cu lecțiile lor (fără materialul HTML). */
+export async function clasele() {
+  const { data, error } = await supabase.from("tabla_alba_clase")
+    .select("id, nume, cod, ordine, stare, lectii:tabla_alba_lectii(id, titlu, ordine, material, creat_la)")
+    .order("ordine").order("creat_la");
+  if (error) { eroare("clasele", error); throw error; }
+  for (const c of data) c.lectii.sort((a, b) => a.ordine - b.ordine || String(a.creat_la).localeCompare(String(b.creat_la)));
+  return data;
+}
+
+export async function claseNoua(nume, cod, ordine) {
+  const { data, error } = await supabase.from("tabla_alba_clase")
+    .insert({ nume, cod, ordine }).select("id, nume, cod, ordine, stare").single();
+  if (error) { eroare("clasă nouă", error); return { eroare: /duplicate|unique/i.test(error.message) ? "Codul e deja luat de altă clasă." : error.message }; }
+  return { clasa: { ...data, lectii: [] } };
+}
+
+export async function schimbaClasa(id, ce) {
+  const { error } = await supabase.from("tabla_alba_clase").update({ ...ce, actualizat_la: new Date().toISOString() }).eq("id", id);
+  if (error) { eroare("schimbă clasa", error); return /duplicate|unique/i.test(error.message) ? "Codul e deja luat de altă clasă." : error.message; }
+  return "";
+}
+
+export async function stergeClasa(id) {
+  const { error } = await supabase.from("tabla_alba_clase").delete().eq("id", id);
+  if (error) { eroare("șterge clasa", error); return false; }
+  return true;
+}
+
+/** Lecție nouă, cu o pagină goală în ea. */
+export async function lectieNoua(clasaId, titlu, ordine) {
+  const { data, error } = await supabase.from("tabla_alba_lectii")
+    .insert({ clasa_id: clasaId, titlu, ordine }).select("id, titlu, ordine, material, creat_la").single();
+  if (error) { eroare("lecție nouă", error); return null; }
+  await paginaNoua(data.id, 0);
+  return data;
+}
+
+export async function schimbaLectia(id, ce) {
+  const { error } = await supabase.from("tabla_alba_lectii").update({ ...ce, actualizat_la: new Date().toISOString() }).eq("id", id);
+  if (error) { eroare("schimbă lecția", error); return false; }
+  return true;
+}
+
+export async function stergeLectia(id) {
+  const { error } = await supabase.from("tabla_alba_lectii").delete().eq("id", id);
+  if (error) { eroare("șterge lecția", error); return false; }
+  return true;
+}
+
+export async function paginileAdmin(lectieId) {
+  const { data, error } = await supabase.from("tabla_alba_pagini")
+    .select("id, ordine, desen").eq("lectie_id", lectieId).order("ordine").order("actualizat_la");
+  if (error) { eroare("paginile", error); throw error; }
+  return data;
+}
+
+export async function paginaNoua(lectieId, ordine) {
+  const { data, error } = await supabase.from("tabla_alba_pagini")
+    .insert({ lectie_id: lectieId, ordine }).select("id, ordine, desen").single();
+  if (error) { eroare("pagină nouă", error); return null; }
+  return data;
+}
+
+export async function salveazaPagina(id, desen) {
+  const { error } = await supabase.from("tabla_alba_pagini")
+    .update({ desen, actualizat_la: new Date().toISOString() }).eq("id", id);
+  if (error) { eroare("salvează pagina", error); return false; }
+  return true;
+}
+
+export async function ordineaPaginilor(pagini) {
+  const r = await Promise.all(pagini.map((p, i) => supabase.from("tabla_alba_pagini").update({ ordine: i }).eq("id", p.id)));
+  return r.every((x) => !x.error);
+}
+
+export async function stergePagina(id) {
+  const { error } = await supabase.from("tabla_alba_pagini").delete().eq("id", id);
+  if (error) { eroare("șterge pagina", error); return false; }
+  return true;
+}
+
+export async function materialulAdmin(lectieId) {
+  const { data, error } = await supabase.from("tabla_alba_lectii").select("material_html").eq("id", lectieId).maybeSingle();
+  if (error) { eroare("materialul", error); return null; }
+  return data?.material_html ?? null;
+}
+
+/* ---------- vizitatorul, cu codul ---------- */
+
+/** `{ id, nume, stare, lectii }` ori `null` (cod greșit ori fără net). */
+export async function intraCuCodul(cod) {
+  const { data, error } = await supabase.rpc("tabla_alba_intra", { p_cod: cod });
+  if (error) { eroare("intră", error); return { eroare: "fără legătură" }; }
+  return data && UUID.test(String(data.id)) ? { clasa: data } : { clasa: null };
+}
+
+export async function paginileCuCod(cod, lectieId) {
+  const { data, error } = await supabase.rpc("tabla_alba_pagini_lectiei", { p_cod: cod, p_lectie: lectieId });
+  if (error) { eroare("paginile", error); return null; }
+  return Array.isArray(data) ? data : [];
+}
+
+export async function materialulCuCod(cod, lectieId) {
+  const { data, error } = await supabase.rpc("tabla_alba_material", { p_cod: cod, p_lectie: lectieId });
+  if (error) { eroare("materialul", error); return null; }
+  return typeof data === "string" ? data : null;
+}
+
+/* ---------- canalul live ---------- */
+
+/**
+ * Deschide canalul clasei. `laMesaj(fel, payload)` primește tot ce vine (doar
+ * la cine ascultă); `laLegatura(legat)` spune dacă e în picioare.
+ * Întoarce `{ trimite(fel, payload), opreste() }`.
+ */
+export function canalul(clasaId, laMesaj, laLegatura = () => {}) {
+  let canal = null;
+  let oprit = false;
+  (async () => {
+    try { await supabase.realtime.setAuth(); } catch { /* clienții vechi o fac singuri */ }
+    if (oprit) return;
+    canal = supabase.channel(`tabla-alba:${clasaId}`, { config: { private: true, broadcast: { self: false } } });
+    canal.on("broadcast", { event: "*" }, (m) => { try { laMesaj(m.event, m.payload || {}); } catch (e) { eroare("mesaj", e); } });
+    canal.subscribe((stare) => {
+      if (oprit) return;
+      laLegatura(stare === "SUBSCRIBED");
+    });
+  })().catch((e) => { eroare("canal", e); laLegatura(false); });
+  return {
+    trimite(fel, payload) {
+      if (!canal) return;
+      canal.send({ type: "broadcast", event: fel, payload }).catch(() => {});
+    },
+    opreste() {
+      oprit = true;
+      try { canal && supabase.removeChannel(canal); } catch { /* deja dus */ }
+      canal = null;
+    },
+  };
+}

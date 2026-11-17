@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>Tabla – Atelierul</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f7f3ee">
+<!-- Tabla albă (0113). Fără poarta de prelansare: vizitatorii intră cu codul
+     clasei, logați ori nu. Ce văd le dă baza doar pentru codul bun. -->
+<link rel="stylesheet" href="/src/site/styles/tabla-alba.css">
+</head>
+<body>
+<header class="ta-bara" id="bara"></header>
+<div class="ta-corp">
+  <aside class="ta-panou" id="panou" hidden aria-label="Clasele și lecțiile"></aside>
+  <main class="ta-scena" id="scena">
+    <section class="ta-fila" id="fila-tabla" hidden aria-label="Tabla">
+      <div class="ta-plansa" id="plansa"></div>
+      <nav class="ta-unelte" id="unelte" hidden aria-label="Uneltele tablei"></nav>
+      <nav class="ta-pagini" id="pagini" aria-label="Paginile lecției"></nav>
+      <div class="ta-zoom" id="zoom" role="group" aria-label="Mărirea planșei"></div>
+    </section>
+    <section class="ta-fila ta-fila--material" id="fila-material" hidden aria-label="Materialul lecției"></section>
+    <div class="ta-gol" id="gol"></div>
+  </main>
+</div>
+<div class="ta-cod" id="cod" hidden></div>
+<p class="ta-veste" id="veste" role="status" hidden></p>
+<input type="file" id="alege-imagine" accept="image/*" hidden>
+<input type="file" id="alege-material" accept=".html,.htm,text/html" hidden>
+<script type="module" src="/src/site/scripts/tabla-alba.js"></script>
+</body>
+</html>
