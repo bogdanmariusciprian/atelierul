@@ -14,7 +14,8 @@
 //
 // OPERAȚIILE schimbă desenul și se pot da înapoi; tot ele pleacă pe canal:
 //   { fel: "pune", el: [...], la?: [index, …] }   { fel: "scoate", id: [...] }
-//   { fel: "schimba", el: [...] }                 { fel: "fundal", f }
+//   { fel: "schimba", el: [...] }                 { fel: "fundal", f }   (liniile: pătrățele…)
+//   { fel: "culoare", c }                         culoarea paginii
 // Fiecare operație aplicată întoarce opusa ei: așa se face Undo.
 // Cuprins în română, nume în engleză.
 // =========================================================
@@ -24,6 +25,12 @@ export const idNou = () => Math.random().toString(36).slice(2, 10);
 const copie = (o) => JSON.parse(JSON.stringify(o));
 
 export const FUNDALURI = ["alb", "patratele", "dictando", "puncte"];
+const CULOARE_BUNA = /^#[0-9a-f]{6}$/i;
+/** E închisă culoarea? Atunci liniile se trag deschise, ca să se vadă. */
+const inchisa = (c) => {
+  const n = parseInt(c.slice(1), 16);
+  return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 140;
+};
 const PAS_GRILA = 28;
 const LITERA = '"Segoe UI", system-ui, sans-serif';
 
@@ -128,8 +135,9 @@ export class Plansa {
     this.ctx = this.panza.getContext("2d");
     this.el = [];
     this.fundal = "alb";
+    this.culoareFundal = "#ffffff";
     this.vedere = { x: 0, y: 0, z: 1 };
-    this.unealta = "creion";
+    this.unealta = o.unealta || "creion";
     this.culoare = "#1f2430";
     this.grosime = 3;
     this.marimeText = 28;
@@ -159,6 +167,7 @@ export class Plansa {
     this.inchideTextul(false);
     this.el = Array.isArray(desen?.el) ? copie(desen.el).filter((e) => e && typeof e === "object" && e.id && e.t) : [];
     this.fundal = FUNDALURI.includes(desen?.fundal) ? desen.fundal : "alb";
+    this.culoareFundal = CULOARE_BUNA.test(desen?.culoare || "") ? desen.culoare : "#ffffff";
     this.inapoi = [];
     this.inainte = [];
     this.selectate.clear();
@@ -168,7 +177,7 @@ export class Plansa {
     this.cere();
     this.o.laSchimbare?.();
   }
-  desenul() { return { fundal: this.fundal, el: this.el }; }
+  desenul() { return { fundal: this.fundal, culoare: this.culoareFundal, el: this.el }; }
 
   /** Aplică o operație și întoarce opusa ei (ori null, dacă n-a schimbat nimic). */
   aplica(op) {
@@ -204,6 +213,10 @@ export class Plansa {
       if (op.f === this.fundal) return null;
       opus = { fel: "fundal", f: this.fundal };
       this.fundal = op.f;
+    } else if (op.fel === "culoare" && CULOARE_BUNA.test(op.c || "")) {
+      if (op.c.toLowerCase() === this.culoareFundal.toLowerCase()) return null;
+      opus = { fel: "culoare", c: this.culoareFundal };
+      this.culoareFundal = op.c;
     }
     this.cere();
     return opus;
@@ -315,11 +328,14 @@ export class Plansa {
     const c = this.ctx, d = this.pixel || window.devicePixelRatio || 1;
     const { x, y, z } = this.vedere;
     c.setTransform(d, 0, 0, d, 0, 0);
-    c.fillStyle = "#ffffff";
+    c.fillStyle = this.culoareFundal;
     c.fillRect(0, 0, this.W, this.H);
     this.grila();
     c.setTransform(d * z, 0, 0, d * z, -x * z * d, -y * z * d);
-    for (const e of this.el) if (!this.ascunse.has(e.id)) this.element(e, this.mutare && this.selectate.has(e.id));
+    /* Un text în lucru la profesor poartă id-ul celui pe care îl schimbă: cel
+       vechi nu se mai arată, ca să nu fie de două ori. */
+    const inLucru = this.strain?.t === "x" ? this.strain.id : null;
+    for (const e of this.el) if (!this.ascunse.has(e.id) && e.id !== inLucru) this.element(e, this.mutare && this.selectate.has(e.id));
     if (this.strain) this.element(this.strain);
     if (this.temp) this.element(this.temp);
     if (this.laser) this.deseneazaLaser(this.laser);
@@ -342,11 +358,12 @@ export class Plansa {
     if (pas < 8) return;
     const ox = -x * z % pas, oy = -y * z % pas;
     c.save();
+    const pe = inchisa(this.culoareFundal);
     if (this.fundal === "puncte") {
-      c.fillStyle = "#c9c1b7";
+      c.fillStyle = pe ? "rgba(255, 255, 255, .35)" : "#c9c1b7";
       for (let a = ox; a < this.W; a += pas) for (let b = oy; b < this.H; b += pas) c.fillRect(a - 1, b - 1, 2, 2);
     } else {
-      c.strokeStyle = this.fundal === "dictando" ? "#c7d7ee" : "#e3ddd5";
+      c.strokeStyle = pe ? "rgba(255, 255, 255, .2)" : this.fundal === "dictando" ? "#c7d7ee" : "#e3ddd5";
       c.lineWidth = 1;
       c.beginPath();
       for (let b = oy; b < this.H; b += pas) { c.moveTo(0, Math.round(b) + 0.5); c.lineTo(this.W, Math.round(b) + 0.5); }
@@ -711,14 +728,20 @@ export class Plansa {
     });
     this.gazda.append(ta);
     const creste = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; ta.style.width = "auto"; ta.style.width = `${Math.max(40, ta.scrollWidth + 8)}px`; };
-    ta.addEventListener("input", creste);
+    /* Fiecare literă pleacă live, ca desenul în curs: elevii văd textul cum se scrie. */
+    const id = vechi?.id || idNou();
+    ta.addEventListener("input", () => {
+      creste();
+      const s = ta.value.replace(/\s+$/, "");
+      this.o.laTrasare?.(s ? this.masoaraText({ id, t: "x", c, m, x: r1(wx), y: r1(wy), s }) : null);
+    });
     ta.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "Escape") { this.inchideTextul(false); }
       else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { this.inchideTextul(true); }
     });
     ta.addEventListener("blur", () => setTimeout(() => { if (this.text?.ta === ta) this.inchideTextul(true); }, 0));
-    this.text = { ta, wx, wy, vechi, m, c };
+    this.text = { ta, wx, wy, vechi, m, c, id };
     if (vechi) this.ascunse.add(vechi.id);
     this.cere();
     setTimeout(() => { ta.focus(); creste(); }, 0);
@@ -732,11 +755,13 @@ export class Plansa {
     if (t.vechi) this.ascunse.delete(t.vechi.id);
     const s = t.ta.value.replace(/\s+$/, "");
     if (pastreaza) {
-      const el = s ? this.masoaraText({ id: t.vechi?.id || idNou(), t: "x", c: t.c, m: t.m, x: r1(t.wx), y: r1(t.wy), s }) : null;
+      const el = s ? this.masoaraText({ id: t.id, t: "x", c: t.c, m: t.m, x: r1(t.wx), y: r1(t.wy), s }) : null;
       if (t.vechi && !el) this.fa({ fel: "scoate", id: [t.vechi.id] });
       else if (t.vechi && el.s !== t.vechi.s) this.fa({ fel: "schimba", el: [el] });
       else if (!t.vechi && el) this.fa({ fel: "pune", el: [el] });
     }
+    /* Textul în lucru pleacă de pe ecranele elevilor abia după ce a ajuns cel bun. */
+    this.o.laTrasare?.(null);
     this.cere();
   }
 

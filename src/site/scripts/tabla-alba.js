@@ -74,6 +74,7 @@ const golEl = $("#gol");
 
 const plansa = new Plansa($("#plansa"), {
   poateScrie: admin,
+  unealta: "text",          // cerut de Marius: tabla pornește pe Text
   laOperatie: (op) => opMea(op),
   laTrasare: (el) => trasareMea(el),
   laVedere: () => { arataZoom(); if (admin) stareCurand(150); },
@@ -184,10 +185,13 @@ const UNELTE = [
 ];
 const CULORI = ["#1f2430", "#c2410c", "#dc2626", "#2563eb", "#16a34a", "#7c3aed", "#ca8a04", "#ffffff"];
 const GROSIMI = [[2, "subțire", 20], [4, "mijlocie", 28], [8, "groasă", 44]];
-const NUME_FUNDAL = { alb: "Alb", patratele: "Pătrățele", dictando: "Dictando", puncte: "Puncte" };
+const NUME_FUNDAL = { alb: "Fără linii", patratele: "Pătrățele", dictando: "Dictando", puncte: "Puncte" };
+/* Culorile paginii: albă, crem, verde de tablă, neagră și câteva pale. */
+const CULORI_PAGINA = [["#ffffff", "Albă"], ["#fbf6ec", "Crem"], ["#fdf6c9", "Galben pal"], ["#e8f1fb", "Albastru pal"],
+  ["#eaf6ec", "Verde pal"], ["#1f4d3a", "Verde de tablă"], ["#1e293b", "Albastru închis"], ["#1f2430", "Neagră"]];
 
 function deseneazaUneltele() {
-  if (!admin) { unelte.hidden = true; return; }
+  if (!admin) { unelte.hidden = true; if (panouFundal) panouFundal.hidden = true; return; }
   unelte.hidden = false;
   const sel = plansa.selectate.size;
   unelte.innerHTML = `
@@ -203,12 +207,43 @@ function deseneazaUneltele() {
     </div>
     <div class="ta-grup">
       <button type="button" class="ta-u" data-a="imagine" title="Pune o imagine (merge și Ctrl+V)">🖼</button>
-      <button type="button" class="ta-u" data-a="fundal" title="Fundalul: ${NUME_FUNDAL[plansa.fundal]}">▦</button>
+      <button type="button" class="ta-u${fundalDeschis ? " is-on" : ""}" data-a="fundal" title="Fundalul paginii: culoarea și liniile" aria-expanded="${fundalDeschis}">▦</button>
       <button type="button" class="ta-u" data-a="png" title="Salvează pagina ca imagine">⤓</button>
       <button type="button" class="ta-u ta-u--rosu" data-a="goleste" title="Golește pagina">✕</button>
     </div>`;
+  panouFundal.hidden = !fundalDeschis;
+  panouFundal.innerHTML = fundalDeschis ? `<div class="ta-grup ta-fundal" role="group" aria-label="Fundalul paginii">
+      <p>Culoarea paginii</p>
+      <div class="ta-fundal__culori">${CULORI_PAGINA.map(([c, n]) => `<button type="button" class="ta-cul${plansa.culoareFundal === c ? " is-on" : ""}" data-fc="${c}" style="--c:${c}" title="${n}" aria-label="Pagina ${n.toLowerCase()}"></button>`).join("")}
+        <label class="ta-cul ta-cul--alta" title="Altă culoare"><input type="color" value="${plansa.culoareFundal}" data-fc-alta></label></div>
+      <p>Liniile</p>
+      <div class="ta-fundal__linii">${FUNDALURI.map((f) => `<button type="button" class="ta-btn${plansa.fundal === f ? " is-on" : ""}" data-ff="${f}">${NUME_FUNDAL[f]}</button>`).join("")}</div>
+    </div>` : "";
 }
 
+/* Panoul cu fundalul stă lângă bara de unelte, nu în ea: bara se derulează și
+   l-ar fi tăiat jos, pe ecrane mai mici. */
+let fundalDeschis = false;
+const panouFundal = document.createElement("div");
+panouFundal.className = "ta-fundal-panou";
+panouFundal.hidden = true;
+filaTabla.append(panouFundal);
+/* Pe o pagină închisă, creionul negru nu se vede: trece singur pe alb (și invers). */
+function culoareaPaginii(c) {
+  plansa.fa({ fel: "culoare", c });
+  const n = parseInt(c.slice(1), 16);
+  const inchisa = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 140;
+  if (inchisa && plansa.culoare === "#1f2430") plansa.culoare = "#ffffff";
+  else if (!inchisa && plansa.culoare === "#ffffff") plansa.culoare = "#1f2430";
+  deseneazaUneltele();
+}
+panouFundal.addEventListener("click", (e) => {
+  const fc = e.target.closest("[data-fc]");
+  if (fc) { culoareaPaginii(fc.dataset.fc); return; }
+  const ff = e.target.closest("[data-ff]");
+  if (ff) { plansa.fa({ fel: "fundal", f: ff.dataset.ff }); deseneazaUneltele(); }
+});
+panouFundal.addEventListener("change", (e) => { if (e.target.matches("[data-fc-alta]")) culoareaPaginii(e.target.value); });
 unelte.addEventListener("click", (e) => {
   const u = e.target.closest("[data-u]");
   if (u) { plansa.setUnealta(u.dataset.u); return; }
@@ -227,11 +262,8 @@ unelte.addEventListener("click", (e) => {
   else if (a === "sterge") plansa.stergeSelectia();
   else if (a === "dubleaza") plansa.dubleazaSelectia();
   else if (a === "imagine") $("#alege-imagine").click();
-  else if (a === "fundal") {
-    const f = FUNDALURI[(FUNDALURI.indexOf(plansa.fundal) + 1) % FUNDALURI.length];
-    plansa.fa({ fel: "fundal", f });
-    arataVestea(`Fundal: ${NUME_FUNDAL[f]}`);
-  } else if (a === "png") {
+  else if (a === "fundal") { fundalDeschis = !fundalDeschis; deseneazaUneltele(); }
+  else if (a === "png") {
     const l = document.createElement("a");
     l.href = plansa.imaginePng();
     l.download = `${clasa?.nume || "tabla"} - ${lectie?.titlu || ""} - pagina ${pag + 1}.png`.replace(/[\\/:*?"<>|]/g, "");
@@ -241,6 +273,7 @@ unelte.addEventListener("click", (e) => {
   }
 });
 unelte.addEventListener("input", (e) => { if (e.target.matches("[data-alta]")) puneCuloarea(e.target.value, false); });
+
 function puneCuloarea(c, redeseneaza = true) {
   plansa.culoare = c;
   if (plansa.selectate.size) plansa.coloreazaSelectia(c);
