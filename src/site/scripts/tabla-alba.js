@@ -12,8 +12,9 @@
 //     deschisă (file, pagini, material). Lecția o alege tot profesorul.
 //
 // VIZITATORUL (oricine nu e admin, logat ori nu) doar privește, și numai cât
-// e vizibilă tabla clasei (0115): profesorul a lăsat-o „Deschisă", e deschis
-// Liceul și e ora clasei după orar, ±2 minute. Fără coduri. Intră din Liceu
+// e vizibilă tabla clasei. Fiecare clasă are trei stări (0116): „Automat" (la
+// ora clasei din orar, ±2 minute, cu Liceul deschis), „Deschisă" (oricând) și
+// „Închisă" (doar profesorul). Fără coduri. Intră din Liceu
 // (titlul clasei duce la `/tabla/?clasa=10D`) ori de pe `/tabla/`, unde vede
 // doar butoanele claselor deschise acum. Când tabla se închide, e scos pe loc.
 // Pagina NU are poarta de prelansare: paza e în bază.
@@ -55,7 +56,7 @@ document.body.classList.toggle("ta--admin", admin);
 
 /* ---------- starea paginii ---------- */
 let clase = [];            // adminul: toate clasele
-let clasa = null;          // clasa deschisă: { id, nume, lectii, stare, deschisa? }
+let clasa = null;          // clasa deschisă: { id, nume, lectii, stare, acces? }
 let lectie = null;         // lecția deschisă
 let pagini = [];           // paginile ei: { id, ordine, desen: { rev, fundal, el } }
 let pag = 0;               // pagina deschisă
@@ -105,9 +106,8 @@ function deseneazaBara() {
       <button type="button" data-mod="conduc" class="${mod === "conduc" ? "is-on" : ""}" title="Elevii văd ce vezi tu: fila, pagina, derularea">Conduc eu</button>
       <button type="button" data-mod="liber" class="${mod === "liber" ? "is-on" : ""}" title="Elevii se plimbă singuri prin lecția deschisă">Liber</button>
     </div>` : !admin && clasa ? `<span class="ta-chip">${mod === "conduc" ? "Profesorul conduce" : "Te poți plimba prin lecție"}</span>` : "";
-  const codul = admin && clasa ? `<button type="button" class="ta-chip ta-chip--acces${clasa.deschisa ? " is-on" : ""}" data-bara="acces"
-      title="${clasa.deschisa ? "Elevii intră la ora clasei, după orar (±2 minute). Apasă ca s-o închizi." : "Nimeni nu intră afară de tine. Apasă ca s-o deschizi pentru ora clasei."}"
-      >${clasa.deschisa ? "🔓 Deschisă" : "🔒 Închisă"}</button>` : "";
+  const codul = admin && clasa ? `<div class="ta-mod ta-acces-bara" role="group" aria-label="Cine vede tabla clasei">${ACCES.map(([a, i, n, t]) =>
+      `<button type="button" data-acces="${a}" class="${(clasa.acces || "automat") === a ? `is-on ta-acces--${a}` : ""}" title="${t}">${i} ${n}</button>`).join("")}</div>` : "";
   const urmeaza = !admin && clasa && fila === "tabla" ? `<button type="button" class="ta-btn${urmaresc ? " is-on" : ""}" data-bara="urmaresc"
       title="${urmaresc ? "Planșa ta urmează ce vede profesorul" : "Te uiți singur; apasă ca să urmezi iar profesorul"}">${urmaresc ? "◉ Urmăresc" : "○ Mă uit singur"}</button>` : "";
   const stare = clasa ? `<span class="ta-stare" data-fel="${legat ? "live" : "eroare"}">${legat ? "live" : "fără legătură"}</span>` : "";
@@ -125,6 +125,8 @@ function deseneazaBara() {
 bara.addEventListener("click", async (e) => {
   const f = e.target.closest("[data-fila]");
   if (f && !f.disabled) { schimbaFila(f.dataset.fila); return; }
+  const ac = e.target.closest("[data-acces]");
+  if (ac && admin && clasa) { await puneAccesul(clasa, ac.dataset.acces); return; }
   const m = e.target.closest("[data-mod]");
   if (m && admin) { mod = m.dataset.mod; deseneazaBara(); stareAcum(); return; }
   const b = e.target.closest("[data-bara]")?.dataset.bara;
@@ -132,8 +134,6 @@ bara.addEventListener("click", async (e) => {
   else if (b === "ecran") {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else document.documentElement.requestFullscreen?.().catch(() => {});
-  } else if (b === "acces" && clasa) {
-    await comutaAccesul(clasa);
   } else if (b === "urmaresc") {
     urmaresc = !urmaresc;
     if (urmaresc && prof.vedere) plansa.arataZona(prof.vedere);
@@ -511,6 +511,7 @@ function laMesaj(fel, m) {
     if (mod === "conduc" && fila === "material") aplicaMaterial();
   } else if (fel === "reia") reiaPaginile();
   else if (fel === "inchis") tablaInchisa();
+  else if (fel === "verifica") tablaVizibila(clasa?.id).then((v) => { if (v === false) tablaInchisa(); });
   else if (fel === "structura") reiaTot();
 }
 
@@ -794,9 +795,8 @@ function deseneazaPanoul() {
     ${clase.map((c) => `<section class="ta-cl${clasa?.id === c.id ? " is-on" : ""}">
         <div class="ta-cl__cap">
           <button type="button" class="ta-cl__nume" data-c="deschide" data-id="${c.id}">${esc(c.nume)}</button>
-          <button type="button" class="ta-acces${c.deschisa ? " is-on" : ""}" data-c="acces" data-id="${c.id}"
-            title="${c.deschisa ? "Deschisă: elevii intră la ora clasei. Apasă ca s-o închizi." : "Închisă: nu intră nimeni afară de tine. Apasă ca s-o deschizi."}"
-            aria-pressed="${!!c.deschisa}">${c.deschisa ? "🔓" : "🔒"}</button>
+          ${(() => { const [a, i, n, t] = ACCES.find((x) => x[0] === (c.acces || "automat")); return `<button type="button"
+            class="ta-acces ta-acces--${a}" data-c="acces" data-id="${c.id}" title="${n}: ${t} Apasă ca s-o treci mai departe.">${i}</button>`; })()}
           <button type="button" class="ta-mic" data-c="schimba" data-id="${c.id}" title="Numele clasei">✎</button>
           <button type="button" class="ta-mic ta-mic--rosu" data-c="sterge" data-id="${c.id}" title="Șterge clasa">🗑</button>
         </div>
@@ -810,17 +810,25 @@ function deseneazaPanoul() {
       </section>`).join("")}`;
 }
 
-/** Deschide ori închide tabla clasei pentru elevi. La închidere, elevii care o
- *  au deschisă sunt scoși pe loc (și baza nu le mai dă nimic). */
-async function comutaAccesul(k) {
-  const nou = !k.deschisa;
-  const er = await schimbaClasa(k.id, { deschisa: nou });
-  if (er) { arataVestea(`Nu s-a putut ${nou ? "deschide" : "închide"}: ${er}`, true); return; }
-  k.deschisa = nou;
-  if (!nou && clasa?.id === k.id) trimite("inchis", {});
+/* Cine vede tabla clasei (0116): [stare, semn, nume, ce înseamnă]. */
+const ACCES = [
+  ["automat", "🕘", "Automat", "elevii o văd doar la ora clasei din orar (±2 minute), cu Liceul deschis."],
+  ["deschisa", "🔓", "Deschisă", "o vede oricine, oricând, logat ori nu."],
+  ["inchisa", "🔒", "Închisă", "n-o vede nimeni afară de tine, nici la ora clasei."],
+];
+/** Pune starea tablei clasei. Elevii care o au deschisă își verifică pe loc
+ *  dacă o mai pot vedea (la „Închisă" sunt scoși direct). */
+async function puneAccesul(k, a) {
+  if (!ACCES.some((x) => x[0] === a) || k.acces === a) return;
+  const er = await schimbaClasa(k.id, { acces: a });
+  if (er) { arataVestea(`Nu s-a putut schimba: ${er}`, true); return; }
+  k.acces = a;
+  if (clasa?.id === k.id) trimite(a === "inchisa" ? "inchis" : "verifica", {});
   deseneazaPanoul();
   deseneazaBara();
-  arataVestea(nou ? `Tabla ${k.nume} e deschisă: elevii intră la ora clasei, după orar.` : `Tabla ${k.nume} e închisă.`);
+  deseneazaGolul();
+  const [, i, n, t] = ACCES.find((x) => x[0] === a);
+  arataVestea(`${i} Tabla ${k.nume}, ${n.toLowerCase()}: ${t}`);
 }
 
 panou.addEventListener("click", async (e) => {
@@ -837,7 +845,10 @@ panou.addEventListener("click", async (e) => {
       clase.push(r.clasa);
       deschideClasa(r.clasa);
     } else if (c.dataset.c === "deschide" && k) deschideClasa(k);
-    else if (c.dataset.c === "acces" && k) await comutaAccesul(k);
+    else if (c.dataset.c === "acces" && k) {
+      const i = ACCES.findIndex((x) => x[0] === (k.acces || "automat"));
+      await puneAccesul(k, ACCES[(i + 1) % ACCES.length][0]);
+    }
     else if (c.dataset.c === "schimba" && k) {
       const nume = prompt("Numele clasei, ca în orarul Liceului:", k.nume)?.trim();
       if (!nume || nume === k.nume) return;
@@ -949,7 +960,7 @@ function deseneazaGolul() {
   if (clasa && lectie) { golEl.hidden = true; return; }
   golEl.hidden = false;
   golEl.innerHTML = admin
-    ? (clasa ? `<p>Clasa <b>${esc(clasa.nume)}</b> (${clasa.deschisa ? "🔓 deschisă la ora ei" : "🔒 închisă"}). Alege o lecție din panou ori fă una nouă.</p>`
+    ? (clasa ? `<p>Clasa <b>${esc(clasa.nume)}</b> (${(ACCES.find((x) => x[0] === (clasa.acces || "automat")) || ACCES[0]).slice(1, 3).join(" ").toLowerCase()}). Alege o lecție din panou ori fă una nouă.</p>`
       : `<p>Alege o clasă din panou ori fă una nouă.</p>`)
     : `<p>Profesorul n-a deschis încă nicio lecție. Tabla apare aici singură, când începe.</p>`;
 }

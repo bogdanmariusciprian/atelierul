@@ -19,7 +19,7 @@ const eroare = (unde, e) => { console.warn(`tabla albă, ${unde}:`, e?.message |
 /** Clasele, cu lecțiile lor (fără materialul HTML). */
 export async function clasele() {
   const { data, error } = await supabase.from("tabla_alba_clase")
-    .select("id, nume, ordine, stare, deschisa, lectii:tabla_alba_lectii(id, titlu, ordine, material, creat_la)")
+    .select("id, nume, ordine, stare, acces, lectii:tabla_alba_lectii(id, titlu, ordine, material, creat_la)")
     .order("ordine").order("creat_la");
   if (error) { eroare("clasele", error); throw error; }
   for (const c of data) c.lectii.sort((a, b) => a.ordine - b.ordine || String(a.creat_la).localeCompare(String(b.creat_la)));
@@ -28,7 +28,7 @@ export async function clasele() {
 
 export async function claseNoua(nume, ordine) {
   const { data, error } = await supabase.from("tabla_alba_clase")
-    .insert({ nume, ordine }).select("id, nume, ordine, stare, deschisa").single();
+    .insert({ nume, ordine }).select("id, nume, ordine, stare, acces").single();
   if (error) { eroare("clasă nouă", error); return { eroare: error.message }; }
   return { clasa: { ...data, lectii: [] } };
 }
