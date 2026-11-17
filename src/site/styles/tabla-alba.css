@@ -226,10 +226,11 @@ button { font: inherit; color: inherit; }
   outline: none;
   background: transparent;
   line-height: 1.25;
-  resize: none;
-  overflow: hidden;
   white-space: pre;
+  cursor: text;
 }
+.ta-text b { font-weight: 700; }
+.ta-format .ta-u { font-family: Georgia, serif; font-size: 18px; }
 
 /* ---- materialul ---- */
 .ta-fila--material { display: flex; flex-direction: column; background: #fff; }

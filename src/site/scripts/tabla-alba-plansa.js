@@ -9,7 +9,9 @@
 // ELEMENTELE (ce rămâne desenat), mici, ca să încapă pe canalul live:
 //   { id, t: "p", c, g, o?, pts: [x, y, x, y, …] }      creion (o = marker)
 //   { id, t: "l" | "a" | "r" | "e", c, g, x1, y1, x2, y2 } linie, săgeată, dreptunghi, elipsă
-//   { id, t: "x", c, m, x, y, s, w, h }                 text (m = mărimea literei)
+//   { id, t: "x", c, m, x, y, s, r?, w, h }             text (m = mărimea literei)
+//        r = bucățile formatate: [[câte litere, semne], …], semne: 1 bold,
+//        2 italic, 4 subliniat (Ctrl+B / Ctrl+I / Ctrl+U)
 //   { id, t: "i", x, y, w, h, src }                     imagine lipită
 //
 // OPERAȚIILE schimbă desenul și se pot da înapoi; tot ele pleacă pe canal:
@@ -21,6 +23,76 @@
 // =========================================================
 
 const r1 = (n) => Math.round(n * 10) / 10;
+const escH = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ---------- textul formatat ---------- */
+export const BOLD = 1, ITALIC = 2, SUBLINIAT = 4;
+/** Bucățile textului, verificate: dacă nu acoperă exact textul, e tot simplu. */
+function bucatile(e) {
+  const s = String(e.s || "");
+  const r = Array.isArray(e.r) && e.r.every((x) => Array.isArray(x) && Number.isInteger(x[0]) && x[0] >= 0 && Number.isInteger(x[1]) && x[1] >= 0 && x[1] <= 7)
+    && e.r.reduce((a, x) => a + x[0], 0) === s.length ? e.r : [[s.length, 0]];
+  return r;
+}
+/** Rândurile textului, fiecare cu bucățile lui: [[{s, f}, …], …]. */
+function randurile(e) {
+  const s = String(e.s || "");
+  const linii = [[]];
+  let i = 0;
+  for (const [n, f] of bucatile(e)) {
+    s.slice(i, i + n).split("\n").forEach((b, k) => { if (k) linii.push([]); if (b) linii[linii.length - 1].push({ s: b, f }); });
+    i += n;
+  }
+  return linii;
+}
+const fontul = (f, m) => `${f & ITALIC ? "italic " : ""}${f & BOLD ? "700 " : ""}${m}px ${LITERA}`;
+/** Bucățile, lipite unde au aceleași semne; `null` dacă tot textul e simplu. */
+function strange(r) {
+  const o = [];
+  for (const [n, f] of r) {
+    if (!n) continue;
+    const u = o[o.length - 1];
+    if (u && u[1] === f) u[0] += n; else o.push([n, f]);
+  }
+  return o.length && o.some(([, f]) => f) ? o : null;
+}
+/** Textul din editor (bold, italic, subliniat), ca {s, r}. */
+function dinEditor(rad) {
+  let s = "";
+  const r = [];
+  const adauga = (t, f) => { if (t) { s += t; r.push([t.length, f]); } };
+  const mergi = (n, f) => {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) { adauga(c.data.replace(/\u00a0/g, " "), f); continue; }
+      if (c.nodeType !== 1) continue;
+      if (c.nodeName === "BR") { adauga("\n", f); continue; }
+      let g = f;
+      const st = c.style || {};
+      if (/^(B|STRONG)$/.test(c.nodeName) || /^(bold|bolder|[6-9]00)$/.test(st.fontWeight || "")) g |= BOLD;
+      if (/^(I|EM)$/.test(c.nodeName) || st.fontStyle === "italic") g |= ITALIC;
+      if (c.nodeName === "U" || /underline/.test(`${st.textDecoration || ""} ${st.textDecorationLine || ""}`)) g |= SUBLINIAT;
+      if (/^(DIV|P)$/.test(c.nodeName) && s && !s.endsWith("\n")) adauga("\n", f);
+      mergi(c, g);
+    }
+  };
+  mergi(rad, 0);
+  /* Spațiile și rândurile goale de la coadă nu rămân. */
+  const lung = s.replace(/\s+$/, "").length;
+  let rest = lung;
+  const taiat = [];
+  for (const [n, f] of r) { if (rest <= 0) break; taiat.push([Math.min(n, rest), f]); rest -= n; }
+  return { s: s.slice(0, lung), r: strange(taiat) };
+}
+/** Textul, ca HTML de pus în editor. */
+function inEditor(e) {
+  return randurile(e).map((l) => l.map(({ s: t, f }) => {
+    let h = escH(t);
+    if (f & SUBLINIAT) h = `<u>${h}</u>`;
+    if (f & ITALIC) h = `<i>${h}</i>`;
+    if (f & BOLD) h = `<b>${h}</b>`;
+    return h;
+  }).join("")).join("<br>");
+}
 export const idNou = () => Math.random().toString(36).slice(2, 10);
 const copie = (o) => JSON.parse(JSON.stringify(o));
 
@@ -417,9 +489,18 @@ export class Plansa {
       c.ellipse((e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2, Math.abs(e.x2 - e.x1) / 2, Math.abs(e.y2 - e.y1) / 2, 0, 0, Math.PI * 2);
       c.stroke();
     } else if (e.t === "x") {
-      c.font = `${e.m}px ${LITERA}`;
       c.textBaseline = "top";
-      String(e.s || "").split("\n").forEach((r, i) => c.fillText(r, e.x, e.y + i * e.m * 1.25));
+      randurile(e).forEach((l, k) => {
+        let x = e.x;
+        const y = e.y + k * e.m * 1.25;
+        for (const b of l) {
+          c.font = fontul(b.f, e.m);
+          c.fillText(b.s, x, y);
+          const w = c.measureText(b.s).width;
+          if (b.f & SUBLINIAT) c.fillRect(x, y + e.m * 1.05, w, Math.max(1, e.m / 14));
+          x += w;
+        }
+      });
     } else if (e.t === "i") {
       const img = this.imaginea(e.src);
       if (img.complete && img.naturalWidth) c.drawImage(img, e.x, e.y, e.w, e.h);
@@ -527,7 +608,8 @@ export class Plansa {
     addEventListener("keyup", (e) => { if (e.code === "Space") { this.spatiu = false; this.cursor(); } });
     /* Un text deschis se închide (și se păstrează) la orice apăsare în afara lui. */
     document.addEventListener("pointerdown", (e) => {
-      if (this.text && e.target !== this.text.ta && e.target !== this.panza) this.inchideTextul(true);
+      /* Nu și la B / I / U: ele lucrează chiar pe textul deschis. */
+      if (this.text && !this.text.ta.contains(e.target) && e.target !== this.panza && !e.target.closest?.("[data-f]")) this.inchideTextul(true);
     }, true);
   }
 
@@ -715,36 +797,76 @@ export class Plansa {
   /* ---------- textul ---------- */
   deschideTextul(wx, wy, vechi = null) {
     this.inchideTextul(true);
-    const ta = document.createElement("textarea");
+    /* Un câmp „contenteditable", nu textarea: așa Ctrl+B, Ctrl+I, Ctrl+U merg
+       pe bucăți de text, chiar din browser. */
+    const ta = document.createElement("div");
     ta.className = "ta-text";
+    ta.contentEditable = "true";
+    ta.spellcheck = false;
     const m = vechi ? vechi.m : this.marimeText;
     const c = vechi ? vechi.c : this.culoare;
-    ta.value = vechi ? vechi.s : "";
-    ta.rows = 1;
+    ta.innerHTML = vechi ? inEditor(vechi) : "";
     const { x, y, z } = this.vedere;
     Object.assign(ta.style, {
       left: `${(wx - x) * z}px`, top: `${(wy - y) * z}px`,
       fontSize: `${m * z}px`, color: c, fontFamily: LITERA,
     });
     this.gazda.append(ta);
-    const creste = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; ta.style.width = "auto"; ta.style.width = `${Math.max(40, ta.scrollWidth + 8)}px`; };
     /* Fiecare literă pleacă live, ca desenul în curs: elevii văd textul cum se scrie. */
     const id = vechi?.id || idNou();
-    ta.addEventListener("input", () => {
-      creste();
-      const s = ta.value.replace(/\s+$/, "");
-      this.o.laTrasare?.(s ? this.masoaraText({ id, t: "x", c, m, x: r1(wx), y: r1(wy), s }) : null);
-    });
+    const trimiteLive = () => {
+      const t = dinEditor(ta);
+      this.o.laTrasare?.(t.s ? this.masoaraText({ id, t: "x", c, m, x: r1(wx), y: r1(wy), s: t.s, ...(t.r ? { r: t.r } : {}) }) : null);
+    };
+    ta.addEventListener("input", trimiteLive);
     ta.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "Escape") { this.inchideTextul(false); }
-      else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { this.inchideTextul(true); }
+      else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.inchideTextul(true); }
+      else if (e.key === "Enter") { e.preventDefault(); document.execCommand("insertLineBreak"); }
+      else if ((e.ctrlKey || e.metaKey) && /^[biu]$/i.test(e.key)) {
+        /* Bold, italic, subliniat: browserul le face singur; aici doar plecă live. */
+        setTimeout(trimiteLive, 0);
+      }
+    });
+    /* Lipit în text: doar literele, fără formatarea de unde vin. */
+    ta.addEventListener("paste", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      document.execCommand("insertText", false, e.clipboardData?.getData("text/plain") || "");
     });
     ta.addEventListener("blur", () => setTimeout(() => { if (this.text?.ta === ta) this.inchideTextul(true); }, 0));
     this.text = { ta, wx, wy, vechi, m, c, id };
     if (vechi) this.ascunse.add(vechi.id);
     this.cere();
-    setTimeout(() => { ta.focus(); creste(); }, 0);
+    setTimeout(() => {
+      ta.focus();
+      /* Cursorul la capătul textului, nu la început. */
+      const sel = getSelection();
+      sel.selectAllChildren(ta);
+      sel.collapseToEnd();
+    }, 0);
+  }
+
+  /** Bold / italic / subliniat: în textul deschis, pe ce e selectat în el;
+   *  altfel, pe textele selectate cu săgeata, întregi. */
+  formateaza(semn) {
+    if (this.text) {
+      this.text.ta.focus();
+      document.execCommand(semn === BOLD ? "bold" : semn === ITALIC ? "italic" : "underline");
+      this.text.ta.dispatchEvent(new Event("input"));
+      return;
+    }
+    const texte = this.el.filter((e) => this.selectate.has(e.id) && e.t === "x");
+    if (!texte.length) return;
+    const toate = texte.every((e) => bucatile(e).every(([n, f]) => !n || f & semn));
+    const noi = texte.map((e) => {
+      const r = strange(bucatile(e).map(([n, f]) => [n, toate ? f & ~semn : f | semn]));
+      const n = { ...copie(e) };
+      if (r) n.r = r; else delete n.r;
+      return this.masoaraText(n);
+    });
+    this.fa({ fel: "schimba", el: noi });
   }
 
   inchideTextul(pastreaza) {
@@ -753,11 +875,11 @@ export class Plansa {
     this.text = null;
     t.ta.remove();
     if (t.vechi) this.ascunse.delete(t.vechi.id);
-    const s = t.ta.value.replace(/\s+$/, "");
+    const { s, r } = dinEditor(t.ta);
     if (pastreaza) {
-      const el = s ? this.masoaraText({ id: t.id, t: "x", c: t.c, m: t.m, x: r1(t.wx), y: r1(t.wy), s }) : null;
+      const el = s ? this.masoaraText({ id: t.id, t: "x", c: t.c, m: t.m, x: r1(t.wx), y: r1(t.wy), s, ...(r ? { r } : {}) }) : null;
       if (t.vechi && !el) this.fa({ fel: "scoate", id: [t.vechi.id] });
-      else if (t.vechi && el.s !== t.vechi.s) this.fa({ fel: "schimba", el: [el] });
+      else if (t.vechi && (el.s !== t.vechi.s || JSON.stringify(el.r || null) !== JSON.stringify(t.vechi.r || null))) this.fa({ fel: "schimba", el: [el] });
       else if (!t.vechi && el) this.fa({ fel: "pune", el: [el] });
     }
     /* Textul în lucru pleacă de pe ecranele elevilor abia după ce a ajuns cel bun. */
@@ -768,10 +890,9 @@ export class Plansa {
   masoaraText(e) {
     const c = this.ctx;
     c.save();
-    c.font = `${e.m}px ${LITERA}`;
-    const randuri = e.s.split("\n");
-    e.w = r1(Math.max(...randuri.map((r) => c.measureText(r).width), 4));
-    e.h = r1(randuri.length * e.m * 1.25);
+    const linii = randurile(e);
+    e.w = r1(Math.max(...linii.map((l) => l.reduce((a, b) => { c.font = fontul(b.f, e.m); return a + c.measureText(b.s).width; }, 0)), 4));
+    e.h = r1(linii.length * e.m * 1.25);
     c.restore();
     return e;
   }

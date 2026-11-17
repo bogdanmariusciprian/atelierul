@@ -31,7 +31,7 @@ import {
   paginileAdmin, paginaNoua, salveazaPagina, stergePagina, materialulAdmin,
   intraCuCodul, intraCuClasa, paginileCuCod, materialulCuCod, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
-import { Plansa, FUNDALURI } from "./tabla-alba-plansa.js";
+import { Plansa, FUNDALURI, BOLD, ITALIC, SUBLINIAT } from "./tabla-alba-plansa.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -198,6 +198,11 @@ function deseneazaUneltele() {
     <div class="ta-grup">${UNELTE.map(([u, i, t]) => `<button type="button" class="ta-u${plansa.unealta === u ? " is-on" : ""}" data-u="${u}" title="${t}" aria-label="${t}">${i}</button>`).join("")}</div>
     <div class="ta-grup ta-culori">${CULORI.map((c) => `<button type="button" class="ta-cul${plansa.culoare === c ? " is-on" : ""}" data-c="${c}" style="--c:${c}" title="${c}" aria-label="Culoarea ${c}"></button>`).join("")}
       <label class="ta-cul ta-cul--alta" title="Altă culoare"><input type="color" value="${plansa.culoare}" data-alta></label></div>
+    <div class="ta-grup ta-format" title="Pe textul pe care îl scrii ori pe textele selectate">
+      <button type="button" class="ta-u" data-f="${BOLD}" title="Bold (Ctrl+B)"><b>B</b></button>
+      <button type="button" class="ta-u" data-f="${ITALIC}" title="Italic (Ctrl+I)"><i>I</i></button>
+      <button type="button" class="ta-u" data-f="${SUBLINIAT}" title="Subliniat (Ctrl+U)"><u>U</u></button>
+    </div>
     <div class="ta-grup">${GROSIMI.map(([g, t]) => `<button type="button" class="ta-gros${plansa.grosime === g ? " is-on" : ""}" data-g="${g}" title="Linie ${t}"><i style="--g:${g}px"></i></button>`).join("")}</div>
     <div class="ta-grup">
       <button type="button" class="ta-u" data-a="inapoi" title="Înapoi (Ctrl+Z)"${plansa.inapoi.length ? "" : " disabled"}>↶</button>
@@ -244,7 +249,11 @@ panouFundal.addEventListener("click", (e) => {
   if (ff) { plansa.fa({ fel: "fundal", f: ff.dataset.ff }); deseneazaUneltele(); }
 });
 panouFundal.addEventListener("change", (e) => { if (e.target.matches("[data-fc-alta]")) culoareaPaginii(e.target.value); });
+/* Butoanele B / I / U nu iau cursorul din textul în care scrii. */
+unelte.addEventListener("mousedown", (e) => { if (e.target.closest("[data-f]")) e.preventDefault(); });
 unelte.addEventListener("click", (e) => {
+  const fm = e.target.closest("[data-f]");
+  if (fm) { plansa.formateaza(Number(fm.dataset.f)); return; }
   const u = e.target.closest("[data-u]");
   if (u) { plansa.setUnealta(u.dataset.u); return; }
   const c = e.target.closest("[data-c]");
@@ -295,6 +304,12 @@ addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); if (e.shiftKey) plansa.refa(); else plansa.anuleaza(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "y") { e.preventDefault(); plansa.refa(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "d") { e.preventDefault(); plansa.dubleazaSelectia(); return; }
+  /* Pe textele selectate cu săgeata, întregi (în textul deschis le face browserul). */
+  if ((e.ctrlKey || e.metaKey) && (k === "b" || k === "i" || k === "u")) {
+    e.preventDefault();
+    plansa.formateaza(k === "b" ? BOLD : k === "i" ? ITALIC : SUBLINIAT);
+    return;
+  }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (k === "delete" || k === "backspace") { e.preventDefault(); plansa.stergeSelectia(); return; }
   if (k === "escape") { plansa.selectate.clear(); plansa.cere(); deseneazaUneltele(); return; }
