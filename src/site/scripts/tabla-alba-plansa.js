@@ -554,8 +554,12 @@ export class Plansa {
     const c = this.ctx, z = this.vedere.z;
     const L = this.tabelul(e);
     const { pad } = L;
+    /* Celula în care scrii acum: textul ei vechi nu se desenează (îl ține
+       caseta de deasupra), altfel s-ar vedea de două ori, unul peste altul. */
+    const scriuIn = this.text?.tabel?.id === e.id && !this.pixel ? this.text.celula : null;
     for (const k of L.celule) {
       if (k.cel.bg && CULOARE_BUNA.test(k.cel.bg)) { c.fillStyle = k.cel.bg; c.fillRect(e.x + k.x, e.y + k.y, k.w, k.h); }
+      if (scriuIn && scriuIn.i === k.i && scriuIn.j === k.j) continue;
       const av = k.cel.av || "m";
       const dy = av === "s" ? pad : av === "j" ? k.h - pad - k.as.h : (k.h - k.as.h) / 2;
       deseneazaText(c, k.as, e.x + k.x + pad, e.y + k.y + dy, e.m, e.c);
@@ -1230,6 +1234,23 @@ export class Plansa {
     if (!t) return;
     const { x, y, z } = this.vedere;
     const ta = t.ta;
+    /* Lățimea și litera întâi: înălțimea casetei se măsoară după ele. */
+    Object.assign(ta.style, {
+      fontSize: `${t.m * z}px`, color: t.c, fontFamily: LITERA,
+      width: t.lat ? `${t.lat * z}px` : "", whiteSpace: t.lat ? "pre-wrap" : "pre",
+    });
+    /* În celulă, caseta stă unde va sta textul: sus, la mijloc ori jos. */
+    if (t.tabel && t.celula) {
+      const e = this.el.find((el) => el.id === t.tabel.id);
+      const L = e && this.tabelul(e);
+      const k = L?.celule.find((q) => q.i === t.celula.i && q.j === t.celula.j);
+      if (k) {
+        const h = (ta.offsetHeight || t.m * RAND * z) / z;
+        const av = k.cel.av || "m";
+        t.wy = e.y + k.y + (av === "s" ? L.pad : av === "j" ? Math.max(L.pad, k.h - L.pad - h) : Math.max(L.pad, (k.h - h) / 2));
+        t.wx = e.x + k.x + L.pad;
+      }
+    }
     Object.assign(ta.style, {
       left: `${(t.wx - x) * z}px`, top: `${(t.wy - y) * z}px`,
       fontSize: `${t.m * z}px`, color: t.c, fontFamily: LITERA,
