@@ -38,3 +38,8 @@
 }
 
 .prezenta-fab-btn svg { flex: none; }
+
+/* „Tabla" (0113), lângă „Pregătire BAC", în culoarea tablei. */
+.prezenta-fab-wrap { gap: 8px; }
+.prezenta-fab-btn--tabla { background: #c2410c; box-shadow: 0 12px 28px -10px rgba(194, 65, 12, 0.7); }
+.prezenta-fab-btn--tabla:focus-visible { outline-color: #c2410c; }

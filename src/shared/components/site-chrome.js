@@ -390,6 +390,7 @@ function initAdminQuickPanel(basePath) {
         ${link(`${HUB}#admin/moderare`, "⚖️", "Moderare", _modPending)}
         ${link(`${HUB}#admin/utilizatori`, "👥", "Utilizatori")}
         ${link(`${HUB}#exercitii`, "🧩", "Exerciții în așteptare", _exPending)}
+        ${location.pathname.startsWith("/teste/admitere-drept") ? "" : link("/tabla/", "🖍️", "Tabla albă a claselor")}
         ${slug ? link("#propose-exercise", "📘", "Propunerile acestei lecții", here) : ""}
         <p class="admin-quick__hint">Editezi/ștergi direct pe conținut — controalele ✎/🗑 apar inline.</p>
       </div>`;
