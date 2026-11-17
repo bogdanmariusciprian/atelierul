@@ -141,6 +141,12 @@ export async function materialulCuCod(cod, lectieId) {
 export function canalul(clasaId, laMesaj, laLegatura = () => {}) {
   let canal = null;
   let oprit = false;
+  /* Se trimite doar pe canalul intrat (SUBSCRIBED). Înainte de intrare, ori
+     după o cădere, `send()` ar fi plecat pe REST, cu un avertisment că drumul
+     acela se închide; ce e de trimis atunci așteaptă aici și pleacă la intrare. */
+  let intrat = false;
+  const asteapta = [];
+  const pleaca = (fel, payload) => canal.send({ type: "broadcast", event: fel, payload }).catch(() => {});
   (async () => {
     try { await supabase.realtime.setAuth(); } catch { /* clienții vechi o fac singuri */ }
     if (oprit) return;
@@ -148,13 +154,21 @@ export function canalul(clasaId, laMesaj, laLegatura = () => {}) {
     canal.on("broadcast", { event: "*" }, (m) => { try { laMesaj(m.event, m.payload || {}); } catch (e) { eroare("mesaj", e); } });
     canal.subscribe((stare) => {
       if (oprit) return;
-      laLegatura(stare === "SUBSCRIBED");
+      intrat = stare === "SUBSCRIBED";
+      if (intrat) while (asteapta.length) pleaca(...asteapta.shift());
+      laLegatura(intrat);
     });
   })().catch((e) => { eroare("canal", e); laLegatura(false); });
   return {
     trimite(fel, payload) {
-      if (!canal) return;
-      canal.send({ type: "broadcast", event: fel, payload }).catch(() => {});
+      if (canal && intrat) { pleaca(fel, payload); return; }
+      /* Starea și desenul în curs contează doar ultimele; restul, în ordine. */
+      if (fel === "stare" || fel === "tras") {
+        const i = asteapta.findIndex(([f]) => f === fel);
+        if (i >= 0) asteapta.splice(i, 1);
+      }
+      asteapta.push([fel, payload]);
+      if (asteapta.length > 200) asteapta.shift();
     },
     opreste() {
       oprit = true;
