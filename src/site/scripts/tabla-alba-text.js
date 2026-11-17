@@ -117,6 +117,13 @@ export function marcajele(ps) {
 
 /* ---------- așezarea pe rânduri ---------- */
 
+/* UNDE STĂ O LISTĂ (ca în Word): tot paragraful intră înăuntru. Marcajul
+   (•, 1., a)) stă la jumătate de pas de marginea nivelului, iar textul, cu tot
+   cu rândurile lui următoare, la un pas și jumătate. Un paragraf fără listă,
+   doar cu nivel, intră cu câte un pas pe nivel. */
+export const locMarcaj = (n, pas) => (n + 0.5) * pas;
+export const locText = (n, lista, pas) => (lista ? n + 1.5 : n) * pas;
+
 /**
  * Așază textul: împarte paragrafele în rânduri (la `lat`, dacă e), pune
  * marcajele listelor și aliniază rândurile.
@@ -131,7 +138,7 @@ export function aseaza(ctx, t, { m, lat = null, ind = null, aliniere = "l" }) {
   const randuri = [];   // înainte de aliniere
   ps.forEach(({ bucati, p }, k) => {
     const n = p?.n || 0;
-    const stanga = (n + (p?.l ? 1 : 0)) * pas;
+    const stanga = locText(n, !!p?.l, pas);
     const loc = lat ? Math.max(m, lat - stanga) : Infinity;
     /* Cuvintele și spațiile, fiecare cu semnele lui. */
     const bucs = [];
@@ -164,7 +171,7 @@ export function aseaza(ctx, t, { m, lat = null, ind = null, aliniere = "l" }) {
     linii.forEach((l, i) => {
       while (l.length && l[l.length - 1].sp) l.pop();
       randuri.push({ bucs: l, w: l.reduce((a, x) => a + x.w, 0), stanga, n, p, ultim: i === linii.length - 1,
-        marcaj: i === 0 && p?.l ? { s: marc[k], x: n * pas } : null });
+        marcaj: i === 0 && p?.l ? { s: marc[k], x: locMarcaj(n, pas) } : null });
     });
   });
   const W = lat || Math.max(4, ...randuri.map((x) => x.stanga + x.w));
@@ -283,8 +290,8 @@ export function refaParagrafele(rad, { m, ind = null, z = 1, aliniere = "l" }) {
   pars.forEach((d, k) => {
     const p = pDin(d);
     const n = p?.n || 0;
-    d.style.paddingLeft = `${(n + (p?.l ? 1 : 0)) * pas}px`;
-    d.style.setProperty("--mx", `${n * pas}px`);
+    d.style.paddingLeft = `${locText(n, !!p?.l, pas)}px`;
+    d.style.setProperty("--mx", `${locMarcaj(n, pas)}px`);
     d.style.textAlign = { c: "center", r: "right", j: "justify" }[p?.a || aliniere] || "left";
     if (marc[k]) d.dataset.m = marc[k]; else delete d.dataset.m;
   });
