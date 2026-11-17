@@ -31,10 +31,10 @@
 import { isAdmin } from "../../shared/scripts/session.js";
 import {
   clasele, claseNoua, schimbaClasa, stergeClasa, lectieNoua, schimbaLectia, stergeLectia,
-  paginileAdmin, paginaNoua, salveazaPagina, stergePagina, materialulAdmin,
+  paginileAdmin, paginaNoua, salveazaPagina, stergePagina, materialulAdmin, setarileMele, salveazaSetarile,
   tableDeschise, intraCuClasa, tablaVizibila, paginileClasei, materialulClasei, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
-import { Plansa, FUNDALURI, BOLD, ITALIC, SUBLINIAT } from "./tabla-alba-plansa.js";
+import { Plansa, FUNDALURI, CHENARE, LISTE, BOLD, ITALIC, SUBLINIAT, inchisa } from "./tabla-alba-plansa.js";
 /* Puntea spre lecția HTML din fila Material e cea din modulul Liceu: ascultă
    din afară apăsările, tastele, gesturile și derularea, iar la elev le reface
    în același loc (vezi `fisa-punte.js` și `jurnal.js`). */
@@ -175,13 +175,19 @@ function arataFila() {
 /* =========================================================
    UNELTELE (adminul)
    ========================================================= */
+/* Selecția: un dreptunghi punctat, nu o săgeată (săgeata se confunda cu
+   unealta de săgeți). */
+const SEL_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"
+  fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3.2 2.6"/></svg>`;
+const TABEL_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"
+  fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15M15 4.5v15" stroke="currentColor" stroke-width="1.4"/></svg>`;
 const UNELTE = [
-  ["selectie", "↖", "Selecție (V): muți, mărești, ștergi"],
+  ["selectie", SEL_SVG, "Selecție (V): alegi, muți, mărești; la text, marginea din dreapta îi alege lățimea"],
   ["mana", "✋", "Mâna (H): tragi planșa"],
   ["creion", "✎", "Creion (P)"],
   ["marker", "▬", "Marker de evidențiere (M)"],
   ["radiera", "⌫", "Radieră (E)"],
-  ["text", "T", "Text (T)"],
+  ["text", "T", "Text (T). Alt+Enter: un text nou chiar dedesubt"],
   ["linie", "╱", "Linie (L); cu Shift, dreaptă"],
   ["sageata", "➚", "Săgeată (A)"],
   ["dreptunghi", "▭", "Dreptunghi (R)"],
@@ -194,89 +200,253 @@ const NUME_FUNDAL = { alb: "Fără linii", patratele: "Pătrățele", dictando: 
 /* Culorile paginii: albă, crem, verde de tablă, neagră și câteva pale. */
 const CULORI_PAGINA = [["#ffffff", "Albă"], ["#fbf6ec", "Crem"], ["#fdf6c9", "Galben pal"], ["#e8f1fb", "Albastru pal"],
   ["#eaf6ec", "Verde pal"], ["#1f4d3a", "Verde de tablă"], ["#1e293b", "Albastru închis"], ["#1f2430", "Neagră"]];
+/* Iconițele alinierii: patru rânduri, așezate ca textul. */
+const svgAl = (a) => {
+  const L = [[16, 10, 16, 8], [16, 10, 16, 8], [16, 10, 16, 8], [16, 16, 16, 10]][["l", "c", "r", "j"].indexOf(a)];
+  return `<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">${L.map((w, k) => {
+    const x = a === "c" ? (20 - w) / 2 : a === "r" ? 18 - w : 2;
+    return `<rect x="${x}" y="${3 + k * 4.2}" width="${w}" height="2" rx="1" fill="currentColor"/>`;
+  }).join("")}</svg>`;
+};
+const ALINIERI = [["l", svgAl("l"), "La stânga (Ctrl+L)"], ["c", svgAl("c"), "La mijloc (Ctrl+E)"], ["r", svgAl("r"), "La dreapta (Ctrl+R)"], ["j", svgAl("j"), "Stânga-dreapta, justified (Ctrl+J)"]];
+const NUME_LISTE = { b: "Buline", n: "Numere", a: "Litere" };
+const NUME_CHENARE = { toate: "Toate", exterior: "Doar exteriorul", interior: "Doar interiorul", orizontale: "Doar orizontale", fara: "Fără chenare" };
+
+/* ---------- implicitele tale, ținute în cont (0117) ---------- */
+let setari = { culoare: "#1f2430", grosime: 3, marimeText: 28, fundalCuloare: "#ffffff", fundalLinii: "alb", indent: null };
+let ceasSetari = null;
+function tineMinte(ce) {
+  Object.assign(setari, ce);
+  clearTimeout(ceasSetari);
+  ceasSetari = setTimeout(() => salveazaSetarile(setari), 800);
+}
+function aplicaSetarile() {
+  plansa.culoare = setari.culoare;
+  plansa.grosime = setari.grosime;
+  plansa.marimeText = setari.marimeText;
+  plansa.indent = setari.indent;
+}
+/** O pagină nouă pornește cu fundalul tău (culoarea și liniile). */
+const desenNou = () => ({ rev: 0, el: [], culoare: setari.fundalCuloare, fundal: setari.fundalLinii });
+
+/* Panoul de lângă bara de unelte: fundalul, listele ori tabelul nou; când e
+   ales un tabel, panoul tabelului. */
+let panouDeschis = null;
+const panouFundal = document.createElement("div");
+panouFundal.className = "ta-fundal-panou";
+panouFundal.hidden = true;
+panouFundal.dataset.pastreazaTextul = "";
+filaTabla.append(panouFundal);
+unelte.dataset.pastreazaTextul = "";
+const formatBara = document.createElement("nav");
+formatBara.className = "ta-format-bara";
+formatBara.hidden = true;
+formatBara.dataset.pastreazaTextul = "";
+formatBara.setAttribute("aria-label", "Formatarea textului");
+filaTabla.append(formatBara);
 
 function deseneazaUneltele() {
-  if (!admin) { unelte.hidden = true; if (panouFundal) panouFundal.hidden = true; return; }
+  if (!admin) { unelte.hidden = true; if (panouFundal) panouFundal.hidden = true; if (formatBara) formatBara.hidden = true; return; }
   unelte.hidden = false;
   const sel = plansa.selectate.size;
+  const buton = (cls, data, titlu, cont, on = false, dez = false) =>
+    `<button type="button" class="ta-u${cls ? ` ${cls}` : ""}${on ? " is-on" : ""}" ${data} title="${titlu}" aria-label="${titlu}"${dez ? " disabled" : ""}>${cont}</button>`;
   unelte.innerHTML = `
-    <div class="ta-grup">${UNELTE.map(([u, i, t]) => `<button type="button" class="ta-u${plansa.unealta === u ? " is-on" : ""}" data-u="${u}" title="${t}" aria-label="${t}">${i}</button>`).join("")}</div>
+    <div class="ta-grup">${UNELTE.map(([u, i, t]) => buton("", `data-u="${u}"`, t, i, plansa.unealta === u)).join("")}
+      ${buton("", 'data-a="tabel-nou"', "Tabel nou", TABEL_SVG, panouDeschis === "tabelNou")}</div>
     <div class="ta-grup ta-culori">${CULORI.map((c) => `<button type="button" class="ta-cul${plansa.culoare === c ? " is-on" : ""}" data-c="${c}" style="--c:${c}" title="${c}" aria-label="Culoarea ${c}"></button>`).join("")}
       <label class="ta-cul ta-cul--alta" title="Altă culoare"><input type="color" value="${plansa.culoare}" data-alta></label></div>
-    <div class="ta-grup ta-format" title="Pe textul pe care îl scrii ori pe textele selectate">
-      <button type="button" class="ta-u" data-f="${BOLD}" title="Bold (Ctrl+B)"><b>B</b></button>
-      <button type="button" class="ta-u" data-f="${ITALIC}" title="Italic (Ctrl+I)"><i>I</i></button>
-      <button type="button" class="ta-u" data-f="${SUBLINIAT}" title="Subliniat (Ctrl+U)"><u>U</u></button>
-    </div>
     <div class="ta-grup">${GROSIMI.map(([g, t]) => `<button type="button" class="ta-gros${plansa.grosime === g ? " is-on" : ""}" data-g="${g}" title="Linie ${t}"><i style="--g:${g}px"></i></button>`).join("")}</div>
     <div class="ta-grup">
-      <button type="button" class="ta-u" data-a="inapoi" title="Înapoi (Ctrl+Z)"${plansa.inapoi.length ? "" : " disabled"}>↶</button>
-      <button type="button" class="ta-u" data-a="inainte" title="Înainte (Ctrl+Y)"${plansa.inainte.length ? "" : " disabled"}>↷</button>
-      ${sel ? `<button type="button" class="ta-u" data-a="dubleaza" title="Dublează selecția (Ctrl+D)">⧉</button>
-      <button type="button" class="ta-u ta-u--rosu" data-a="sterge" title="Șterge selecția (Delete)">🗑</button>` : ""}
+      ${buton("", 'data-a="inapoi"', "Înapoi (Ctrl+Z)", "↶", false, !plansa.inapoi.length)}
+      ${buton("", 'data-a="inainte"', "Înainte (Ctrl+Y)", "↷", false, !plansa.inainte.length)}
+      ${sel ? `${buton("", 'data-a="fata"', "În față, peste celelalte (Ctrl+])", "⬒")}
+      ${buton("", 'data-a="spate"', "În spate, sub celelalte, și sub text (Ctrl+[)", "⬓")}
+      ${buton("", 'data-a="dubleaza"', "Dublează selecția (Ctrl+D)", "⧉")}
+      ${buton("ta-u--rosu", 'data-a="sterge"', "Șterge selecția (Delete)", "🗑")}` : ""}
     </div>
     <div class="ta-grup">
-      <button type="button" class="ta-u" data-a="imagine" title="Pune o imagine (merge și Ctrl+V)">🖼</button>
-      <button type="button" class="ta-u${fundalDeschis ? " is-on" : ""}" data-a="fundal" title="Fundalul paginii: culoarea și liniile" aria-expanded="${fundalDeschis}">▦</button>
-      <button type="button" class="ta-u" data-a="png" title="Salvează pagina ca imagine">⤓</button>
-      <button type="button" class="ta-u ta-u--rosu" data-a="goleste" title="Golește pagina">✕</button>
+      ${buton("", 'data-a="imagine"', "Pune o imagine (merge și Ctrl+V)", "🖼")}
+      ${buton("", 'data-a="fundal"', "Fundalul paginii: culoarea și liniile", "▦", panouDeschis === "fundal")}
+      ${buton("", 'data-a="png"', "Salvează pagina ca imagine", "⤓")}
+      ${buton("ta-u--rosu", 'data-a="goleste"', "Golește pagina", "✕")}
     </div>`;
-  panouFundal.hidden = !fundalDeschis;
-  panouFundal.innerHTML = fundalDeschis ? `<div class="ta-grup ta-fundal" role="group" aria-label="Fundalul paginii">
+  /* Formatarea textului, ca în Word: o bară orizontală, sus. */
+  formatBara.hidden = false;
+  formatBara.innerHTML = `<div class="ta-grup ta-format" title="Pe textul pe care îl scrii ori pe textele (celulele) alese">
+      ${buton("", `data-f="${BOLD}"`, "Bold (Ctrl+B)", "<b>B</b>")}
+      ${buton("", `data-f="${ITALIC}"`, "Italic (Ctrl+I)", "<i>I</i>")}
+      ${buton("", `data-f="${SUBLINIAT}"`, "Subliniat (Ctrl+U)", "<u>U</u>")}
+      ${ALINIERI.map(([a, i, t]) => buton("ta-u--mic", `data-al="${a}"`, t, i)).join("")}
+      ${buton("", 'data-a="liste"', "Liste: buline, numere, litere; nivelul și distanța", "☷", panouDeschis === "liste")}
+      ${buton("", 'data-niv="-1"', "Mai puțin înăuntru (Shift+Tab)", "⇤")}
+      ${buton("", 'data-niv="1"', "Mai înăuntru (Tab)", "⇥")}
+    </div>`;
+  deseneazaPanoulLateral();
+}
+
+function deseneazaPanoulLateral() {
+  const tb = plansa.tabelulAles();
+  const ce = panouDeschis || (tb ? "tabel" : null);
+  panouFundal.hidden = !ce;
+  if (ce === "fundal") {
+    panouFundal.innerHTML = `<div class="ta-grup ta-fundal" role="group" aria-label="Fundalul paginii">
       <p>Culoarea paginii</p>
       <div class="ta-fundal__culori">${CULORI_PAGINA.map(([c, n]) => `<button type="button" class="ta-cul${plansa.culoareFundal === c ? " is-on" : ""}" data-fc="${c}" style="--c:${c}" title="${n}" aria-label="Pagina ${n.toLowerCase()}"></button>`).join("")}
         <label class="ta-cul ta-cul--alta" title="Altă culoare"><input type="color" value="${plansa.culoareFundal}" data-fc-alta></label></div>
       <p>Liniile</p>
       <div class="ta-fundal__linii">${FUNDALURI.map((f) => `<button type="button" class="ta-btn${plansa.fundal === f ? " is-on" : ""}" data-ff="${f}">${NUME_FUNDAL[f]}</button>`).join("")}</div>
-    </div>` : "";
+      <p class="ta-nota">Paginile noi pornesc cu fundalul ales acum.</p>
+    </div>`;
+  } else if (ce === "liste") {
+    const ind = plansa.text?.ind || plansa.indent || Math.round(plansa.marimeText * 1.4);
+    panouFundal.innerHTML = `<div class="ta-grup ta-fundal ta-liste" role="group" aria-label="Liste">
+      ${Object.entries(LISTE).map(([l, fs]) => `<p>${NUME_LISTE[l]}</p><div class="ta-liste__rand">${fs.map((f) =>
+        `<button type="button" class="ta-btn" data-lista="${l}" data-lf="${f}" title="${NUME_LISTE[l]}: ${f}">${l === "b" ? f : f.replace("1", "1").replace("a", "a")}</button>`).join("")}</div>`).join("")}
+      <div class="ta-liste__rand"><button type="button" class="ta-btn" data-lista="" title="Fără listă">Fără listă</button></div>
+      <p>Nivelul</p>
+      <div class="ta-liste__rand"><button type="button" class="ta-btn" data-niv="-1" title="Shift+Tab">⇤ Afară</button><button type="button" class="ta-btn" data-niv="1" title="Tab">Înăuntru ⇥</button></div>
+      <p>Distanța indentării: <b data-ind-val>${Math.round(ind)}</b></p>
+      <input type="range" min="8" max="160" step="2" value="${Math.round(ind)}" data-ind aria-label="Distanța indentării">
+      <p class="ta-nota">Se pune și singură: „1. ", „a) ", „(1) ", „- " la început de rând.</p>
+    </div>`;
+  } else if (ce === "tabelNou") {
+    panouFundal.innerHTML = `<div class="ta-grup ta-fundal ta-tabel-nou" role="group" aria-label="Tabel nou">
+      <p>Tabel nou: <b data-dim>3 × 3</b></p>
+      <div class="ta-grila">${Array.from({ length: 64 }, (_, k) => `<button type="button" data-tr="${Math.floor(k / 8) + 1}" data-tc="${(k % 8) + 1}" aria-label="${Math.floor(k / 8) + 1} rânduri, ${(k % 8) + 1} coloane"></button>`).join("")}</div>
+      <p class="ta-nota">Treci peste pătrățele și apasă: rânduri × coloane.</p>
+    </div>`;
+  } else if (ce === "tabel") {
+    const ch = tb.ch || {};
+    const v = (x) => `data-tab="${x}"`;
+    panouFundal.innerHTML = `<div class="ta-grup ta-fundal ta-tabel" role="group" aria-label="Tabelul">
+      <p>Rânduri și coloane</p>
+      <div class="ta-liste__rand">
+        <button type="button" class="ta-btn" ${v("rand")} data-v="sus" title="Un rând deasupra">+ rând ↑</button>
+        <button type="button" class="ta-btn" ${v("rand")} data-v="jos" title="Un rând dedesubt">+ rând ↓</button>
+        <button type="button" class="ta-btn" ${v("coloana")} data-v="stanga" title="O coloană la stânga">+ col. ←</button>
+        <button type="button" class="ta-btn" ${v("coloana")} data-v="dreapta" title="O coloană la dreapta">+ col. →</button>
+        <button type="button" class="ta-btn ta-btn--rosu" ${v("sterge-rand")}>− rând</button>
+        <button type="button" class="ta-btn ta-btn--rosu" ${v("sterge-coloana")}>− col.</button>
+      </div>
+      <div class="ta-liste__rand">
+        <button type="button" class="ta-btn" ${v("imbina")} title="Unește celulele alese (le alegi trăgând peste ele)">Îmbină</button>
+        <button type="button" class="ta-btn" ${v("desparte")} title="Desparte celulele îmbinate">Desparte</button>
+      </div>
+      <p>Alinierea în celule</p>
+      <div class="ta-liste__rand">${ALINIERI.map(([a, i, t]) => `<button type="button" class="ta-btn" ${v("orizontal")} data-v="${a}" title="${t}">${i}</button>`).join("")}</div>
+      <div class="ta-liste__rand">
+        <button type="button" class="ta-btn" ${v("vertical")} data-v="s" title="Sus">⤒ sus</button>
+        <button type="button" class="ta-btn" ${v("vertical")} data-v="m" title="La mijloc (implicit)">↕ mijloc</button>
+        <button type="button" class="ta-btn" ${v("vertical")} data-v="j" title="Jos">⤓ jos</button>
+      </div>
+      <p>Fundalul celulelor</p>
+      <div class="ta-fundal__culori">${["#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#e9d5ff", "#f1ebe4"].map((c) => `<button type="button" class="ta-cul" ${v("fundal")} data-v="${c}" style="--c:${c}" title="${c}"></button>`).join("")}
+        <button type="button" class="ta-cul ta-cul--fara" ${v("fundal")} data-v="" title="Fără fundal">∅</button></div>
+      <p>Chenarele</p>
+      <div class="ta-fundal__linii">${CHENARE.map((f) => `<button type="button" class="ta-btn${(ch.f || "toate") === f ? " is-on" : ""}" ${v("chenar")} data-v="${f}">${NUME_CHENARE[f]}</button>`).join("")}</div>
+      <div class="ta-liste__rand">
+        ${[1, 1.5, 2.5, 4].map((g) => `<button type="button" class="ta-btn${(ch.g || 1.5) === g ? " is-on" : ""}" ${v("chenar-grosime")} data-v="${g}" title="Grosimea liniei">${g}</button>`).join("")}
+        <label class="ta-cul ta-cul--alta" title="Culoarea chenarelor"><input type="color" value="${ch.c || "#1f2430"}" data-tab-culoare></label>
+      </div>
+      <div class="ta-liste__rand"><button type="button" class="ta-btn ta-btn--rosu" ${v("sterge")}>Șterge tabelul</button></div>
+      <p class="ta-nota">Alegi celulele trăgând peste ele; dublu-clic într-o celulă ca să scrii (Tab trece mai departe). Marginile se trag; tabelul se mută de ✥.</p>
+    </div>`;
+  } else panouFundal.innerHTML = "";
 }
 
-/* Panoul cu fundalul stă lângă bara de unelte, nu în ea: bara se derulează și
-   l-ar fi tăiat jos, pe ecrane mai mici. */
-let fundalDeschis = false;
-const panouFundal = document.createElement("div");
-panouFundal.className = "ta-fundal-panou";
-panouFundal.hidden = true;
-filaTabla.append(panouFundal);
 /* Pe o pagină închisă, creionul negru nu se vede: trece singur pe alb (și invers). */
 function culoareaPaginii(c) {
   plansa.fa({ fel: "culoare", c });
-  const n = parseInt(c.slice(1), 16);
-  const inchisa = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 140;
-  if (inchisa && plansa.culoare === "#1f2430") plansa.culoare = "#ffffff";
-  else if (!inchisa && plansa.culoare === "#ffffff") plansa.culoare = "#1f2430";
+  if (inchisa(c) && plansa.culoare === "#1f2430") plansa.culoare = "#ffffff";
+  else if (!inchisa(c) && plansa.culoare === "#ffffff") plansa.culoare = "#1f2430";
+  tineMinte({ fundalCuloare: c, culoare: plansa.culoare });
   deseneazaUneltele();
+}
+/* Butoanele care lucrează pe textul deschis nu-i iau cursorul. */
+for (const loc of [unelte, panouFundal, formatBara]) {
+  loc.addEventListener("mousedown", (e) => {
+    if (e.target.closest("button") && plansa.text) e.preventDefault();
+  });
 }
 panouFundal.addEventListener("click", (e) => {
   const fc = e.target.closest("[data-fc]");
   if (fc) { culoareaPaginii(fc.dataset.fc); return; }
   const ff = e.target.closest("[data-ff]");
-  if (ff) { plansa.fa({ fel: "fundal", f: ff.dataset.ff }); deseneazaUneltele(); }
+  if (ff) { plansa.fa({ fel: "fundal", f: ff.dataset.ff }); tineMinte({ fundalLinii: ff.dataset.ff }); deseneazaUneltele(); return; }
+  const li = e.target.closest("[data-lista]");
+  if (li) { plansa.puneListaText(li.dataset.lista, li.dataset.lf || ""); return; }
+  const nv = e.target.closest("[data-niv]");
+  if (nv) { plansa.nivelText(Number(nv.dataset.niv)); return; }
+  const tr = e.target.closest("[data-tr]");
+  if (tr) { panouDeschis = null; plansa.puneTabel(Number(tr.dataset.tr), Number(tr.dataset.tc)); deseneazaUneltele(); return; }
+  const tb = e.target.closest("[data-tab]");
+  if (tb) {
+    const v = tb.dataset.v;
+    plansa.tabel(tb.dataset.tab, tb.dataset.tab === "chenar-grosime" ? Number(v) : v);
+    deseneazaUneltele();
+  }
 });
-panouFundal.addEventListener("change", (e) => { if (e.target.matches("[data-fc-alta]")) culoareaPaginii(e.target.value); });
-/* Butoanele B / I / U nu iau cursorul din textul în care scrii. */
-unelte.addEventListener("mousedown", (e) => { if (e.target.closest("[data-f]")) e.preventDefault(); });
+panouFundal.addEventListener("pointerover", (e) => {
+  const tr = e.target.closest("[data-tr]");
+  if (!tr) return;
+  const r = Number(tr.dataset.tr), c = Number(tr.dataset.tc);
+  panouFundal.querySelectorAll("[data-tr]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.tr) <= r && Number(b.dataset.tc) <= c));
+  const d = panouFundal.querySelector("[data-dim]");
+  if (d) d.textContent = `${r} × ${c}`;
+});
+panouFundal.addEventListener("input", (e) => {
+  if (e.target.matches("[data-ind]")) {
+    const px = Number(e.target.value);
+    panouFundal.querySelector("[data-ind-val]").textContent = px;
+    plansa.puneIndentarea(px);
+    tineMinte({ indent: px });
+  }
+});
+panouFundal.addEventListener("change", (e) => {
+  if (e.target.matches("[data-fc-alta]")) culoareaPaginii(e.target.value);
+  else if (e.target.matches("[data-tab-culoare]")) { plansa.tabel("chenar-culoare", e.target.value); deseneazaUneltele(); }
+});
+
+formatBara.addEventListener("click", (e) => {
+  const fm = e.target.closest("[data-f]");
+  if (fm) { plansa.formateaza(Number(fm.dataset.f)); return; }
+  const al = e.target.closest("[data-al]");
+  if (al) { plansa.aliniazaText(al.dataset.al); return; }
+  const nv = e.target.closest("[data-niv]");
+  if (nv) { plansa.nivelText(Number(nv.dataset.niv)); return; }
+  if (e.target.closest('[data-a="liste"]')) { panouDeschis = panouDeschis === "liste" ? null : "liste"; deseneazaUneltele(); }
+});
 unelte.addEventListener("click", (e) => {
   const fm = e.target.closest("[data-f]");
   if (fm) { plansa.formateaza(Number(fm.dataset.f)); return; }
+  const al = e.target.closest("[data-al]");
+  if (al) { plansa.aliniazaText(al.dataset.al); return; }
+  const nv = e.target.closest("[data-niv]");
+  if (nv) { plansa.nivelText(Number(nv.dataset.niv)); return; }
   const u = e.target.closest("[data-u]");
-  if (u) { plansa.setUnealta(u.dataset.u); return; }
+  if (u) { panouDeschis = panouDeschis === "liste" ? "liste" : null; plansa.setUnealta(u.dataset.u); return; }
   const c = e.target.closest("[data-c]");
   if (c) { puneCuloarea(c.dataset.c); return; }
   const g = e.target.closest("[data-g]");
   if (g) {
     plansa.grosime = Number(g.dataset.g);
     plansa.marimeText = GROSIMI.find((x) => x[0] === plansa.grosime)?.[2] || 28;
+    tineMinte({ grosime: plansa.grosime, marimeText: plansa.marimeText });
     deseneazaUneltele();
     return;
   }
   const a = e.target.closest("[data-a]")?.dataset.a;
+  const comuta = (p) => { panouDeschis = panouDeschis === p ? null : p; deseneazaUneltele(); };
   if (a === "inapoi") plansa.anuleaza();
   else if (a === "inainte") plansa.refa();
   else if (a === "sterge") plansa.stergeSelectia();
   else if (a === "dubleaza") plansa.dubleazaSelectia();
+  else if (a === "fata" || a === "spate") plansa.ordoneazaSelectia(a);
   else if (a === "imagine") $("#alege-imagine").click();
-  else if (a === "fundal") { fundalDeschis = !fundalDeschis; deseneazaUneltele(); }
+  else if (a === "fundal") comuta("fundal");
+  else if (a === "liste") comuta("liste");
+  else if (a === "tabel-nou") comuta("tabelNou");
   else if (a === "png") {
     const l = document.createElement("a");
     l.href = plansa.imaginePng();
@@ -290,7 +460,9 @@ unelte.addEventListener("input", (e) => { if (e.target.matches("[data-alta]")) p
 
 function puneCuloarea(c, redeseneaza = true) {
   plansa.culoare = c;
-  if (plansa.selectate.size) plansa.coloreazaSelectia(c);
+  tineMinte({ culoare: c });
+  if (plansa.text) plansa.culoareText(c);
+  else if (plansa.selectate.size) plansa.coloreazaSelectia(c);
   if (redeseneaza) deseneazaUneltele();
   else unelte.querySelectorAll(".ta-cul").forEach((b) => b.classList.toggle("is-on", b.dataset.c === c));
 }
@@ -309,6 +481,12 @@ addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); if (e.shiftKey) plansa.refa(); else plansa.anuleaza(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "y") { e.preventDefault(); plansa.refa(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "d") { e.preventDefault(); plansa.dubleazaSelectia(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "]" || e.key === "[")) { e.preventDefault(); plansa.ordoneazaSelectia(e.key === "]" ? "fata" : "spate"); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && /^[lerj]$/.test(k) && (plansa.selectate.size || plansa.tabelulAles())) {
+    e.preventDefault();
+    plansa.aliniazaText({ l: "l", e: "c", r: "r", j: "j" }[k]);
+    return;
+  }
   /* Pe textele selectate cu săgeata, întregi (în textul deschis le face browserul). */
   if ((e.ctrlKey || e.metaKey) && (k === "b" || k === "i" || k === "u")) {
     e.preventDefault();
@@ -368,7 +546,7 @@ paginiEl.addEventListener("click", async (e) => {
   else if (v === "inainte") mergiLaPagina(pag + 1);
   else if (v === "noua" && admin) {
     await salveazaAcum();
-    const n = await paginaNoua(lectie.id, pagini.length);
+    const n = await paginaNoua(lectie.id, pagini.length, desenNou());
     if (!n) { arataVestea("Pagina nouă n-a intrat în bază.", true); return; }
     pagini.push(n);
     mergiLaPagina(pagini.length - 1);
@@ -871,7 +1049,7 @@ panou.addEventListener("click", async (e) => {
     if (l.dataset.l === "noua") {
       const titlu = prompt("Titlul lecției:")?.trim();
       if (!titlu) return;
-      const n = await lectieNoua(clasa.id, titlu.slice(0, 120), clasa.lectii.length);
+      const n = await lectieNoua(clasa.id, titlu.slice(0, 120), clasa.lectii.length, desenNou());
       if (!n) { arataVestea("Lecția n-a intrat în bază.", true); return; }
       clasa.lectii.push(n);
       await deschideLectia(n);
@@ -940,7 +1118,7 @@ async function deschideLectia(l, stare = null) {
   lectie = l;
   let p;
   try { p = await paginileAdmin(l.id); } catch { arataVestea("Paginile n-au putut fi aduse.", true); return; }
-  if (!p.length) { const n = await paginaNoua(l.id, 0); if (n) p = [n]; }
+  if (!p.length) { const n = await paginaNoua(l.id, 0, desenNou()); if (n) p = [n]; }
   pagini = p;
   const i = stare ? pagini.findIndex((x) => x.id === stare.pagina) : -1;
   pag = i >= 0 ? i : 0;
@@ -1051,6 +1229,11 @@ if (admin) {
   panou.hidden = false;
   deseneazaBara();
   deseneazaGolul();
+  /* Implicitele tale (culorile, grosimea, fundalul paginilor noi), din cont. */
+  const s0 = await setarileMele();
+  if (s0) Object.assign(setari, s0);
+  aplicaSetarile();
+  deseneazaUneltele();
   try { clase = await clasele(); } catch (e) {
     arataVestea(`Clasele n-au putut fi aduse: ${e?.message || e}`, true);
   }

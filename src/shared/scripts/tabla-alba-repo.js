@@ -45,12 +45,12 @@ export async function stergeClasa(id) {
   return true;
 }
 
-/** Lecție nouă, cu o pagină goală în ea. */
-export async function lectieNoua(clasaId, titlu, ordine) {
+/** Lecție nouă, cu o pagină goală în ea (cu fundalul tău implicit). */
+export async function lectieNoua(clasaId, titlu, ordine, desen = null) {
   const { data, error } = await supabase.from("tabla_alba_lectii")
     .insert({ clasa_id: clasaId, titlu, ordine }).select("id, titlu, ordine, material, creat_la").single();
   if (error) { eroare("lecție nouă", error); return null; }
-  await paginaNoua(data.id, 0);
+  await paginaNoua(data.id, 0, desen);
   return data;
 }
 
@@ -73,9 +73,9 @@ export async function paginileAdmin(lectieId) {
   return data;
 }
 
-export async function paginaNoua(lectieId, ordine) {
+export async function paginaNoua(lectieId, ordine, desen = null) {
   const { data, error } = await supabase.from("tabla_alba_pagini")
-    .insert({ lectie_id: lectieId, ordine }).select("id, ordine, desen").single();
+    .insert({ lectie_id: lectieId, ordine, ...(desen ? { desen } : {}) }).select("id, ordine, desen").single();
   if (error) { eroare("pagină nouă", error); return null; }
   return data;
 }
@@ -102,6 +102,23 @@ export async function materialulAdmin(lectieId) {
   const { data, error } = await supabase.from("tabla_alba_lectii").select("material_html").eq("id", lectieId).maybeSingle();
   if (error) { eroare("materialul", error); return null; }
   return data?.material_html ?? null;
+}
+
+/* ---------- implicitele profesorului (0117) ---------- */
+
+/** Culorile, grosimea, fundalul paginilor noi: ce a ales profesorul ultima oară. */
+export async function setarileMele() {
+  const { data, error } = await supabase.from("tabla_alba_setari").select("setari").maybeSingle();
+  if (error) { eroare("setările", error); return null; }
+  return data?.setari && typeof data.setari === "object" ? data.setari : null;
+}
+export async function salveazaSetarile(setari) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u?.user?.id) return false;
+  const { error } = await supabase.from("tabla_alba_setari")
+    .upsert({ user_id: u.user.id, setari, actualizat_la: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) { eroare("salvează setările", error); return false; }
+  return true;
 }
 
 /* ---------- vizitatorul (0115) ---------- */

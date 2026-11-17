@@ -97,7 +97,8 @@ button { font: inherit; color: inherit; }
 .ta-corp { flex: 1; display: flex; min-height: 0; position: relative; }
 .ta-scena { flex: 1; position: relative; min-width: 0; }
 .ta-fila { position: absolute; inset: 0; }
-.ta-plansa { position: absolute; inset: 0; overflow: hidden; background: #fff; }
+/* `clip`, nu `hidden`: un text lung scris lângă margine nu mai trage tabla în lateral. */
+.ta-plansa { position: absolute; inset: 0; overflow: clip; background: #fff; }
 .ta-panza { display: block; touch-action: none; }
 
 .ta-gol { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; color: var(--muted); text-align: center; font-size: 17px; }
@@ -173,12 +174,24 @@ button { font: inherit; color: inherit; }
 .ta-cul--alta input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 /* ---- fundalul paginii (▦): culoarea și liniile ---- */
-.ta-fundal-panou { position: absolute; z-index: 6; top: 12px; left: 172px; }
+/* Panoul lateral (fundal, liste, tabel): în dreapta, ca să nu acopere tabla de lângă unelte. */
+.ta-fundal-panou { position: absolute; z-index: 6; top: 66px; right: 12px; }
 .ta-fundal { display: block; width: 147px; }
 .ta-fundal p { margin: 2px 2px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .ta-fundal__culori { display: grid; grid-template-columns: repeat(3, 42px); justify-items: center; gap: 4px; margin-bottom: 8px; }
 .ta-fundal__linii { display: grid; gap: 4px; }
 .ta-fundal__linii .ta-btn { min-height: 32px; padding: 4px 8px; font-size: 13px; }
+.ta-fundal .ta-nota { margin: 8px 2px 0; font-size: 11px; font-weight: 400; line-height: 1.35; color: var(--muted); }
+.ta-fundal-panou { max-height: calc(100% - 150px); overflow-y: auto; scrollbar-width: thin; }
+/* Listele și tabelul: panouri mai late. */
+.ta-liste, .ta-tabel, .ta-tabel-nou { width: 236px; }
+.ta-liste__rand { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.ta-liste__rand .ta-btn { min-height: 34px; min-width: 40px; padding: 4px 8px; font-size: 14px; }
+.ta-liste input[type="range"] { width: 100%; }
+.ta-cul--fara { display: grid; place-items: center; background: #fff; color: var(--muted); font-size: 14px; }
+.ta-grila { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.ta-grila button { aspect-ratio: 1; border: 1px solid var(--line); border-radius: 3px; background: #fff; cursor: pointer; padding: 0; }
+.ta-grila button.is-on { border-color: var(--accent); background: var(--accent-soft); }
 
 /* ---- paginile, jos la mijloc ---- */
 .ta-pagini {
@@ -220,7 +233,7 @@ button { font: inherit; color: inherit; }
   .ta-culori { grid-template-columns: repeat(2, 38px); }
 }
 
-/* ---- textul scris pe planșă ---- */
+/* ---- textul scris pe planșă (editorul) ---- */
 .ta-text {
   position: absolute; z-index: 6;
   min-width: 40px;
@@ -230,10 +243,47 @@ button { font: inherit; color: inherit; }
   background: transparent;
   line-height: 1.25;
   white-space: pre;
+  overflow-wrap: break-word;
   cursor: text;
 }
 .ta-text b { font-weight: 700; }
+.ta-text .ta-p { position: relative; min-height: 1.25em; }
+/* Marcajul listei (•, 1., a)), calculat în script, ca pe tablă. */
+.ta-text .ta-p[data-m]::before {
+  content: attr(data-m);
+  position: absolute;
+  left: var(--mx, 0);
+  font-weight: 400; font-style: normal; text-decoration: none;
+  white-space: pre;
+}
+/* Marginea până unde merge rândul: o tragi, textul se reașază pe loc. */
+.ta-margine {
+  position: absolute; z-index: 7;
+  width: 10px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.ta-margine::after {
+  content: "";
+  position: absolute; left: 3px; top: 0; bottom: 0;
+  width: 4px; border-radius: 4px;
+  background: rgba(37, 99, 235, .55);
+}
+.ta-margine:hover::after { background: #2563eb; }
+.ta-ghid {
+  position: absolute; z-index: 5; top: 0; bottom: 0;
+  border-left: 1px dashed rgba(37, 99, 235, .55);
+  pointer-events: none;
+}
+/* Formatarea textului: o bară orizontală, sus la mijloc (ca în Word). */
+.ta-format-bara {
+  position: absolute; z-index: 5; top: 12px; left: 50%; transform: translateX(-50%);
+  max-width: calc(100% - 340px);
+  overflow-x: auto; scrollbar-width: none;
+}
+.ta-format-bara .ta-grup { display: flex; gap: 2px; }
 .ta-format .ta-u { font-family: Georgia, serif; font-size: 18px; }
+.ta-format .ta-u--mic { font-family: inherit; font-size: 13px; letter-spacing: -1px; }
 
 /* ---- materialul ---- */
 .ta-fila--material { display: flex; flex-direction: column; background: #fff; }

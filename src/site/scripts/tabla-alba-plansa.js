@@ -9,102 +9,64 @@
 // ELEMENTELE (ce rămâne desenat), mici, ca să încapă pe canalul live:
 //   { id, t: "p", c, g, o?, pts: [x, y, x, y, …] }      creion (o = marker)
 //   { id, t: "l" | "a" | "r" | "e", c, g, x1, y1, x2, y2 } linie, săgeată, dreptunghi, elipsă
-//   { id, t: "x", c, m, x, y, s, r?, w, h }             text (m = mărimea literei)
-//        r = bucățile formatate: [[câte litere, semne], …], semne: 1 bold,
-//        2 italic, 4 subliniat (Ctrl+B / Ctrl+I / Ctrl+U)
+//   { id, t: "x", c, m, x, y, s, r?, p?, lat?, ind?, w, h }  text (vezi `tabla-alba-text.js`)
 //   { id, t: "i", x, y, w, h, src }                     imagine lipită
+//   { id, t: "t", x, y, m, c, col: [lățimi], rh: [înălțimi minime],
+//     cel: [[celulă]], ch: { f, c, g }, w, h }          tabel
+//        celulă: { s, r?, p?, ah?, av?, bg?, cs?, rs?, x? } (text ca mai sus;
+//        ah aliniere pe orizontală l/c/r/j, av pe verticală s/m/j (implicit m),
+//        bg fundal, cs/rs îmbinare pe coloane/rânduri, x = acoperită de alta)
+//        ch.f: chenarele: toate | exterior | interior | orizontale | fara
 //
 // OPERAȚIILE schimbă desenul și se pot da înapoi; tot ele pleacă pe canal:
 //   { fel: "pune", el: [...], la?: [index, …] }   { fel: "scoate", id: [...] }
 //   { fel: "schimba", el: [...] }                 { fel: "fundal", f }   (liniile: pătrățele…)
 //   { fel: "culoare", c }                         culoarea paginii
+//   { fel: "ordine", id: [toate, în ordine] }     în față / în spate
 // Fiecare operație aplicată întoarce opusa ei: așa se face Undo.
+//
+// GRILA DIN SPATE (cerută pe 17 noiembrie 2026): textele, formele, tabelele și
+// mutările se prind de o grilă nevăzută, cu pasul `PAS` (mic, ca să nu se
+// simtă); creionul nu. Un text pus chiar sub altul se aliniază la stânga lui.
 // Cuprins în română, nume în engleză.
 // =========================================================
+import {
+  BOLD, ITALIC, SUBLINIAT, LITERA, RAND, LISTE, bucatile, strange, paragrafele, aseaza, deseneazaText,
+  inEditor, dinEditor, refaParagrafele, paragrafeleSelectate, puneLista, schimbaNivelul, aliniaza,
+  undeECursorul, taieInceputul, autoLista, NIVEL_MAX,
+} from "./tabla-alba-text.js";
+
+export { BOLD, ITALIC, SUBLINIAT, LISTE };
 
 const r1 = (n) => Math.round(n * 10) / 10;
-const escH = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-/* ---------- textul formatat ---------- */
-export const BOLD = 1, ITALIC = 2, SUBLINIAT = 4;
-/** Bucățile textului, verificate: dacă nu acoperă exact textul, e tot simplu. */
-function bucatile(e) {
-  const s = String(e.s || "");
-  const r = Array.isArray(e.r) && e.r.every((x) => Array.isArray(x) && Number.isInteger(x[0]) && x[0] >= 0 && Number.isInteger(x[1]) && x[1] >= 0 && x[1] <= 7)
-    && e.r.reduce((a, x) => a + x[0], 0) === s.length ? e.r : [[s.length, 0]];
-  return r;
-}
-/** Rândurile textului, fiecare cu bucățile lui: [[{s, f}, …], …]. */
-function randurile(e) {
-  const s = String(e.s || "");
-  const linii = [[]];
-  let i = 0;
-  for (const [n, f] of bucatile(e)) {
-    s.slice(i, i + n).split("\n").forEach((b, k) => { if (k) linii.push([]); if (b) linii[linii.length - 1].push({ s: b, f }); });
-    i += n;
-  }
-  return linii;
-}
-const fontul = (f, m) => `${f & ITALIC ? "italic " : ""}${f & BOLD ? "700 " : ""}${m}px ${LITERA}`;
-/** Bucățile, lipite unde au aceleași semne; `null` dacă tot textul e simplu. */
-function strange(r) {
-  const o = [];
-  for (const [n, f] of r) {
-    if (!n) continue;
-    const u = o[o.length - 1];
-    if (u && u[1] === f) u[0] += n; else o.push([n, f]);
-  }
-  return o.length && o.some(([, f]) => f) ? o : null;
-}
-/** Textul din editor (bold, italic, subliniat), ca {s, r}. */
-function dinEditor(rad) {
-  let s = "";
-  const r = [];
-  const adauga = (t, f) => { if (t) { s += t; r.push([t.length, f]); } };
-  const mergi = (n, f) => {
-    for (const c of n.childNodes) {
-      if (c.nodeType === 3) { adauga(c.data.replace(/\u00a0/g, " "), f); continue; }
-      if (c.nodeType !== 1) continue;
-      if (c.nodeName === "BR") { adauga("\n", f); continue; }
-      let g = f;
-      const st = c.style || {};
-      if (/^(B|STRONG)$/.test(c.nodeName) || /^(bold|bolder|[6-9]00)$/.test(st.fontWeight || "")) g |= BOLD;
-      if (/^(I|EM)$/.test(c.nodeName) || st.fontStyle === "italic") g |= ITALIC;
-      if (c.nodeName === "U" || /underline/.test(`${st.textDecoration || ""} ${st.textDecorationLine || ""}`)) g |= SUBLINIAT;
-      if (/^(DIV|P)$/.test(c.nodeName) && s && !s.endsWith("\n")) adauga("\n", f);
-      mergi(c, g);
-    }
-  };
-  mergi(rad, 0);
-  /* Spațiile și rândurile goale de la coadă nu rămân. */
-  const lung = s.replace(/\s+$/, "").length;
-  let rest = lung;
-  const taiat = [];
-  for (const [n, f] of r) { if (rest <= 0) break; taiat.push([Math.min(n, rest), f]); rest -= n; }
-  return { s: s.slice(0, lung), r: strange(taiat) };
-}
-/** Textul, ca HTML de pus în editor. */
-function inEditor(e) {
-  return randurile(e).map((l) => l.map(({ s: t, f }) => {
-    let h = escH(t);
-    if (f & SUBLINIAT) h = `<u>${h}</u>`;
-    if (f & ITALIC) h = `<i>${h}</i>`;
-    if (f & BOLD) h = `<b>${h}</b>`;
-    return h;
-  }).join("")).join("<br>");
-}
 export const idNou = () => Math.random().toString(36).slice(2, 10);
 const copie = (o) => JSON.parse(JSON.stringify(o));
 
 export const FUNDALURI = ["alb", "patratele", "dictando", "puncte"];
+export const CHENARE = ["toate", "exterior", "interior", "orizontale", "fara"];
 const CULOARE_BUNA = /^#[0-9a-f]{6}$/i;
 /** E închisă culoarea? Atunci liniile se trag deschise, ca să se vadă. */
-const inchisa = (c) => {
-  const n = parseInt(c.slice(1), 16);
+export const inchisa = (c) => {
+  const n = parseInt(String(c).slice(1), 16);
   return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 140;
 };
-const PAS_GRILA = 28;
-const LITERA = '"Segoe UI", system-ui, sans-serif';
+const PAS_GRILA = 28;     // liniile de fundal (pătrățele, dictando), cele care se văd
+export const PAS = 6;     // grila din spate, care nu se vede
+const prinde = (v) => Math.round(v / PAS) * PAS;
+
+/* ---------- tabelele: forma lor ---------- */
+const padTabel = (e) => e.m * 0.35;
+const randMinim = (e) => e.m * RAND + 2 * padTabel(e);
+/** Un tabel nou, gol, cu `nr` rânduri și `nc` coloane. */
+export function tabelNou(nr, nc, { x, y, m, c }) {
+  return {
+    id: idNou(), t: "t", x: r1(x), y: r1(y), m, c,
+    col: Array(nc).fill(r1(m * 6)), rh: Array(nr).fill(r1(m * RAND + m * 0.7)),
+    cel: Array.from({ length: nr }, () => Array.from({ length: nc }, () => ({ s: "" }))),
+    ch: { f: "toate", c: c || "#1f2430", g: 1.5 },
+  };
+}
+const celOk = (e, i, j) => e.cel?.[i]?.[j] && !e.cel[i][j].x;
 
 /** Cutia unui element, în coordonatele lumii. */
 export function cutia(e) {
@@ -117,7 +79,7 @@ export function cutia(e) {
     const g = (e.g || 2) / 2;
     return { x: x0 - g, y: y0 - g, w: x1 - x0 + 2 * g, h: y1 - y0 + 2 * g };
   }
-  if (e.t === "x" || e.t === "i") return { x: e.x, y: e.y, w: e.w || 0, h: e.h || 0 };
+  if (e.t === "x" || e.t === "i" || e.t === "t") return { x: e.x, y: e.y, w: e.w || 0, h: e.h || 0 };
   const g = (e.g || 2) / 2;
   const x = Math.min(e.x1, e.x2), y = Math.min(e.y1, e.y2);
   return { x: x - g, y: y - g, w: Math.abs(e.x2 - e.x1) + 2 * g, h: Math.abs(e.y2 - e.y1) + 2 * g };
@@ -141,7 +103,7 @@ function distSegment(px, py, ax, ay, bx, by) {
 function atinge(e, px, py, tol, inauntru = false) {
   const b = cutia(e);
   if (px < b.x - tol || px > b.x + b.w + tol || py < b.y - tol || py > b.y + b.h + tol) return false;
-  if (e.t === "x" || e.t === "i") return true;
+  if (e.t === "x" || e.t === "i" || e.t === "t") return true;
   const g = (e.g || 2) / 2 + tol;
   if (e.t === "p") {
     if (e.pts.length === 2) return Math.hypot(px - e.pts[0], py - e.pts[1]) <= g;
@@ -170,7 +132,7 @@ function atinge(e, px, py, tol, inauntru = false) {
 function mutat(e, dx, dy) {
   const n = copie(e);
   if (n.t === "p") for (let i = 0; i < n.pts.length; i += 2) { n.pts[i] = r1(n.pts[i] + dx); n.pts[i + 1] = r1(n.pts[i + 1] + dy); }
-  else if (n.t === "x" || n.t === "i") { n.x = r1(n.x + dx); n.y = r1(n.y + dy); }
+  else if (n.t === "x" || n.t === "i" || n.t === "t") { n.x = r1(n.x + dx); n.y = r1(n.y + dy); }
   else { n.x1 = r1(n.x1 + dx); n.x2 = r1(n.x2 + dx); n.y1 = r1(n.y1 + dy); n.y2 = r1(n.y2 + dy); }
   return n;
 }
@@ -180,10 +142,27 @@ function marit(e, ox, oy, s) {
   const n = copie(e);
   const X = (x) => r1(ox + (x - ox) * s), Y = (y) => r1(oy + (y - oy) * s);
   if (n.t === "p") { for (let i = 0; i < n.pts.length; i += 2) { n.pts[i] = X(n.pts[i]); n.pts[i + 1] = Y(n.pts[i + 1]); } n.g = r1(Math.max(0.5, n.g * s)); }
-  else if (n.t === "x") { n.x = X(n.x); n.y = Y(n.y); n.m = r1(Math.max(6, n.m * s)); n.w = r1(n.w * s); n.h = r1(n.h * s); }
-  else if (n.t === "i") { n.x = X(n.x); n.y = Y(n.y); n.w = r1(n.w * s); n.h = r1(n.h * s); }
-  else { n.x1 = X(n.x1); n.x2 = X(n.x2); n.y1 = Y(n.y1); n.y2 = Y(n.y2); n.g = r1(Math.max(0.5, n.g * s)); }
+  else if (n.t === "x") {
+    n.x = X(n.x); n.y = Y(n.y); n.m = r1(Math.max(6, n.m * s)); n.w = r1(n.w * s); n.h = r1(n.h * s);
+    if (n.lat) n.lat = r1(n.lat * s);
+    if (n.ind) n.ind = r1(n.ind * s);
+  } else if (n.t === "i") { n.x = X(n.x); n.y = Y(n.y); n.w = r1(n.w * s); n.h = r1(n.h * s); }
+  else if (n.t === "t") {
+    n.x = X(n.x); n.y = Y(n.y); n.m = r1(Math.max(6, n.m * s));
+    n.col = n.col.map((w) => r1(w * s)); n.rh = n.rh.map((h) => r1(h * s));
+    n.ch = { ...n.ch, g: r1(Math.max(0.5, (n.ch?.g || 1.5) * s)) };
+  } else { n.x1 = X(n.x1); n.x2 = X(n.x2); n.y1 = Y(n.y1); n.y2 = Y(n.y2); n.g = r1(Math.max(0.5, n.g * s)); }
   return n;
+}
+
+/* Paragrafele unui model de text, schimbate de `fn(p, k)` (p: obiect ori null). */
+function cuParagrafe(model, fn) {
+  const ps = paragrafele(model).map((x) => (x.p ? { ...x.p } : {}));
+  ps.forEach((p, k) => fn(p, k));
+  const curat = ps.map((p) => (Object.keys(p).length ? p : null));
+  const o = { ...model };
+  if (curat.some(Boolean)) o.p = curat; else delete o.p;
+  return o;
 }
 
 export class Plansa {
@@ -213,21 +192,26 @@ export class Plansa {
     this.culoare = "#1f2430";
     this.grosime = 3;
     this.marimeText = 28;
+    this.indent = null;        // cât intră un nivel de listă la textele noi (null = după literă)
     this.inapoi = [];
     this.inainte = [];
     this.selectate = new Set();
+    this.celule = null;        // celulele alese într-un tabel: { id, i0, j0, i1, j1 }
     this.temp = null;          // desenul meu în curs
     this.strain = null;        // desenul în curs al profesorului (la cine privește)
     this.laser = null;
     this.ascunse = new Set();  // radiera în curs: elementele încă neșterse de-a binelea
     this.imagini = new Map();
+    this.asezari = new WeakMap();
     this.degete = new Map();
     this.spatiu = false;
     this.cerut = false;
-    this.text = null;          // câmpul de text deschis
+    this.text = null;          // editorul deschis (text ori celulă de tabel)
 
     this.marime();
-    new ResizeObserver(() => { this.marime(); this.o.laMarime?.(); this.o.laVedere?.(); }).observe(gazda);
+    new ResizeObserver(() => { this.marime(); this.o.laMarime?.(); this.o.laVedere?.(); this.pozitioneazaEditorul(); }).observe(gazda);
+    /* Plasă: dacă browserul tot derulează gazda (ca să arate cursorul), o pune la loc. */
+    gazda.addEventListener("scroll", () => { gazda.scrollLeft = 0; gazda.scrollTop = 0; });
     this.leaga();
   }
 
@@ -243,6 +227,7 @@ export class Plansa {
     this.inapoi = [];
     this.inainte = [];
     this.selectate.clear();
+    this.celule = null;
     this.temp = null;
     this.strain = null;
     this.ascunse.clear();
@@ -270,6 +255,7 @@ export class Plansa {
       if (!scoase.length) return null;
       this.el = this.el.filter((e) => !ids.has(e.id));
       ids.forEach((id) => this.selectate.delete(id));
+      if (this.celule && ids.has(this.celule.id)) this.celule = null;
       opus = { fel: "pune", el: scoase, la };
     } else if (op.fel === "schimba" && Array.isArray(op.el)) {
       const vechi = [];
@@ -281,6 +267,13 @@ export class Plansa {
       }
       if (!vechi.length) return null;
       opus = { fel: "schimba", el: vechi };
+    } else if (op.fel === "ordine" && Array.isArray(op.id)) {
+      const inainte = this.el.map((e) => e.id);
+      const loc = new Map(op.id.map((id, k) => [id, k]));
+      const noua = [...this.el].sort((a, b) => (loc.get(a.id) ?? 1e9) - (loc.get(b.id) ?? 1e9));
+      if (noua.every((e, k) => e === this.el[k])) return null;
+      this.el = noua;
+      opus = { fel: "ordine", id: inainte };
     } else if (op.fel === "fundal" && FUNDALURI.includes(op.f)) {
       if (op.f === this.fundal) return null;
       opus = { fel: "fundal", f: this.fundal };
@@ -326,11 +319,18 @@ export class Plansa {
     this.fa({ fel: "scoate", id: [...this.selectate] });
   }
   dubleazaSelectia() {
-    const noi = this.el.filter((e) => this.selectate.has(e.id)).map((e) => ({ ...mutat(e, 24, 24), id: idNou() }));
+    const noi = this.el.filter((e) => this.selectate.has(e.id)).map((e) => ({ ...mutat(e, PAS * 4, PAS * 4), id: idNou() }));
     if (!noi.length) return;
     this.fa({ fel: "pune", el: noi });
     this.selectate = new Set(noi.map((e) => e.id));
     this.cere();
+  }
+  /** Selecția în fața tuturor (deasupra textului) ori în spatele lor. */
+  ordoneazaSelectia(unde) {
+    if (!this.selectate.size) return;
+    const alese = this.el.filter((e) => this.selectate.has(e.id)).map((e) => e.id);
+    const rest = this.el.filter((e) => !this.selectate.has(e.id)).map((e) => e.id);
+    this.fa({ fel: "ordine", id: unde === "fata" ? [...rest, ...alese] : [...alese, ...rest] });
   }
   /** Culoarea aleasă se pune și pe ce e selectat. */
   coloreazaSelectia(c) {
@@ -364,6 +364,7 @@ export class Plansa {
     const z = Math.min(8, Math.max(0.05, Math.min(this.W / b.w, this.H / b.h)));
     this.vedere = { z, x: b.x + b.w / 2 - this.W / 2 / z, y: b.y + b.h / 2 - this.H / 2 / z };
     this.cere();
+    this.pozitioneazaEditorul();
   }
   mareste(f, sx = this.W / 2, sy = this.H / 2) {
     const { x, y, z } = this.vedere;
@@ -371,6 +372,7 @@ export class Plansa {
     const wx = x + sx / z, wy = y + sy / z;
     this.vedere = { z: nz, x: wx - sx / nz, y: wy - sy / nz };
     this.cere();
+    this.pozitioneazaEditorul();
     this.o.laVedere?.();
   }
   /** Încape tot desenul; o pagină goală se întoarce la început. */
@@ -380,6 +382,7 @@ export class Plansa {
     if (!b) this.vedere = { x: 0, y: 0, z: 1 };
     else this.arataZona({ x: b.x - 40, y: b.y - 40, w: Math.max(b.w + 80, 300), h: Math.max(b.h + 80, 200) });
     this.cere();
+    this.pozitioneazaEditorul();
     this.o.laVedere?.();
   }
   laMarimeaReala() { this.mareste(1 / this.vedere.z); }
@@ -388,6 +391,53 @@ export class Plansa {
     const { x, y, z } = this.vedere;
     return [x + (cx - r.left) / z, y + (cy - r.top) / z];
   }
+
+  /* ---------- așezarea textelor și a tabelelor ---------- */
+  asezareText(e) {
+    let a = this.asezari.get(e);
+    if (!a) {
+      a = aseaza(this.ctx, e, { m: e.m, lat: e.lat || null, ind: e.ind || null });
+      this.asezari.set(e, a);
+    }
+    return a;
+  }
+  /** Rândurile și celulele unui tabel, cu textul așezat în fiecare. */
+  tabelul(e) {
+    let L = this.asezari.get(e);
+    if (L) return L;
+    const pad = padTabel(e);
+    const nr = e.cel.length, nc = e.col.length;
+    const xs = [0]; for (const w of e.col) xs.push(xs[xs.length - 1] + w);
+    const celule = [];
+    for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) {
+      if (!celOk(e, i, j)) continue;
+      const c = e.cel[i][j];
+      const cs = Math.min(c.cs || 1, nc - j), rs = Math.min(c.rs || 1, nr - i);
+      const w = xs[j + cs] - xs[j];
+      const as = aseaza(this.ctx, c, { m: e.m, lat: Math.max(e.m, w - 2 * pad), aliniere: c.ah || "l" });
+      celule.push({ i, j, cs, rs, x: xs[j], w, as, cel: c });
+    }
+    /* Înălțimile: cea minimă a rândului, ori cât cere textul celulelor lui. */
+    const hr = e.rh.map((h) => Math.max(h, randMinim(e)));
+    for (const k of celule.filter((x) => x.rs === 1)) hr[k.i] = Math.max(hr[k.i], k.as.h + 2 * pad);
+    for (const k of celule.filter((x) => x.rs > 1)) {
+      const are = hr.slice(k.i, k.i + k.rs).reduce((a, x) => a + x, 0);
+      const vrea = k.as.h + 2 * pad;
+      if (vrea > are) hr[k.i + k.rs - 1] += vrea - are;
+    }
+    const ys = [0]; for (const h of hr) ys.push(ys[ys.length - 1] + h);
+    for (const k of celule) { k.y = ys[k.i]; k.h = ys[k.i + k.rs] - ys[k.i]; }
+    L = { xs, ys, hr, celule, w: xs[nc], h: ys[nr], pad };
+    this.asezari.set(e, L);
+    return L;
+  }
+  /** Măsoară elementul (lățimea și înălțimea lui, pentru selecție). */
+  masoara(e) {
+    if (e.t === "x") { const a = aseaza(this.ctx, e, { m: e.m, lat: e.lat || null, ind: e.ind || null }); e.w = r1(a.w); e.h = r1(a.h); }
+    else if (e.t === "t") { this.asezari.delete(e); const L = this.tabelul(e); e.w = r1(L.w); e.h = r1(L.h); this.asezari.delete(e); }
+    return e;
+  }
+  masoaraText(e) { return this.masoara(e); }
 
   /* ---------- desenul pe ecran ---------- */
   cere() {
@@ -404,14 +454,14 @@ export class Plansa {
     c.fillRect(0, 0, this.W, this.H);
     this.grila();
     c.setTransform(d * z, 0, 0, d * z, -x * z * d, -y * z * d);
-    /* Un text în lucru la profesor poartă id-ul celui pe care îl schimbă: cel
-       vechi nu se mai arată, ca să nu fie de două ori. */
-    const inLucru = this.strain?.t === "x" ? this.strain.id : null;
+    /* Un text ori un tabel în lucru la profesor poartă id-ul celui pe care îl
+       schimbă: cel vechi nu se mai arată, ca să nu fie de două ori. */
+    const inLucru = this.strain?.id || null;
     for (const e of this.el) if (!this.ascunse.has(e.id) && e.id !== inLucru) this.element(e, this.mutare && this.selectate.has(e.id));
-    if (this.strain) this.element(this.strain);
+    if (this.strain && this.strain.t !== "laser") this.element(this.strain);
     if (this.temp) this.element(this.temp);
     if (this.laser) this.deseneazaLaser(this.laser);
-    if (this.selectate.size) this.selectia();
+    if (this.selectate.size && !this.pixel) this.selectia();
     if (this.banda) {
       const b = this.banda;
       c.save();
@@ -426,7 +476,7 @@ export class Plansa {
     if (this.fundal === "alb") return;
     const c = this.ctx;
     const { x, y, z } = this.vedere;
-    let pas = PAS_GRILA * z;
+    const pas = PAS_GRILA * z;
     if (pas < 8) return;
     const ox = -x * z % pas, oy = -y * z % pas;
     c.save();
@@ -489,24 +539,67 @@ export class Plansa {
       c.ellipse((e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2, Math.abs(e.x2 - e.x1) / 2, Math.abs(e.y2 - e.y1) / 2, 0, 0, Math.PI * 2);
       c.stroke();
     } else if (e.t === "x") {
-      c.textBaseline = "top";
-      randurile(e).forEach((l, k) => {
-        let x = e.x;
-        const y = e.y + k * e.m * 1.25;
-        for (const b of l) {
-          c.font = fontul(b.f, e.m);
-          c.fillText(b.s, x, y);
-          const w = c.measureText(b.s).width;
-          if (b.f & SUBLINIAT) c.fillRect(x, y + e.m * 1.05, w, Math.max(1, e.m / 14));
-          x += w;
-        }
-      });
+      deseneazaText(c, this.asezareText(e), e.x, e.y, e.m, e.c);
+    } else if (e.t === "t") {
+      this.deseneazaTabel(e);
     } else if (e.t === "i") {
       const img = this.imaginea(e.src);
       if (img.complete && img.naturalWidth) c.drawImage(img, e.x, e.y, e.w, e.h);
       else { c.strokeStyle = "#e3ddd5"; c.lineWidth = 1; c.strokeRect(e.x, e.y, e.w, e.h); }
     }
     c.restore();
+  }
+
+  deseneazaTabel(e) {
+    const c = this.ctx, z = this.vedere.z;
+    const L = this.tabelul(e);
+    const { pad } = L;
+    for (const k of L.celule) {
+      if (k.cel.bg && CULOARE_BUNA.test(k.cel.bg)) { c.fillStyle = k.cel.bg; c.fillRect(e.x + k.x, e.y + k.y, k.w, k.h); }
+      const av = k.cel.av || "m";
+      const dy = av === "s" ? pad : av === "j" ? k.h - pad - k.as.h : (k.h - k.as.h) / 2;
+      deseneazaText(c, k.as, e.x + k.x + pad, e.y + k.y + dy, e.m, e.c);
+    }
+    /* Chenarele, după fel. */
+    const f = e.ch?.f || "toate";
+    const ex = 0.5;
+    const muchii = [];
+    for (const k of L.celule) {
+      const sus = k.y < ex, jos = Math.abs(k.y + k.h - L.h) < ex, st = k.x < ex, dr = Math.abs(k.x + k.w - L.w) < ex;
+      const x0 = e.x + k.x, y0 = e.y + k.y, x1 = x0 + k.w, y1 = y0 + k.h;
+      const vrea = (margine) => f === "toate" || (f === "exterior" && margine) || (f === "interior" && !margine);
+      if (f === "orizontale") { muchii.push([x0, y0, x1, y0], [x0, y1, x1, y1]); continue; }
+      if (vrea(sus)) muchii.push([x0, y0, x1, y0]);
+      if (vrea(jos)) muchii.push([x0, y1, x1, y1]);
+      if (vrea(st)) muchii.push([x0, y0, x0, y1]);
+      if (vrea(dr)) muchii.push([x1, y0, x1, y1]);
+    }
+    if (muchii.length && f !== "fara") {
+      c.save();
+      c.strokeStyle = e.ch?.c || "#1f2430";
+      c.lineWidth = e.ch?.g || 1.5;
+      c.lineCap = "square";
+      c.beginPath();
+      for (const [a, b, x, y] of muchii) { c.moveTo(a, b); c.lineTo(x, y); }
+      c.stroke();
+      c.restore();
+    }
+    /* La profesor, cât lucrează pe tabel: liniile ascunse, punctate (ca în Word). */
+    const lucreaza = this.poateScrie && !this.pixel && (this.selectate.has(e.id) || this.text?.tabel?.id === e.id);
+    if (lucreaza && f !== "toate") {
+      c.save();
+      c.strokeStyle = "rgba(37, 99, 235, .45)"; c.lineWidth = 1 / z; c.setLineDash([3 / z, 3 / z]);
+      for (const k of L.celule) c.strokeRect(e.x + k.x, e.y + k.y, k.w, k.h);
+      c.restore();
+    }
+    /* Celulele alese. */
+    const s = this.celule;
+    if (s && s.id === e.id && !this.pixel) {
+      c.save();
+      c.fillStyle = "rgba(37, 99, 235, .14)";
+      for (const k of L.celule) if (k.i <= s.i1 && k.i + k.rs - 1 >= s.i0 && k.j <= s.j1 && k.j + k.cs - 1 >= s.j0) c.fillRect(e.x + k.x, e.y + k.y, k.w, k.h);
+      c.restore();
+    }
   }
 
   imaginea(src) {
@@ -537,7 +630,7 @@ export class Plansa {
 
   cutiaSelectiei() {
     let b = null;
-    for (const e of this.el) if (this.selectate.has(e.id)) b = uneste(b, cutia(e));
+    for (const e of this.el) if (this.selectate.has(e.id)) b = uneste(b, cutia(this.previzualizare?.id === e.id ? this.previzualizare : e));
     if (b && this.mutare) b = { ...b, x: b.x + this.mutare.dx, y: b.y + this.mutare.dy };
     if (b && this.scalare) {
       const { ox, oy, s } = this.scalare;
@@ -545,7 +638,26 @@ export class Plansa {
     }
     return b;
   }
+  /** Singurul element ales, dacă e unul singur. */
+  singurul() {
+    if (this.selectate.size !== 1) return null;
+    const id = [...this.selectate][0];
+    return this.el.find((e) => e.id === id) || null;
+  }
+  /* Mânerele: colțul (mărește), dreapta (lățimea textului), mutarea tabelului. */
+  manere() {
+    const b = this.cutiaSelectiei();
+    if (!b) return null;
+    const z = this.vedere.z, d = 6 / z;
+    const unul = this.singurul();
+    return {
+      colt: { x: b.x + b.w + d, y: b.y + b.h + d },
+      latime: unul?.t === "x" && !this.mutare && !this.scalare ? { x: b.x + b.w + d, y: b.y + b.h / 2 } : null,
+      mutare: unul?.t === "t" && !this.scalare ? { x: b.x - d - 9 / z, y: b.y - d - 9 / z } : null,
+    };
+  }
   selectia() {
+    if (this.text && !this.text.tabel) return;   // cât scrii, chenarul selecției nu stă peste text
     const b = this.cutiaSelectiei();
     if (!b) return;
     const c = this.ctx, z = this.vedere.z;
@@ -555,8 +667,24 @@ export class Plansa {
     c.setLineDash([]);
     c.fillStyle = "#ffffff";
     const m = 14 / z;
-    c.fillRect(b.x + b.w + 6 / z - m / 2, b.y + b.h + 6 / z - m / 2, m, m);
-    c.strokeRect(b.x + b.w + 6 / z - m / 2, b.y + b.h + 6 / z - m / 2, m, m);
+    const M = this.manere();
+    const patrat = (p) => { c.fillRect(p.x - m / 2, p.y - m / 2, m, m); c.strokeRect(p.x - m / 2, p.y - m / 2, m, m); };
+    patrat(M.colt);
+    if (M.latime) {
+      c.fillRect(M.latime.x - m / 4, M.latime.y - m, m / 2, m * 2);
+      c.strokeRect(M.latime.x - m / 4, M.latime.y - m, m / 2, m * 2);
+    }
+    if (M.mutare) {
+      patrat(M.mutare);
+      c.strokeStyle = "#c2410c"; c.lineWidth = 1.5 / z;
+      const { x, y } = M.mutare, q = m * 0.32;
+      c.beginPath(); c.moveTo(x - q, y); c.lineTo(x + q, y); c.moveTo(x, y - q); c.lineTo(x, y + q); c.stroke();
+    }
+    if (this.latire) {
+      c.strokeStyle = "rgba(37, 99, 235, .7)"; c.setLineDash([4 / z, 4 / z]);
+      const lx = this.latire.e.x + this.latire.lat;
+      c.beginPath(); c.moveTo(lx, b.y - 40 / z); c.lineTo(lx, b.y + b.h + 40 / z); c.stroke();
+    }
     c.restore();
   }
 
@@ -569,7 +697,7 @@ export class Plansa {
   setUnealta(u) {
     this.inchideTextul(true);
     this.unealta = u;
-    if (u !== "selectie") { this.selectate.clear(); this.cere(); }
+    if (u !== "selectie") { this.selectate.clear(); this.celule = null; this.cere(); }
     this.cursor();
     this.o.laSchimbare?.();
   }
@@ -589,6 +717,7 @@ export class Plansa {
         this.vedere.x += e.deltaX / this.vedere.z;
         this.vedere.y += e.deltaY / this.vedere.z;
         this.cere();
+        this.pozitioneazaEditorul();
         this.o.laVedere?.();
       }
       this.o.laManaMea?.();
@@ -596,21 +725,41 @@ export class Plansa {
     p.addEventListener("dblclick", (e) => {
       if (!this.poateScrie || this.unealta !== "selectie") return;
       const [wx, wy] = this.lume(e.clientX, e.clientY);
-      const t = [...this.el].reverse().find((x) => x.t === "x" && atinge(x, wx, wy, 4 / this.vedere.z));
-      if (t) this.deschideTextul(t.x, t.y, t);
+      const t = [...this.el].reverse().find((x) => (x.t === "x" || x.t === "t") && atinge(x, wx, wy, 4 / this.vedere.z));
+      if (t?.t === "x") this.deschideTextul(t.x, t.y, t);
+      else if (t?.t === "t") { const k = this.celulaLa(t, wx, wy); if (k) this.deschideCelula(t, k.i, k.j); }
     });
     addEventListener("keydown", (e) => {
-      if (e.code === "Space" && !this.text && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName || "")) {
+      if (e.code === "Space" && !this.text && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName || "") && !document.activeElement?.isContentEditable) {
         if (!this.spatiu) { this.spatiu = true; this.cursor(); }
         e.preventDefault();
       }
     });
     addEventListener("keyup", (e) => { if (e.code === "Space") { this.spatiu = false; this.cursor(); } });
-    /* Un text deschis se închide (și se păstrează) la orice apăsare în afara lui. */
+    /* Un text deschis se închide (și se păstrează) la orice apăsare în afara lui
+       și a uneltelor care lucrează chiar pe el (B / I / U, liste, aliniere, tabel). */
     document.addEventListener("pointerdown", (e) => {
-      /* Nu și la B / I / U: ele lucrează chiar pe textul deschis. */
-      if (this.text && !this.text.ta.contains(e.target) && e.target !== this.panza && !e.target.closest?.("[data-f]")) this.inchideTextul(true);
+      if (!this.text) return;
+      const t = e.target;
+      if (this.text.ta.contains(t) || t === this.panza || t.closest?.("[data-pastreaza-textul], .ta-margine")) return;
+      this.inchideTextul(true);
     }, true);
+  }
+
+  /** Celula tabelului de sub punct. */
+  celulaLa(e, wx, wy) {
+    const L = this.tabelul(e);
+    const x = wx - e.x, y = wy - e.y;
+    return L.celule.find((k) => x >= k.x && x <= k.x + k.w && y >= k.y && y <= k.y + k.h) || null;
+  }
+  /** Marginea de coloană ori de rând de sub punct (pentru tras). */
+  margineLa(e, wx, wy) {
+    const L = this.tabelul(e);
+    const tol = 5 / this.vedere.z;
+    const x = wx - e.x, y = wy - e.y;
+    if (y >= -tol && y <= L.h + tol) for (let j = 1; j < L.xs.length; j++) if (Math.abs(x - L.xs[j]) <= tol) return { fel: "col", j: j - 1 };
+    if (x >= -tol && x <= L.w + tol) for (let i = 1; i < L.ys.length; i++) if (Math.abs(y - L.ys[i]) <= tol) return { fel: "rand", i: i - 1 };
+    return null;
   }
 
   jos(e) {
@@ -619,7 +768,9 @@ export class Plansa {
     this.panza.setPointerCapture(e.pointerId);
     /* Două degete: planșa se trage și se mărește; desenul început se lasă. */
     if (this.degete.size === 2) {
-      this.temp = null; this.banda = null; this.mutare = null; this.scalare = null; this.ascunse.clear();
+      this.temp = null; this.banda = null; this.mutare = null; this.scalare = null; this.latire = null; this.tragTabel = null;
+      this.gataPrevizualizarea();
+      this.ascunse.clear();
       this.o.laTrasare?.(null);
       this.gest = this.gestul();
       this.actiune = "gest";
@@ -643,7 +794,7 @@ export class Plansa {
       this.temp = { id: idNou(), t: "p", c: this.culoare, g: marker ? this.grosime * 5 : this.grosime, ...(marker ? { o: 0.35 } : {}), pts: [r1(wx), r1(wy)] };
     } else if (u === "linie" || u === "sageata" || u === "dreptunghi" || u === "elipsa") {
       const t = { linie: "l", sageata: "a", dreptunghi: "r", elipsa: "e" }[u];
-      this.temp = { id: idNou(), t, c: this.culoare, g: this.grosime, x1: r1(wx), y1: r1(wy), x2: r1(wx), y2: r1(wy) };
+      this.temp = { id: idNou(), t, c: this.culoare, g: this.grosime, x1: prinde(wx), y1: prinde(wy), x2: prinde(wx), y2: prinde(wy) };
     } else if (u === "radiera") {
       this.urmaRadierei = [wx, wy];
       this.sterge(wx, wy, tol * 2);
@@ -651,32 +802,77 @@ export class Plansa {
       this.laser = { t: "laser", pts: [r1(wx), r1(wy)] };
       clearTimeout(this.ceasLaser);
     } else if (u === "text") {
-      const t = [...this.el].reverse().find((x) => x.t === "x" && atinge(x, wx, wy, tol));
-      this.deschideTextul(t ? t.x : wx, t ? t.y : wy - this.marimeText * 0.6, t || null);
+      const sub = [...this.el].reverse().find((x) => (x.t === "x" || x.t === "t") && atinge(x, wx, wy, tol));
+      if (sub?.t === "t") { const k = this.celulaLa(sub, wx, wy); if (k) this.deschideCelula(sub, k.i, k.j); }
+      else if (sub) this.deschideTextul(sub.x, sub.y, sub);
+      else { const [x, y] = this.locDeText(wx, wy); this.deschideTextul(x, y, null); }
       this.actiune = null;
       e.preventDefault();
     } else if (u === "selectie") {
-      const b = this.cutiaSelectiei();
-      const m = 14 / this.vedere.z;
-      if (b && Math.abs(wx - (b.x + b.w + 6 / this.vedere.z)) <= m && Math.abs(wy - (b.y + b.h + 6 / this.vedere.z)) <= m) {
-        this.actiune = "scaleaza";
-        this.scalare = { ox: b.x, oy: b.y, s: 1, w0: Math.max(1, b.w), h0: Math.max(1, b.h) };
-      } else {
-        const t = [...this.el].reverse().find((x) => atinge(x, wx, wy, tol, true));
-        if (t) {
-          if (e.shiftKey) { if (this.selectate.has(t.id)) this.selectate.delete(t.id); else this.selectate.add(t.id); }
-          else if (!this.selectate.has(t.id)) this.selectate = new Set([t.id]);
-          this.actiune = "muta";
-          this.mutare = { x0: wx, y0: wy, dx: 0, dy: 0 };
-        } else {
-          if (!e.shiftKey) this.selectate.clear();
-          this.actiune = "banda";
-          this.banda = { x0: wx, y0: wy, x: wx, y: wy, w: 0, h: 0 };
-        }
-      }
-      this.o.laSchimbare?.();
+      this.josSelectie(e, wx, wy, tol);
     }
     this.cere();
+  }
+
+  /** Unde se pune un text nou: pe grilă, iar chiar sub alt text, aliniat la el. */
+  locDeText(wx, wy) {
+    const m = this.marimeText;
+    for (const t of this.el) {
+      if (t.t !== "x") continue;
+      const jos = t.y + (t.h || 0);
+      if (Math.abs(wx - t.x) <= Math.max(30, t.m * 1.5) && wy >= jos - t.m * 0.3 && wy <= jos + t.m * 2.2) {
+        return [t.x, prinde(jos + t.m * 0.25)];
+      }
+    }
+    return [prinde(wx), prinde(wy - m * 0.6)];
+  }
+
+  josSelectie(e, wx, wy, tol) {
+    const M = this.manere();
+    const m = 14 / this.vedere.z;
+    const pe = (p) => p && Math.abs(wx - p.x) <= m && Math.abs(wy - p.y) <= m;
+    const unul = this.singurul();
+    if (M && pe(M.latime)) {
+      this.actiune = "latime";
+      this.latire = { e: unul, lat: unul.lat || unul.w };
+    } else if (M && pe(M.mutare)) {
+      this.actiune = "muta";
+      this.mutare = { x0: wx, y0: wy, dx: 0, dy: 0 };
+    } else if (M && pe(M.colt)) {
+      const b = this.cutiaSelectiei();
+      this.actiune = "scaleaza";
+      this.scalare = { ox: b.x, oy: b.y, s: 1, w0: Math.max(1, b.w), h0: Math.max(1, b.h) };
+    } else if (unul?.t === "t" && atinge(unul, wx, wy, tol)) {
+      /* Tabelul ales: marginile se trag, celulele se aleg (ca în Word). */
+      const mg = this.margineLa(unul, wx, wy);
+      if (mg) {
+        this.actiune = "tabel-margine";
+        this.tragTabel = { e: unul, ...mg, x0: wx, y0: wy, L: this.tabelul(unul) };
+      } else {
+        const k = this.celulaLa(unul, wx, wy);
+        if (k) {
+          this.actiune = "tabel-celule";
+          this.tragTabel = { e: unul, i0: k.i, j0: k.j };
+          this.celule = { id: unul.id, i0: k.i, j0: k.j, i1: k.i + k.rs - 1, j1: k.j + k.cs - 1 };
+        }
+      }
+    } else {
+      const t = [...this.el].reverse().find((x) => atinge(x, wx, wy, tol, true));
+      this.celule = null;
+      if (t) {
+        if (e.shiftKey) { if (this.selectate.has(t.id)) this.selectate.delete(t.id); else this.selectate.add(t.id); }
+        else if (!this.selectate.has(t.id)) this.selectate = new Set([t.id]);
+        /* Un tabel abia ales nu se mută din mijloc (acolo se aleg celulele):
+           se mută de mânerul lui ✥. */
+        if (t.t === "t" && this.selectate.size === 1 && !e.shiftKey) this.actiune = null;
+        else { this.actiune = "muta"; this.mutare = { x0: wx, y0: wy, dx: 0, dy: 0 }; }
+      } else {
+        if (!e.shiftKey) this.selectate.clear();
+        this.actiune = "banda";
+        this.banda = { x0: wx, y0: wy, x: wx, y: wy, w: 0, h: 0 };
+      }
+    }
+    this.o.laSchimbare?.();
   }
 
   gestul() {
@@ -685,7 +881,23 @@ export class Plansa {
   }
 
   misca(e) {
-    if (!this.degete.has(e.pointerId)) return;
+    if (!this.degete.has(e.pointerId)) {
+      /* Fără nimic apăsat: cursorul spune ce se poate trage. */
+      if (this.poateScrie && this.unealta === "selectie" && !this.degete.size && !this.spatiu) {
+        const [wx, wy] = this.lume(e.clientX, e.clientY);
+        const unul = this.singurul();
+        const M = this.manere();
+        const m = 14 / this.vedere.z;
+        const pe = (p) => p && Math.abs(wx - p.x) <= m && Math.abs(wy - p.y) <= m;
+        let c = "default";
+        if (M && pe(M.latime)) c = "ew-resize";
+        else if (M && pe(M.colt)) c = "nwse-resize";
+        else if (M && pe(M.mutare)) c = "move";
+        else if (unul?.t === "t") { const mg = this.margineLa(unul, wx, wy); if (mg) c = mg.fel === "col" ? "col-resize" : "row-resize"; }
+        this.panza.style.cursor = c;
+      }
+      return;
+    }
     this.degete.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const a = this.actiune;
     if (a === "gest" && this.degete.size === 2) {
@@ -695,6 +907,7 @@ export class Plansa {
       const wx = g0.v.x + (g0.cx - r.left) / g0.v.z, wy = g0.v.y + (g0.cy - r.top) / g0.v.z;
       this.vedere = { z, x: wx - (g.cx - r.left) / z, y: wy - (g.cy - r.top) / z };
       this.cere();
+      this.pozitioneazaEditorul();
       this.o.laVedere?.();
       this.o.laManaMea?.();
       return;
@@ -704,6 +917,7 @@ export class Plansa {
       this.vedere.x = s.x - (e.clientX - s.cx) / this.vedere.z;
       this.vedere.y = s.y - (e.clientY - s.cy) / this.vedere.z;
       this.cere();
+      this.pozitioneazaEditorul();
       this.o.laVedere?.();
       this.o.laManaMea?.();
       return;
@@ -725,8 +939,8 @@ export class Plansa {
           const l = Math.hypot(wx - this.temp.x1, wy - this.temp.y1);
           x2 = this.temp.x1 + l * Math.cos(u); y2 = this.temp.y1 + l * Math.sin(u);
         }
-      }
-      this.temp.x2 = r1(x2); this.temp.y2 = r1(y2);
+        this.temp.x2 = r1(x2); this.temp.y2 = r1(y2);
+      } else { this.temp.x2 = prinde(x2); this.temp.y2 = prinde(y2); }
       this.o.laTrasare?.(this.temp);
     } else if (a === "radiera") {
       /* Și pe drumul dintre două mișcări: o mână repede sare peste desen. */
@@ -740,15 +954,67 @@ export class Plansa {
       if (this.laser.pts.length > 60) this.laser.pts.splice(0, this.laser.pts.length - 60);
       this.o.laTrasare?.(this.laser);
     } else if (a === "muta" && this.mutare) {
-      this.mutare.dx = wx - this.mutare.x0; this.mutare.dy = wy - this.mutare.y0;
+      /* Pe grila din spate: colțul de sus al selecției cade pe un punct al ei. */
+      const b = this.el.filter((x) => this.selectate.has(x.id)).reduce((acc, x) => uneste(acc, cutia(x)), null);
+      const dx = wx - this.mutare.x0, dy = wy - this.mutare.y0;
+      this.mutare.dx = b ? prinde(b.x + dx) - b.x : dx;
+      this.mutare.dy = b ? prinde(b.y + dy) - b.y : dy;
     } else if (a === "scaleaza" && this.scalare) {
       const s = this.scalare;
       s.s = Math.max(0.05, Math.max((wx - s.ox) / s.w0, (wy - s.oy) / s.h0));
+    } else if (a === "latime" && this.latire) {
+      /* Lățimea textului, cu previzualizare: textul se reașază pe loc. */
+      const l = this.latire;
+      l.lat = Math.max(l.e.m * 2, prinde(wx - l.e.x));
+      this.strainMeu(this.masoara({ ...copie(l.e), lat: l.lat }));
+    } else if (a === "tabel-margine" && this.tragTabel) {
+      const g = this.tragTabel;
+      const n = copie(g.e);
+      if (g.fel === "col") n.col[g.j] = Math.max(g.e.m * 1.5, prinde(wx - g.e.x - g.L.xs[g.j]));
+      else n.rh[g.i] = Math.max(randMinim(g.e), prinde(wy - g.e.y - g.L.ys[g.i]));
+      this.strainMeu(this.masoara(n));
+    } else if (a === "tabel-celule" && this.tragTabel) {
+      const g = this.tragTabel;
+      const k = this.celulaLa(g.e, wx, wy);
+      if (k) this.celule = this.inchideZona(g.e, Math.min(g.i0, k.i), Math.min(g.j0, k.j), Math.max(g.i0, k.i + k.rs - 1), Math.max(g.j0, k.j + k.cs - 1));
     } else if (a === "banda" && this.banda) {
       const b = this.banda;
       b.x = Math.min(b.x0, wx); b.y = Math.min(b.y0, wy); b.w = Math.abs(wx - b.x0); b.h = Math.abs(wy - b.y0);
     } else return;
     this.cere();
+  }
+
+  /** Previzualizarea unei schimbări a mea, cât ții degetul: se vede în locul
+   *  elementului și pleacă live, ca desenul în curs. */
+  strainMeu(el) {
+    if (this.previzualizare) this.ascunse.delete(this.previzualizare.id);
+    this.previzualizare = el;
+    this.temp = el;
+    if (el) this.ascunse.add(el.id);
+    this.o.laTrasare?.(el);
+  }
+  gataPrevizualizarea() {
+    if (this.previzualizare) { this.ascunse.delete(this.previzualizare.id); this.temp = null; }
+    this.previzualizare = null;
+  }
+
+  /** Zona de celule lărgită cât să cuprindă întregi celulele îmbinate. */
+  inchideZona(e, i0, j0, i1, j1) {
+    let schimbat = true;
+    while (schimbat) {
+      schimbat = false;
+      for (let i = 0; i < e.cel.length; i++) for (let j = 0; j < e.col.length; j++) {
+        if (!celOk(e, i, j)) continue;
+        const c = e.cel[i][j];
+        const ie = i + (c.rs || 1) - 1, je = j + (c.cs || 1) - 1;
+        if (!(i <= i1 && ie >= i0 && j <= j1 && je >= j0)) continue;
+        if (i < i0) { i0 = i; schimbat = true; }
+        if (j < j0) { j0 = j; schimbat = true; }
+        if (ie > i1) { i1 = ie; schimbat = true; }
+        if (je > j1) { j1 = je; schimbat = true; }
+      }
+    }
+    return { id: e.id, i0, j0, i1, j1 };
   }
 
   sus(e, anulat = false) {
@@ -776,7 +1042,17 @@ export class Plansa {
     } else if (a === "scaleaza" && this.scalare) {
       const { ox, oy, s } = this.scalare;
       this.scalare = null;
-      if (Math.abs(s - 1) > 0.005) this.fa({ fel: "schimba", el: this.el.filter((x) => this.selectate.has(x.id)).map((x) => marit(x, ox, oy, s)) });
+      if (Math.abs(s - 1) > 0.005) this.fa({ fel: "schimba", el: this.el.filter((x) => this.selectate.has(x.id)).map((x) => this.masoara(marit(x, ox, oy, s))) });
+    } else if ((a === "latime" || a === "tabel-margine") && this.previzualizare) {
+      const n = this.previzualizare;
+      this.gataPrevizualizarea();
+      this.latire = null;
+      this.tragTabel = null;
+      if (!anulat) this.fa({ fel: "schimba", el: [n] });
+      this.o.laTrasare?.(null);
+    } else if (a === "tabel-celule") {
+      this.tragTabel = null;
+      this.o.laSchimbare?.();
     } else if (a === "banda" && this.banda) {
       const b = this.banda;
       this.banda = null;
@@ -786,6 +1062,8 @@ export class Plansa {
       }
       this.o.laSchimbare?.();
     }
+    this.latire = null;
+    this.tragTabel = null;
     this.cere();
   }
 
@@ -794,51 +1072,86 @@ export class Plansa {
     this.cere();
   }
 
-  /* ---------- textul ---------- */
-  deschideTextul(wx, wy, vechi = null) {
+  /* =========================================================
+     EDITORUL DE TEXT (casetă ori celulă de tabel)
+     ========================================================= */
+
+  /**
+   * Deschide editorul. `o`: { wx, wy, model, m, c, lat, ind, aliniere, id,
+   * latFixa (celulă), tabel, celula, laLive(model), laGata(model, pastreaza, t) }.
+   */
+  deschideEditorul(o) {
     this.inchideTextul(true);
-    /* Un câmp „contenteditable", nu textarea: așa Ctrl+B, Ctrl+I, Ctrl+U merg
-       pe bucăți de text, chiar din browser. */
     const ta = document.createElement("div");
     ta.className = "ta-text";
     ta.contentEditable = "true";
     ta.spellcheck = false;
-    const m = vechi ? vechi.m : this.marimeText;
-    const c = vechi ? vechi.c : this.culoare;
-    ta.innerHTML = vechi ? inEditor(vechi) : "";
-    const { x, y, z } = this.vedere;
-    Object.assign(ta.style, {
-      left: `${(wx - x) * z}px`, top: `${(wy - y) * z}px`,
-      fontSize: `${m * z}px`, color: c, fontFamily: LITERA,
-    });
+    ta.innerHTML = inEditor(o.model);
     this.gazda.append(ta);
-    /* Fiecare literă pleacă live, ca desenul în curs: elevii văd textul cum se scrie. */
-    const id = vechi?.id || idNou();
-    const trimiteLive = () => {
-      const t = dinEditor(ta);
-      this.o.laTrasare?.(t.s ? this.masoaraText({ id, t: "x", c, m, x: r1(wx), y: r1(wy), s: t.s, ...(t.r ? { r: t.r } : {}) }) : null);
+    const t = {
+      ta, margine: null, ghid: null, wx: o.wx, wy: o.wy, m: o.m, c: o.c, lat: o.lat || null, ind: o.ind || null,
+      aliniere: o.aliniere || "l", latFixa: !!o.latFixa, laGata: o.laGata, laLive: o.laLive, tabel: o.tabel || null,
+      celula: o.celula || null, id: o.id,
     };
-    ta.addEventListener("input", trimiteLive);
-    ta.addEventListener("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Escape") { this.inchideTextul(false); }
-      else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.inchideTextul(true); }
-      else if (e.key === "Enter") { e.preventDefault(); document.execCommand("insertLineBreak"); }
-      else if ((e.ctrlKey || e.metaKey) && /^[biu]$/i.test(e.key)) {
-        /* Bold, italic, subliniat: browserul le face singur; aici doar plecă live. */
-        setTimeout(trimiteLive, 0);
+    if (!o.latFixa) {
+      /* Marginea textului: o tragi, iar textul se reașază pe loc (previzualizare);
+         dublu-clic pe ea o scoate (rândul merge cât e scris). */
+      t.margine = document.createElement("div");
+      t.margine.className = "ta-margine";
+      t.margine.title = "Trage ca să alegi până unde merge rândul; dublu-clic: fără margine";
+      t.margine.dataset.pastreazaTextul = "";
+      t.ghid = document.createElement("div");
+      t.ghid.className = "ta-ghid";
+      this.gazda.append(t.ghid, t.margine);
+      t.margine.addEventListener("pointerdown", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        t.margine.setPointerCapture(e.pointerId);
+        const muta = (ev) => {
+          const r = this.gazda.getBoundingClientRect();
+          const wx = this.vedere.x + (ev.clientX - r.left) / this.vedere.z;
+          t.lat = Math.max(t.m * 2, prinde(wx - t.wx));
+          t.trimiteLive();
+        };
+        const gata = () => { t.margine.removeEventListener("pointermove", muta); t.margine.removeEventListener("pointerup", gata); ta.focus(); };
+        t.margine.addEventListener("pointermove", muta);
+        t.margine.addEventListener("pointerup", gata);
+      });
+      t.margine.addEventListener("dblclick", () => { t.lat = null; t.trimiteLive(); ta.focus(); });
+    }
+    t.model = () => dinEditor(ta);
+    t.trimiteLive = () => {
+      refaParagrafele(ta, { m: t.m, ind: t.ind, z: this.vedere.z, aliniere: t.aliniere });
+      this.pozitioneazaEditorul();
+      t.laLive?.(t.model());
+    };
+    this.text = t;
+    ta.addEventListener("input", (e) => {
+      /* Lista se pune singură, ca în Word: „1. ", „a) ", „- " la început de paragraf. */
+      if (e.inputType === "insertText" && e.data === " ") {
+        const u = undeECursorul(ta);
+        if (u && !u.d.dataset.l) {
+          const l = autoLista(u.inainte);
+          if (l) { u.d.dataset.l = l.l; u.d.dataset.f = l.f; taieInceputul(u.d, u.inainte.length); }
+        }
       }
+      t.trimiteLive();
     });
+    ta.addEventListener("keydown", (e) => this.tastaInEditor(e));
     /* Lipit în text: doar literele, fără formatarea de unde vin. */
     ta.addEventListener("paste", (e) => {
       e.stopPropagation();
       e.preventDefault();
       document.execCommand("insertText", false, e.clipboardData?.getData("text/plain") || "");
     });
-    ta.addEventListener("blur", () => setTimeout(() => { if (this.text?.ta === ta) this.inchideTextul(true); }, 0));
-    this.text = { ta, wx, wy, vechi, m, c, id };
-    if (vechi) this.ascunse.add(vechi.id);
+    ta.addEventListener("blur", () => setTimeout(() => {
+      if (this.text?.ta !== ta) return;
+      const a = document.activeElement;
+      if (a === ta || a?.closest?.("[data-pastreaza-textul]")) return;
+      this.inchideTextul(true);
+    }, 0));
     this.cere();
+    refaParagrafele(ta, { m: t.m, ind: t.ind, z: this.vedere.z, aliniere: t.aliniere });
+    this.pozitioneazaEditorul();
     setTimeout(() => {
       ta.focus();
       /* Cursorul la capătul textului, nu la început. */
@@ -846,63 +1159,345 @@ export class Plansa {
       sel.selectAllChildren(ta);
       sel.collapseToEnd();
     }, 0);
+    this.o.laSchimbare?.();
   }
 
-  /** Bold / italic / subliniat: în textul deschis, pe ce e selectat în el;
-   *  altfel, pe textele selectate cu săgeata, întregi. */
+  tastaInEditor(e) {
+    const t = this.text;
+    if (!t) return;
+    e.stopPropagation();
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key;
+    const u = undeECursorul(t.ta);
+    /* Escape închide caseta și păstrează ce ai scris (greșelile se dau înapoi cu Ctrl+Z). */
+    if (k === "Escape") { this.inchideTextul(true); return; }
+    if (k === "Enter" && ctrl) { e.preventDefault(); this.inchideTextul(true); return; }
+    if (k === "Enter" && e.altKey && !t.tabel) {
+      /* Alt+Enter: textul se închide și se deschide unul nou chiar dedesubt. */
+      e.preventDefault();
+      const x = t.wx;
+      this.inchideTextul(true);
+      const el = this.el.find((y) => y.id === t.id);
+      const y = el ? prinde(el.y + el.h + el.m * 0.25) : prinde(t.wy + t.m * RAND * 1.5);
+      this.deschideTextul(x, y, null);
+      return;
+    }
+    if (k === "Enter" && u && u.d.dataset.l && !u.d.textContent.trim()) {
+      /* Enter pe un rând gol de listă: lista se oprește (ca în Word). */
+      e.preventDefault();
+      delete u.d.dataset.l; delete u.d.dataset.f;
+      t.trimiteLive();
+      return;
+    }
+    if (k === "Enter" && e.shiftKey) { e.preventDefault(); document.execCommand("insertParagraph"); return; }
+    if (k === "Backspace" && u && u.inainte === "" && (u.d.dataset.l || u.d.dataset.n)) {
+      e.preventDefault();
+      if (u.d.dataset.l) { delete u.d.dataset.l; delete u.d.dataset.f; } else schimbaNivelul([u.d], -1);
+      t.trimiteLive();
+      return;
+    }
+    if (k === "Tab") {
+      e.preventDefault();
+      const pars = paragrafeleSelectate(t.ta);
+      /* În tabel, Tab pe un paragraf care nu e în listă trece la celula vecină. */
+      if (t.tabel && !pars.some((d) => d.dataset.l)) { this.celulaVecina(e.shiftKey ? -1 : 1); return; }
+      schimbaNivelul(pars, e.shiftKey ? -1 : 1);
+      t.trimiteLive();
+      return;
+    }
+    if (ctrl && /^[biu]$/i.test(k)) { setTimeout(() => t.trimiteLive(), 0); return; }
+    if (ctrl && !e.shiftKey && /^[lerj]$/i.test(k)) {
+      e.preventDefault();
+      this.aliniazaText({ l: "l", e: "c", r: "r", j: "j" }[k.toLowerCase()]);
+      return;
+    }
+    if (ctrl && e.shiftKey && /^l$/i.test(k)) { e.preventDefault(); this.puneListaText("b", "•"); }
+  }
+
+  /** Culoarea textului deschis (toată caseta are o culoare). */
+  culoareText(c) {
+    const t = this.text;
+    if (!t) return;
+    if (t.tabel) { this.inchideTextul(true); this.peTabel((n) => { n.c = c; return n; }); return; }
+    t.c = c;
+    t.trimiteLive();
+    t.ta.focus();
+  }
+
+  /** Pune editorul (și marginea) unde trebuie, după vedere. */
+  pozitioneazaEditorul() {
+    const t = this.text;
+    if (!t) return;
+    const { x, y, z } = this.vedere;
+    const ta = t.ta;
+    Object.assign(ta.style, {
+      left: `${(t.wx - x) * z}px`, top: `${(t.wy - y) * z}px`,
+      fontSize: `${t.m * z}px`, color: t.c, fontFamily: LITERA,
+      width: t.lat ? `${t.lat * z}px` : "", whiteSpace: t.lat ? "pre-wrap" : "pre",
+    });
+    if (t.margine) {
+      const r = ta.getBoundingClientRect(), g = this.gazda.getBoundingClientRect();
+      const lx = t.lat ? (t.wx - x + t.lat) * z : r.right - g.left;
+      Object.assign(t.margine.style, { left: `${lx - 5}px`, top: `${r.top - g.top}px`, height: `${Math.max(r.height, t.m * z)}px` });
+      Object.assign(t.ghid.style, { left: `${lx}px`, display: t.lat ? "" : "none" });
+    }
+  }
+
+  /** Bold / italic / subliniat: în editor, pe ce e selectat în el; altfel, pe
+   *  textele ori celulele alese, întregi. */
   formateaza(semn) {
     if (this.text) {
       this.text.ta.focus();
       document.execCommand(semn === BOLD ? "bold" : semn === ITALIC ? "italic" : "underline");
-      this.text.ta.dispatchEvent(new Event("input"));
+      this.text.trimiteLive();
+      return;
+    }
+    this.peModele((m) => ({ toate: bucatile(m).every(([n, f]) => !n || f & semn) }), (m, { toate }) => {
+      const r = strange(bucatile(m).map(([n, f]) => [n, toate ? f & ~semn : f | semn]));
+      const o = { ...m };
+      if (r) o.r = r; else delete o.r;
+      return o;
+    });
+  }
+  /** Lista: în editor, pe paragrafele alese; altfel pe tot textul ales. */
+  puneListaText(l, f) {
+    if (this.text) {
+      puneLista(paragrafeleSelectate(this.text.ta), l, f);
+      this.text.trimiteLive();
+      this.text.ta.focus();
+      return;
+    }
+    this.peModele((m) => ({ toate: paragrafele(m).every((x) => x.p?.l === l && x.p?.f === f) }),
+      (m, { toate }) => cuParagrafe(m, (p) => { if (toate || !l) { delete p.l; delete p.f; } else { p.l = l; p.f = f; } }));
+  }
+  nivelText(cu) {
+    if (this.text) { schimbaNivelul(paragrafeleSelectate(this.text.ta), cu); this.text.trimiteLive(); this.text.ta.focus(); return; }
+    this.peModele(() => ({}), (m) => cuParagrafe(m, (p) => {
+      const n = Math.max(0, Math.min(NIVEL_MAX, (p.n || 0) + cu));
+      if (n) p.n = n; else delete p.n;
+    }));
+  }
+  aliniazaText(a) {
+    if (this.text) { aliniaza(paragrafeleSelectate(this.text.ta), a); this.text.trimiteLive(); this.text.ta.focus(); return; }
+    /* Celulele alese: alinierea lor (ah), ca s-o aibă și paragrafele noi. */
+    const tb = this.tabelulAles();
+    if (tb) { this.peCelule((c) => { const o = cuParagrafe(c, (p) => { delete p.a; }); if (a === "l") delete o.ah; else o.ah = a; return o; }); return; }
+    this.peModele(() => ({}), (m) => cuParagrafe(m, (p) => { if (a === "l") delete p.a; else p.a = a; }));
+  }
+  /** Cât intră un nivel de listă (cu previzualizare): pe textul deschis ori ales. */
+  puneIndentarea(px) {
+    this.indent = px;
+    if (this.text && !this.text.tabel) { this.text.ind = px; this.text.trimiteLive(); return; }
+    const noi = this.el.filter((e) => this.selectate.has(e.id) && e.t === "x").map((e) => this.masoara({ ...copie(e), ind: px }));
+    if (noi.length) this.fa({ fel: "schimba", el: noi });
+  }
+
+  /** Aplică o schimbare pe textul ales: textele selectate, ori celulele alese
+   *  (ori toate) ale tabelului ales. `pregatire(model)` → { toate }. */
+  peModele(pregatire, schimba) {
+    const tb = this.tabelulAles();
+    if (tb) {
+      const cel = this.celuleleAlese(tb);
+      const st = { toate: cel.every(([i, j]) => pregatire(tb.cel[i][j]).toate) };
+      this.peCelule((c) => schimba(c, st));
       return;
     }
     const texte = this.el.filter((e) => this.selectate.has(e.id) && e.t === "x");
     if (!texte.length) return;
-    const toate = texte.every((e) => bucatile(e).every(([n, f]) => !n || f & semn));
-    const noi = texte.map((e) => {
-      const r = strange(bucatile(e).map(([n, f]) => [n, toate ? f & ~semn : f | semn]));
-      const n = { ...copie(e) };
-      if (r) n.r = r; else delete n.r;
-      return this.masoaraText(n);
+    const st = { toate: texte.every((e) => pregatire(e).toate) };
+    this.fa({ fel: "schimba", el: texte.map((e) => this.masoara(schimba(copie(e), st))) });
+  }
+
+  /* =========================================================
+     CASETELE DE TEXT
+     ========================================================= */
+  deschideTextul(wx, wy, vechi = null) {
+    const id = vechi?.id || idNou();
+    const m = vechi ? vechi.m : this.marimeText;
+    const c = vechi ? vechi.c : this.culoare;
+    const element = (model, t) => this.masoara({
+      id, t: "x", c: t.c || c, m, x: r1(t.wx), y: r1(t.wy), s: model.s, ...(model.r ? { r: model.r } : {}), ...(model.p ? { p: model.p } : {}),
+      ...(t.lat ? { lat: r1(t.lat) } : {}), ...(t.ind ? { ind: r1(t.ind) } : {}),
     });
-    this.fa({ fel: "schimba", el: noi });
+    this.deschideEditorul({
+      wx, wy, model: vechi || { s: "" }, m, c, lat: vechi?.lat || null, ind: vechi ? vechi.ind || null : this.indent, id,
+      laLive: (model) => this.o.laTrasare?.(model.s ? element(model, this.text) : null),
+      laGata: (model, pastreaza, t) => {
+        if (vechi) this.ascunse.delete(vechi.id);
+        if (!pastreaza) return;
+        const el = model.s ? element(model, t) : null;
+        const schimbat = (a, b) => ["s", "r", "p", "lat", "ind"].some((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null));
+        if (vechi && !el) this.fa({ fel: "scoate", id: [vechi.id] });
+        else if (vechi && schimbat(el, vechi)) this.fa({ fel: "schimba", el: [el] });
+        else if (!vechi && el) this.fa({ fel: "pune", el: [el] });
+      },
+    });
+    if (vechi) { this.ascunse.add(vechi.id); this.cere(); }
   }
 
   inchideTextul(pastreaza) {
     const t = this.text;
     if (!t) return;
     this.text = null;
+    const model = dinEditor(t.ta);
     t.ta.remove();
-    if (t.vechi) this.ascunse.delete(t.vechi.id);
-    const { s, r } = dinEditor(t.ta);
-    if (pastreaza) {
-      const el = s ? this.masoaraText({ id: t.id, t: "x", c: t.c, m: t.m, x: r1(t.wx), y: r1(t.wy), s, ...(r ? { r } : {}) }) : null;
-      if (t.vechi && !el) this.fa({ fel: "scoate", id: [t.vechi.id] });
-      else if (t.vechi && (el.s !== t.vechi.s || JSON.stringify(el.r || null) !== JSON.stringify(t.vechi.r || null))) this.fa({ fel: "schimba", el: [el] });
-      else if (!t.vechi && el) this.fa({ fel: "pune", el: [el] });
-    }
+    t.margine?.remove();
+    t.ghid?.remove();
+    t.laGata?.(model, pastreaza, t);
     /* Textul în lucru pleacă de pe ecranele elevilor abia după ce a ajuns cel bun. */
     this.o.laTrasare?.(null);
     this.cere();
-  }
-
-  masoaraText(e) {
-    const c = this.ctx;
-    c.save();
-    const linii = randurile(e);
-    e.w = r1(Math.max(...linii.map((l) => l.reduce((a, b) => { c.font = fontul(b.f, e.m); return a + c.measureText(b.s).width; }, 0)), 4));
-    e.h = r1(linii.length * e.m * 1.25);
-    c.restore();
-    return e;
+    this.o.laSchimbare?.();
   }
 
   /** Un text lipit (Ctrl+V) ajunge la mijlocul ecranului. */
   lipesteText(s) {
     const z = this.zonaVazuta();
-    const el = this.masoaraText({ id: idNou(), t: "x", c: this.culoare, m: this.marimeText, x: r1(z.x + z.w / 2 - 100), y: r1(z.y + z.h / 2 - 20), s: s.slice(0, 4000) });
+    const el = this.masoara({ id: idNou(), t: "x", c: this.culoare, m: this.marimeText, x: prinde(z.x + z.w / 2 - 100), y: prinde(z.y + z.h / 2 - 20), s: s.slice(0, 4000) });
     this.fa({ fel: "pune", el: [el] });
   }
+
+  /* =========================================================
+     TABELELE
+     ========================================================= */
+  /** Un tabel nou, la mijlocul ecranului, pe grilă. */
+  puneTabel(nr, nc) {
+    const z = this.zonaVazuta();
+    const m = this.marimeText;
+    const e = this.masoara(tabelNou(nr, nc, { x: 0, y: 0, m, c: this.culoare }));
+    e.x = prinde(z.x + Math.max(20, (z.w - e.w) / 2));
+    e.y = prinde(z.y + Math.max(20, (z.h - e.h) / 3));
+    this.fa({ fel: "pune", el: [e] });
+    this.setUnealta("selectie");
+    this.selectate = new Set([e.id]);
+    this.celule = null;
+    this.cere();
+    this.o.laSchimbare?.();
+  }
+  /** Tabelul la care se lucrează: cel ales (singur) ori cel cu celula deschisă. */
+  tabelulAles() {
+    if (this.text?.tabel) return this.el.find((e) => e.id === this.text.tabel.id) || null;
+    const u = this.singurul();
+    return u?.t === "t" ? u : null;
+  }
+  /** Zona de celule la care se aplică o schimbare: cele alese, ori cea deschisă,
+   *  ori tot tabelul. */
+  zonaAleasa(e) {
+    if (this.celule?.id === e.id) return this.celule;
+    if (this.text?.tabel?.id === e.id) return { i0: this.text.celula.i, j0: this.text.celula.j, i1: this.text.celula.i, j1: this.text.celula.j };
+    return { i0: 0, j0: 0, i1: e.cel.length - 1, j1: e.col.length - 1 };
+  }
+  celuleleAlese(e) {
+    const z = this.zonaAleasa(e);
+    const o = [];
+    for (let i = z.i0; i <= z.i1; i++) for (let j = z.j0; j <= z.j1; j++) if (celOk(e, i, j)) o.push([i, j]);
+    return o;
+  }
+  /** Schimbă celulele alese ale tabelului ales cu `fn(celulă) → celulă`. */
+  peCelule(fn) {
+    const e = this.tabelulAles();
+    if (!e) return;
+    const z = this.zonaAleasa(e);
+    if (this.text?.tabel) this.inchideTextul(true);
+    const n = copie(this.el.find((x) => x.id === e.id));
+    for (let i = z.i0; i <= z.i1; i++) for (let j = z.j0; j <= z.j1; j++) if (celOk(n, i, j)) n.cel[i][j] = fn(copie(n.cel[i][j]));
+    this.fa({ fel: "schimba", el: [this.masoara(n)] });
+  }
+  /** O schimbare a întregului tabel ales: `fn(copie) → copie`. */
+  peTabel(fn) {
+    const e = this.tabelulAles();
+    if (!e) return;
+    if (this.text?.tabel) this.inchideTextul(true);
+    const n = fn(copie(this.el.find((x) => x.id === e.id)));
+    if (n) this.fa({ fel: "schimba", el: [this.masoara(n)] });
+  }
+
+  /** Comenzile tabelului, din panou. */
+  tabel(fel, v) {
+    const e = this.tabelulAles();
+    if (!e) return;
+    const z = this.zonaAleasa(e);
+    if (fel === "orizontal") this.aliniazaText(v);
+    else if (fel === "vertical") this.peCelule((c) => { if (v === "m") delete c.av; else c.av = v; return c; });
+    else if (fel === "fundal") this.peCelule((c) => { if (v) c.bg = v; else delete c.bg; return c; });
+    else if (fel === "chenar") this.peTabel((n) => { n.ch = { ...n.ch, f: v }; return n; });
+    else if (fel === "chenar-culoare") this.peTabel((n) => { n.ch = { ...n.ch, c: v }; return n; });
+    else if (fel === "chenar-grosime") this.peTabel((n) => { n.ch = { ...n.ch, g: v }; return n; });
+    else if (fel === "rand") this.peTabel((n) => adaugaRand(n, v === "sus" ? z.i0 : z.i1 + 1));
+    else if (fel === "coloana") this.peTabel((n) => adaugaColoana(n, v === "stanga" ? z.j0 : z.j1 + 1));
+    else if (fel === "sterge-rand") {
+      if (e.cel.length <= z.i1 - z.i0 + 1) { this.fa({ fel: "scoate", id: [e.id] }); return; }
+      this.peTabel((n) => { for (let i = z.i1; i >= z.i0; i--) stergeRand(n, i); return n; });
+      this.celule = null;
+    } else if (fel === "sterge-coloana") {
+      if (e.col.length <= z.j1 - z.j0 + 1) { this.fa({ fel: "scoate", id: [e.id] }); return; }
+      this.peTabel((n) => { for (let j = z.j1; j >= z.j0; j--) stergeColoana(n, j); return n; });
+      this.celule = null;
+    } else if (fel === "imbina") {
+      if (z.i0 === z.i1 && z.j0 === z.j1) return;
+      this.peTabel((n) => imbina(n, z));
+      this.celule = { id: e.id, i0: z.i0, j0: z.j0, i1: z.i1, j1: z.j1 };
+    } else if (fel === "desparte") {
+      this.peTabel((n) => { for (let i = z.i0; i <= z.i1; i++) for (let j = z.j0; j <= z.j1; j++) desparte(n, i, j); return n; });
+    } else if (fel === "sterge") this.fa({ fel: "scoate", id: [e.id] });
+    this.cere();
+    this.o.laSchimbare?.();
+  }
+
+  /** Deschide editorul într-o celulă a tabelului. */
+  deschideCelula(e, i, j) {
+    if (!celOk(e, i, j)) return;
+    const L = this.tabelul(e);
+    const k = L.celule.find((x) => x.i === i && x.j === j);
+    if (!k) return;
+    const cel = e.cel[i][j];
+    const pad = L.pad;
+    this.selectate = new Set([e.id]);
+    this.celule = null;
+    const tabelCu = (model) => {
+      const cur = this.el.find((x) => x.id === e.id) || e;
+      const n = copie(cur);
+      const c = { ...n.cel[i][j], s: model.s };
+      if (model.r) c.r = model.r; else delete c.r;
+      if (model.p) c.p = model.p; else delete c.p;
+      n.cel[i][j] = c;
+      return this.masoara(n);
+    };
+    this.deschideEditorul({
+      wx: e.x + k.x + pad, wy: e.y + k.y + pad, model: cel, m: e.m, c: e.c, lat: Math.max(e.m, k.w - 2 * pad),
+      latFixa: true, aliniere: cel.ah || "l", tabel: { id: e.id }, celula: { i, j }, id: e.id,
+      laLive: (model) => this.o.laTrasare?.(tabelCu(model)),
+      laGata: (model, pastreaza) => {
+        if (!pastreaza) return;
+        const vechi = this.el.find((x) => x.id === e.id)?.cel?.[i]?.[j];
+        if (!vechi) return;
+        const schimbat = ["s", "r", "p"].some((x) => JSON.stringify(model[x] ?? (x === "s" ? "" : null)) !== JSON.stringify(vechi[x] ?? (x === "s" ? "" : null)));
+        if (schimbat) this.fa({ fel: "schimba", el: [tabelCu(model)] });
+      },
+    });
+  }
+  /** Tab / Shift+Tab: celula următoare ori cea dinainte (la capăt, un rând nou). */
+  celulaVecina(cu) {
+    const t = this.text;
+    if (!t?.tabel) return;
+    const id = t.tabel.id;
+    const { i, j } = t.celula;
+    this.inchideTextul(true);
+    let e = this.el.find((x) => x.id === id);
+    if (!e) return;
+    const nc = e.col.length, nr = e.cel.length;
+    let k = i * nc + j;
+    do { k += cu; } while (k >= 0 && k < nr * nc && !celOk(e, Math.floor(k / nc), k % nc));
+    if (k >= nr * nc) {
+      this.fa({ fel: "schimba", el: [this.masoara(adaugaRand(copie(e), nr))] });
+      e = this.el.find((x) => x.id === id);
+      k = nr * nc;
+    }
+    if (k < 0) return;
+    this.deschideCelula(e, Math.floor(k / nc), k % nc);
+  }
+
+  /* ---------- imaginile și exportul ---------- */
 
   /** O imagine lipită ori aleasă: micșorată cât să nu încarce tabla. */
   async lipesteImagine(fisier) {
@@ -927,7 +1522,7 @@ export class Plansa {
       }
       const z = this.zonaVazuta();
       const fw = Math.min(w, z.w * 0.7), fh = fw * h / w;
-      this.fa({ fel: "pune", el: [{ id: idNou(), t: "i", x: r1(z.x + (z.w - fw) / 2), y: r1(z.y + (z.h - fh) / 2), w: r1(fw), h: r1(fh), src }] });
+      this.fa({ fel: "pune", el: [{ id: idNou(), t: "i", x: prinde(z.x + (z.w - fw) / 2), y: prinde(z.y + (z.h - fh) / 2), w: r1(fw), h: r1(fh), src }] });
     } finally { URL.revokeObjectURL(url); }
   }
 
@@ -940,17 +1535,120 @@ export class Plansa {
     const s = Math.min(2, 4000 / Math.max(b.w, b.h));
     const c = document.createElement("canvas");
     c.width = Math.round(b.w * s); c.height = Math.round(b.h * s);
-    const veche = { ctx: this.ctx, vedere: this.vedere, W: this.W, H: this.H, sel: this.selectate };
+    const veche = { ctx: this.ctx, vedere: this.vedere, W: this.W, H: this.H };
     this.ctx = c.getContext("2d");
     this.vedere = { x: b.x, y: b.y, z: s };
     this.W = c.width; this.H = c.height;
-    this.selectate = new Set();
     this.pixel = 1;
     try { this.deseneaza(); } finally {
       this.pixel = 0;
-      Object.assign(this, { ctx: veche.ctx, vedere: veche.vedere, W: veche.W, H: veche.H, selectate: veche.sel });
+      Object.assign(this, { ctx: veche.ctx, vedere: veche.vedere, W: veche.W, H: veche.H });
       this.cere();
     }
     return c.toDataURL("image/png");
   }
+}
+
+/* ---------- tabelele: rânduri, coloane, îmbinări ---------- */
+/** Ancora celulei care acoperă (i, j). */
+function ancora(n, i, j) {
+  for (let a = 0; a <= i; a++) for (let b = 0; b <= j; b++) {
+    const c = n.cel[a]?.[b];
+    if (c && !c.x && a + (c.rs || 1) > i && b + (c.cs || 1) > j) return [a, b];
+  }
+  return [i, j];
+}
+function adaugaRand(n, la) {
+  const nc = n.col.length;
+  const rand = Array.from({ length: nc }, () => ({ s: "" }));
+  if (la > 0 && la < n.cel.length) {
+    for (let j = 0; j < nc; j++) {
+      const [a, b] = ancora(n, la, j);
+      if (a < la) {
+        rand[j] = { s: "", x: 1 };
+        if (b === j) n.cel[a][b].rs = (n.cel[a][b].rs || 1) + 1;
+      }
+    }
+  }
+  n.cel.splice(la, 0, rand);
+  n.rh.splice(la, 0, n.rh[Math.min(la, n.rh.length - 1)] || n.m * 2);
+  return n;
+}
+function adaugaColoana(n, la) {
+  const nr = n.cel.length;
+  const intre = la > 0 && la < n.col.length;
+  const ancore = intre ? n.cel.map((_, i) => ancora(n, i, la)) : [];
+  for (let i = 0; i < nr; i++) {
+    let nou = { s: "" };
+    if (intre) {
+      const [a, b] = ancore[i];
+      if (b < la) { nou = { s: "", x: 1 }; if (a === i) n.cel[a][b].cs = (n.cel[a][b].cs || 1) + 1; }
+    }
+    n.cel[i].splice(la, 0, nou);
+  }
+  n.col.splice(la, 0, n.col[Math.min(la, n.col.length - 1)] || n.m * 6);
+  return n;
+}
+function stergeRand(n, k) {
+  for (let j = 0; j < n.col.length; j++) {
+    const [a, b] = ancora(n, k, j);
+    if (b !== j) continue;
+    const c = n.cel[a][b];
+    if ((c.rs || 1) > 1) {
+      if (a === k) n.cel[k + 1][j] = { ...c, rs: c.rs - 1 };
+      else c.rs -= 1;
+    }
+  }
+  n.cel.splice(k, 1);
+  n.rh.splice(k, 1);
+}
+function stergeColoana(n, k) {
+  for (let i = 0; i < n.cel.length; i++) {
+    const [a, b] = ancora(n, i, k);
+    if (a !== i) continue;
+    const c = n.cel[a][b];
+    if ((c.cs || 1) > 1) {
+      if (b === k) n.cel[i][k + 1] = { ...c, cs: c.cs - 1 };
+      else c.cs -= 1;
+    }
+  }
+  for (const r of n.cel) r.splice(k, 1);
+  n.col.splice(k, 1);
+}
+function imbina(n, z) {
+  const texte = [];
+  for (let i = z.i0; i <= z.i1; i++) for (let j = z.j0; j <= z.j1; j++) {
+    const c = n.cel[i][j];
+    if (c && !c.x && c.s) texte.push(c);
+  }
+  const prima = { ...n.cel[z.i0][z.j0] };
+  /* Textele tuturor celulelor se pun unul sub altul, în ancoră. */
+  if (texte.length > 1) {
+    let s = "";
+    const r = [], p = [];
+    texte.forEach((c, k) => {
+      if (k) { s += "\n"; r.push([1, 0]); }
+      s += c.s;
+      r.push(...bucatile(c));
+      p.push(...paragrafele(c).map((x) => x.p));
+    });
+    prima.s = s;
+    const rr = strange(r);
+    if (rr) prima.r = rr; else delete prima.r;
+    if (p.some(Boolean)) prima.p = p; else delete prima.p;
+  } else if (texte.length === 1) Object.assign(prima, { s: texte[0].s, r: texte[0].r, p: texte[0].p });
+  prima.rs = z.i1 - z.i0 + 1; prima.cs = z.j1 - z.j0 + 1;
+  if (prima.rs === 1) delete prima.rs;
+  if (prima.cs === 1) delete prima.cs;
+  for (const k of ["r", "p"]) if (prima[k] == null) delete prima[k];
+  for (let i = z.i0; i <= z.i1; i++) for (let j = z.j0; j <= z.j1; j++) n.cel[i][j] = { s: "", x: 1 };
+  n.cel[z.i0][z.j0] = prima;
+  return n;
+}
+function desparte(n, i, j) {
+  const c = n.cel[i]?.[j];
+  if (!c || c.x || ((c.rs || 1) === 1 && (c.cs || 1) === 1)) return;
+  for (let a = i; a < i + (c.rs || 1); a++) for (let b = j; b < j + (c.cs || 1); b++) if (n.cel[a]?.[b]) n.cel[a][b] = { s: "" };
+  delete c.rs; delete c.cs;
+  n.cel[i][j] = c;
 }
