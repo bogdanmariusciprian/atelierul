@@ -18,7 +18,8 @@
 // cu același nume (ori e întrebat dacă s-o facă).
 //
 // LIVE. Pe canalul clasei pleacă: `stare` (unde e profesorul; repetată la
-// 3 secunde, ca un elev intrat târziu să afle singur), `op` (o schimbare a
+// 3 secunde, ca un elev intrat târziu să afle singur), `material` (ce s-a
+// apăsat și derulat în lecția HTML, ca la telecomanda Liceului), `op` (o schimbare a
 // desenului, cu numărul ei, `rev`), `tras` (desenul în curs, ca să se vadă
 // cum scrie) și `structura` (s-au schimbat lecțiile, paginile ori materialul:
 // se citesc din nou). Cine primește o `op` care nu urmează numărului lui (a
@@ -32,6 +33,12 @@ import {
   intraCuCodul, intraCuClasa, paginileCuCod, materialulCuCod, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
 import { Plansa, FUNDALURI, BOLD, ITALIC, SUBLINIAT } from "./tabla-alba-plansa.js";
+/* Puntea spre lecția HTML din fila Material e cea din modulul Liceu: ascultă
+   din afară apăsările, tastele, gesturile și derularea, iar la elev le reface
+   în același loc (vezi `fisa-punte.js` și `jurnal.js`). */
+import { puntea } from "../../highschool/scripts/fisa-punte.js";
+import { cePunem } from "../../highschool/scripts/jurnal.js";
+import { cuAcelasiZar } from "../../highschool/scripts/zarul.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -164,7 +171,7 @@ function arataFila() {
   filaMaterial.hidden = !are || fila !== "material";
   golEl.hidden = are;
   if (are && fila === "tabla") plansa.marime();
-  if (are && fila === "material") deseneazaMaterialul();
+  if (are && fila === "material") { deseneazaMaterialul(); if (!admin && mod === "conduc") aplicaMaterial(); }
 }
 
 /* =========================================================
@@ -415,7 +422,7 @@ function stareaMea() {
     lectie: lectie?.id || null, pagina: pagini[pag]?.id || null, tab: fila, mod,
     /* O planșă încă nedesenată (fila ascunsă) n-are mărime: se trimite ce era. */
     vedere: plansa.W > 50 && plansa.H > 50 ? plansa.zonaVazuta() : clasa?.stare?.vedere || null,
-    derulare: derulareaMea, rev: pagini[pag]?.desen?.rev || 0,
+    rev: pagini[pag]?.desen?.rev || 0,
   };
 }
 let ceasStare = null;
@@ -434,7 +441,7 @@ function stareAcum() {
   ceasStareBaza = setTimeout(() => schimbaClasa(clasa.id, { stare: s }), 1500);
 }
 /* Repetată, ca un elev intrat la mijlocul orei să afle singur unde suntem. */
-setInterval(() => { if (admin && clasa) trimite("stare", stareaMea()); }, 3000);
+setInterval(() => { if (admin && clasa) { trimite("stare", stareaMea()); trimiteMaterial(); } }, 3000);
 
 function opMea(op) {
   const p = pagini[pag];
@@ -501,6 +508,9 @@ function laMesaj(fel, m) {
     if (m.el?.t === "laser") { plansa.laser = m.el; plansa.strain = null; }
     else { plansa.strain = m.el && typeof m.el === "object" ? m.el : null; if (!m.el) plansa.laser = null; }
     plansa.cere();
+  } else if (fel === "material") {
+    ultimMaterial = m;
+    if (mod === "conduc" && fila === "material") aplicaMaterial();
   } else if (fel === "reia") reiaPaginile();
   else if (fel === "structura") reiaTot();
 }
@@ -509,6 +519,10 @@ async function aplicaStarea(s) {
   prof = s || {};
   const veche = mod;
   mod = s.mod === "liber" ? "liber" : "conduc";
+  /* Din „Liber" înapoi la „Conduc eu": lecția HTML a elevului poate să fi
+     plecat în altă parte, deci se ia de la capăt după jurnalul profesorului. */
+  if (veche === "liber" && mod === "conduc") urm.dinNou = true;
+  filaMaterial.classList.toggle("ta-urmeaza", !admin && mod === "conduc");
   if (s.lectie && s.lectie !== lectie?.id) {
     const l = clasa.lectii.find((x) => x.id === s.lectie);
     if (!l) { await reiaTot(); return; }
@@ -522,7 +536,6 @@ async function aplicaStarea(s) {
     const i = pagini.findIndex((p) => p.id === s.pagina);
     if (i < 0 && s.pagina) { reiaPaginile(); }
     else if (i >= 0 && i !== pag) { pastreazaPagina(); pag = i; incarcaPagina(); }
-    if (fila === "material" && typeof s.derulare === "number") deruleazaLa(s.derulare);
   }
   if (urmaresc && s.vedere && fila === "tabla" && (mod === "conduc" || s.pagina === pagini[pag]?.id)) plansa.arataZona(s.vedere);
   /* A pierdut ceva (un mesaj căzut)? Numărul paginii profesorului o spune. */
@@ -579,9 +592,19 @@ async function deschideLectiaVizitator(l) {
 /* =========================================================
    MATERIALUL
    ========================================================= */
-let derulareaMea = 0;
-let ceasDerulare = null;
+/* Fiecare deschidere a materialului are numărul ei: una pornită înainte, care
+   încă aștepta fișierul, se lasă baltă. Altfel, două deschideri din aceeași
+   clipă puneau două cadre unul sub altul. */
 let materialAfisat = "";
+let randMaterial = 0;
+let cadruMat = null;
+let punte = null;
+const MAX_JURNAL = 2000;
+/* La profesor: ce s-a făcut în material de la deschiderea lui. */
+const jur = { cheie: "", jurnal: [], derulari: {}, slide: 0 };
+/* La elev: ce s-a refăcut deja, ce e de refăcut după o reîncărcare. */
+const urm = { aplicate: [], deRefacut: null, dinNou: false };
+let ultimMaterial = null;
 
 async function deseneazaMaterialul() {
   if (!lectie) return;
@@ -594,12 +617,16 @@ async function deseneazaMaterialul() {
       <button type="button" class="ta-btn" data-m="pagina">Pagină de pe sit</button>
       ${m.fel ? `<button type="button" class="ta-btn ta-btn--rosu" data-m="scoate">Scoate</button>` : ""}
     </div>` : "";
-  if (materialAfisat === cheie && filaMaterial.querySelector("iframe")) {
+  if (materialAfisat === cheie) {
     const u = filaMaterial.querySelector(".ta-mat-unelte");
     if (u) u.outerHTML = unelteM;
     return;
   }
   materialAfisat = cheie;
+  const nr = ++randMaterial;
+  punte?.uita?.();
+  punte = null;
+  cadruMat = null;
   if (!m.fel) {
     filaMaterial.innerHTML = `${unelteM}<div class="ta-mat-gol">${admin
       ? "Pune aici lecția ta HTML: o urci ca fișier ori alegi o pagină a sitului."
@@ -616,38 +643,110 @@ async function deseneazaMaterialul() {
     let html = materiale.get(lectie.id);
     if (html == null) {
       html = admin ? await materialulAdmin(lectie.id) : await materialulCuCod(cod, lectie.id);
+      if (nr !== randMaterial) return;
       if (html == null) { filaMaterial.querySelector(".ta-mat-gol").textContent = "Materialul n-a putut fi adus."; return; }
       materiale.set(lectie.id, html);
     }
-    if (materialAfisat !== cheie) return;
-    cadru.srcdoc = html;
+    if (nr !== randMaterial) return;
+    /* Același zar la profesor și la elevi: o lecție care amestecă ceva la
+       întâmplare se așază la fel pe toate ecranele, iar apăsările nimeresc. */
+    cadru.srcdoc = cuAcelasiZar(html, lectie.id);
   } else return;
-  filaMaterial.querySelector(".ta-mat-gol")?.remove();
+  filaMaterial.querySelectorAll(".ta-mat-gol, iframe").forEach((x) => x.remove());
   filaMaterial.append(cadru);
-  cadru.addEventListener("load", () => legaDerularea(cadru));
+  cadruMat = cadru;
+  cadru.addEventListener("load", () => { if (cadru === cadruMat) legaPuntea(cadru, cheie); });
 }
 
-/** Derularea materialului: la admin pleacă, la vizitator vine. */
-function legaDerularea(cadru) {
-  let w;
-  try { w = cadru.contentWindow; void w.document; } catch { return; }
-  const el = () => w.document.scrollingElement || w.document.documentElement;
+/** La fiecare încărcare a materialului: la profesor ascultă, la elev reface. */
+function legaPuntea(cadru, cheie) {
+  punte?.uita?.();
+  punte = puntea(cadru);
   if (admin) {
-    w.addEventListener("scroll", () => {
-      const s = el();
-      derulareaMea = Math.round((s.scrollTop / Math.max(1, s.scrollHeight - s.clientHeight)) * 10000) / 10000;
-      clearTimeout(ceasDerulare);
-      ceasDerulare = setTimeout(stareAcum, 120);
-    }, { passive: true });
-  } else if (mod === "conduc" && typeof prof.derulare === "number") deruleazaLa(prof.derulare);
+    jur.cheie = cheie;
+    jur.jurnal = [];
+    jur.derulari = {};
+    jur.slide = punte.slide();
+    const inJurnal = (rand) => {
+      if (jur.jurnal.length >= MAX_JURNAL) return;
+      jur.jurnal.push(rand);
+      trimiteMaterialDupaApasare();
+    };
+    punte.pePunere(inJurnal);
+    punte.pePunereGest?.(inJurnal);
+    punte.pePunereTasta?.(inJurnal);
+    punte.pePunereInchidere?.(inJurnal);
+    punte.pePunereDerulare?.((cale, loc) => { jur.derulari[cale] = loc; trimiteDerularea(); });
+    trimiteMaterial();
+    return;
+  }
+  punte.ecranulPlinRamaneAlTau();
+  if (urm.deRefacut) {
+    const lista = urm.deRefacut;
+    urm.deRefacut = null;
+    lista.forEach((c) => punte.apasa(c));
+    urm.aplicate = lista.slice();
+  } else urm.aplicate = [];
+  if (mod === "conduc") aplicaMaterial();
 }
-function deruleazaLa(p) {
-  const cadru = filaMaterial.querySelector("iframe");
+
+/* ---------- la profesor: ce pleacă ---------- */
+function trimiteMaterial() {
+  if (!admin || !jur.cheie || jur.cheie !== materialAfisat || !punte) return;
+  jur.slide = punte.slide();
+  trimite("material", { lectie: lectie?.id, cheie: jur.cheie, slide: jur.slide, jurnal: jur.jurnal, derulari: jur.derulari });
+}
+/* Apăsarea e prinsă înainte s-o facă lecția; starea pleacă după, cu slide-ul
+   ei adevărat (ca la telecomanda Liceului). */
+let ceasApasare = null;
+function trimiteMaterialDupaApasare() {
+  if (ceasApasare !== null) return;
+  ceasApasare = setTimeout(() => { ceasApasare = null; trimiteMaterial(); }, 0);
+}
+let ceasDerulare = null, ultimaDerulare = 0;
+function trimiteDerularea() {
+  clearTimeout(ceasDerulare);
+  const ramas = 120 - (Date.now() - ultimaDerulare);
+  const pleaca = () => { ultimaDerulare = Date.now(); trimiteMaterial(); };
+  if (ramas <= 0) pleaca(); else ceasDerulare = setTimeout(pleaca, ramas);
+}
+/* Slide-ul schimbat altfel decât prin apăsare (din cod, la un temporizator):
+   se întreabă lecția de trei ori pe secundă. */
+setInterval(() => {
+  if (admin && punte && fila === "material" && jur.cheie === materialAfisat && punte.slide() !== jur.slide) trimiteMaterial();
+}, 350);
+
+/* ---------- la elev: ce vine ---------- */
+function aplicaMaterial() {
+  const m = ultimMaterial;
+  if (!m || admin || !punte || urm.deRefacut || !lectie || m.lectie !== lectie.id || m.cheie !== materialAfisat) return;
+  const lista = Array.isArray(m.jurnal) ? m.jurnal.filter((x) => typeof x === "string") : [];
+  if (urm.dinNou) { urm.dinNou = false; refaDeLaCapat(lista); return; }
+  const ce = cePunem(urm.aplicate, lista);
+  if (ce.fel === "de-la-capat") { refaDeLaCapat(lista); return; }
+  if (ce.fel === "coada") {
+    for (let i = ce.deLa; i < lista.length; i++) punte.apasa(lista[i]);
+    urm.aplicate = lista.slice();
+  }
+  const altSlide = punte.fel !== "fara" && Number.isInteger(m.slide) && punte.slide() !== m.slide;
+  if (altSlide) punte.laSlide(m.slide);
+  const deruleaza = () => {
+    if (!punte?.deruleaza) return;
+    for (const [cale, loc] of Object.entries(m.derulari || {}).slice(0, 30)) punte.deruleaza(cale, loc);
+  };
+  deruleaza();
+  if (altSlide) setTimeout(deruleaza, 350);
+}
+/** Lecția se ia de la început și se refac toate apăsările, după încărcare. */
+function refaDeLaCapat(lista) {
+  const cadru = cadruMat;
+  if (!cadru) return;
+  urm.deRefacut = lista.slice();
+  urm.aplicate = [];
   try {
-    const d = cadru?.contentWindow?.document;
-    const s = d && (d.scrollingElement || d.documentElement);
-    if (s) s.scrollTop = p * Math.max(0, s.scrollHeight - s.clientHeight);
-  } catch { /* altă origine: nu se poate */ }
+    if (cadru.srcdoc) cadru.srcdoc = cadru.srcdoc;
+    else cadru.contentWindow.location.replace(cadru.contentWindow.location.href.split("#")[0]);
+  } catch { urm.deRefacut = null; }
 }
 
 filaMaterial.addEventListener("click", async (e) => {
@@ -679,7 +778,6 @@ async function puneMaterialul(material, html) {
   lectie.material = material;
   if (html != null) materiale.set(lectie.id, html); else materiale.delete(lectie.id);
   materialAfisat = "";
-  derulareaMea = 0;
   deseneazaMaterialul();
   trimite("structura", {});
   arataVestea("Materialul s-a salvat.");
@@ -838,7 +936,6 @@ async function deschideLectia(l, stare = null) {
   pag = i >= 0 ? i : 0;
   fila = stare?.tab === "material" ? "material" : "tabla";
   materialAfisat = "";
-  derulareaMea = 0;
   pune(CHEIE_UNDE, JSON.stringify({ clasa: clasa.id, lectie: l.id }));
   arataFila();
   incarcaPagina();
