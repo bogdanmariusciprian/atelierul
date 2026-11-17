@@ -51,6 +51,7 @@ button { font: inherit; color: inherit; }
 .ta-g { flex: 1 1 auto !important; }
 
 .ta-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 38px;
   padding: 6px 12px;
   border: 1px solid var(--line);
@@ -84,7 +85,7 @@ button { font: inherit; color: inherit; }
 /* Cine vede tabla clasei: Automat / Deschisă / Închisă (0116). */
 .ta-acces-bara button.is-on.ta-acces--deschisa { color: #15803d; }
 .ta-acces-bara button.is-on.ta-acces--inchisa { color: var(--red); }
-.ta-acces { width: 34px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: #fffcf9; cursor: pointer; }
+.ta-acces { display: grid; place-items: center; width: 34px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: #fffcf9; cursor: pointer; }
 .ta-acces--deschisa { border-color: #16a34a; background: #ecfdf3; }
 .ta-acces--inchisa { border-color: #fecaca; background: #fef2f2; }
 .ta-stare { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -119,7 +120,7 @@ button { font: inherit; color: inherit; }
 .ta-cl.is-on { border-color: var(--accent); }
 .ta-cl__cap { display: flex; align-items: center; gap: 4px; padding: 6px; }
 .ta-cl__nume { flex: 1; min-height: 36px; padding: 4px 8px; border: 0; background: none; text-align: left; font-weight: 700; cursor: pointer; }
-.ta-mic { width: 32px; height: 32px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.ta-mic { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
 .ta-mic:hover { border-color: var(--line); color: var(--accent); }
 .ta-mic--rosu:hover { color: var(--red); }
 .ta-lec { list-style: none; margin: 0; padding: 0 6px 8px; }
@@ -155,7 +156,9 @@ button { font: inherit; color: inherit; }
   background: none; cursor: pointer;
   font-size: 19px; line-height: 1;
 }
-.ta-u:hover, .ta-gros:hover { background: #f6f1eb; }
+.ta-u { display: grid; place-items: center; color: #3f3a33; }
+.ta-u svg, .ta-pagini svg, .ta-zoom svg, .ta-bara svg { display: block; }
+.ta-u:hover, .ta-gros:hover { background: #f6f1eb; color: var(--ink); }
 .ta-u.is-on, .ta-gros.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .ta-u:disabled { opacity: .3; cursor: default; background: none; }
 .ta-u--rosu:hover { color: var(--red); }
@@ -205,7 +208,7 @@ button { font: inherit; color: inherit; }
   box-shadow: 0 8px 24px -14px rgba(31, 36, 48, .35);
 }
 .ta-pagini button {
-  flex: none; min-width: 38px; height: 38px; padding: 0 8px;
+  flex: none; display: grid; place-items: center; min-width: 38px; height: 38px; padding: 0 8px;
   border: 1px solid transparent; border-radius: 9px; background: none; cursor: pointer;
 }
 .ta-pagini button:hover:not(:disabled) { background: #f6f1eb; }
@@ -221,7 +224,7 @@ button { font: inherit; color: inherit; }
   background: rgba(255, 255, 255, .96);
   box-shadow: 0 8px 24px -14px rgba(31, 36, 48, .35);
 }
-.ta-zoom button { min-width: 38px; height: 38px; padding: 0 6px; border: 0; border-radius: 9px; background: none; cursor: pointer; font-variant-numeric: tabular-nums; }
+.ta-zoom button { display: grid; place-items: center; min-width: 38px; height: 38px; padding: 0 6px; border: 0; border-radius: 9px; background: none; cursor: pointer; font-variant-numeric: tabular-nums; }
 .ta-zoom button:hover { background: #f6f1eb; }
 
 @media (max-width: 700px) {
@@ -319,3 +322,6 @@ button { font: inherit; color: inherit; }
   box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .5);
 }
 .ta-veste.is-eroare { background: var(--red); }
+
+.ta-mod button svg, .ta-mat-unelte svg, .ta-lec__titlu svg { display: inline-block; vertical-align: -2px; }
+.ta-mod button { display: inline-flex; align-items: center; gap: 5px; }

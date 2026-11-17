@@ -34,6 +34,7 @@ import {
   paginileAdmin, paginaNoua, salveazaPagina, stergePagina, materialulAdmin, setarileMele, salveazaSetarile,
   tableDeschise, intraCuClasa, tablaVizibila, paginileClasei, materialulClasei, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
+import { ic } from "./tabla-alba-icone.js";
 import { Plansa, FUNDALURI, CHENARE, LISTE, BOLD, ITALIC, SUBLINIAT, inchisa } from "./tabla-alba-plansa.js";
 /* Puntea spre lecția HTML din fila Material e cea din modulul Liceu: ascultă
    din afară apăsările, tastele, gesturile și derularea, iar la elev le reface
@@ -112,14 +113,14 @@ function deseneazaBara() {
       title="${urmaresc ? "Planșa ta urmează ce vede profesorul" : "Te uiți singur; apasă ca să urmezi iar profesorul"}">${urmaresc ? "◉ Urmăresc" : "○ Mă uit singur"}</button>` : "";
   const stare = clasa ? `<span class="ta-stare" data-fel="${legat ? "live" : "eroare"}">${legat ? "live" : "fără legătură"}</span>` : "";
   bara.innerHTML = `
-    ${admin ? `<button type="button" class="ta-btn ta-btn--panou" data-bara="panou" aria-expanded="${!panou.hidden}" title="Clasele și lecțiile">☰ Clase</button>` : `<a class="ta-acasa" href="/" title="Atelierul">◂</a>`}
+    ${admin ? `<button type="button" class="ta-btn ta-btn--panou" data-bara="panou" aria-expanded="${!panou.hidden}" title="Clasele și lecțiile">${ic("panou", 18)} Clase</button>` : `<a class="ta-acasa" href="/" title="Atelierul">◂</a>`}
     <span class="ta-marca">Tabla</span>
     <div class="ta-titlu">${titlu}</div>
     ${file}
     <span class="ta-g"></span>
     ${moduri}${codul}${urmeaza}${stare}
     ${!admin && clasa ? `<button type="button" class="ta-btn" data-bara="iesi" title="Ieși din clasa asta">Ieși</button>` : ""}
-    <button type="button" class="ta-btn" data-bara="ecran" title="Pe tot ecranul">⛶</button>`;
+    <button type="button" class="ta-btn" data-bara="ecran" title="Pe tot ecranul">${ic("potriveste", 18)}</button>`;
 }
 
 bara.addEventListener("click", async (e) => {
@@ -175,24 +176,19 @@ function arataFila() {
 /* =========================================================
    UNELTELE (adminul)
    ========================================================= */
-/* Selecția: un dreptunghi punctat, nu o săgeată (săgeata se confunda cu
-   unealta de săgeți). */
-const SEL_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"
-  fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3.2 2.6"/></svg>`;
-const TABEL_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"
-  fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15M15 4.5v15" stroke="currentColor" stroke-width="1.4"/></svg>`;
+/* Iconițele: un singur set, același stil (vezi `tabla-alba-icone.js`). */
 const UNELTE = [
-  ["selectie", SEL_SVG, "Selecție (V): alegi, muți, mărești; la text, marginea din dreapta îi alege lățimea"],
-  ["mana", "✋", "Mâna (H): tragi planșa"],
-  ["creion", "✎", "Creion (P)"],
-  ["marker", "▬", "Marker de evidențiere (M)"],
-  ["radiera", "⌫", "Radieră (E)"],
-  ["text", "T", "Text (T). Alt+Enter: un text nou chiar dedesubt"],
-  ["linie", "╱", "Linie (L); cu Shift, dreaptă"],
-  ["sageata", "➚", "Săgeată (A)"],
-  ["dreptunghi", "▭", "Dreptunghi (R)"],
-  ["elipsa", "◯", "Elipsă (O)"],
-  ["laser", "✦", "Laser (K): arată, nu rămâne"],
+  ["selectie", ic("selectie"), "Selecție (V): alegi, muți, mărești; la text, marginea din dreapta îi alege lățimea"],
+  ["mana", ic("mana"), "Mâna (H): tragi planșa"],
+  ["creion", ic("creion"), "Creion (P)"],
+  ["marker", ic("marker"), "Marker de evidențiere (M)"],
+  ["radiera", ic("radiera"), "Radieră (E)"],
+  ["text", ic("text"), "Text (T). Alt+Enter: un text nou chiar dedesubt"],
+  ["linie", ic("linie"), "Linie (L); cu Shift, dreaptă"],
+  ["sageata", ic("sageata"), "Săgeată (A)"],
+  ["dreptunghi", ic("dreptunghi"), "Dreptunghi (R)"],
+  ["elipsa", ic("elipsa"), "Elipsă (O)"],
+  ["laser", ic("laser"), "Laser (K): arată, nu rămâne"],
 ];
 const CULORI = ["#1f2430", "#c2410c", "#dc2626", "#2563eb", "#16a34a", "#7c3aed", "#ca8a04", "#ffffff"];
 const GROSIMI = [[2, "subțire", 20], [4, "mijlocie", 28], [8, "groasă", 44]];
@@ -253,34 +249,34 @@ function deseneazaUneltele() {
     `<button type="button" class="ta-u${cls ? ` ${cls}` : ""}${on ? " is-on" : ""}" ${data} title="${titlu}" aria-label="${titlu}"${dez ? " disabled" : ""}>${cont}</button>`;
   unelte.innerHTML = `
     <div class="ta-grup">${UNELTE.map(([u, i, t]) => buton("", `data-u="${u}"`, t, i, plansa.unealta === u)).join("")}
-      ${buton("", 'data-a="tabel-nou"', "Tabel nou", TABEL_SVG, panouDeschis === "tabelNou")}</div>
+      ${buton("", 'data-a="tabel-nou"', "Tabel nou", ic("tabel"), panouDeschis === "tabelNou")}</div>
     <div class="ta-grup ta-culori">${CULORI.map((c) => `<button type="button" class="ta-cul${plansa.culoare === c ? " is-on" : ""}" data-c="${c}" style="--c:${c}" title="${c}" aria-label="Culoarea ${c}"></button>`).join("")}
       <label class="ta-cul ta-cul--alta" title="Altă culoare"><input type="color" value="${plansa.culoare}" data-alta></label></div>
     <div class="ta-grup">${GROSIMI.map(([g, t]) => `<button type="button" class="ta-gros${plansa.grosime === g ? " is-on" : ""}" data-g="${g}" title="Linie ${t}"><i style="--g:${g}px"></i></button>`).join("")}</div>
     <div class="ta-grup">
-      ${buton("", 'data-a="inapoi"', "Înapoi (Ctrl+Z)", "↶", false, !plansa.inapoi.length)}
-      ${buton("", 'data-a="inainte"', "Înainte (Ctrl+Y)", "↷", false, !plansa.inainte.length)}
-      ${sel ? `${buton("", 'data-a="fata"', "În față, peste celelalte (Ctrl+])", "⬒")}
-      ${buton("", 'data-a="spate"', "În spate, sub celelalte, și sub text (Ctrl+[)", "⬓")}
-      ${buton("", 'data-a="dubleaza"', "Dublează selecția (Ctrl+D)", "⧉")}
-      ${buton("ta-u--rosu", 'data-a="sterge"', "Șterge selecția (Delete)", "🗑")}` : ""}
+      ${buton("", 'data-a="inapoi"', "Înapoi (Ctrl+Z)", ic("inapoi"), false, !plansa.inapoi.length)}
+      ${buton("", 'data-a="inainte"', "Înainte (Ctrl+Y)", ic("inainte"), false, !plansa.inainte.length)}
+      ${sel ? `${buton("", 'data-a="fata"', "În față, peste celelalte (Ctrl+])", ic("fata"))}
+      ${buton("", 'data-a="spate"', "În spate, sub celelalte, și sub text (Ctrl+[)", ic("spate"))}
+      ${buton("", 'data-a="dubleaza"', "Dublează selecția (Ctrl+D)", ic("dubleaza"))}
+      ${buton("ta-u--rosu", 'data-a="sterge"', "Șterge selecția (Delete)", ic("sterge"))}` : ""}
     </div>
     <div class="ta-grup">
-      ${buton("", 'data-a="imagine"', "Pune o imagine (merge și Ctrl+V)", "🖼")}
-      ${buton("", 'data-a="fundal"', "Fundalul paginii: culoarea și liniile", "▦", panouDeschis === "fundal")}
-      ${buton("", 'data-a="png"', "Salvează pagina ca imagine", "⤓")}
-      ${buton("ta-u--rosu", 'data-a="goleste"', "Golește pagina", "✕")}
+      ${buton("", 'data-a="imagine"', "Pune o imagine (merge și Ctrl+V)", ic("imagine"))}
+      ${buton("", 'data-a="fundal"', "Fundalul paginii: culoarea și liniile", ic("fundal"), panouDeschis === "fundal")}
+      ${buton("", 'data-a="png"', "Salvează pagina ca imagine", ic("descarca"))}
+      ${buton("ta-u--rosu", 'data-a="goleste"', "Golește pagina", ic("goleste"))}
     </div>`;
   /* Formatarea textului, ca în Word: o bară orizontală, sus. */
   formatBara.hidden = false;
   formatBara.innerHTML = `<div class="ta-grup ta-format" title="Pe textul pe care îl scrii ori pe textele (celulele) alese">
-      ${buton("", `data-f="${BOLD}"`, "Bold (Ctrl+B)", "<b>B</b>")}
-      ${buton("", `data-f="${ITALIC}"`, "Italic (Ctrl+I)", "<i>I</i>")}
-      ${buton("", `data-f="${SUBLINIAT}"`, "Subliniat (Ctrl+U)", "<u>U</u>")}
+      ${buton("", `data-f="${BOLD}"`, "Bold (Ctrl+B)", ic("bold"))}
+      ${buton("", `data-f="${ITALIC}"`, "Italic (Ctrl+I)", ic("italic"))}
+      ${buton("", `data-f="${SUBLINIAT}"`, "Subliniat (Ctrl+U)", ic("subliniat"))}
       ${ALINIERI.map(([a, i, t]) => buton("ta-u--mic", `data-al="${a}"`, t, i)).join("")}
-      ${buton("", 'data-a="liste"', "Liste: buline, numere, litere; nivelul și distanța", "☷", panouDeschis === "liste")}
-      ${buton("", 'data-niv="-1"', "Mai puțin înăuntru (Shift+Tab)", "⇤")}
-      ${buton("", 'data-niv="1"', "Mai înăuntru (Tab)", "⇥")}
+      ${buton("", 'data-a="liste"', "Liste: buline, numere, litere; nivelul și distanța", ic("liste"), panouDeschis === "liste")}
+      ${buton("", 'data-niv="-1"', "Mai puțin înăuntru (Shift+Tab)", ic("afara"))}
+      ${buton("", 'data-niv="1"', "Mai înăuntru (Tab)", ic("inauntru"))}
     </div>`;
   deseneazaPanoulLateral();
 }
@@ -512,10 +508,10 @@ function arataZoom() {
   const p = zoomEl.querySelector("[data-z='real']");
   if (p) p.textContent = `${Math.round(plansa.vedere.z * 100)}%`;
 }
-zoomEl.innerHTML = `<button type="button" data-z="minus" title="Mai mic">−</button>
+zoomEl.innerHTML = `<button type="button" data-z="minus" title="Mai mic">${ic("minus", 18)}</button>
   <button type="button" data-z="real" title="Mărimea reală">100%</button>
-  <button type="button" data-z="plus" title="Mai mare">+</button>
-  <button type="button" data-z="tot" title="Tot desenul pe ecran">⤢</button>`;
+  <button type="button" data-z="plus" title="Mai mare">${ic("plus", 18)}</button>
+  <button type="button" data-z="tot" title="Tot desenul pe ecran">${ic("potriveste", 18)}</button>`;
 zoomEl.addEventListener("click", (e) => {
   const z = e.target.closest("[data-z]")?.dataset.z;
   if (!z) return;
@@ -532,11 +528,11 @@ zoomEl.addEventListener("click", (e) => {
 function deseneazaPaginile() {
   const poate = admin || mod === "liber";
   paginiEl.innerHTML = `
-    <button type="button" data-p="inapoi" title="Pagina dinainte"${poate && pag > 0 ? "" : " disabled"}>‹</button>
+    <button type="button" data-p="inapoi" title="Pagina dinainte"${poate && pag > 0 ? "" : " disabled"}>${ic("stanga", 18)}</button>
     ${pagini.map((_, i) => `<button type="button" class="ta-nr${i === pag ? " is-on" : ""}" data-p="${i}"${poate || i === pag ? "" : " disabled"}>${i + 1}</button>`).join("")}
-    <button type="button" data-p="inainte" title="Pagina următoare"${poate && pag < pagini.length - 1 ? "" : " disabled"}>›</button>
-    ${admin ? `<button type="button" data-p="noua" title="Pagină nouă">＋</button>
-      ${pagini.length > 1 ? `<button type="button" data-p="sterge" class="ta-p-sterge" title="Șterge pagina asta">🗑</button>` : ""}` : ""}`;
+    <button type="button" data-p="inainte" title="Pagina următoare"${poate && pag < pagini.length - 1 ? "" : " disabled"}>${ic("dreapta", 18)}</button>
+    ${admin ? `<button type="button" data-p="noua" title="Pagină nouă">${ic("paginaNoua", 18)}</button>
+      ${pagini.length > 1 ? `<button type="button" data-p="sterge" class="ta-p-sterge" title="Șterge pagina asta">${ic("sterge", 18)}</button>` : ""}` : ""}`;
 }
 paginiEl.addEventListener("click", async (e) => {
   const p = e.target.closest("[data-p]");
@@ -790,7 +786,7 @@ async function deseneazaMaterialul() {
   const m = lectie.material || {};
   const cheie = `${lectie.id}|${m.fel || ""}|${m.adresa || m.nume || ""}`;
   const unelteM = admin ? `<div class="ta-mat-unelte">
-      <span>${m.fel === "fisier" ? `📄 ${esc(m.nume || "lecția.html")}` : m.fel === "pagina" ? `🔗 ${esc(m.adresa)}` : "Lecția n-are încă material."}</span>
+      <span>${m.fel === "fisier" ? `${ic("fisier", 16)} ${esc(m.nume || "lecția.html")}` : m.fel === "pagina" ? `${ic("legatura", 16)} ${esc(m.adresa)}` : "Lecția n-are încă material."}</span>
       <span class="ta-g"></span>
       <button type="button" class="ta-btn" data-m="fisier">${m.fel === "fisier" ? "Înlocuiește fișierul" : "Urcă o lecție .html"}</button>
       <button type="button" class="ta-btn" data-m="pagina">Pagină de pe sit</button>
@@ -975,14 +971,14 @@ function deseneazaPanoul() {
           <button type="button" class="ta-cl__nume" data-c="deschide" data-id="${c.id}">${esc(c.nume)}</button>
           ${(() => { const [a, i, n, t] = ACCES.find((x) => x[0] === (c.acces || "automat")); return `<button type="button"
             class="ta-acces ta-acces--${a}" data-c="acces" data-id="${c.id}" title="${n}: ${t} Apasă ca s-o treci mai departe.">${i}</button>`; })()}
-          <button type="button" class="ta-mic" data-c="schimba" data-id="${c.id}" title="Numele clasei">✎</button>
-          <button type="button" class="ta-mic ta-mic--rosu" data-c="sterge" data-id="${c.id}" title="Șterge clasa">🗑</button>
+          <button type="button" class="ta-mic" data-c="schimba" data-id="${c.id}" title="Numele clasei">${ic("creion", 16)}</button>
+          <button type="button" class="ta-mic ta-mic--rosu" data-c="sterge" data-id="${c.id}" title="Șterge clasa">${ic("sterge", 16)}</button>
         </div>
         ${clasa?.id === c.id ? `<ul class="ta-lec">${c.lectii.map((l) => `<li class="${lectie?.id === l.id ? "is-on" : ""}">
-            <button type="button" class="ta-lec__titlu" data-l="deschide" data-id="${l.id}">${esc(l.titlu)}${l.material?.fel ? ` <small title="Are material">📄</small>` : ""}</button>
-            <button type="button" class="ta-mic" data-l="sus" data-id="${l.id}" title="Mai sus">↑</button>
-            <button type="button" class="ta-mic" data-l="schimba" data-id="${l.id}" title="Titlul">✎</button>
-            <button type="button" class="ta-mic ta-mic--rosu" data-l="sterge" data-id="${l.id}" title="Șterge lecția">🗑</button>
+            <button type="button" class="ta-lec__titlu" data-l="deschide" data-id="${l.id}">${esc(l.titlu)}${l.material?.fel ? ` <small title="Are material">${ic("fisier", 13)}</small>` : ""}</button>
+            <button type="button" class="ta-mic" data-l="sus" data-id="${l.id}" title="Mai sus">${ic("sus", 16)}</button>
+            <button type="button" class="ta-mic" data-l="schimba" data-id="${l.id}" title="Titlul">${ic("creion", 16)}</button>
+            <button type="button" class="ta-mic ta-mic--rosu" data-l="sterge" data-id="${l.id}" title="Șterge lecția">${ic("sterge", 16)}</button>
           </li>`).join("")}
           <li><button type="button" class="ta-lec__noua" data-l="noua">+ Lecție</button></li></ul>` : ""}
       </section>`).join("")}`;
@@ -990,9 +986,9 @@ function deseneazaPanoul() {
 
 /* Cine vede tabla clasei (0116): [stare, semn, nume, ce înseamnă]. */
 const ACCES = [
-  ["automat", "🕘", "Automat", "elevii o văd doar la ora clasei din orar (±2 minute), cu Liceul deschis."],
-  ["deschisa", "🔓", "Deschisă", "o vede oricine, oricând, logat ori nu."],
-  ["inchisa", "🔒", "Închisă", "n-o vede nimeni afară de tine, nici la ora clasei."],
+  ["automat", ic("ceas", 16), "Automat", "elevii o văd doar la ora clasei din orar (±2 minute), cu Liceul deschis."],
+  ["deschisa", ic("deschis", 16), "Deschisă", "o vede oricine, oricând, logat ori nu."],
+  ["inchisa", ic("inchis", 16), "Închisă", "n-o vede nimeni afară de tine, nici la ora clasei."],
 ];
 /** Pune starea tablei clasei. Elevii care o au deschisă își verifică pe loc
  *  dacă o mai pot vedea (la „Închisă" sunt scoși direct). */
@@ -1005,8 +1001,8 @@ async function puneAccesul(k, a) {
   deseneazaPanoul();
   deseneazaBara();
   deseneazaGolul();
-  const [, i, n, t] = ACCES.find((x) => x[0] === a);
-  arataVestea(`${i} Tabla ${k.nume}, ${n.toLowerCase()}: ${t}`);
+  const [, , n, t] = ACCES.find((x) => x[0] === a);
+  arataVestea(`Tabla ${k.nume}, ${n.toLowerCase()}: ${t}`);
 }
 
 panou.addEventListener("click", async (e) => {
@@ -1138,7 +1134,7 @@ function deseneazaGolul() {
   if (clasa && lectie) { golEl.hidden = true; return; }
   golEl.hidden = false;
   golEl.innerHTML = admin
-    ? (clasa ? `<p>Clasa <b>${esc(clasa.nume)}</b> (${(ACCES.find((x) => x[0] === (clasa.acces || "automat")) || ACCES[0]).slice(1, 3).join(" ").toLowerCase()}). Alege o lecție din panou ori fă una nouă.</p>`
+    ? (clasa ? `<p>Clasa <b>${esc(clasa.nume)}</b> (${((ACCES.find((x) => x[0] === (clasa.acces || "automat")) || ACCES[0])[2]).toLowerCase()}). Alege o lecție din panou ori fă una nouă.</p>`
       : `<p>Alege o clasă din panou ori fă una nouă.</p>`)
     : `<p>Profesorul n-a deschis încă nicio lecție. Tabla apare aici singură, când începe.</p>`;
 }
