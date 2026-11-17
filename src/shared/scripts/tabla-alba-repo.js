@@ -2,9 +2,11 @@
 // TABLA ALBĂ (0113): clasele, lecțiile, paginile și canalul live.
 //
 // Adminul citește și scrie direct în tabele (le păzește `is_admin_user()`).
-// Vizitatorul, logat ori nu, primește doar prin funcțiile care îi cer codul
-// clasei. Pe canalul `tabla-alba:<id>` scrie numai profesorul; ascultă oricine
-// a dat codul bun (de acolo află id-ul).
+// Vizitatorul, logat ori nu, primește doar prin funcții, și doar cât e
+// vizibilă tabla clasei: profesorul a lăsat-o deschisă, e deschis Liceul și e
+// ora clasei după orar, ±2 minute (0115; codurile din 0113 nu mai există).
+// Pe canalul `tabla-alba:<id>` scrie numai profesorul; ascultă doar cine vede
+// acum tabla clasei.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { supabase } from "./supabase-client.js";
@@ -17,23 +19,23 @@ const eroare = (unde, e) => { console.warn(`tabla albă, ${unde}:`, e?.message |
 /** Clasele, cu lecțiile lor (fără materialul HTML). */
 export async function clasele() {
   const { data, error } = await supabase.from("tabla_alba_clase")
-    .select("id, nume, cod, ordine, stare, lectii:tabla_alba_lectii(id, titlu, ordine, material, creat_la)")
+    .select("id, nume, ordine, stare, deschisa, lectii:tabla_alba_lectii(id, titlu, ordine, material, creat_la)")
     .order("ordine").order("creat_la");
   if (error) { eroare("clasele", error); throw error; }
   for (const c of data) c.lectii.sort((a, b) => a.ordine - b.ordine || String(a.creat_la).localeCompare(String(b.creat_la)));
   return data;
 }
 
-export async function claseNoua(nume, cod, ordine) {
+export async function claseNoua(nume, ordine) {
   const { data, error } = await supabase.from("tabla_alba_clase")
-    .insert({ nume, cod, ordine }).select("id, nume, cod, ordine, stare").single();
-  if (error) { eroare("clasă nouă", error); return { eroare: /duplicate|unique/i.test(error.message) ? "Codul e deja luat de altă clasă." : error.message }; }
+    .insert({ nume, ordine }).select("id, nume, ordine, stare, deschisa").single();
+  if (error) { eroare("clasă nouă", error); return { eroare: error.message }; }
   return { clasa: { ...data, lectii: [] } };
 }
 
 export async function schimbaClasa(id, ce) {
   const { error } = await supabase.from("tabla_alba_clase").update({ ...ce, actualizat_la: new Date().toISOString() }).eq("id", id);
-  if (error) { eroare("schimbă clasa", error); return /duplicate|unique/i.test(error.message) ? "Codul e deja luat de altă clasă." : error.message; }
+  if (error) { eroare("schimbă clasa", error); return error.message; }
   return "";
 }
 
@@ -102,31 +104,38 @@ export async function materialulAdmin(lectieId) {
   return data?.material_html ?? null;
 }
 
-/* ---------- vizitatorul, cu codul ---------- */
+/* ---------- vizitatorul (0115) ---------- */
 
-/** `{ id, nume, stare, lectii }` ori `null` (cod greșit ori fără net). */
-export async function intraCuCodul(cod) {
-  const { data, error } = await supabase.rpc("tabla_alba_intra", { p_cod: cod });
+/** Numele claselor cu tabla deschisă acum; `null` dacă nu se poate afla. */
+export async function tableDeschise() {
+  const { data, error } = await supabase.rpc("tabla_alba_deschise");
+  if (error) { eroare("tablele deschise", error); return null; }
+  return (Array.isArray(data) ? data : []).map((x) => String(x?.nume || "")).filter(Boolean);
+}
+
+/** Clasa după nume („10D"), cu starea și lecțiile ei, doar cât e vizibilă:
+ *  `{ clasa }`, `{ clasa: null }` (închisă) ori `{ eroare }` (fără net). */
+export async function intraCuClasa(nume) {
+  const { data, error } = await supabase.rpc("tabla_alba_intra_clasa", { p_nume: nume });
   if (error) { eroare("intră", error); return { eroare: "fără legătură" }; }
   return data && UUID.test(String(data.id)) ? { clasa: data } : { clasa: null };
 }
 
-/** Intrarea după numele clasei („10D"), din modulul Liceu (0114). Merge doar
- *  cât e deschis Liceul; altfel `{ clasa: null }`. Clasa vine cu tot cu cod. */
-export async function intraCuClasa(nume) {
-  const { data, error } = await supabase.rpc("tabla_alba_intra_clasa", { p_nume: nume });
-  if (error) { eroare("intră după clasă", error); return { eroare: "fără legătură" }; }
-  return data && UUID.test(String(data.id)) && /^[0-9a-z]{4}$/.test(String(data.cod)) ? { clasa: data } : { clasa: null };
+/** Mai e vizibilă tabla clasei? `null` dacă nu se poate afla (fără net). */
+export async function tablaVizibila(clasaId) {
+  const { data, error } = await supabase.rpc("tabla_alba_vizibila", { p_clasa: clasaId });
+  if (error) { eroare("vizibilă", error); return null; }
+  return data === true;
 }
 
-export async function paginileCuCod(cod, lectieId) {
-  const { data, error } = await supabase.rpc("tabla_alba_pagini_lectiei", { p_cod: cod, p_lectie: lectieId });
+export async function paginileClasei(clasaId, lectieId) {
+  const { data, error } = await supabase.rpc("tabla_alba_pagini_clasei", { p_clasa: clasaId, p_lectie: lectieId });
   if (error) { eroare("paginile", error); return null; }
-  return Array.isArray(data) ? data : [];
+  return Array.isArray(data) ? data : null;
 }
 
-export async function materialulCuCod(cod, lectieId) {
-  const { data, error } = await supabase.rpc("tabla_alba_material", { p_cod: cod, p_lectie: lectieId });
+export async function materialulClasei(clasaId, lectieId) {
+  const { data, error } = await supabase.rpc("tabla_alba_material_clasei", { p_clasa: clasaId, p_lectie: lectieId });
   if (error) { eroare("materialul", error); return null; }
   return typeof data === "string" ? data : null;
 }

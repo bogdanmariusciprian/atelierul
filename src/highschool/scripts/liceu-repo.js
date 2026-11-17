@@ -227,3 +227,14 @@ export async function fetchConfig() {
     return Object.fromEntries((randuri || []).map((r) => [r.cheie, r.valoare]));
   }, {});
 }
+
+/**
+ * E deschis Liceul ACUM pentru vizitatori (0115)? Butonul profesorului ori o
+ * oră din orar (±2 minute). Se întreabă funcția din bază, nu semnul scris de
+ * mână: semnul e doar jumătate din răspuns. `null` = nu s-a putut afla.
+ */
+export async function liceulDeschisAcum() {
+  const { data, error } = await supabase.rpc("liceu_deschis");
+  if (error) { console.warn("[liceu] deschis acum:", error.message); return null; }
+  return data === true;
+}

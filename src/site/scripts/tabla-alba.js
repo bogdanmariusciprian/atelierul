@@ -11,11 +11,12 @@
 //     materialului ale profesorului. „Liber": se plimbă singuri prin lecția
 //     deschisă (file, pagini, material). Lecția o alege tot profesorul.
 //
-// VIZITATORUL (oricine nu e admin, logat ori nu) intră cu codul clasei și doar
-// privește. Pagina NU are poarta de prelansare: codul e cheia ei.
-// DIN LICEU (0114): titlul clasei („10D") duce la `/tabla/?clasa=10D`. Cât e
-// deschis modulul Liceu, elevul intră așa fără cod; adminul ajunge pe clasa
-// cu același nume (ori e întrebat dacă s-o facă).
+// VIZITATORUL (oricine nu e admin, logat ori nu) doar privește, și numai cât
+// e vizibilă tabla clasei (0115): profesorul a lăsat-o „Deschisă", e deschis
+// Liceul și e ora clasei după orar, ±2 minute. Fără coduri. Intră din Liceu
+// (titlul clasei duce la `/tabla/?clasa=10D`) ori de pe `/tabla/`, unde vede
+// doar butoanele claselor deschise acum. Când tabla se închide, e scos pe loc.
+// Pagina NU are poarta de prelansare: paza e în bază.
 //
 // LIVE. Pe canalul clasei pleacă: `stare` (unde e profesorul; repetată la
 // 3 secunde, ca un elev intrat târziu să afle singur), `material` (ce s-a
@@ -30,7 +31,7 @@ import { isAdmin } from "../../shared/scripts/session.js";
 import {
   clasele, claseNoua, schimbaClasa, stergeClasa, lectieNoua, schimbaLectia, stergeLectia,
   paginileAdmin, paginaNoua, salveazaPagina, stergePagina, materialulAdmin,
-  intraCuCodul, intraCuClasa, paginileCuCod, materialulCuCod, canalul,
+  tableDeschise, intraCuClasa, tablaVizibila, paginileClasei, materialulClasei, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
 import { Plansa, FUNDALURI, BOLD, ITALIC, SUBLINIAT } from "./tabla-alba-plansa.js";
 /* Puntea spre lecția HTML din fila Material e cea din modulul Liceu: ascultă
@@ -42,7 +43,6 @@ import { cuAcelasiZar } from "../../highschool/scripts/zarul.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const CHEIE_COD = "tabla-alba:cod";
 const CHEIE_UNDE = "tabla-alba:unde";
 const ia = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const pune = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* nimic */ } };
@@ -55,8 +55,7 @@ document.body.classList.toggle("ta--admin", admin);
 
 /* ---------- starea paginii ---------- */
 let clase = [];            // adminul: toate clasele
-let clasa = null;          // clasa deschisă: { id, nume, cod?, lectii, stare }
-let cod = "";              // vizitatorul: codul cu care a intrat
+let clasa = null;          // clasa deschisă: { id, nume, lectii, stare, deschisa? }
 let lectie = null;         // lecția deschisă
 let pagini = [];           // paginile ei: { id, ordine, desen: { rev, fundal, el } }
 let pag = 0;               // pagina deschisă
@@ -106,7 +105,9 @@ function deseneazaBara() {
       <button type="button" data-mod="conduc" class="${mod === "conduc" ? "is-on" : ""}" title="Elevii văd ce vezi tu: fila, pagina, derularea">Conduc eu</button>
       <button type="button" data-mod="liber" class="${mod === "liber" ? "is-on" : ""}" title="Elevii se plimbă singuri prin lecția deschisă">Liber</button>
     </div>` : !admin && clasa ? `<span class="ta-chip">${mod === "conduc" ? "Profesorul conduce" : "Te poți plimba prin lecție"}</span>` : "";
-  const codul = admin && clasa ? `<button type="button" class="ta-chip ta-chip--cod" data-bara="cod" title="Copiază adresa pentru elevi">Cod: <b>${esc(clasa.cod)}</b></button>` : "";
+  const codul = admin && clasa ? `<button type="button" class="ta-chip ta-chip--acces${clasa.deschisa ? " is-on" : ""}" data-bara="acces"
+      title="${clasa.deschisa ? "Elevii intră la ora clasei, după orar (±2 minute). Apasă ca s-o închizi." : "Nimeni nu intră afară de tine. Apasă ca s-o deschizi pentru ora clasei."}"
+      >${clasa.deschisa ? "🔓 Deschisă" : "🔒 Închisă"}</button>` : "";
   const urmeaza = !admin && clasa && fila === "tabla" ? `<button type="button" class="ta-btn${urmaresc ? " is-on" : ""}" data-bara="urmaresc"
       title="${urmaresc ? "Planșa ta urmează ce vede profesorul" : "Te uiți singur; apasă ca să urmezi iar profesorul"}">${urmaresc ? "◉ Urmăresc" : "○ Mă uit singur"}</button>` : "";
   const stare = clasa ? `<span class="ta-stare" data-fel="${legat ? "live" : "eroare"}">${legat ? "live" : "fără legătură"}</span>` : "";
@@ -131,16 +132,13 @@ bara.addEventListener("click", async (e) => {
   else if (b === "ecran") {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else document.documentElement.requestFullscreen?.().catch(() => {});
-  } else if (b === "cod" && clasa) {
-    const adresa = `${location.origin}/tabla/?cod=${clasa.cod}`;
-    try { await navigator.clipboard.writeText(adresa); arataVestea(`Am copiat: ${adresa}`); }
-    catch { prompt("Adresa pentru elevi:", adresa); }
+  } else if (b === "acces" && clasa) {
+    await comutaAccesul(clasa);
   } else if (b === "urmaresc") {
     urmaresc = !urmaresc;
     if (urmaresc && prof.vedere) plansa.arataZona(prof.vedere);
     deseneazaBara();
   } else if (b === "iesi") {
-    pune(CHEIE_COD, null);
     location.href = "/tabla/";
   }
 });
@@ -512,6 +510,7 @@ function laMesaj(fel, m) {
     ultimMaterial = m;
     if (mod === "conduc" && fila === "material") aplicaMaterial();
   } else if (fel === "reia") reiaPaginile();
+  else if (fel === "inchis") tablaInchisa();
   else if (fel === "structura") reiaTot();
 }
 
@@ -557,7 +556,7 @@ function reiaPaginile(paginaId = null, rev = 0) {
     if (reiaInZbor || !lectie) return;
     reiaInZbor = true;
     const id = pagini[pag]?.id;
-    const p = await paginileCuCod(cod, lectie.id);
+    const p = await paginileClasei(clasa.id, lectie.id);
     reiaInZbor = false;
     if (!p) return;
     pagini = p;
@@ -569,8 +568,9 @@ function reiaPaginile(paginaId = null, rev = 0) {
   }, 900 + incercari * 700);
 }
 async function reiaTot() {
-  const r = await intraCuCodul(cod);
-  if (!r.clasa) return;
+  const r = await intraCuClasa(clasa.nume);
+  if (r.eroare) return;
+  if (!r.clasa) { tablaInchisa(); return; }
   clasa = r.clasa;
   materiale.clear();
   lectie = null;
@@ -580,7 +580,7 @@ async function reiaTot() {
 
 async function deschideLectiaVizitator(l) {
   lectie = l;
-  pagini = (await paginileCuCod(cod, l.id)) || [];
+  pagini = (await paginileClasei(clasa.id, l.id)) || [];
   const i = pagini.findIndex((p) => p.id === prof.pagina);
   pag = i >= 0 ? i : 0;
   if (mod === "conduc") fila = prof.tab === "material" ? "material" : "tabla";
@@ -642,7 +642,7 @@ async function deseneazaMaterialul() {
   } else if (m.fel === "fisier") {
     let html = materiale.get(lectie.id);
     if (html == null) {
-      html = admin ? await materialulAdmin(lectie.id) : await materialulCuCod(cod, lectie.id);
+      html = admin ? await materialulAdmin(lectie.id) : await materialulClasei(clasa.id, lectie.id);
       if (nr !== randMaterial) return;
       if (html == null) { filaMaterial.querySelector(".ta-mat-gol").textContent = "Materialul n-a putut fi adus."; return; }
       materiale.set(lectie.id, html);
@@ -794,8 +794,10 @@ function deseneazaPanoul() {
     ${clase.map((c) => `<section class="ta-cl${clasa?.id === c.id ? " is-on" : ""}">
         <div class="ta-cl__cap">
           <button type="button" class="ta-cl__nume" data-c="deschide" data-id="${c.id}">${esc(c.nume)}</button>
-          <span class="ta-codul" title="Codul clasei">${esc(c.cod)}</span>
-          <button type="button" class="ta-mic" data-c="schimba" data-id="${c.id}" title="Numele și codul">✎</button>
+          <button type="button" class="ta-acces${c.deschisa ? " is-on" : ""}" data-c="acces" data-id="${c.id}"
+            title="${c.deschisa ? "Deschisă: elevii intră la ora clasei. Apasă ca s-o închizi." : "Închisă: nu intră nimeni afară de tine. Apasă ca s-o deschizi."}"
+            aria-pressed="${!!c.deschisa}">${c.deschisa ? "🔓" : "🔒"}</button>
+          <button type="button" class="ta-mic" data-c="schimba" data-id="${c.id}" title="Numele clasei">✎</button>
           <button type="button" class="ta-mic ta-mic--rosu" data-c="sterge" data-id="${c.id}" title="Șterge clasa">🗑</button>
         </div>
         ${clasa?.id === c.id ? `<ul class="ta-lec">${c.lectii.map((l) => `<li class="${lectie?.id === l.id ? "is-on" : ""}">
@@ -808,17 +810,18 @@ function deseneazaPanoul() {
       </section>`).join("")}`;
 }
 
-/** „12C" → „012c"; „9A" → „009a". Altfel, patru semne la întâmplare. */
-function codPropus(nume) {
-  const m = String(nume).toLowerCase().match(/(\d{1,3})\s*([a-z])/);
-  let c = m ? `${m[1].padStart(3, "0")}${m[2]}` : "";
-  if (!c || clase.some((x) => x.cod === c)) {
-    do c = Array.from({ length: 4 }, () => "abcdefghjkmnpqrstuvwxyz23456789"[Math.floor(Math.random() * 31)]).join("");
-    while (clase.some((x) => x.cod === c));
-  }
-  return c;
+/** Deschide ori închide tabla clasei pentru elevi. La închidere, elevii care o
+ *  au deschisă sunt scoși pe loc (și baza nu le mai dă nimic). */
+async function comutaAccesul(k) {
+  const nou = !k.deschisa;
+  const er = await schimbaClasa(k.id, { deschisa: nou });
+  if (er) { arataVestea(`Nu s-a putut ${nou ? "deschide" : "închide"}: ${er}`, true); return; }
+  k.deschisa = nou;
+  if (!nou && clasa?.id === k.id) trimite("inchis", {});
+  deseneazaPanoul();
+  deseneazaBara();
+  arataVestea(nou ? `Tabla ${k.nume} e deschisă: elevii intră la ora clasei, după orar.` : `Tabla ${k.nume} e închisă.`);
 }
-const codBun = (c) => /^[0-9a-z]{4}$/.test(c);
 
 panou.addEventListener("click", async (e) => {
   const c = e.target.closest("[data-c]");
@@ -827,24 +830,20 @@ panou.addEventListener("click", async (e) => {
     const id = c.dataset.id;
     const k = clase.find((x) => x.id === id);
     if (c.dataset.c === "noua") {
-      const nume = prompt("Numele clasei (de exemplu 12C):")?.trim();
+      const nume = prompt("Numele clasei, ca în orarul Liceului (de exemplu 12C):")?.trim();
       if (!nume) return;
-      const codul = prompt("Codul de intrare pentru elevi: 4 litere mici ori cifre.", codPropus(nume))?.trim().toLowerCase();
-      if (!codul) return;
-      if (!codBun(codul)) { arataVestea("Codul are 4 semne: litere mici ori cifre (de exemplu 012c).", true); return; }
-      const r = await claseNoua(nume.slice(0, 40), codul, clase.length);
+      const r = await claseNoua(nume.slice(0, 40), clase.length);
       if (r.eroare) { arataVestea(r.eroare, true); return; }
       clase.push(r.clasa);
       deschideClasa(r.clasa);
     } else if (c.dataset.c === "deschide" && k) deschideClasa(k);
+    else if (c.dataset.c === "acces" && k) await comutaAccesul(k);
     else if (c.dataset.c === "schimba" && k) {
-      const nume = prompt("Numele clasei:", k.nume)?.trim();
-      if (!nume) return;
-      const codul = prompt("Codul de intrare (4 litere mici ori cifre). Dacă îl schimbi, elevii intră cu cel nou.", k.cod)?.trim().toLowerCase();
-      if (!codul || !codBun(codul)) { if (codul) arataVestea("Codul are 4 semne: litere mici ori cifre.", true); return; }
-      const er = await schimbaClasa(k.id, { nume: nume.slice(0, 40), cod: codul });
+      const nume = prompt("Numele clasei, ca în orarul Liceului:", k.nume)?.trim();
+      if (!nume || nume === k.nume) return;
+      const er = await schimbaClasa(k.id, { nume: nume.slice(0, 40) });
       if (er) { arataVestea(er, true); return; }
-      k.nume = nume.slice(0, 40); k.cod = codul;
+      k.nume = nume.slice(0, 40);
       deseneazaPanoul(); deseneazaBara();
     } else if (c.dataset.c === "sterge" && k) {
       if (prompt(`Ștergi clasa „${k.nume}”, cu toate lecțiile, paginile și materialele ei? Nu se mai pot aduce înapoi.\n\nScrie numele clasei ca să confirmi:`)?.trim() !== k.nume) return;
@@ -950,44 +949,48 @@ function deseneazaGolul() {
   if (clasa && lectie) { golEl.hidden = true; return; }
   golEl.hidden = false;
   golEl.innerHTML = admin
-    ? (clasa ? `<p>Clasa <b>${esc(clasa.nume)}</b> (cod <b>${esc(clasa.cod)}</b>). Alege o lecție din panou ori fă una nouă.</p>`
+    ? (clasa ? `<p>Clasa <b>${esc(clasa.nume)}</b> (${clasa.deschisa ? "🔓 deschisă la ora ei" : "🔒 închisă"}). Alege o lecție din panou ori fă una nouă.</p>`
       : `<p>Alege o clasă din panou ori fă una nouă.</p>`)
     : `<p>Profesorul n-a deschis încă nicio lecție. Tabla apare aici singură, când începe.</p>`;
 }
 
 /* =========================================================
-   INTRAREA CU COD (vizitatorul)
+   INTRAREA (vizitatorul, 0115): fără coduri. Pe /tabla/ se văd doar butoanele
+   claselor cu tabla deschisă acum; din Liceu se vine cu `?clasa=10D`.
    ========================================================= */
-function arataCodul(mesaj = "") {
+let ceasLista = null;
+async function arataIntrarea(mesaj = "") {
   const f = $("#cod");
   f.hidden = false;
   scena.hidden = true;
   bara.hidden = true;
-  f.innerHTML = `<form class="ta-cod__cutie" autocomplete="off">
-      <span class="ta-marca ta-marca--mare">Tabla</span>
-      <label for="cod-camp">Codul clasei</label>
-      <input id="cod-camp" name="cod" inputmode="text" maxlength="4" placeholder="012c" spellcheck="false" autocapitalize="off" value="${esc(parametri.get("cod") || ia(CHEIE_COD) || "")}">
-      <button type="submit" class="ta-btn ta-btn--plin">Intră</button>
-      <p class="ta-cod__mesaj" role="status">${esc(mesaj)}</p>
-      <p class="ta-cod__nota">Codul ți-l dă profesorul. Are patru semne, de exemplu <b>012c</b>.</p>
-    </form>`;
-  const camp = $("#cod-camp");
-  camp.focus();
-  f.querySelector("form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const c = camp.value.trim().toLowerCase();
-    if (!codBun(c)) { f.querySelector(".ta-cod__mesaj").textContent = "Codul are patru semne: litere ori cifre."; return; }
-    f.querySelector(".ta-cod__mesaj").textContent = "Se verifică…";
-    await intraCu(c);
-  });
+  clearInterval(ceasLista);
+  const deseneaza = async () => {
+    const lista = await tableDeschise();
+    f.innerHTML = `<div class="ta-cod__cutie" role="status">
+        <span class="ta-marca ta-marca--mare">Tabla</span>
+        ${mesaj ? `<p class="ta-cod__mesaj">${esc(mesaj)}</p>` : ""}
+        ${lista === null ? `<p class="ta-cod__nota">Fără legătură. Verifică netul.</p>`
+          : lista.length ? lista.map((n) => `<button type="button" class="ta-btn ta-btn--plin" data-intra="${esc(n)}">Intră la ${esc(n)}</button>`).join("")
+          : `<p class="ta-cod__nota">Nicio tablă deschisă acum.</p>`}
+      </div>`;
+  };
+  await deseneaza();
+  /* Lista se împrospătează singură: o tablă se deschide la începutul orei. */
+  ceasLista = setInterval(() => { if (!document.hidden && !$("#cod").hidden) deseneaza(); }, 30000);
 }
+$("#cod").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-intra]");
+  if (!b) return;
+  b.disabled = true;
+  await intraLaClasa(b.dataset.intra);
+});
 
-async function intraCu(c, gata = null) {
-  const r = gata ? { clasa: gata } : await intraCuCodul(c);
-  if (r.eroare) { arataCodul("Fără legătură. Verifică netul și încearcă iar."); return; }
-  if (!r.clasa) { pune(CHEIE_COD, null); arataCodul("Codul nu e bun. Verifică-l și încearcă iar."); return; }
-  cod = c;
-  pune(CHEIE_COD, c);
+async function intraLaClasa(nume) {
+  const r = await intraCuClasa(nume);
+  if (r.eroare) { await arataIntrarea("Fără legătură. Verifică netul și încearcă iar."); return; }
+  if (!r.clasa) { await arataIntrarea("Tabla clasei nu e deschisă acum."); return; }
+  clearInterval(ceasLista);
   clasa = r.clasa;
   $("#cod").hidden = true;
   scena.hidden = false;
@@ -998,6 +1001,34 @@ async function intraCu(c, gata = null) {
   deseneazaGolul();
   await aplicaStarea(clasa.stare || {});
   deseneazaGolul();
+  pazaInchiderii();
+}
+
+/* Tabla se închide (profesorul a închis-o, s-a terminat ora, s-a închis
+   Liceul): elevul e scos pe loc. Profesorul anunță pe canal când o închide el;
+   restul se află întrebând baza, la fiecare jumătate de minut și la fiecare
+   întoarcere pe pagină. */
+let ceasPaza = null;
+function pazaInchiderii() {
+  clearInterval(ceasPaza);
+  const intreaba = async () => {
+    if (!clasa || admin) return;
+    if ((await tablaVizibila(clasa.id)) === false) tablaInchisa();
+  };
+  ceasPaza = setInterval(intreaba, 30000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) intreaba(); });
+}
+function tablaInchisa() {
+  if (admin || !clasa) return;
+  clearInterval(ceasPaza);
+  canal?.opreste();
+  canal = null;
+  clasa = null; lectie = null; pagini = [];
+  plansa.incarca(null);
+  materiale.clear();
+  materialAfisat = "";
+  filaMaterial.innerHTML = "";
+  arataIntrarea("Tabla s-a închis.");
 }
 
 /* =========================================================
@@ -1023,9 +1054,8 @@ if (admin) {
     if (dupaNume) k = dupaNume;
     else {
       k = null;
-      const propus = codPropus(numeClasa);
-      if (confirm(`Clasa ${numeClasa} nu are încă tablă. O fac acum, cu codul ${propus}?`)) {
-        const r = await claseNoua(numeClasa, propus, clase.length);
+      if (confirm(`Clasa ${numeClasa} nu are încă tablă. O fac acum?`)) {
+        const r = await claseNoua(numeClasa, clase.length);
         if (r.eroare) arataVestea(r.eroare, true);
         else { clase.push(r.clasa); k = r.clasa; }
       }
@@ -1033,21 +1063,13 @@ if (admin) {
     history.replaceState(null, "", "/tabla/");
   }
   if (k) {
-    const l = k.lectii.find((x) => x.id === unde.lectie);
+    const l = k.lectii.find((x) => x.id === unde?.lectie);
     if (l && k.stare?.lectie !== l.id) k.stare = { ...(k.stare || {}), lectie: l.id };
     await deschideClasa(k);
   }
 } else {
   panou.hidden = true;
-  const numeClasa = (parametri.get("clasa") || "").trim();
-  const c = (parametri.get("cod") || ia(CHEIE_COD) || "").trim().toLowerCase();
-  if (numeClasa) {
-    /* Venit din Liceu: clasa după nume, fără cod (cât e deschis Liceul). */
-    $("#cod").hidden = true;
-    const r = await intraCuClasa(numeClasa);
-    if (r.clasa) await intraCu(r.clasa.cod, r.clasa);
-    else arataCodul(r.eroare ? "Fără legătură. Verifică netul și încearcă iar."
-      : `Tabla clasei ${numeClasa} nu e deschisă acum. Intră cu codul primit de la profesor.`);
-  } else if (codBun(c)) { $("#cod").hidden = true; await intraCu(c); }
-  else arataCodul();
+  const numeClasa = (parametri.get("clasa") || "").trim().slice(0, 40);
+  if (numeClasa) { $("#cod").hidden = true; await intraLaClasa(numeClasa); }
+  else await arataIntrarea();
 }

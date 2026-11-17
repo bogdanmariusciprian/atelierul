@@ -34,7 +34,7 @@ import { hourCard } from "./hour-card.js";
 import { stareaDeAcum, numeZi, minute, ora2, LUCRATOARE } from "./school-time.js";
 import {
   fetchZiua, fetchOrarul, fetchConfig, fetchPlan, fetchFisa, fetchFisaBruta,
-  salveazaFisa, stergeFisa, ziuaISO,
+  salveazaFisa, stergeFisa, ziuaISO, liceulDeschisAcum,
 } from "./liceu-repo.js";
 import {
   aduFisele, fiseleClasei, fisaDupaId, adresaFisei, cheiaFisei, cheiaNoua, FELUL_FISEI,
@@ -2251,6 +2251,11 @@ function apasa(e) {
  * Rămâne numai fundalul colorat al modulului, încețoșat, ca pagina să nu arate
  * ca o eroare a sitului: nu e stricată, e închisă.
  */
+async function deschisAcum() {
+  const v = await liceulDeschisAcum();
+  return v === null ? aduLiceuDeschis() : v;
+}
+
 function ecranulInchis() {
   radacina.classList.remove("lic--fisa");
   radacina.classList.add("lic--acasa", "lic--inchis");
@@ -2263,8 +2268,8 @@ function ecranulInchis() {
       <div class="lic-inchis" role="alertdialog" aria-labelledby="lic-inchis-t">
         <h1 class="lic-inchis__titlu" id="lic-inchis-t">Partea asta e închisă</h1>
         <p class="lic-inchis__vorba">
-          Liceul se deschide când îl deschide profesorul. Până atunci nu e nimic
-          de văzut aici, nici măcar pe ocolite.
+          Liceul se deschide singur în timpul orelor, ori când îl deschide
+          profesorul. Până atunci nu e nimic de văzut aici, nici măcar pe ocolite.
         </p>
         <a class="lic-inchis__btn" href="${esc(caleaSitului) || "/"}">Înapoi la site</a>
       </div>
@@ -2287,7 +2292,17 @@ export async function renderHighschool(gazda, basePath = "") {
      nicio dată: se pune fereastra și ne oprim aici.
      Pagina e ținută ascunsă de poartă până sfârșim, deci nu apucă nimeni să
      vadă modulul o clipă înainte de fereastră. */
-  if (!isAdmin() && !(await aduLiceuDeschis())) { ecranulInchis(); return; }
+  /* DUPĂ ORAR (0115): pentru vizitatori, Liceul e deschis cât e butonul tău
+     aprins ori cât e o oră din orar (±2 minute). Răspunsul îl dă baza; dacă
+     nu răspunde, rămâne semnul scris de mână, ca înainte. */
+  if (!isAdmin() && !(await deschisAcum())) { ecranulInchis(); return; }
+  if (!isAdmin()) {
+    /* Se închide singur la sfârșitul orei: se întreabă din minut în minut și
+       la fiecare întoarcere pe pagină. */
+    const intreaba = async () => { if ((await liceulDeschisAcum()) === false) ecranulInchis(); };
+    setInterval(() => { if (!document.hidden) intreaba(); }, 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) intreaba(); });
+  }
 
   /* Lista fișelor, o dată, înainte de primul desen: ruta se citește din ea
      (`#/f/11d-5-b` are nevoie să știe că fișa aia există), iar fără ea cineva
