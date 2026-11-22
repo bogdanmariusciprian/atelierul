@@ -1414,6 +1414,113 @@ let culori = citeste(CHEIE.culori);
 let marcaje = citeste(CHEIE.marcaje);   /* { 'strofa:vers': [[început, sfârșit, 'b'], …] } */
 let texte = citeste(CHEIE.texte);       /* versurile pe care le-ai îndreptat tu */
 
+/* ===== ADNOTĂRILE CLASEI (22 noiembrie 2026) =====
+   Adnotările unei eleve a profesorului, scrise din contul ei pe această pagină
+   și puse aici de profesor, ca să le vadă oricine intră. Sunt adnotarea de
+   pornire a fiecărei strofe: cine scrie peste una o are pe a lui, în
+   browserul lui (ca până acum); dacă o golește, revine cea a clasei. */
+const ADNOTARI_COMUNE = {
+  "1": "formulă specifică basmului<br>rădăcinile nobile ale fetei",
+  "2": "acum se îndepărtează de convențiile basmului (o singură fată)",
+  "3": "odaia fetei este întunecată → condițiile exterioare ale visului → visul nocturn<br>în lucrarea sa „Poetica reveriei”, Gaston Bachelard distinge între reverie (subiectul își proiectează controlat imaginile) și vis nocturn (subiectul nu are control asupra imaginilor, ci le primește → Luceafărul controlează visul fetei)",
+  "4": "imaginea Luceafărului-călăuză → funcția atribuită de Demiurg.",
+  "5": "= se îndrăgostește (expresia seamănă cu modelul to fall in love / tomber amoureux → etimologia explică instalarea sentimentului pe imaginea coborârii → aceeași coborâre o putem sesiza în reproșul fetei din „Floare-albastră”: „iar te-ai cufundat în stele”)",
+  "6": "momentul de reverie al fetei",
+  "7": "răspunsul tacit al Luceafărului la sentimentele fetei",
+  "8": "descrierea prin antiteză a Luceafărului; imaginea feerică a Luceafărului",
+  "9": "Luceafărul instalează în ființa fetei visul nocturn",
+  "10": "Luceafărul poate să acceseze lumea fetei prin oglindire",
+  "11": "jocul erotic (are trăsături ludice)",
+  "12": "FATA: PRIMA CHEMARE",
+  "13": "fata îl invocă pe Luceafăr în spațiul ei intim.<br>invocație; pleonasmul „cobori în jos” măsoară distanța dintre cele două lumi<br>antiteza sus/jos",
+  "14": "PRIMA ÎNTRUPARE a Luceafărului: din cer și din mare → ipostaza ANGELICĂ",
+  "15": "imaginea cosmogonică a Luceafărului (Luceafărul se întrupează ca o lume)",
+  "16": "fereastra = prag de trecere din lumea Lui în lumea ei<br>imaginea Luceafărului care se adaptează la lumea ei (imaginea nobilă)",
+  "17": "portretul ipostazei angelice<br>frumusețea luminoasă, nobilă, construită în antiteză cu condiția umană.",
+  "18": "Luceafărul este construit prin antiteză",
+  "19": "lumea Luceafărului = SFERĂ",
+  "20": "sacrificiul asumat de Luceafăr (coborârea din sfera înaltă în spațiul terestru)",
+  "21": "Chemarea Luceafărului",
+  "22": "promisiunea nemuririi și a stăpânirii lumii acvatice.<br>încercarea de a o ridica pe fată în lumea lui abstractă.",
+  "23": "refuzul fetei",
+  "24": "incompatibilitatea dintre cele două lumi",
+  "25": "formulă mediană",
+  "26": "visul nocturn",
+  "27": "A DOUĂ CHEMARE a Luceafărului",
+  "28": "cercurile apei din care se întrupase prima dată se transferă acum la nivelul lumii Luceafărului",
+  "29": "A DOUĂ ÎNTRUPARE a Luceafărului din soare și din noapte → ipostaza DEMONICĂ",
+  "30": "soarele = valență negativă, distructivă",
+  "31": "portretul ipostazei demonice<br>antiteză cromatică",
+  "32": "trăsăturile ipostazei demonice (privirea adâncă, himerică, incompatibilă cu firea muritoare a fetei)",
+  "33": "lumea Luceafărului = sferă",
+  "34": "A DOUĂ CHEMARE a Luceafărului",
+  "35": "promisiunea Luceafărului = eternitatea",
+  "36": "ipostaza demonică<br>refuzul fetei",
+  "37": "incompatibilitatea celor două lumi",
+  "38": "Luceafărul exprimă condiția celor două lumi",
+  "39": "incompatibilitatea celor două lumi = comunicarea nu poate funcționa",
+  "40": "chemarea fetei",
+  "41": "insistența Luceafărului opune nemurirea față de sărutare",
+  "42": "acceptarea supremului sacrificiu al geniului: renunțarea la nemurire",
+  "43": "Luceafărul pleacă spre Demiurg să îi ceară schimbarea condiției de nemuritor",
+  "44": "condiția inferioară a lui Cătălin față de condiția nobilă a fetei (Cătălin = slugă)",
+  "45": "portretul lui Cătălin (îndrăzneț și lipsit de aspirație spre absolut)",
+  "46": "gesturi ludice (expresie a iubirii concrete, pământene)",
+  "47": "stilul indirect liber",
+  "48": "idila dintre doi muritori = modelul rustic",
+  "49": "avansurile lui Cătălin",
+  "50": "dilema fetei<br>antiteză dintre chemarea terestră a lui Cătălin și nostalgia după iubirea ideală",
+  "51": "Cătălin îi îndeplinește fetei iubirea prin mijloace ale lumii terestre",
+  "52": "Cătălin își exprimă sentimentele prin analogii din lumea muritorilor",
+  "53": "inițierea erotică în plan terestru (iubirea concretă, accesibilă muritorilor)",
+  "54": "împlinirea cuplului terestru (relație de egalitate între ființe aparținând aceleiași lumi)",
+  "55": "fericirea concretă, specifică exclusiv muritorilor",
+  "56": "idila dintre tineri = rustic",
+  "57": "declarația iubirii fetei pentru Luceafăr",
+  "58": "diferența dintre cele două lumi (Luceafărul rămâne un reper astral, inaccesibil, aparținând sferei înalte)",
+  "59": "nostalgia fetei<br>suferința provocată de imposibilitatea atingerii absolutului",
+  "60": "antiteză sus - jos (imposibilitatea atingerii idealului - „Dar se înalță tot mai sus, / Ca să nu-l pot ajunge.”)",
+  "61": "ruptura dintre lumea ei (cercul) și lumea lui (sfera)",
+  "62": "opoziția realitate - vis<br>banalitatea vieții terestre în antiteză cu farmecul nocturn al aspirației ideale.",
+  "63": "insistența lui Cătălin = promisiunea băiatului se materializează tot în lumea terestră",
+  "64": "Cătălin reduce lumea Luceafărului prin antonomază (substantivul propriu „Luceafăr” trece la substantivul comun cu formă de plural generalizant „luceferi”)",
+  "65": "zborul cosmic reia interferența domeniului fizicii din poezia „La steaua” („La steaua care a răsărit / E-o cale atât de lungă / că mii de ani i-au trebuit / luminii să ne ajungă”)",
+  "66": "Luceafărul este descris la granița dintre două lumi superioare → Luceafărul, prin condiția sa, poate accesa întreaga verticală a lumii: și lumea inferioară a fetei, și lumea superioară a Demiurgului<br>Deplasarea cu viteza luminii a Luceafărului",
+  "67": "cu ajutorul vitezei luminii, Luceafărul străbate spațiul cosmic până la Facerea Lumii",
+  "68": "Luceafărul ajunge, prin depersonalizare, o realitate abstractă (gândul)",
+  "69": "viziunea cosmogonică și nemărginirea spațiului și a timpului<br>spațiul atemporal de dinaintea genezei, accesibil doar geniului",
+  "70": "metafora setei („Nu e nimic și totuși e / O sete care-l soarbe” - geniul este aspirație, nu împlinire)",
+  "71": "Luceafărul îi cere Demiurgului schimbarea condiției",
+  "72": "capacitatea geniului de sacrificiu",
+  "73": "nimb = aura cu care sunt portretizați de obicei sfinții în iconografie<br>Luceafărul cere o oră de iubire",
+  "74": "discursul Luceafărului se încheie cu o reflecție filozofică: setea de repaos",
+  "75": "Demiurgul este singura ființă care cunoaște identitatea Luceafărului (Hyperion)",
+  "76": "Demiurgul enunță legea muritorilor: viață, moarte, viață",
+  "77": "antiteza pronominală ei - noi",
+  "78": "Eminescu notează pe marginea manuscrisului definiția omului de geniu",
+  "79": "Demiurgul oferă exemple ale ciclicității vieții",
+  "80": "ciclicitatea viață - moarte",
+  "81": "refuzul Demiurgului (imposibilitatea anulării condiției de nemuritor)<br>PRIMA OFERTĂ: înțelepciunea (cunoașterea obiectivă)",
+  "82": "A DOUĂ OFERTĂ: darul cântării (puterea creației artistice)",
+  "83": "A TREIA OFERTĂ: putere asupra pământului (gloria lumească; împărăția)",
+  "84": "Demiurgul este atotputernic, cu excepția schimbării condiției",
+  "85": "constatarea limitei lumii terestre și îndemnul Demiurgului ca Hyperion să privească spre pământ pentru a înțelege iubirea terestră.",
+  "86": "Luceafărul se întoarce de la Demiurg în aceeași condiție de nemuritor",
+  "87": "Luceafărul răsare la începutul nopții (seara)",
+  "88": "luna luminează o anume cărare<br>imaginea cuplului (Cătălin și Cătălina) în intimitatea de sub tei",
+  "89": "Cătălin și Cătălina își consumă povestea de iubire",
+  "90": "motive romantice: luna; noaptea<br>cadrul nocturn romantic<br>atmosfera idilei pământene sub lumina lunii",
+  "91": "împlinirea în cercul strâmt",
+  "92": "Hyperion este martor al iubirii dintre cei doi<br>Imaginea lui Hyperion care judecă apropierea dintre cei doi",
+  "93": "prin descrierea celor doi se reface imaginea cuplului adamic (cei doi sunt reduși la imaginea unor copii care experimentează iubirea cu mijloacele lumii concrete)",
+  "94": "fata îi cere Luceafărului să îi binecuvânteze iubirea",
+  "95": "a treia chemare a fetei (descântecul), aceeași formulă de invocație, dar golită de aspirația spre absolut;<br>Luceafărul este redus la rolul de astru protector al norocului terestru.",
+  "96": "imaginea Luceafărului-călăuză este răsturnată: singurătatea Luceafărului este sugerată prin absența corăbiilor",
+  "97": "detașarea rece și obiectivă a lui Hyperion față de ființa efemeră („chip de lut”)",
+  "98": "lumea fetei = CERC → lumea lui conține mai multe dimensiuni ale absolutului, lumea ei are doar o dimensiune"
+  };
+
+
 const poem = document.getElementById('poem');
 const strofe = [...poem.querySelectorAll('.strofa')];
 
@@ -1439,7 +1546,7 @@ function aplicaStarea() {
     if (c) el.dataset.culoare = c; else delete el.dataset.culoare;
     const ad = el.querySelector('.adnotare');
     /* adnotările vechi erau text simplu; le trecem la HTML fără să le stricăm */
-    const v = adnotari[n] ?? '';
+    const v = adnotari[n] ?? ADNOTARI_COMUNE[n] ?? '';
     ad.innerHTML = v.includes('<') ? curata(v) : esc(v).split(String.fromCharCode(10)).join('<br>');
     el.querySelector('.s-print').innerHTML = ad.innerHTML;
     for (const vers of el.querySelectorAll('.v-txt')) {
