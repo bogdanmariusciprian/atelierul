@@ -309,6 +309,10 @@ button { font: inherit; }
 .tr-fisa__stare a { color: var(--accent); font-weight: 600; }
 .tr-fisa__pagini { overflow-x: auto; }
 .tr-fisa__pagini .docx-wrapper { background: transparent; padding: 0; }
+/* PDF (0118): fiecare pagină e o poză, de lățimea unei pagini A4 (794 px). */
+.tr-pdf { display: flex; flex-direction: column; align-items: center; }
+.tr-pdf__pagina { width: 794px; max-width: none; background: #fff; overflow: hidden; }
+.tr-pdf__pagina img { display: block; width: 100%; height: auto; }
 .tr-fisa__pagini .docx-wrapper > section.docx {
   margin: 0 auto 18px;
   box-shadow: 0 10px 30px -14px rgba(31, 36, 48, .35);

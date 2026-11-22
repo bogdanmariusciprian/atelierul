@@ -62,7 +62,8 @@
 // fiecare scriitor primește și ce scrie celălalt, fără să-i fie atins câmpul
 // în care scrie chiar atunci.
 //
-// FIȘA WORD (0107). Sub enunțuri, adminul poate urca o fișă .docx; se vede ca
+// FIȘA WORD ORI PDF (0107, 0118). Sub enunțuri, adminul poate urca o fișă .docx
+// ori .pdf; Word se vede ca în Word, PDF pagină cu pagină (pdf.js). Se vede ca
 // în Word, cu pagini, la toți. Golirea curăță enunțurile, nu și fișa.
 //
 // LUCRĂRILE (17 octombrie 2026, modelul „Grilă"). Elevul pornit își păstrează
@@ -85,6 +86,7 @@ import { citesteTabla, scrieTabla, urmaresteTabla, urcaFisa, adresaFisa, stergeF
   scrieEnunt, poateScrieTabla, ascultaIngaduinta, citesteFormele, scrieForma } from "../../shared/scripts/tabla-live-repo.js";
 import { tutoringPupils, setPupilPermission } from "../../shared/scripts/pupils-repo.js";
 import { saveSheet, salveazaLucrareaElevului } from "../../shared/scripts/board-repo.js";
+import { desenezaPdf } from "../../highschool/scripts/pdf-desen.js";
 import { deschideLucrarile, LECTIE, ziDeAzi, ziFrumoasa, operaDinFisa, operaDinText, textOpera, numeOpera }
   from "./tabla-redactare-lucrari.js";
 
@@ -272,7 +274,7 @@ function normalizeaza(d) {
   /* Fișa se ia doar dacă numele fișierului arată cum îl dă urcarea: altfel
      adresa ar putea trimite oriunde. */
   const f = d?.fisa;
-  const fisa = f && /^[a-z0-9-]+\.docx$/.test(String(f.fisier || ""))
+  const fisa = f && /^[a-z0-9-]+\.(docx|pdf)$/.test(String(f.fisier || ""))
     ? { fisier: f.fisier, nume: String(f.nume || "fișa.docx"), marime: Number(f.marime) || 0 } : null;
   /* Opera scrisă de profesor (altfel se ia din numele fișei) și lucrarea adusă
      din grilă, în care scrie mai departe elevul ei. */
@@ -623,7 +625,7 @@ const marimeMB = (o) => {
 function deseneazaFisa(mesaj = "") {
   const unelte = admin
     ? `<div class="tr-fisa__unelte">
-         <button type="button" class="tr-btn" data-fisa="urca">${fisa ? "Înlocuiește fișa" : "+ Urcă fișa Word"}</button>
+         <button type="button" class="tr-btn" data-fisa="urca">${fisa ? "Înlocuiește fișa" : "+ Urcă fișa (Word ori PDF)"}</button>
          ${fisa ? `<button type="button" class="tr-btn tr-btn--sterge" data-fisa="scoate">Scoate fișa</button>` : ""}
          ${mesaj ? `<span class="tr-fisa__mesaj">${esc(mesaj)}</span>` : ""}
        </div>` : "";
@@ -655,14 +657,29 @@ function deseneazaFisa(mesaj = "") {
   arataFisa(fisa.fisier, sectiuneFisa.querySelector(".tr-fisa__pagini"));
 }
 
-/** Aduce fișierul și îl desenează ca în Word, pagină cu pagină (docx-preview). */
+/** Aduce fișierul și îl desenează pagină cu pagină: Word ca în Word
+ *  (docx-preview), PDF ca poze ale paginilor (pdf.js, ca la Liceu). */
 async function arataFisa(fisier, unde) {
   try {
-    docxPreview ||= await import("https://esm.sh/docx-preview@0.4.1?deps=jszip@3.10.1");
     const r = await fetch(adresaFisa(fisier));
     if (!r.ok) throw new Error(`fișa n-a venit (${r.status})`);
     const octeti = await r.arrayBuffer();
     if (fisaAfisata !== fisier) return;   // între timp a venit alta
+    if (/\.pdf$/i.test(fisier)) {
+      /* Aceleași cutii ca la Word (`.docx-wrapper` > `section.docx`), ca mărirea
+         cu A+ / A− și încadrarea în ecran să meargă la fel. */
+      const { pagini, sarite } = await desenezaPdf(octeti);
+      if (fisaAfisata !== fisier) return;
+      unde.innerHTML = `<div class="docx-wrapper tr-pdf">${pagini.map((src, i) =>
+        `<section class="docx tr-pdf__pagina"><img src="${src}" alt="Pagina ${i + 1}"></section>`).join("")}</div>${
+        sarite ? `<p class="tr-fisa__stare">Încă ${sarite} pagini n-au mai fost arătate (fișa e prea lungă). <a href="${esc(adresaFisa(fisier))}" target="_blank" rel="noopener">Deschide PDF-ul întreg</a>.</p>` : ""}`;
+      const img = unde.querySelector("img");
+      if (img && !img.complete) await new Promise((r) => { img.onload = r; img.onerror = r; });
+      incadreazaFisa();
+      return;
+    }
+    docxPreview ||= await import("https://esm.sh/docx-preview@0.4.1?deps=jszip@3.10.1");
+    if (fisaAfisata !== fisier) return;
     unde.innerHTML = "";
     await docxPreview.renderAsync(octeti, unde, null, {
       className: "docx", inWrapper: true, breakPages: true,

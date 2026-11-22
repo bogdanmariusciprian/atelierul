@@ -87,13 +87,15 @@ export function adresaFisa(fisier) {
  */
 export async function urcaFisa(slug, file) {
   if (!file) return { eroare: "Alege un fișier." };
-  if (!/\.docx$/i.test(file.name || "")) return { eroare: "Fișa trebuie să fie Word (.docx)." };
+  /* Word ori PDF (0118). */
+  const ext = /\.pdf$/i.test(file.name || "") ? "pdf" : /\.docx$/i.test(file.name || "") ? "docx" : "";
+  if (!ext) return { eroare: "Fișa trebuie să fie Word (.docx) ori PDF." };
   if (file.size > MAX_FISA) return { eroare: "Fișa are peste 10 MB." };
   const a = new Uint8Array(6);
   crypto.getRandomValues(a);
-  const fisier = `${slug}-${[...a].map((x) => "abcdefghijklmnopqrstuvwxyz0123456789"[x % 36]).join("")}.docx`;
+  const fisier = `${slug}-${[...a].map((x) => "abcdefghijklmnopqrstuvwxyz0123456789"[x % 36]).join("")}.${ext}`;
   const { error } = await supabase.storage.from(GALEATA_FISE)
-    .upload(fisier, file, { contentType: DOCX, upsert: false });
+    .upload(fisier, file, { contentType: ext === "pdf" ? "application/pdf" : DOCX, upsert: false });
   if (error) { console.warn("urcaFisa:", error.message); return { eroare: "Fișa n-a intrat în găleată." }; }
   return { fisa: { fisier, nume: file.name, marime: file.size } };
 }

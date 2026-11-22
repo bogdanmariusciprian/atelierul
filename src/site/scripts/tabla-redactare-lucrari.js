@@ -45,7 +45,7 @@ export function ziFrumoasa(zi, scurt = false) {
  * iar autorul e cel din paranteza de la capăt. `null` dacă nu iese nimic.
  */
 export function operaDinFisa(numeFisa) {
-  let s = String(numeFisa || "").replace(/\.docx$/i, "").trim();
+  let s = String(numeFisa || "").replace(/\.(docx|pdf)$/i, "").trim();
   if (!s) return null;
   const bucati = s.split(/\s[-–]\s/);
   s = bucati[bucati.length - 1].trim();
