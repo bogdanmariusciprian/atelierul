@@ -717,7 +717,20 @@ async function aduPlanul(clasa) {
   if (planuri[clasa]) return;
   planuri[clasa] = { seAduce: true, ore: [] };
   const r = await fetchPlan(clasa);
-  planuri[clasa] = { seAduce: false, ore: r.date || [] };
+  planuri[clasa] = {
+    seAduce: false,
+    ore: r.date || [],
+    /* N-a venit nimic și nici nu era ceva ținut de altă dată: nu se știe dacă
+       clasa are planificare. Gol ar fi însemnat „n-are", și n-ar fi fost adevărat. */
+    nestiut: r.offline && r.la == null,
+  };
+  /* Pe ecranul unei fișe nu se redesenează nimic: cadrul s-ar fi încărcat din
+     nou sub ochii clasei. Se schimbă doar capul barei („Ora 3" → „Lecția 3"). */
+  if (rutaE("f")) {
+    const f = fisaDupaId(rutaId());
+    const b = f?.clasa === clasa ? radacina.querySelector(".lic-fisa__titlu b") : null;
+    if (b) b.textContent = `${f.clasa} · ${undeEFisa(f)}`;
+  }
   /* Dacă între timp ai plecat pe alt ecran, nu-l smulgem de sub tine. Orarul
      intră și el la socoteală: numerele din colțul celulelor vin din aceleași
      planificări, deci grila se umple pe măsură ce sosesc. */
@@ -780,13 +793,17 @@ function vedereDeClasa(c) {
     return `<div class="lic-clasa" style="--h:${c.hue}">${cap}
       <p class="lic-clasa__gol">Aduc planificarea…</p></div>`;
   }
-  if (!p.ore.length) {
-    /* 11F și 12F ajung aici, și e în regulă: au câte o oră pe săptămână în orar,
-       dar n-au planificare. Ecranul lor există (cerut de Marius), doar că e gol
-       până apare una. */
+  if (p.nestiut) {
+    /* Cererea n-a răspuns și nici n-a rămas ceva din altă zi. NU e „fără
+       planificare": dacă ar fi trecut drept asta, clasa ar fi primit butonul
+       de lecții, iar o „Lecția 1" s-ar fi lipit apoi de Ora 1 a planificării. */
     return `<div class="lic-clasa" style="--h:${c.hue}">${cap}
-      <p class="lic-clasa__gol">Clasa asta n-are încă planificare în bază.
-        Orele ei se văd în orar; lista de aici se umple când intră planificarea.</p></div>`;
+      <p class="lic-clasa__gol">Planificarea clasei n-a putut fi adusă.</p></div>`;
+  }
+  if (!p.ore.length) {
+    /* 11F și 12F ajung aici: au câte o oră pe săptămână în orar, dar n-au
+       planificare. Lecțiile lor le adaugă profesorul, una câte una. */
+    return vedereDeLectii(c, fise, cap);
   }
 
   /* BENZILE DE ORAR, în ordine, ca să se vadă de unde încolo s-a mutat ora.
@@ -851,6 +868,90 @@ function vedereDeClasa(c) {
     </div>`;
 }
 
+/** Clasa n-are planificare (adusă și goală). Până sosește, nu se știe. */
+const faraPlanificare = (clasa) => {
+  const p = planuri[clasa];
+  return Boolean(p && !p.seAduce && !p.nestiut && !p.ore.length);
+};
+
+/** „Ora 5", „Orele 7, 8, 9" ori, la o clasă fără planificare, „Lecția 5". */
+function undeEFisa(f) {
+  const lectii = faraPlanificare(f.clasa);
+  if (f.ore.length > 1) return `${lectii ? "Lecțiile" : "Orele"} ${f.ore.join(", ")}`;
+  return `${lectii ? "Lecția" : "Ora"} ${f.ora}`;
+}
+
+/**
+ * O CLASĂ FĂRĂ PLANIFICARE (11F, 12F): lecțiile le adaugă profesorul, de mână.
+ *
+ * NUMĂRUL LECȚIEI ȚINE LOCUL NUMĂRULUI DE ORĂ. Un material se leagă de un număr
+ * (`ore` din `school_fise`), oricum; la clasele cu planificare numărul e al orei
+ * din an, aici e al lecției din listă. Așa se folosește aceeași găleată, același
+ * rând în bază și aceeași fereastră de urcare, fără nimic nou în bază.
+ *
+ * O lecție poate ține mai multe materiale, ca o oră: „+"-ul de pe rândul ei
+ * adaugă încă unul (exercițiile de după teorie), iar „Adaugă lecție" deschide
+ * următorul număr.
+ */
+function vedereDeLectii(c, fise, cap) {
+  const peLectie = materialelePeOra(fise);
+  const numere = [...peLectie.keys()].sort((a, b) => a - b);
+  const urmatoarea = (numere.at(-1) || 0) + 1;
+  const admin = isAdmin();
+
+  const buton = admin
+    ? `<button type="button" class="lic-btn lic-btn--tare lic-clasa__adauga" data-act="lectie-noua"
+         data-clasa="${esc(c.cod)}" data-nr="${urmatoarea}"
+         title="Urcă un HTML (ori un PDF) ca Lecția ${urmatoarea}">${PLUS}<span>Adaugă lecție</span></button>`
+    : "";
+
+  if (!numere.length) {
+    return `
+      <div class="lic-clasa" style="--h:${c.hue}">
+        ${cap}
+        ${buton ? `<div class="lic-clasa__bara">${buton}</div>` : ""}
+        <p class="lic-clasa__gol">${admin
+          ? "Clasa asta n-are planificare. Lecțiile ei le adaugi de aici, una câte una: un fișier HTML cu lecția ori cu exercițiile."
+          : "Clasa asta n-are încă lecții."}</p>
+      </div>`;
+  }
+
+  const randuri = numere.map((nr) => {
+    const ale = peLectie.get(nr);
+    const f = ale.length === 1 ? ale[0] : null;
+    const titlu = ale[0].titlu;
+    /* Sub titlu: numele materialului, când spune altceva decât titlul, ori câte
+       sunt. Numele scurt se ia din fișier, deci adesea e chiar titlul. */
+    const sub = f
+      ? (f.nume && f.nume !== titlu ? esc(f.nume) : "")
+      : `${ale.length} materiale`;
+    const cuprins = `
+      <span class="lic-ora__nr">Lecția ${nr}</span>
+      <span class="lic-ora__ce">
+        <b>${esc(titlu)}</b>${sub ? `<small>${sub}</small>` : ""}
+      </span>
+      <span class="lic-ora__semn">${esc(f?.fel)}</span>`;
+    const capulRandului = f
+      ? `<a class="lic-ora" href="#/f/${esc(f.id)}" title="${esc(vorbaFisei(f))}">${cuprins}</a>`
+      : `<span class="lic-ora" title="Lecția asta are ${ale.length} materiale">${cuprins}</span>`;
+    return `
+      <li class="lic-rand${ale.length > 1 ? " lic-rand--multe" : ""}">
+        ${capulRandului}${unelteleOrei(c, { nr }, f)}
+        ${ale.length > 1 ? randuriDeMaterial(ale) : ""}
+      </li>`;
+  }).join("");
+
+  return `
+    <div class="lic-clasa" style="--h:${c.hue}">
+      ${cap}
+      <div class="lic-clasa__bara">
+        <p class="lic-clasa__cate">${numere.length === 1 ? "o lecție" : `${numere.length} lecții`}</p>
+        ${buton}
+      </div>
+      <ul class="lic-ore lic-ore--lectii">${randuri}</ul>
+    </div>`;
+}
+
 /** Ce scrie pe fișă când treci peste ea. Litera spune cel mai mult, dar nu toate
  *  fișele au una (vezi `fise.js`); atunci vorbește titlul ei. */
 const vorbaFisei = (f) => FELUL_FISEI[f?.fel]?.ce || f?.titlu || "";
@@ -912,8 +1013,9 @@ function randuriDeMaterial(ale) {
 function unelteleOrei(c, o, f) {
   if (!isAdmin()) return "";
   const cheie = `${c.cod}|${o.nr}`;
+  const unde = faraPlanificare(c.cod) ? "lecția" : "ora";
   const plus = `<button type="button" class="lic-unealta" data-act="fisa-noua" data-cheie="${esc(cheie)}"
-      title="Adaugă un material la ora asta" aria-label="Adaugă un material">${PLUS}</button>`;
+      title="Adaugă un material la ${unde} asta" aria-label="Adaugă un material">${PLUS}</button>`;
   return `<span class="lic-unelte">${plus}${f ? unelteleMaterialului(f, cheie) : ""}</span>`;
 }
 
@@ -1513,7 +1615,7 @@ function baraDeFisa(f, adresaSingura, semn = "") {
   return `
     <div class="lic-fisa__bar">
       <span class="lic-fisa__titlu">
-        <b>${esc(f.clasa)} · ${f.ore.length > 1 ? `Orele ${esc(f.ore.join(", "))}` : `Ora ${f.ora}`}</b>
+        <b>${esc(f.clasa)} · ${esc(undeEFisa(f))}</b>
         <small>${esc(f.titlu)}${semn ? ` · <i>${esc(semn)}</i>` : ""}</small>
       </span>
       ${randTelecomanda(telec.punte)}
@@ -1552,6 +1654,10 @@ function baraDeFisa(f, adresaSingura, semn = "") {
  * vederea. Semnul se pune NUMAI pe cadru; „Singură ↗" deschide fișa curată.
  */
 function vedereDeFisa(f) {
+  /* Planificarea clasei spune dacă bara scrie „Ora" ori „Lecția". Venită pe
+     un link de-a dreptul, încă n-a fost cerută; când sosește, `aduPlanul`
+     schimbă doar capul barei, fără să redeseneze cadrul. */
+  if (!planuri[f.clasa]) aduPlanul(f.clasa);
   if (f.cale) {
     const adresa = adresaFisei(f, caleaSitului);
     const bg = culoareaModulului();
@@ -2019,7 +2125,7 @@ function lectiileDinJur(s) {
  * numele fișierului fără coadă, ca să n-ai de scris nimic dacă ți-l numești deja
  * cum trebuie pe disc.
  */
-function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
+function fereastraDeFisa({ clasa, nr, titlu, fisaVeche, lectieNoua = false }) {
   const vechi = document.getElementById("lic-urcare");
   if (vechi) vechi.remove();
 
@@ -2028,8 +2134,8 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
   d.className = "lic-urcare";
   d.innerHTML = `
     <form method="dialog" class="lic-urcare__form">
-      <h2 class="lic-urcare__titlu">${fisaVeche ? "Înlocuiește materialul" : "Material nou"}</h2>
-      <p class="lic-urcare__unde">${esc(clasa)} · Ora ${nr}</p>
+      <h2 class="lic-urcare__titlu">${fisaVeche ? "Înlocuiește materialul" : lectieNoua ? "Lecție nouă" : "Material nou"}</h2>
+      <p class="lic-urcare__unde">${esc(clasa)} · ${faraPlanificare(clasa) ? "Lecția" : "Ora"} ${nr}</p>
 
       <label class="lic-urcare__camp">
         <span>Fișierul</span>
@@ -2044,7 +2150,8 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
 
       <label class="lic-urcare__camp">
         <span>Titlul lecției, cum se vede în listă</span>
-        <input type="text" name="titlu" value="${esc(fisaVeche?.titlu || titlu || "")}" required />
+        <input type="text" name="titlu" value="${esc(fisaVeche?.titlu || titlu || "")}" required
+          ${lectieNoua ? `placeholder="se ia din numele fișierului"` : ""} />
       </label>
 
       <label class="lic-urcare__camp">
@@ -2075,10 +2182,15 @@ function fereastraDeFisa({ clasa, nr, titlu, fisaVeche }) {
      atins tu: dacă l-ai scris cu mâna, alegerea altui fișier nu ți-l mai ia. */
   let numeScrisDeMana = Boolean(fisaVeche?.nume);
   form.nume.addEventListener("input", () => { numeScrisDeMana = true; });
+  /* La o lecție nouă nu vine niciun titlu din planificare, deci și titlul se
+     propune din numele fișierului, tot până îl scrii tu. */
+  let titluScrisDeMana = !lectieNoua;
+  form.titlu.addEventListener("input", () => { titluScrisDeMana = true; });
   form.fisier.addEventListener("change", () => {
-    if (numeScrisDeMana) return;
     const f = form.fisier.files?.[0];
-    if (f) form.nume.value = numeDinFisier(f.name);
+    if (!f) return;
+    if (!numeScrisDeMana) form.nume.value = numeDinFisier(f.name);
+    if (!titluScrisDeMana) form.titlu.value = numeDinFisier(f.name);
   });
 
   /* `seUrca` ține fereastra deschisă cât se urcă: altfel, o apăsare pe lângă ea
@@ -2152,7 +2264,10 @@ function oraDupaCheie(cheie) {
   const nr = Number(nrText);
   const plan = planuri[cod];
   const o = plan?.ore?.find((x) => x.nr === nr) || null;
-  return { clasa: cod, nr, titlu: o?.titlu || "" };
+  /* La o clasă fără planificare, titlul e al lecției, adică al materialelor ei. */
+  const titlu = o?.titlu
+    || fiseleClasei(cod).find((f) => f.ore.includes(nr))?.titlu || "";
+  return { clasa: cod, nr, titlu };
 }
 
 async function stergeFisaDinLista(id) {
@@ -2207,6 +2322,11 @@ function apasa(e) {
     return;
   }
   if (act === "fisa-sterge") { e.preventDefault(); stergeFisaDinLista(b.dataset.id); return; }
+  if (act === "lectie-noua") {
+    e.preventDefault();
+    fereastraDeFisa({ clasa: b.dataset.clasa, nr: Number(b.dataset.nr), titlu: "", lectieNoua: true });
+    return;
+  }
 
   if (act === "telec-conduc") { alegeRolul("conduc"); return; }
   if (act === "telec-urmez") { alegeRolul("urmez"); return; }

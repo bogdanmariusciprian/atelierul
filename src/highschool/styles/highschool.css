@@ -791,7 +791,24 @@
   color: var(--color-text-muted);
 }
 
+/* LA CLASELE FĂRĂ PLANIFICARE: câte lecții sunt, iar alături „Adaugă lecție". */
+.lic-clasa__bara {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.6rem;
+  margin: -0.8rem 0 1.1rem;
+}
+.lic-clasa__bara .lic-clasa__cate { margin: 0; }
+.lic-clasa__adauga { gap: 0.4rem; margin-inline-start: auto; }
+
 .lic-ore { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+
+/* „Lecția 12" e mai lung decât „Ora 12"; materialele de sub ea se mută odată
+   cu titlul, ca să rămână aliniate sub el. */
+.lic-ore--lectii .lic-ora__nr { inline-size: 4.8rem; }
+.lic-ore--lectii .lic-mat__ce { padding-inline-start: 5rem; }
+@media (max-width: 640px) {
+  .lic-ore--lectii .lic-mat__ce { padding-inline-start: 0.6rem; }
+}
 
 /* Titlul unității de învățare, ca un cap de capitol peste orele ei. */
 .lic-unit {
