@@ -79,6 +79,13 @@
 // e nimeni pornit. La prima schimbare pe o lucrare nouă tabla îl întreabă pe
 // profesor „pentru cine e lucrul acesta?" (elevi anume ori „doar live"), iar
 // alegerea stă la vedere pe bară. Golirea salvează întâi.
+//
+// ÎNCHEIEREA LUCRĂRII (cerută de Marius pe 22 noiembrie 2026: „nu se înțelege
+// ce se întâmplă când închid fișa elevului"). O bandă sus spune mereu starea:
+// lucrarea cui e și că se salvează singură; ori că e doar live; ori că s-a
+// încheiat. „Încheie lucrarea" salvează pe loc, spune unde s-a salvat și
+// întreabă ce faci cu tabla: o golești ori o lași la vedere, fără să se mai
+// salveze. Elevul vede și el că lucrarea s-a încheiat și unde o găsește.
 // Cuprins în română, nume în engleză.
 // =========================================================
 import { isAdmin, CURRENT_USER } from "../../shared/scripts/session.js";
@@ -304,7 +311,13 @@ function normalizeaza(d) {
     const [t, e] = String(k).split("|");
     if (TIPURI.some((x) => x.cheie === t) && UUID.test(String(e)) && UUID.test(String(v))) ids[`${t}|${e}`] = v;
   }
-  return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa, opera, sursa, pentru, inceput, ids };
+  /* Lucrarea încheiată, lăsată pe tablă: la cine s-a salvat (ca elevul să afle
+     că s-a încheiat și unde o găsește). */
+  const inc = d?.incheiat;
+  const incheiat = inc && Array.isArray(inc.elevi)
+    ? { elevi: inc.elevi.filter((e) => UUID.test(String(e?.id))).slice(0, 20).map((e) => ({ id: e.id, nume: String(e.nume || "elev").slice(0, 80) })) }
+    : null;
+  return { tip: TIPURI.some((t) => t.cheie === d?.tip) ? d.tip : TIPURI[0].cheie, stari, fisa, opera, sursa, pentru, inceput, ids, incheiat };
 }
 
 /* `admin` conduce tabla (treapta, tipul, fișa, golirea); `scriu` = poate scrie
@@ -324,8 +337,9 @@ let privat = null;     // lucrarea deschisă doar pentru elev: { id, titlu, data
 let pentru = { decis: false, elevi: [] };   // în contul cui se salvează lucrul live
 let inceput = null;    // când a început lucrarea live de acum
 let ids = {};          // lucrarea fiecărui elev: „tip|elev" → id
+let incheiat = null;   // lucrarea încheiată, lăsată pe tablă: { elevi }
 function incarca(nou) {
-  ({ tip, stari, fisa, opera, sursa, pentru, inceput, ids } = nou);
+  ({ tip, stari, fisa, opera, sursa, pentru, inceput, ids, incheiat } = nou);
   ({ treapta, enunturi } = stari[tip]);
 }
 const pastreazaTipul = () => { stari[tip] = { treapta, enunturi }; };
@@ -474,7 +488,7 @@ async function trimite() {
   if (inZbor) { maiAm = true; return; }
   inZbor = true;
   pastreazaTipul();
-  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa, opera, sursa, pentru, inceput, ids, forme: formele() });
+  const ok = await scrieTabla(SLUG, { tip, tipuri: stari, fisa, opera, sursa, pentru, inceput, ids, incheiat, forme: formele() });
   inZbor = false;
   if (maiAm) { maiAm = false; trimite(); return; }
   arataStarea(ok ? "live · trimis" : "netrimis: verifică netul", ok ? "live" : "eroare");
@@ -526,6 +540,7 @@ foaie.addEventListener("input", (e) => {
   enunturi[t.dataset.n][Number(t.dataset.i)] = t.value;
   potriveste(t);
   numara();
+  deseneazaBandaLucrului();
   if (privat) { salveazaPrivatCurand(); return; }
   trimiteEnuntul(t.dataset.n, t.dataset.i);
   lucrareaSeSchimba();
@@ -573,16 +588,12 @@ document.getElementById("mare").addEventListener("click", () => { marime += 0.1;
 
 document.getElementById("goleste").addEventListener("click", async () => {
   if (!admin) return;
-  if (!trepteLe().some((n) => enunturi[n].some((x) => x.trim()))) return;
+  /* Cu un elev ales, golirea e încheierea lucrării: aceeași întrebare limpede. */
+  if (pentru.elevi.length) { await incheieLucrarea(); return; }
+  if (!trepteLe().some((n) => enunturi[n].some((x) => x.trim()))) { if (incheiat) await golesteTabla(); return; }
   const nume = document.querySelector(`.tr-tip[data-tip="${tip}"]`)?.textContent.trim() || "acesta";
-  /* ÎNTÂI SE SALVEAZĂ. Lucrarea pleacă în contul elevilor ei chiar acum, nu
-     peste câteva secunde, ca golirea să nu-i ia ultimele rânduri. Dacă n-are
-     niciun elev, tabla întreabă dacă o trimiți cuiva. */
-  if (pentru.elevi.length) {
-    arataSalvarea("se salvează înainte de golire…");
-    if (!(await salveazaLaElevi())) {
-      if (!confirm("Lucrarea NU s-a putut salva la elev (vezi mesajul de sub bară). Golești totuși tabla? Ce e scris se pierde.")) return;
-    } else if (!confirm(`Lucrarea s-a salvat la ${pentru.elevi.map((e) => e.nume).join(", ")}.\n\nGolești eseul „${nume}" pentru un lucru nou? Celălalt eseu și fișa rămân.`)) return;
+  if (incheiat) {
+    if (!confirm(`Golești tabla? Lucrarea încheiată e deja salvată la ${incheiat.elevi.map((e) => e.nume).join(", ")}.`)) return;
   } else {
     const ales = await intreaba("Lucrarea nu e salvată la niciun elev",
       `Ce e scris acum la „${nume}" se pierde la golire. O trimiți întâi în contul unui elev?`,
@@ -594,6 +605,11 @@ document.getElementById("goleste").addEventListener("click", async () => {
       if (!confirm(`Lucrarea s-a salvat la ${pentru.elevi.map((e) => e.nume).join(", ")}.\n\nGolești acum eseul „${nume}"?`)) return;
     }
   }
+  await golesteTabla();
+});
+
+/** Golește eseul deschis și începe o lucrare nouă (fără nicio întrebare). */
+async function golesteTabla() {
   clearTimeout(ceas);
   uitaTrimiterile();
   enunturi = gol();
@@ -602,13 +618,50 @@ document.getElementById("goleste").addEventListener("click", async () => {
   pentru = { decis: false, elevi: [] };
   inceput = null;
   ids = {};
+  incheiat = null;
   intrebatPentru = false;
   arataSalvarea("");
   deseneaza();
   arataStarea("se golește…", "trimite");
   await trimite();
   foaie.querySelector(".tr-camp")?.focus();
-});
+}
+
+/**
+ * „Încheie lucrarea": se salvează pe loc la elev, se spune unde, apoi se
+ * întreabă ce faci cu tabla: o golești ori o lași la vedere (fără să se mai
+ * salveze la nimeni).
+ */
+async function incheieLucrarea() {
+  if (!admin || !pentru.elevi.length) return;
+  const cine = pentru.elevi.map((e) => e.nume).join(", ");
+  arataSalvarea("se salvează…");
+  const ok = await salveazaLaElevi();
+  if (!ok) {
+    const ales = await intreaba("Lucrarea NU s-a putut salva",
+      `Nu s-a putut salva la ${cine} (vezi mesajul de sub bară). Verifică netul și încearcă iar.`,
+      [["iar", "Încearcă din nou", "plin"], ["nu", "Înapoi la tablă", ""]]);
+    if (ales === "iar") await incheieLucrarea();
+    return;
+  }
+  const elevi = pentru.elevi.slice();
+  const ales = await intreaba(`Lucrarea s-a salvat la ${cine}`,
+    `O găsiți în 📁 Lucrări: tu, la „Lucrările elevilor”; ${elevi.length > 1 ? "elevii" : "elevul"}, la „Lucrările mele”. De aici încolo, ce e pe tablă nu se mai salvează nicăieri. Ce faci cu tabla?`,
+    [["goleste", "Golește tabla (pentru altceva ori alt elev)", "plin"], ["lasa", "Las-o pe tablă, la vedere", ""], ["nu", "Anulează: continui lucrarea", ""]]);
+  if (!ales || ales === "nu") { arataSalvarea(`salvat la ${cine}`); return; }
+  if (ales === "goleste") { await golesteTabla(); arataSalvarea(`lucrarea s-a salvat la ${cine}; tabla e goală`); return; }
+  /* Rămâne la vedere, dar nu mai e a nimănui: o schimbare de acum n-o mai atinge. */
+  incheiat = { elevi };
+  pentru = { decis: true, elevi: [] };
+  sursa = null;
+  inceput = null;
+  ids = {};
+  intrebatPentru = true;
+  deseneaza();
+  clearTimeout(ceas);
+  await trimite();
+  arataSalvarea(`lucrarea s-a încheiat; e salvată la ${cine}`);
+}
 
 /* ---------- fișa Word de sub tablă ---------- */
 const sectiuneFisa = document.getElementById("fisa");
@@ -997,6 +1050,53 @@ bandaPrivat.hidden = true;
 document.querySelector(".tr-zona").prepend(bandaPrivat);
 bandaPrivat.addEventListener("click", (e) => { if (e.target.closest("[data-iesi]")) ieseDinPrivat(); });
 
+/* BANDA LUCRULUI: sus, mereu limpede ce se întâmplă cu ce e pe tablă. */
+const bandaLucru = document.createElement("div");
+bandaLucru.className = "tr-lucru";
+bandaLucru.hidden = true;
+document.querySelector(".tr-zona").prepend(bandaLucru);
+bandaLucru.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-lucru]")?.dataset.lucru;
+  if (!b || !admin) return;
+  if (b === "incheie") await incheieLucrarea();
+  else if (b === "alege") { if (await alegePentru()) incheiat = null; deseneaza(); }
+  else if (b === "goleste") document.getElementById("goleste").click();
+});
+function deseneazaBandaLucrului() {
+  const titlu = () => `<b>${esc(numeOpera(operaAcum()))}</b> · ${esc(numeTip(tip))}`;
+  let h = "", fel = "";
+  if (privat) { bandaLucru.hidden = true; return; }
+  if (admin) {
+    if (pentru.elevi.length) {
+      fel = "elev";
+      h = `<span>✎ Lucrare pentru <b>${esc(pentru.elevi.map((x) => x.nume).join(", "))}</b>: ${titlu()}. Se salvează singură în contul ${pentru.elevi.length > 1 ? "elevilor" : "elevului"}, la fiecare schimbare.</span>
+        <button type="button" class="tr-btn tr-btn--plin" data-lucru="incheie">Încheie lucrarea</button>`;
+    } else if (incheiat) {
+      fel = "gata";
+      h = `<span>✓ Lucrarea s-a încheiat și e salvată la <b>${esc(incheiat.elevi.map((x) => x.nume).join(", "))}</b>. Ce e pe tablă acum nu se mai salvează nicăieri.</span>
+        <button type="button" class="tr-btn" data-lucru="goleste">Golește tabla</button>
+        <button type="button" class="tr-btn" data-lucru="alege">Lucrare nouă cu un elev</button>`;
+    } else if (pentru.decis) {
+      fel = "live";
+      h = `<span>Lucrezi doar live: ce scrii nu se salvează la niciun elev.</span>
+        <button type="button" class="tr-btn" data-lucru="alege">Salvează la un elev</button>`;
+    } else if (trepteLe().some((n) => enunturi[n]?.some((x) => String(x).trim()))) {
+      fel = "nou";
+      h = `<span>Lucru nou pe tablă: încă nu se salvează la nimeni.</span>
+        <button type="button" class="tr-btn" data-lucru="alege">Alege elevul</button>`;
+    }
+  } else if (incheiat?.elevi.some((x) => x.id === CURRENT_USER.authId)) {
+    fel = "gata";
+    h = `<span>✓ Profesorul a încheiat lucrarea. O găsești în <b>📁 Lucrările mele</b>.</span>`;
+  } else if (pentru.elevi.some((x) => x.id === CURRENT_USER.authId)) {
+    fel = "elev";
+    h = `<span>✎ Lucrarea ta: ${titlu()}. Se salvează singură în contul tău.</span>`;
+  }
+  bandaLucru.hidden = !h;
+  bandaLucru.dataset.fel = fel;
+  if (bandaLucru.innerHTML !== h) bandaLucru.innerHTML = h;
+}
+
 const chipPentru = document.createElement("button");
 chipPentru.type = "button";
 chipPentru.className = "tr-pentru";
@@ -1008,9 +1108,9 @@ function deseneazaLucrarile() {
   chipPentru.hidden = !admin || !!privat;
   chipPentru.classList.toggle("is-live", pentru.decis && !pentru.elevi.length);
   chipPentru.classList.toggle("is-nedecis", !pentru.decis);
-  chipPentru.innerHTML = !pentru.decis ? "❔ Pentru cine e lucrul?"
+  chipPentru.innerHTML = !pentru.decis ? "❔ Alege elevul"
     : pentru.elevi.length ? `💾 Se salvează la: <b>${esc(pentru.elevi.map((e) => e.nume).join(", "))}</b>`
-      : "⚠ Doar live, nesalvat";
+      : incheiat ? "✓ Lucrare încheiată" : "⚠ Doar live, nesalvat";
   chipPentru.title = "Alege în contul cui se salvează lucrarea de pe tablă";
   if (!admin && !privat) {
     const eu = pentru.elevi.some((e) => e.id === CURRENT_USER.authId);
@@ -1022,6 +1122,7 @@ function deseneazaLucrarile() {
     + (admin ? `<button type="button" class="tr-opera__creion" data-opera title="Schimbă opera">✎</button>` : "");
   btnLucrari.hidden = !!privat || !(admin || CURRENT_USER.authId);
   btnLucrari.textContent = admin ? "📁 Lucrările elevilor" : "📁 Lucrările mele";
+  deseneazaBandaLucrului();
   bandaPrivat.hidden = !privat;
   if (privat) {
     bandaPrivat.innerHTML = `<span>✎ Lucrezi singur pe lucrarea ta: <b>${esc(numeOpera(privat.data.opera))} · ${esc(numeTip(privat.data.tip))}</b> · ${esc(ziFrumoasa(privat.data.zi))}. Ce scrii aici se salvează doar în contul tău; nu apare pe tabla live.</span>
@@ -1300,6 +1401,7 @@ urmaresteTabla(SLUG, (d) => {
     nou.pentru = pentru;
     nou.inceput = inceput;
     nou.ids = ids;
+    nou.incheiat = incheiat;
   }
   const altaTreapta = nou.tip !== tip || nou.stari[nou.tip].treapta !== treapta;
   const altaFisa = (nou.fisa?.fisier || "") !== (fisa?.fisier || "");
@@ -1313,6 +1415,7 @@ urmaresteTabla(SLUG, (d) => {
       if (el !== document.activeElement && el.value !== v) { el.value = v; potriveste(el); }
     });
     numara();
+    deseneazaLucrarile();   // banda și chipurile: elevul vede pe loc dacă s-a încheiat lucrarea
     lucrareaSeSchimba();
     return;
   }

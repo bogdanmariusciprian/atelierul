@@ -400,6 +400,16 @@ button { font: inherit; }
   border: 1.5px solid #c4b5fd; background: #f5f3ff; color: #4c1d95; border-radius: 12px; font-size: 14px;
 }
 .tr-privat[hidden] { display: none; }
+/* Banda lucrului (22 nov. 2026): a cui e lucrarea și ce se întâmplă cu ea. */
+.tr-lucru {
+  max-width: 980px; margin: 0 auto 14px; padding: 10px 14px;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  border: 1.5px solid #fdba74; background: #fff7ed; color: #7c2d12; border-radius: 12px; font-size: 14px;
+}
+.tr-lucru[hidden] { display: none; }
+.tr-lucru span { flex: 1; min-width: 240px; }
+.tr-lucru[data-fel="gata"] { border-color: #86efac; background: #f0fdf4; color: #14532d; }
+.tr-lucru[data-fel="live"], .tr-lucru[data-fel="nou"] { border-color: #e5e7eb; background: #f9fafb; color: #374151; }
 .tr-privat span { flex: 1; min-width: 240px; }
 
 /* ---- lucrările: grila „operă × tip de eseu" și cititorul ---- */
