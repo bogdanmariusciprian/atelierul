@@ -19,7 +19,7 @@ const eroare = (unde, e) => { console.warn(`tabla albă, ${unde}:`, e?.message |
 /** Clasele, cu lecțiile lor (fără materialul HTML). */
 export async function clasele() {
   const { data, error } = await supabase.from("tabla_alba_clase")
-    .select("id, nume, ordine, stare, acces, lectii:tabla_alba_lectii(id, titlu, ordine, material, creat_la)")
+    .select("id, nume, ordine, stare, acces, lectii:tabla_alba_lectii(id, titlu, ordine, material, loc, creat_la)")
     .order("ordine").order("creat_la");
   if (error) { eroare("clasele", error); throw error; }
   for (const c of data) c.lectii.sort((a, b) => a.ordine - b.ordine || String(a.creat_la).localeCompare(String(b.creat_la)));
@@ -48,7 +48,7 @@ export async function stergeClasa(id) {
 /** Lecție nouă, cu o pagină goală în ea (cu fundalul tău implicit). */
 export async function lectieNoua(clasaId, titlu, ordine, desen = null) {
   const { data, error } = await supabase.from("tabla_alba_lectii")
-    .insert({ clasa_id: clasaId, titlu, ordine }).select("id, titlu, ordine, material, creat_la").single();
+    .insert({ clasa_id: clasaId, titlu, ordine }).select("id, titlu, ordine, material, loc, creat_la").single();
   if (error) { eroare("lecție nouă", error); return null; }
   await paginaNoua(data.id, 0, desen);
   return data;
@@ -68,14 +68,14 @@ export async function stergeLectia(id) {
 
 export async function paginileAdmin(lectieId) {
   const { data, error } = await supabase.from("tabla_alba_pagini")
-    .select("id, ordine, desen").eq("lectie_id", lectieId).order("ordine").order("actualizat_la");
+    .select("id, ordine, desen, vedere").eq("lectie_id", lectieId).order("ordine").order("actualizat_la");
   if (error) { eroare("paginile", error); throw error; }
   return data;
 }
 
 export async function paginaNoua(lectieId, ordine, desen = null) {
   const { data, error } = await supabase.from("tabla_alba_pagini")
-    .insert({ lectie_id: lectieId, ordine, ...(desen ? { desen } : {}) }).select("id, ordine, desen").single();
+    .insert({ lectie_id: lectieId, ordine, ...(desen ? { desen } : {}) }).select("id, ordine, desen, vedere").single();
   if (error) { eroare("pagină nouă", error); return null; }
   return data;
 }
@@ -85,6 +85,26 @@ export async function salveazaPagina(id, desen) {
     .update({ desen, actualizat_la: new Date().toISOString() }).eq("id", id);
   if (error) { eroare("salvează pagina", error); return false; }
   return true;
+}
+
+/* ---------- locul lăsat de profesor (0119) ---------- */
+
+/** Bucata de planșă lăsată pe pagină: `{ x, y, w, h }`. Doar ea se scrie, nu și
+ *  desenul; `actualizat_la` rămâne neatins, fiindcă pagina nu s-a schimbat. */
+export async function puneVederea(id, vedere) {
+  const { error } = await supabase.from("tabla_alba_pagini").update({ vedere }).eq("id", id);
+  if (error) { eroare("locul paginii", error); return false; }
+  return true;
+}
+
+/** Unde a rămas profesorul în materialul lecției: `null` dacă nicăieri,
+ *  `undefined` dacă nu s-a putut citi (nu e același lucru: peste un loc necitit
+ *  nu se scrie). Se aduce separat de lecții: poartă jurnalul apăsărilor, care
+ *  poate fi mare. */
+export async function loculMaterialului(lectieId) {
+  const { data, error } = await supabase.from("tabla_alba_lectii").select("loc_material").eq("id", lectieId).maybeSingle();
+  if (error) { eroare("locul din material", error); return undefined; }
+  return data?.loc_material && typeof data.loc_material === "object" ? data.loc_material : null;
 }
 
 export async function ordineaPaginilor(pagini) {

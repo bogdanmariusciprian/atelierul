@@ -172,7 +172,8 @@ export class Plansa {
    * @param {boolean} o.poateScrie
    * @param {(op) => void} [o.laOperatie]       o operație făcută aici (de trimis, de salvat)
    * @param {(el|null) => void} [o.laTrasare]   desenul în curs (de trimis live)
-   * @param {() => void} [o.laVedere]           s-a mișcat ori s-a mărit planșa
+   * @param {(cauza?: string) => void} [o.laVedere]  s-a mișcat ori s-a mărit planșa; `"marime"` = doar
+   *                                            fiindcă planșa și-a schimbat mărimea pe ecran, nu a mișcat-o nimeni
    * @param {() => void} [o.laManaMea]          omul a mișcat singur planșa
    * @param {() => void} [o.laMarime]           planșa și-a schimbat mărimea pe ecran
    * @param {() => void} [o.laSchimbare]        s-a schimbat ceva de arătat pe bară (undo, selecție)
@@ -209,7 +210,7 @@ export class Plansa {
     this.text = null;          // editorul deschis (text ori celulă de tabel)
 
     this.marime();
-    new ResizeObserver(() => { this.marime(); this.o.laMarime?.(); this.o.laVedere?.(); this.pozitioneazaEditorul(); }).observe(gazda);
+    new ResizeObserver(() => { this.marime(); this.o.laMarime?.(); this.o.laVedere?.("marime"); this.pozitioneazaEditorul(); }).observe(gazda);
     /* Plasă: dacă browserul tot derulează gazda (ca să arate cursorul), o pune la loc. */
     gazda.addEventListener("scroll", () => { gazda.scrollLeft = 0; gazda.scrollTop = 0; });
     this.leaga();

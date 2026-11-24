@@ -32,7 +32,7 @@ import { isAdmin } from "../../shared/scripts/session.js";
 import {
   clasele, claseNoua, schimbaClasa, stergeClasa, lectieNoua, schimbaLectia, stergeLectia,
   paginileAdmin, paginaNoua, salveazaPagina, stergePagina, materialulAdmin, setarileMele, salveazaSetarile,
-  tableDeschise, intraCuClasa, tablaVizibila, paginileClasei, materialulClasei, canalul,
+  puneVederea, loculMaterialului, tableDeschise, intraCuClasa, tablaVizibila, paginileClasei, materialulClasei, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
 import { ic } from "./tabla-alba-icone.js";
 import { Plansa, FUNDALURI, CHENARE, LISTE, BOLD, ITALIC, SUBLINIAT, inchisa } from "./tabla-alba-plansa.js";
@@ -85,9 +85,9 @@ const plansa = new Plansa($("#plansa"), {
   unealta: "text",          // cerut de Marius: tabla pornește pe Text
   laOperatie: (op) => opMea(op),
   laTrasare: (el) => trasareMea(el),
-  laVedere: () => { arataZoom(); if (admin) stareCurand(150); },
+  laVedere: (cauza) => vedereaSchimbata(cauza),
   laManaMea: () => { if (!admin && urmaresc) { urmaresc = false; deseneazaBara(); } },
-  laMarime: () => { if (!admin && urmaresc && prof.vedere) plansa.arataZona(prof.vedere); },
+  laMarime: () => { if (!admin && urmaresc && prof.vedere && profulEAici()) plansa.arataZona(prof.vedere); },
   laSchimbare: () => deseneazaUneltele(),
 });
 
@@ -137,7 +137,7 @@ bara.addEventListener("click", async (e) => {
     else document.documentElement.requestFullscreen?.().catch(() => {});
   } else if (b === "urmaresc") {
     urmaresc = !urmaresc;
-    if (urmaresc && prof.vedere) plansa.arataZona(prof.vedere);
+    if (urmaresc && prof.vedere && profulEAici()) plansa.arataZona(prof.vedere);
     deseneazaBara();
   } else if (b === "iesi") {
     location.href = "/tabla/";
@@ -162,15 +162,19 @@ function schimbaFila(f) {
   fila = f;
   arataFila();
   deseneazaBara();
-  if (admin) stareAcum();
+  if (admin) { stareAcum(); tineMinteLocul(); if (f !== "material") salveazaLocurileDinMaterial(); }
 }
 function arataFila() {
   const are = !!(clasa && lectie);
   filaTabla.hidden = !are || fila !== "tabla";
   filaMaterial.hidden = !are || fila !== "material";
   golEl.hidden = are;
-  if (are && fila === "tabla") plansa.marime();
-  if (are && fila === "material") { deseneazaMaterialul(); if (!admin && mod === "conduc") aplicaMaterial(); }
+  if (are && fila === "tabla") { plansa.marime(); if (vedereDePus) asazaVederea(stareDePus); }
+  if (are && fila === "material") {
+    deseneazaMaterialul();
+    if (admin && legaLaAratare) { const leaga = legaLaAratare; legaLaAratare = null; leaga(); }
+    if (!admin && mod === "conduc") aplicaMaterial();
+  }
 }
 
 /* =========================================================
@@ -552,11 +556,13 @@ paginiEl.addEventListener("click", async (e) => {
     const id = pagini[pag].id;
     clearTimeout(ceasSalvare);
     if (!(await stergePagina(id))) { arataVestea("Pagina n-a putut fi ștearsă.", true); return; }
+    vederiDeSalvat.delete(pagini[pag]);
     pagini.splice(pag, 1);
     pag = Math.min(pag, pagini.length - 1);
     incarcaPagina();
     trimite("structura", {});
     stareAcum();
+    tineMinteLocul();
   } else if (/^\d+$/.test(v)) mergiLaPagina(Number(v));
 });
 
@@ -566,23 +572,121 @@ async function mergiLaPagina(i) {
   else pastreazaPagina();
   pag = i;
   incarcaPagina();
-  if (admin) stareAcum();
+  if (admin) { stareAcum(); tineMinteLocul(); }
 }
 /* Vizitatorul ține desenul paginii pe care o lasă, cu numărul ei. */
 function pastreazaPagina() {
   const p = pagini[pag];
   if (p) p.desen = { ...plansa.desenul(), rev: p.desen?.rev || 0 };
 }
-function incarcaPagina() {
+/**
+ * Pune pe planșă pagina `pag`. `aceeasi` = e tot pagina de pe ecran, doar
+ * adusă din nou din bază: atunci planșa rămâne unde o ținea omul. Altfel se
+ * așază la locul lăsat pe pagina aceea (0119).
+ */
+function incarcaPagina(aceeasi = false, stareClasa = null) {
   const p = pagini[pag];
   plansa.incarca(p?.desen);
   plansa.strain = null;
-  if (!admin && urmaresc && prof.vedere) plansa.arataZona(prof.vedere);
-  else if (admin) plansa.potriveste();
+  if (!aceeasi) asazaVederea(stareClasa);
+  else if (!admin && urmaresc && prof.vedere && prof.pagina === p?.id) plansa.arataZona(prof.vedere);
   deseneazaPaginile();
   deseneazaUneltele();
   arataZoom();
 }
+
+/* =========================================================
+   LOCUL LĂSAT (0119). Pe fiecare pagină, bucata de planșă văzută; pe fiecare
+   lecție, pagina și fila; în material, slide-ul și apăsările (mai jos, la
+   material). Când te întorci, le găsești cum le-ai lăsat.
+
+   SE ȚINE MINTE DOAR CE A MIȘCAT OMUL. O planșă așezată de cod la deschidere
+   ori o fereastră trasă de colț nu schimbă nimic din ce s-a lăsat: altfel,
+   trecând de pe tabla smart pe laptop și înapoi, locul s-ar fi tot depărtat.
+   ========================================================= */
+/* Vederea profesorului e a paginii LUI: elevul o ia doar cât e pe aceeași
+   pagină (când conduce profesorul, e mereu pe ea). */
+const profulEAici = () => mod === "conduc" || prof.pagina === pagini[pag]?.id;
+const bunaVedere = (v) => !!v && [v.x, v.y, v.w, v.h].every(Number.isFinite) && v.w >= 20 && v.h >= 20;
+const vederiDeSalvat = new Set();   // paginile cu locul încă nescris în bază
+let ceasVederi = null;
+let asezEu = false;                 // planșa o așază codul acum, nu omul
+let vedereDePus = false;            // fila Tablă era ascunsă: se așază când apare
+let stareDePus = null;
+
+function vedereaSchimbata(cauza) {
+  arataZoom();
+  if (!admin) return;
+  stareCurand(150);
+  const p = pagini[pag];
+  if (asezEu || cauza === "marime" || !lectie || !p || fila !== "tabla" || plansa.W < 50 || plansa.H < 50) return;
+  p.vedere = plansa.zonaVazuta();
+  vederiDeSalvat.add(p);
+  clearTimeout(ceasVederi);
+  ceasVederi = setTimeout(salveazaVederile, 600);
+}
+function salveazaVederile() {
+  clearTimeout(ceasVederi);
+  const lista = [...vederiDeSalvat];
+  vederiDeSalvat.clear();
+  for (const p of lista) if (p.id && bunaVedere(p.vedere)) puneVederea(p.id, p.vedere);
+}
+
+/**
+ * Așază planșa la deschiderea unei pagini.
+ * Profesorul: unde a lăsat pagina; altfel unde o ținea clasa (ce s-a salvat
+ * înainte de 0119); altfel tot desenul pe ecran.
+ * Elevul: unde e profesorul chiar acum, dacă e pe pagina asta; altfel unde a
+ * lăsat-o profesorul; altfel tot desenul.
+ */
+function asazaVederea(stareClasa = null) {
+  const p = pagini[pag];
+  if (!p) return;
+  if (fila !== "tabla") { vedereDePus = true; stareDePus = stareClasa; return; }
+  vedereDePus = false;
+  stareDePus = null;
+  const v = admin
+    ? p.vedere || (stareClasa?.pagina === p.id ? stareClasa.vedere : null)
+    : (prof.pagina === p.id && prof.vedere) || p.vedere;
+  asezEu = true;
+  try { if (bunaVedere(v)) plansa.arataZona(v); else plansa.potriveste(); }
+  finally { asezEu = false; }
+  arataZoom();
+}
+
+/** Pagina și fila pe care rămâne lecția deschisă. */
+let ceasLoc = null;
+const lectiiDeSalvat = new Set();
+function tineMinteLocul() {
+  if (!admin || !lectie || !pagini[pag]) return;
+  const loc = { pagina: pagini[pag].id, tab: fila };
+  if (lectie.loc?.pagina === loc.pagina && lectie.loc?.tab === loc.tab) return;
+  lectie.loc = loc;
+  lectiiDeSalvat.add(lectie);
+  clearTimeout(ceasLoc);
+  ceasLoc = setTimeout(salveazaLocul, 600);
+}
+function salveazaLocul() {
+  clearTimeout(ceasLoc);
+  const lista = [...lectiiDeSalvat];
+  lectiiDeSalvat.clear();
+  for (const l of lista) schimbaLectia(l.id, { loc: l.loc });
+}
+
+/** Tot ce e de ținut minte pleacă acum în bază: la plecarea de pe lecție, de
+ *  pe clasă ori de pe pagina sitului.
+ *  LA ÎNCHIDEREA FILEI NU E SIGUR: browserul poate tăia o cerere abia pornită.
+ *  Se poate pierde doar ce ai mișcat în ultima jumătate de secundă (două
+ *  secunde și jumătate în material); rămâne locul de dinainte. */
+function lasLocul() {
+  if (!admin) return;
+  scrieStarea();
+  salveazaVederile();
+  salveazaLocul();
+  salveazaLocurileDinMaterial();
+}
+addEventListener("pagehide", lasLocul);
+document.addEventListener("visibilitychange", () => { if (document.hidden) lasLocul(); });
 
 /* =========================================================
    LIVE: ce trimite profesorul
@@ -592,8 +696,10 @@ function trimite(fel, payload) { if (admin && canal) canal.trimite(fel, { ...pay
 function stareaMea() {
   return {
     lectie: lectie?.id || null, pagina: pagini[pag]?.id || null, tab: fila, mod,
-    /* O planșă încă nedesenată (fila ascunsă) n-are mărime: se trimite ce era. */
-    vedere: plansa.W > 50 && plansa.H > 50 ? plansa.zonaVazuta() : clasa?.stare?.vedere || null,
+    /* O planșă încă nedesenată (fila ascunsă) n-are mărime: se trimite locul
+       lăsat pe pagină, ori ce ținea clasa pentru ea. */
+    vedere: fila === "tabla" && plansa.W > 50 && plansa.H > 50 ? plansa.zonaVazuta()
+      : pagini[pag]?.vedere || (clasa?.stare?.pagina === pagini[pag]?.id ? clasa.stare.vedere : null) || null,
     rev: pagini[pag]?.desen?.rev || 0,
   };
 }
@@ -602,15 +708,24 @@ function stareCurand(ms = 300) {
   clearTimeout(ceasStare);
   ceasStare = setTimeout(stareAcum, ms);
 }
-let ceasStareBaza = null;
+let ceasStareBaza = null, stareDeScris = null;
 function stareAcum() {
   if (!admin || !clasa) return;
   clearTimeout(ceasStare);
   const s = stareaMea();
   trimite("stare", s);
   clasa.stare = s;
+  /* Starea se ține cu id-ul clasei EI: dacă până se scrie deschizi altă clasă,
+     tot în rândul celei dintâi ajunge (înainte nimerea în al celei noi). */
+  stareDeScris = { id: clasa.id, stare: s };
   clearTimeout(ceasStareBaza);
-  ceasStareBaza = setTimeout(() => schimbaClasa(clasa.id, { stare: s }), 1500);
+  ceasStareBaza = setTimeout(scrieStarea, 1500);
+}
+function scrieStarea() {
+  clearTimeout(ceasStareBaza);
+  const x = stareDeScris;
+  stareDeScris = null;
+  if (x) schimbaClasa(x.id, { stare: x.stare });
 }
 /* Repetată, ca un elev intrat la mijlocul orei să afle singur unde suntem. */
 setInterval(() => { if (admin && clasa) { trimite("stare", stareaMea()); trimiteMaterial(); } }, 3000);
@@ -711,7 +826,11 @@ async function aplicaStarea(s) {
     if (i < 0 && s.pagina) { reiaPaginile(); }
     else if (i >= 0 && i !== pag) { pastreazaPagina(); pag = i; incarcaPagina(); }
   }
-  if (urmaresc && s.vedere && fila === "tabla" && (mod === "conduc" || s.pagina === pagini[pag]?.id)) plansa.arataZona(s.vedere);
+  /* Locul profesorului pe pagina lui se ține și aici: dacă elevul ajunge mai
+     târziu singur pe ea, de acolo pornește (0119). */
+  const aProfului = pagini.find((x) => x.id === s.pagina);
+  if (aProfului && bunaVedere(s.vedere)) aProfului.vedere = s.vedere;
+  if (urmaresc && s.vedere && fila === "tabla" && profulEAici()) plansa.arataZona(s.vedere);
   /* A pierdut ceva (un mesaj căzut)? Numărul paginii profesorului o spune. */
   const p = pagini[pag];
   if (p && s.pagina === p.id && typeof s.rev === "number" && s.rev > (p.desen?.rev || 0)) reiaPaginile(p.id, s.rev);
@@ -736,7 +855,7 @@ function reiaPaginile(paginaId = null, rev = 0) {
     if (!p) return;
     pagini = p;
     pag = Math.max(0, pagini.findIndex((x) => x.id === id));
-    incarcaPagina();
+    incarcaPagina(pagini[pag]?.id === id);
     const x = dorit && pagini.find((y) => y.id === dorit.pagina);
     if (x && (x.desen?.rev || 0) < dorit.rev && ++incercari < 5) reiaPaginile();
     else dorit = null;
@@ -748,10 +867,15 @@ async function reiaTot() {
   if (!r.clasa) { tablaInchisa(); return; }
   clasa = r.clasa;
   materiale.clear();
+  /* Pagina de pe ecran: dacă după reluare e tot ea, planșa rămâne unde o ținea
+     elevul (0119), ca la `reiaPaginile`. */
+  ramasaPe = lectie ? pagini[pag]?.id || null : null;
   lectie = null;
-  await aplicaStarea(clasa.stare || {});
+  try { await aplicaStarea(clasa.stare || {}); }
+  finally { ramasaPe = null; }
   if (fila === "material") deseneazaMaterialul();
 }
+let ramasaPe = null;
 
 async function deschideLectiaVizitator(l) {
   lectie = l;
@@ -759,8 +883,11 @@ async function deschideLectiaVizitator(l) {
   const i = pagini.findIndex((p) => p.id === prof.pagina);
   pag = i >= 0 ? i : 0;
   if (mod === "conduc") fila = prof.tab === "material" ? "material" : "tabla";
+  const aceeasi = !!ramasaPe && pagini[pag]?.id === ramasaPe;
+  ramasaPe = null;
+  vedereDePus = false;
   arataFila();
-  incarcaPagina();
+  incarcaPagina(aceeasi);
   deseneazaBara();
 }
 
@@ -790,7 +917,8 @@ async function deseneazaMaterialul() {
       <span class="ta-g"></span>
       <button type="button" class="ta-btn" data-m="fisier">${m.fel === "fisier" ? "Înlocuiește fișierul" : "Urcă o lecție .html"}</button>
       <button type="button" class="ta-btn" data-m="pagina">Pagină de pe sit</button>
-      ${m.fel ? `<button type="button" class="ta-btn ta-btn--rosu" data-m="scoate">Scoate</button>` : ""}
+      ${m.fel ? `<button type="button" class="ta-btn" data-m="inceput" title="Ia lecția de la capăt: uită unde ai rămas în ea">De la început</button>
+      <button type="button" class="ta-btn ta-btn--rosu" data-m="scoate">Scoate</button>` : ""}
     </div>` : "";
   if (materialAfisat === cheie) {
     const u = filaMaterial.querySelector(".ta-mat-unelte");
@@ -799,9 +927,15 @@ async function deseneazaMaterialul() {
   }
   materialAfisat = cheie;
   const nr = ++randMaterial;
+  const lec = lectie;
+  /* Desenul ăsta se lasă baltă (între timp e altă lecție pe ecran ori n-a venit
+     fișierul): cheia lui nu mai ține locul ocupat, ca la întoarcerea pe lecție
+     materialul să se deseneze din nou, nu să rămână la „Se deschide…". */
+  const lasBalta = () => { if (nr === randMaterial && materialAfisat === cheie) materialAfisat = ""; };
   punte?.uita?.();
   punte = null;
   cadruMat = null;
+  legaLaAratare = null;
   if (!m.fel) {
     filaMaterial.innerHTML = `${unelteM}<div class="ta-mat-gol">${admin
       ? "Pune aici lecția ta HTML: o urci ca fișier ori alegi o pagină a sitului."
@@ -809,48 +943,96 @@ async function deseneazaMaterialul() {
     return;
   }
   filaMaterial.innerHTML = `${unelteM}<div class="ta-mat-gol">Se deschide materialul…</div>`;
+  /* Locul lăsat în material (0119) se aduce o dată pe lecție, înaintea cadrului:
+     `legaPuntea` are nevoie de el chiar la încărcare. */
+  if (admin && !locuriMaterial.has(lec.id)) {
+    const adus = await loculMaterialului(lec.id);
+    /* Necitit (fără net) nu e totuna cu „nicăieri": nu se ține minte, se mai
+       încearcă la deschiderea următoare, iar până atunci locul din bază nu se
+       atinge (altfel s-ar fi scris peste el un material luat de la capăt). */
+    if (adus === undefined) locNecitit.add(lec.id);
+    else { locNecitit.delete(lec.id); if (!locuriMaterial.has(lec.id)) locuriMaterial.set(lec.id, adus); }
+    if (nr !== randMaterial || lectie?.id !== lec.id) { lasBalta(); return; }
+  }
   const cadru = document.createElement("iframe");
   cadru.className = "ta-mat-cadru";
   cadru.title = "Materialul lecției";
   if (m.fel === "pagina" && ADRESA_BUNA.test(m.adresa || "")) {
     cadru.src = m.adresa;
   } else if (m.fel === "fisier") {
-    let html = materiale.get(lectie.id);
+    let html = materiale.get(lec.id);
     if (html == null) {
-      html = admin ? await materialulAdmin(lectie.id) : await materialulClasei(clasa.id, lectie.id);
-      if (nr !== randMaterial) return;
-      if (html == null) { filaMaterial.querySelector(".ta-mat-gol").textContent = "Materialul n-a putut fi adus."; return; }
-      materiale.set(lectie.id, html);
+      html = admin ? await materialulAdmin(lec.id) : await materialulClasei(clasa.id, lec.id);
+      /* După id, nu după obiect: la elev, lecția se face din nou la fiecare
+         reluare din bază, dar e tot ea. */
+      if (nr !== randMaterial || lectie?.id !== lec.id) { lasBalta(); return; }
+      if (html == null) {
+        const gol = filaMaterial.querySelector(".ta-mat-gol");
+        if (gol) gol.textContent = "Materialul n-a putut fi adus.";
+        lasBalta();   // la următoarea arătare a filei se mai încearcă o dată
+        return;
+      }
+      materiale.set(lec.id, html);
     }
     if (nr !== randMaterial) return;
     /* Același zar la profesor și la elevi: o lecție care amestecă ceva la
        întâmplare se așază la fel pe toate ecranele, iar apăsările nimeresc. */
-    cadru.srcdoc = cuAcelasiZar(html, lectie.id);
+    cadru.srcdoc = cuAcelasiZar(html, lec.id);
   } else return;
   filaMaterial.querySelectorAll(".ta-mat-gol, iframe").forEach((x) => x.remove());
   filaMaterial.append(cadru);
   cadruMat = cadru;
-  cadru.addEventListener("load", () => { if (cadru === cadruMat) legaPuntea(cadru, cheie); });
+  /* Locul lăsat se reface doar la prima încărcare a cadrului: dacă lecția se
+     reîncarcă singură (un buton „de la capăt" al ei), pornește curată. */
+  let prima = true;
+  cadru.addEventListener("load", () => {
+    if (cadru !== cadruMat) return;
+    const leaga = () => { if (cadru !== cadruMat) return; legaPuntea(cadru, cheie, prima); prima = false; };
+    /* Încărcat cu fila ascunsă (ai trecut între timp pe Tablă): un cadru fără
+       așezare nu se poate derula, iar gesturile refăcute ar nimeri aiurea.
+       Puntea se leagă când apare fila; până atunci n-are cine apăsa în el. */
+    if (admin && filaMaterial.hidden) { legaLaAratare = leaga; return; }
+    legaLaAratare = null;
+    leaga();
+  });
 }
+/* Legarea punții, amânată până apare fila Material (vezi mai sus). */
+let legaLaAratare = null;
 
 /** La fiecare încărcare a materialului: la profesor ascultă, la elev reface. */
-function legaPuntea(cadru, cheie) {
+function legaPuntea(cadru, cheie, prima = false) {
   punte?.uita?.();
   punte = puntea(cadru);
   if (admin) {
     jur.cheie = cheie;
     jur.jurnal = [];
     jur.derulari = {};
+    /* Locul lăsat în material (0119): apăsările se refac ÎNAINTE să ascultăm,
+       altfel ar intra a doua oară în jurnal. */
+    const lasat = prima && lectie ? locuriMaterial.get(lectie.id) : null;
+    const refacut = !!lasat && lasat.cheie === cheie;
+    if (refacut) refaLoculDinMaterial(lasat);
     jur.slide = punte.slide();
+    let plin = false;
     const inJurnal = (rand) => {
-      if (jur.jurnal.length >= MAX_JURNAL) return;
+      if (jur.jurnal.length >= MAX_JURNAL) {
+        /* Peste atât, apăsările noi nu mai pleacă la elevi. Înainte se tăcea;
+           acum, cu jurnalul ținut de la o oră la alta, se poate ajunge aici. */
+        if (!plin) { plin = true; arataVestea("Materialul a strâns prea multe apăsări: elevii nu le mai primesc pe cele noi. Apasă „De la început” ca să-l iei de la capăt.", true); }
+        return;
+      }
       jur.jurnal.push(rand);
       trimiteMaterialDupaApasare();
     };
     punte.pePunere(inJurnal);
     punte.pePunereGest?.(inJurnal);
     punte.pePunereTasta?.(inJurnal);
-    punte.pePunereInchidere?.(inJurnal);
+    /* Ferestrele închise de apăsările refăcute își anunță închiderea cu o
+       clipă întârziere; se ascultă abia după ele, ca să nu intre încă o dată
+       în jurnal la fiecare întoarcere. */
+    const puntea0 = punte;
+    if (refacut) setTimeout(() => { if (punte === puntea0) punte.pePunereInchidere?.(inJurnal); }, 80);
+    else punte.pePunereInchidere?.(inJurnal);
     punte.pePunereDerulare?.((cale, loc) => { jur.derulari[cale] = loc; trimiteDerularea(); });
     trimiteMaterial();
     return;
@@ -870,6 +1052,61 @@ function trimiteMaterial() {
   if (!admin || !jur.cheie || jur.cheie !== materialAfisat || !punte) return;
   jur.slide = punte.slide();
   trimite("material", { lectie: lectie?.id, cheie: jur.cheie, slide: jur.slide, jurnal: jur.jurnal, derulari: jur.derulari });
+  tineMinteMaterialul();
+}
+
+/* ---------- la profesor: locul lăsat în material (0119) ---------- */
+/* Pe lecții: { cheie, slide, jurnal, derulari, semn }; `null` = nicăieri;
+   lipsă = încă neadus din bază (vezi `deseneazaMaterialul`). */
+const locuriMaterial = new Map();
+const materialeDeSalvat = new Set();
+const locNecitit = new Set();        // lecțiile al căror loc n-a putut fi citit: nu se scrie peste el
+const JURNAL_DE_REFACUT = 1000;      // jumătate din `MAX_JURNAL`
+let ceasLocMaterial = null;
+const semnulMaterialului = () => `${jur.cheie}|${jur.jurnal.length}|${jur.slide}|${JSON.stringify(jur.derulari)}`;
+
+/** Ține minte unde e materialul acum, dacă s-a schimbat ceva de data trecută. */
+function tineMinteMaterialul() {
+  if (!admin || !lectie || !jur.cheie || jur.cheie !== materialAfisat || locNecitit.has(lectie.id)) return;
+  const semn = semnulMaterialului();
+  if (locuriMaterial.get(lectie.id)?.semn === semn) return;
+  locuriMaterial.set(lectie.id, { cheie: jur.cheie, slide: jur.slide, jurnal: jur.jurnal.slice(), derulari: { ...jur.derulari }, semn });
+  materialeDeSalvat.add(lectie.id);
+  clearTimeout(ceasLocMaterial);
+  ceasLocMaterial = setTimeout(salveazaLocurileDinMaterial, 2500);
+}
+function salveazaLocurileDinMaterial() {
+  clearTimeout(ceasLocMaterial);
+  for (const id of materialeDeSalvat) {
+    const l = locuriMaterial.get(id);
+    if (!l) continue;
+    const loc = { cheie: l.cheie, slide: l.slide, jurnal: l.jurnal, derulari: l.derulari };
+    /* Un jurnal foarte lung nu încape pe rând: rămân slide-ul și derulările. */
+    if (JSON.stringify(loc).length > 200000) loc.jurnal = [];
+    schimbaLectia(id, { loc_material: loc });
+  }
+  materialeDeSalvat.clear();
+}
+/** Aduce materialul proaspăt încărcat unde a fost lăsat: apăsările, în ordine,
+ *  apoi slide-ul și derulările. Elevii primesc același jurnal și ajung la fel. */
+function refaLoculDinMaterial(l) {
+  let lista = Array.isArray(l.jurnal) ? l.jurnal.filter((x) => typeof x === "string") : [];
+  /* JURNALUL SE ADUNĂ de la o oră la alta. Unul ajuns lung nu se mai reface:
+     ar lăsa prea puțin loc până la plin (`MAX_JURNAL`), iar de acolo încolo
+     elevii n-ar mai primi nimic. Rămân slide-ul și derulările, pe curat. */
+  if (lista.length > JURNAL_DE_REFACUT) lista = [];
+  lista.forEach((c) => punte.apasa(c));
+  jur.jurnal = lista;
+  if (punte.fel !== "fara" && Number.isInteger(l.slide) && punte.slide() !== l.slide) punte.laSlide(l.slide);
+  const der = l.derulari && typeof l.derulari === "object" ? Object.entries(l.derulari).slice(0, 30) : [];
+  jur.derulari = Object.fromEntries(der);
+  const puntea0 = punte;
+  const deruleaza = () => { if (punte === puntea0 && punte.deruleaza) for (const [cale, loc] of der) punte.deruleaza(cale, loc); };
+  deruleaza();
+  /* După un slide schimbat, pagina mai are de așezat: derularea se mai pune o dată. */
+  setTimeout(deruleaza, 350);
+  jur.slide = punte.slide();
+  locuriMaterial.set(lectie.id, { cheie: jur.cheie, slide: jur.slide, jurnal: lista.slice(), derulari: { ...jur.derulari }, semn: semnulMaterialului() });
 }
 /* Apăsarea e prinsă înainte s-o facă lecția; starea pleacă după, cu slide-ul
    ei adevărat (ca la telecomanda Liceului). */
@@ -928,6 +1165,16 @@ filaMaterial.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-m]")?.dataset.m;
   if (!b || !admin || !lectie) return;
   if (b === "fisier") { $("#alege-material").click(); return; }
+  if (b === "inceput") {
+    /* Lecția se ia de la capăt: se uită locul lăsat, iar cadrul se face din nou. */
+    locuriMaterial.set(lectie.id, null);
+    materialeDeSalvat.delete(lectie.id);
+    locNecitit.delete(lectie.id);
+    schimbaLectia(lectie.id, { loc_material: null });
+    materialAfisat = "";
+    deseneazaMaterialul();
+    return;
+  }
   if (b === "pagina") {
     const r = prompt("Adresa paginii de pe sit, de la bară încolo, de exemplu:\n/lectii/lectura/luceafarul/\n\nAtenție: cât e situl în prelansare, vizitatorii fără cont nu văd paginile lui; o lecție urcată ca fișier .html o văd toți.", lectie.material?.adresa || "/lectii/");
     if (r == null) return;
@@ -948,8 +1195,12 @@ $("#alege-material").addEventListener("change", async (e) => {
   await puneMaterialul({ fel: "fisier", nume: f.name.slice(0, 120) }, await f.text());
 });
 async function puneMaterialul(material, html) {
-  const ok = await schimbaLectia(lectie.id, { material, material_html: html });
+  const ok = await schimbaLectia(lectie.id, { material, material_html: html, loc_material: null });
   if (!ok) { arataVestea("Materialul n-a intrat în bază.", true); return; }
+  /* Alt material: locul lăsat în cel vechi nu mai are unde să se potrivească. */
+  locuriMaterial.set(lectie.id, null);
+  materialeDeSalvat.delete(lectie.id);
+  locNecitit.delete(lectie.id);
   lectie.material = material;
   if (html != null) materiale.set(lectie.id, html); else materiale.delete(lectie.id);
   materialAfisat = "";
@@ -1091,6 +1342,8 @@ function legaCanalul() {
 async function deschideClasa(k) {
   if (clasa?.id === k.id) { deseneazaPanoul(); return; }
   await salveazaAcum();
+  lasLocul();
+  randLectie++;   // o lecție a clasei dinainte, care încă își aștepta paginile, se lasă baltă
   clasa = k;
   lectie = null;
   pagini = [];
@@ -1103,30 +1356,56 @@ async function deschideClasa(k) {
   else { arataFila(); deseneazaBara(); deseneazaGolul(); }
 }
 function inchideClasa() {
+  lasLocul();
+  randLectie++;
   canal?.opreste();
   canal = null;
   clasa = null; lectie = null; pagini = [];
   arataFila(); deseneazaBara(); deseneazaGolul();
 }
 
+/* Fiecare deschidere de lecție are numărul ei: dacă apeși repede pe alta, cea
+   dinainte, care încă își aștepta paginile, se lasă baltă. */
+let randLectie = 0;
 async function deschideLectia(l, stare = null) {
+  const nr = ++randLectie;
   await salveazaAcum();
-  lectie = l;
+  /* Locul lecției din care pleci (pagina, fila, vederile, materialul) pleacă în bază. */
+  lasLocul();
   let p;
   try { p = await paginileAdmin(l.id); } catch { arataVestea("Paginile n-au putut fi aduse.", true); return; }
   if (!p.length) { const n = await paginaNoua(l.id, 0, desenNou()); if (n) p = [n]; }
+  if (nr !== randLectie) return;
+  /* Aceeași lecție, deschisă din nou: locul paginilor abia mișcate poate să nu
+     fi ajuns încă în bază când s-au citit paginile; cel din memorie e cel bun. */
+  if (l === lectie) for (const n of p) { const v = pagini.find((o) => o.id === n.id)?.vedere; if (v) n.vedere = v; }
+  lectie = l;
   pagini = p;
-  const i = stare ? pagini.findIndex((x) => x.id === stare.pagina) : -1;
+  /* UNDE SE DESCHIDE (0119). Lecția își știe singură pagina și fila lăsate, iar
+     locul ei se scrie mai des decât starea clasei, deci el e cel proaspăt.
+     Starea clasei rămâne pentru ce s-a lăsat înainte de 0119, și numai dacă
+     profesorul era chiar pe lecția asta (așa se deschide clasa). */
+  const s = stare?.lectie === l.id ? stare : null;
+  const loc = l.loc || {};
+  let i = pagini.findIndex((x) => x.id === loc.pagina);
+  if (i < 0 && s) i = pagini.findIndex((x) => x.id === s.pagina);
   pag = i >= 0 ? i : 0;
-  fila = stare?.tab === "material" ? "material" : "tabla";
+  fila = (loc.tab || s?.tab) === "material" ? "material" : "tabla";
   materialAfisat = "";
+  randMaterial++;
+  legaLaAratare = null;
+  vedereDePus = false;
   pune(CHEIE_UNDE, JSON.stringify({ clasa: clasa.id, lectie: l.id }));
   arataFila();
-  incarcaPagina();
-  if (stare?.vedere) plansa.arataZona(stare.vedere);
+  incarcaPagina(false, s);
   deseneazaPanoul();
   deseneazaBara();
   stareAcum();
+  /* La o lecție deschisă, starea clasei pleacă pe loc în bază, nu peste o
+     secundă și jumătate: elevii care iau totul din bază chiar atunci (lecție
+     nouă, legătură căzută) o găsesc pe cea bună, nu pe lecția dinainte. */
+  scrieStarea();
+  tineMinteLocul();
   if (innerWidth < 900) { panou.hidden = true; deseneazaBara(); }
 }
 
@@ -1254,7 +1533,10 @@ if (admin) {
   }
   if (k) {
     const l = k.lectii.find((x) => x.id === unde?.lectie);
-    if (l && k.stare?.lectie !== l.id) k.stare = { ...(k.stare || {}), lectie: l.id };
+    /* Lecția ținută minte pe aparatul ăsta, dacă e alta decât a clasei: se
+       deschide ea, la locul EI (pagina și vederea din starea clasei sunt ale
+       celeilalte lecții). */
+    if (l && k.stare?.lectie !== l.id) k.stare = { mod: k.stare?.mod, lectie: l.id };
     await deschideClasa(k);
   }
 } else {
