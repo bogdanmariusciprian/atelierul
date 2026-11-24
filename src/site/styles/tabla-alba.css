@@ -92,6 +92,18 @@ button { font: inherit; color: inherit; }
 .ta-stare::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #c9c1b7; }
 .ta-stare[data-fel="live"]::before { background: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .18); }
 .ta-stare[data-fel="eroare"] { color: var(--red); }
+/* Butonul de salvare: verde = salvat, portocaliu = mai e de scris, roșu = n-a mers. */
+.ta-salvare { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; transition: background .25s, color .25s, border-color .25s; }
+.ta-salvare[data-fel="salvat"] { color: #15803d; border-color: #86efac; background: #f0fdf4; }
+.ta-salvare[data-fel="asteapta"], .ta-salvare[data-fel="salveaza"] { color: #b45309; border-color: #fcd34d; background: #fffbeb; }
+.ta-salvare[data-fel="eroare"] { color: #fff; border-color: var(--red); background: var(--red); }
+.ta-salvare.is-puls { animation: ta-salvat 1.5s ease-out; }
+@keyframes ta-salvat {
+  0% { background: #16a34a; color: #fff; box-shadow: 0 0 0 0 rgba(22, 163, 74, .55); }
+  60% { box-shadow: 0 0 0 10px rgba(22, 163, 74, 0); }
+  100% { background: #f0fdf4; color: #15803d; box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .ta-salvare.is-puls { animation: none; } }
 .ta-stare[data-fel="eroare"]::before { background: var(--red); }
 
 /* ---- corpul: panoul și scena ---- */

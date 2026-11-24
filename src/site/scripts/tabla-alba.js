@@ -90,7 +90,7 @@ const plansa = new Plansa($("#plansa"), {
   laVedere: (cauza) => vedereaSchimbata(cauza),
   laManaMea: () => { if (!admin && urmaresc) { urmaresc = false; deseneazaBara(); } },
   laMarime: () => { if (!admin && urmaresc && prof.vedere && profulEAici()) plansa.arataZona(prof.vedere); },
-  laSchimbare: () => deseneazaUneltele(),
+  laSchimbare: () => { deseneazaUneltele(); picteazaSalvarea(); },
   laFormat: () => formatCurand(),
 });
 
@@ -123,7 +123,9 @@ function deseneazaBara() {
     <span class="ta-g"></span>
     ${moduri}${codul}${urmeaza}${stare}
     ${!admin && clasa ? `<button type="button" class="ta-btn" data-bara="iesi" title="Ieși din clasa asta">Ieși</button>` : ""}
+    ${admin && clasa && lectie ? `<button type="button" class="ta-btn ta-salvare" data-bara="salveaza"></button>` : ""}
     <button type="button" class="ta-btn" data-bara="ecran" title="Pe tot ecranul">${ic("potriveste", 18)}</button>`;
+  picteazaSalvarea();
 }
 
 bara.addEventListener("click", async (e) => {
@@ -135,6 +137,7 @@ bara.addEventListener("click", async (e) => {
   if (m && admin) { mod = m.dataset.mod; deseneazaBara(); stareAcum(); return; }
   const b = e.target.closest("[data-bara]")?.dataset.bara;
   if (b === "panou") { panou.hidden = !panou.hidden; deseneazaBara(); }
+  else if (b === "salveaza") salveazaCuMana();
   else if (b === "ecran") {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else document.documentElement.requestFullscreen?.().catch(() => {});
@@ -895,22 +898,80 @@ function trasareMea(el) {
 
 /* ---------- salvarea paginii ---------- */
 let ceasSalvare = null, deSalvat = null, spuneDupa = false;
+/* BUTONUL DE SALVARE (cerut de Marius pe 25 noiembrie 2026). Tabla se salvează
+   singură la o clipă după fiecare schimbare; butonul arată că s-a salvat
+   (verde), că mai e ceva de scris în bază (portocaliu) ori că n-a mers (roșu),
+   iar apăsat, salvează pe loc, cu tot cu textul din caseta încă deschisă. */
+let stareSalvare = "salvat", inSalvare = 0, ceasPuls = null;
+function picteazaSalvarea(puls = false) {
+  const b = bara.querySelector("[data-bara='salveaza']");
+  if (!b) return;
+  const fel = stareSalvare === "eroare" ? "eroare" : inSalvare ? "salveaza" : deSalvat || plansa.text ? "asteapta" : "salvat";
+  b.dataset.fel = fel;
+  b.innerHTML = `${ic("salveaza", 18)}<span>${{ salvat: "Salvat", salveaza: "Se salvează…", asteapta: "Salvează", eroare: "Nesalvat! Apasă" }[fel]}</span>`;
+  b.title = { salvat: "Tot ce e pe tablă e salvat. Apasă ca să salvezi din nou, pe loc.",
+    salveaza: "Se scrie în bază…", asteapta: plansa.text ? "Textul din caseta deschisă se salvează când o închizi; apasă ca să-l salvezi acum." : "Se salvează singură într-o clipă; apasă ca să salvezi acum.",
+    eroare: "Pagina NU s-a salvat (verifică netul). Apasă ca să mai încerci." }[fel];
+  if (puls && fel === "salvat") {
+    b.classList.remove("is-puls");
+    void b.offsetWidth;
+    b.classList.add("is-puls");
+    clearTimeout(ceasPuls);
+    ceasPuls = setTimeout(() => b.classList.remove("is-puls"), 1600);
+  }
+}
 function salveazaCurand(spune = false) {
   deSalvat = pagini[pag];
   spuneDupa ||= spune;
   clearTimeout(ceasSalvare);
   ceasSalvare = setTimeout(salveazaAcum, 800);
+  picteazaSalvarea();
 }
 async function salveazaAcum() {
   clearTimeout(ceasSalvare);
   const p = deSalvat;
   deSalvat = null;
-  if (!admin || !p) return;
+  if (!admin || !p) return true;
+  inSalvare++;
+  picteazaSalvarea();
   const ok = await salveazaPagina(p.id, p.desen);
-  if (!ok) { arataVestea("Pagina NU s-a salvat: verifică netul.", true); deSalvat ||= p; return; }
+  inSalvare--;
+  if (!ok) {
+    arataVestea("Pagina NU s-a salvat: verifică netul.", true);
+    deSalvat ||= p;
+    stareSalvare = "eroare";
+    /* Se mai încearcă singură: înainte rămânea nesalvată până la schimbarea următoare. */
+    clearTimeout(ceasSalvare);
+    ceasSalvare = setTimeout(salveazaAcum, 4000);
+    picteazaSalvarea();
+    return false;
+  }
+  stareSalvare = "salvat";
   if (spuneDupa) { spuneDupa = false; trimite("reia", { pagina: p.id }); }
+  picteazaSalvarea(true);
+  return true;
 }
-addEventListener("beforeunload", (e) => { if (deSalvat) { salveazaAcum(); e.preventDefault(); } });
+/** Salvarea cu mâna: închide caseta de text deschisă (ca textul ei să intre pe
+ *  pagină), apoi scrie pagina în bază, chiar dacă părea deja salvată. */
+async function salveazaCuMana() {
+  if (!admin || !pagini[pag]) return;
+  if (plansa.text) plansa.inchideTextul(true);
+  deSalvat ||= pagini[pag];
+  if (await salveazaAcum()) arataVestea("Salvat.");
+}
+/* Din timp în timp, butonul clipește verde dacă totul e salvat. */
+setInterval(() => { if (admin && lectie && !document.hidden) picteazaSalvarea(true); }, 20000);
+/* La plecarea de pe pagină (ori la trecerea în altă filă), textul din caseta
+   deschisă intră pe pagină și se salvează: altfel se pierdea cu tot cu casetă. */
+document.addEventListener("visibilitychange", () => {
+  if (!admin || !document.hidden) return;
+  if (plansa.text) plansa.inchideTextul(true);
+  if (deSalvat) salveazaAcum();
+});
+addEventListener("beforeunload", (e) => {
+  if (admin && plansa.text) plansa.inchideTextul(true);
+  if (deSalvat) { salveazaAcum(); e.preventDefault(); }
+});
 
 /* =========================================================
    LIVE: ce primește vizitatorul
