@@ -416,7 +416,7 @@ export function geometria(ps, { m, ind = null, masoara }) {
     const lista = !!p?.l;
     return { n, pm, pas, lista, marc: marc[k], wm: lista ? masoara(marc[k], 0, pm) : 0, xm: locMarcaj(n, pas), slot: 0, gol: 0, stanga: n * pas,
       /* Alineatul: doar primul rând intră, cu un pas (cel puțin o literă și jumătate). */
-      alin: !lista && p?.i ? Math.max(pas, pm * 1.5) : 0 };
+      alin: !lista && p?.i ? Math.max(pas, pm * 1.5) * 1.5 : 0 };
   });
   /* Listele, pe niveluri: paragrafele de același fel, unul după altul. */
   const deschise = [];
