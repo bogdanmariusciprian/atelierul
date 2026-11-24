@@ -255,9 +255,17 @@ button { font: inherit; color: inherit; }
 .ta-text .ta-p[data-m]::before {
   content: attr(data-m);
   position: absolute;
-  left: var(--mx, 0);
+  left: var(--mx, 0); top: var(--my, 0);
+  /* Mărimea semnului e a paragrafului lui, nu a casetei (`--ms`, din script). */
+  font-size: var(--ms, inherit); line-height: 1.25;
   font-weight: 400; font-style: normal; text-decoration: none;
   white-space: pre;
+}
+/* Lista la mijloc ori la dreapta: semnul merge cu primul rând, lipit de el. */
+.ta-text .ta-p[data-m][data-am]::before {
+  position: static; display: inline-block;
+  width: var(--mw, 1.5em);
+  text-align: left;
 }
 /* Marginea până unde merge rândul: o tragi, textul se reașază pe loc. */
 .ta-margine {
@@ -284,7 +292,41 @@ button { font: inherit; color: inherit; }
   max-width: calc(100% - 340px);
   overflow-x: auto; scrollbar-width: none;
 }
-.ta-format-bara .ta-grup { display: flex; gap: 2px; }
+.ta-format-bara .ta-grup { display: flex; gap: 2px; align-items: center; }
+/* Mărimea literei: caseta cu numărul și lista ei (ca în Word). */
+.ta-marime {
+  flex: none; display: flex; align-items: stretch; height: 42px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; overflow: hidden;
+}
+.ta-marime:focus-within { border-color: var(--accent); }
+.ta-marime input {
+  width: 48px; border: 0; outline: 0; background: none;
+  text-align: center; font: 600 16px/1 inherit; color: var(--ink);
+}
+.ta-format .ta-u--ingust { width: 24px; }
+.ta-marime .ta-u { height: auto; border-radius: 0; }
+.ta-ev-grup { flex: none; display: flex; }
+.ta-ev { position: relative; }
+.ta-ev i { position: absolute; left: 9px; right: 9px; bottom: 4px; height: 5px; border-radius: 2px; border: 1px solid rgba(31, 36, 48, .25); }
+/* Listele de sub bară: mărimile, culorile markerului. */
+.ta-pop {
+  position: absolute; z-index: 8;
+  display: grid; gap: 3px; padding: 6px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px -14px rgba(31, 36, 48, .45);
+  max-height: min(60vh, 420px); overflow-y: auto; scrollbar-width: thin;
+}
+.ta-pop--marimi { grid-template-columns: repeat(4, 46px); }
+.ta-pop--marimi button {
+  height: 38px; border: 1px solid transparent; border-radius: 8px;
+  background: none; cursor: pointer; font: inherit; font-size: 15px; color: var(--ink);
+}
+.ta-pop--marimi button:hover { background: #f6f1eb; }
+.ta-pop--marimi button.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.ta-pop--evidentieri { grid-template-columns: repeat(3, 42px); justify-items: center; align-items: center; }
+.ta-pop--evidentieri .ta-btn { grid-column: 1 / -1; justify-self: stretch; min-height: 34px; padding: 4px 8px; font-size: 14px; }
 .ta-format .ta-u { font-family: Georgia, serif; font-size: 18px; }
 .ta-format .ta-u--mic { font-family: inherit; font-size: 13px; letter-spacing: -1px; }
 

@@ -9,7 +9,8 @@
 // ELEMENTELE (ce rămâne desenat), mici, ca să încapă pe canalul live:
 //   { id, t: "p", c, g, o?, pts: [x, y, x, y, …] }      creion (o = marker)
 //   { id, t: "l" | "a" | "r" | "e", c, g, x1, y1, x2, y2 } linie, săgeată, dreptunghi, elipsă
-//   { id, t: "x", c, m, x, y, s, r?, p?, lat?, ind?, w, h }  text (vezi `tabla-alba-text.js`)
+//   { id, t: "x", c, m, x, y, s, r?, p?, lat?, ind?, w, h }  text (vezi `tabla-alba-text.js`);
+//        c și m sunt culoarea și mărimea casetei; cuvintele pot avea altele, în `r`
 //   { id, t: "i", x, y, w, h, src }                     imagine lipită
 //   { id, t: "t", x, y, m, c, col: [lățimi], rh: [înălțimi minime],
 //     cel: [[celulă]], ch: { f, c, g }, w, h }          tabel
@@ -31,12 +32,14 @@
 // Cuprins în română, nume în engleză.
 // =========================================================
 import {
-  BOLD, ITALIC, SUBLINIAT, LITERA, RAND, LISTE, bucatile, strange, paragrafele, aseaza, deseneazaText,
-  inEditor, dinEditor, refaParagrafele, paragrafeleSelectate, puneLista, schimbaNivelul, aliniaza,
-  undeECursorul, taieInceputul, autoLista, NIVEL_MAX,
+  BOLD, ITALIC, SUBLINIAT, LITERA, RAND, LISTE, MARIMI, EVIDENTIERI, bucatile, strange, paragrafele, aseaza, deseneazaText,
+  inEditor, inEditorCuAsteptare, dinEditor, dinParagrafe, paragrafeleDinEditor, modelDinParagrafe, refaParagrafele, paragrafeleSelectate,
+  puneLista, schimbaNivelul, aliniaza, undeECursorul, taieInceputul, autoLista, continuaLista, mutaNivelul,
+  marimeaMica, marimeaDeBaza, marimeaVecina, marimeBuna, cuBaza, cuMarime, cuCuloare, cuEvidentiere, textMarit, formatulIn,
+  selectiaIn, puneSelectia, cursorInAsteptare, curataAsteptarea, areStrain, saltulEditorului,
 } from "./tabla-alba-text.js";
 
-export { BOLD, ITALIC, SUBLINIAT, LISTE };
+export { BOLD, ITALIC, SUBLINIAT, LISTE, MARIMI, EVIDENTIERI, marimeaVecina };
 
 const r1 = (n) => Math.round(n * 10) / 10;
 export const idNou = () => Math.random().toString(36).slice(2, 10);
@@ -146,10 +149,12 @@ function marit(e, ox, oy, s) {
     n.x = X(n.x); n.y = Y(n.y); n.m = r1(Math.max(6, n.m * s)); n.w = r1(n.w * s); n.h = r1(n.h * s);
     if (n.lat) n.lat = r1(n.lat * s);
     if (n.ind) n.ind = r1(n.ind * s);
+    Object.assign(n, textMarit(n, s));   // și mărimile scrise pe cuvinte
   } else if (n.t === "i") { n.x = X(n.x); n.y = Y(n.y); n.w = r1(n.w * s); n.h = r1(n.h * s); }
   else if (n.t === "t") {
     n.x = X(n.x); n.y = Y(n.y); n.m = r1(Math.max(6, n.m * s));
     n.col = n.col.map((w) => r1(w * s)); n.rh = n.rh.map((h) => r1(h * s));
+    n.cel = n.cel.map((rand) => rand.map((c) => (c && !c.x ? textMarit(c, s) : c)));
     n.ch = { ...n.ch, g: r1(Math.max(0.5, (n.ch?.g || 1.5) * s)) };
   } else { n.x1 = X(n.x1); n.x2 = X(n.x2); n.y1 = Y(n.y1); n.y2 = Y(n.y2); n.g = r1(Math.max(0.5, n.g * s)); }
   return n;
@@ -177,6 +182,7 @@ export class Plansa {
    * @param {() => void} [o.laManaMea]          omul a mișcat singur planșa
    * @param {() => void} [o.laMarime]           planșa și-a schimbat mărimea pe ecran
    * @param {() => void} [o.laSchimbare]        s-a schimbat ceva de arătat pe bară (undo, selecție)
+   * @param {() => void} [o.laFormat]           s-a mutat selecția din casetă: bara arată formatul de acolo
    */
   constructor(gazda, o = {}) {
     this.o = o;
@@ -209,6 +215,23 @@ export class Plansa {
     this.cerut = false;
     this.text = null;          // editorul deschis (text ori celulă de tabel)
 
+    /* Selecția din caseta deschisă se ține minte, în poziții: cât ai mâna pe
+       bara de unelte (pe caseta cu mărimea, de pildă), browserul o pierde. */
+    document.addEventListener("selectionchange", () => {
+      const t = this.text;
+      if (!t || t.compun) return;
+      const sel = selectiaIn(t.ta);
+      if (!sel) return;
+      t.sel = sel;
+      if (t.ist.cur) t.ist.cur.sel = sel;
+      /* Formatul care aștepta la cursor se lasă baltă dacă ai plecat de acolo. */
+      if (t.asteapta) {
+        if (!curataAsteptarea(t.ta)) t.asteapta = null;
+        else t.asteapta.poz = sel.a;
+      }
+      this.o.laFormat?.();
+    });
+
     this.marime();
     new ResizeObserver(() => { this.marime(); this.o.laMarime?.(); this.o.laVedere?.("marime"); this.pozitioneazaEditorul(); }).observe(gazda);
     /* Plasă: dacă browserul tot derulează gazda (ca să arate cursorul), o pune la loc. */
@@ -223,6 +246,9 @@ export class Plansa {
   incarca(desen) {
     this.inchideTextul(false);
     this.el = Array.isArray(desen?.el) ? copie(desen.el).filter((e) => e && typeof e === "object" && e.id && e.t) : [];
+    /* Cutiile textelor și ale tabelelor se măsoară din nou: cele ținute în
+       desen pot fi de dinaintea unei schimbări de așezare (listele din 0119+). */
+    for (const e of this.el) if (e.t === "x" || e.t === "t") { try { this.masoara(e); } catch { /* rămâne cum era */ } }
     this.fundal = FUNDALURI.includes(desen?.fundal) ? desen.fundal : "alb";
     this.culoareFundal = CULOARE_BUNA.test(desen?.culoare || "") ? desen.culoare : "#ffffff";
     this.inapoi = [];
@@ -299,6 +325,7 @@ export class Plansa {
     this.o.laSchimbare?.();
   }
   anuleaza() {
+    if (this.text) { this.inapoiInEditor(); return; }
     const op = this.inapoi.pop();
     if (!op) return;
     const opus = this.aplica(op);
@@ -307,6 +334,7 @@ export class Plansa {
     this.o.laSchimbare?.();
   }
   refa() {
+    if (this.text) { this.inainteInEditor(); return; }
     const op = this.inainte.pop();
     if (!op) return;
     const opus = this.aplica(op);
@@ -335,7 +363,13 @@ export class Plansa {
   }
   /** Culoarea aleasă se pune și pe ce e selectat. */
   coloreazaSelectia(c) {
-    const noi = this.el.filter((e) => this.selectate.has(e.id) && e.t !== "i").map((e) => ({ ...copie(e), c }));
+    const noi = this.el.filter((e) => this.selectate.has(e.id) && e.t !== "i").map((e) => {
+      let n = { ...copie(e), c };
+      /* Tot textul ia culoarea: cele puse pe cuvinte nu mai rămân. */
+      if (n.t === "x") n = cuCuloare(n, 0, String(n.s || "").length, null);
+      else if (n.t === "t") n.cel = n.cel.map((rand) => rand.map((k) => (k && !k.x ? cuCuloare(k, 0, String(k.s || "").length, null) : k)));
+      return n;
+    });
     if (noi.length) this.fa({ fel: "schimba", el: noi });
   }
   golesteTot() {
@@ -1079,7 +1113,22 @@ export class Plansa {
 
   /* =========================================================
      EDITORUL DE TEXT (casetă ori celulă de tabel)
+
+     Scrisul îl face browserul (`contenteditable`). Formatul pe cuvinte
+     (mărimea, culoarea, markerul) se pune ÎN MODEL, iar caseta se scrie din
+     nou din el, cu selecția la loc: așa nu rămâne în ea nimic pus de browser
+     după capul lui. Fără nimic selectat, formatul ales așteaptă la cursor și
+     îl ia ce tastezi mai departe, ca în Word.
+
+     CTRL+Z E AL CASETEI, nu al browserului: istoricul browserului nu știe de
+     listele făcute singure ori de formatul pus din bară, și le sărea. Fiecare
+     pas ține textul și selecția; tastatul se strânge pe cuvinte.
      ========================================================= */
+
+  /** Ce trebuie știut ca să se citească textul din casetă. */
+  optEditor(t = this.text) {
+    return { m: t.m, baza: t.baza, z: this.vedere.z, c: t.c };
+  }
 
   /**
    * Deschide editorul. `o`: { wx, wy, model, m, c, lat, ind, aliniere, id,
@@ -1091,12 +1140,14 @@ export class Plansa {
     ta.className = "ta-text";
     ta.contentEditable = "true";
     ta.spellcheck = false;
-    ta.innerHTML = inEditor(o.model);
+    const baza = marimeaMica(o.model, o.m);
+    ta.innerHTML = inEditor(o.model, { m: o.m, baza });
     this.gazda.append(ta);
     const t = {
-      ta, margine: null, ghid: null, wx: o.wx, wy: o.wy, m: o.m, c: o.c, lat: o.lat || null, ind: o.ind || null,
+      ta, margine: null, ghid: null, wx: o.wx, wy: o.wy, m: o.m, baza, c: o.c, lat: o.lat || null, ind: o.ind || null,
       aliniere: o.aliniere || "l", latFixa: !!o.latFixa, laGata: o.laGata, laLive: o.laLive, tabel: o.tabel || null,
-      celula: o.celula || null, id: o.id,
+      celula: o.celula || null, id: o.id, sel: null, compun: false, asteapta: null,
+      ist: { inapoi: [], inainte: [], cur: null, fel: "", cand: 0 },
     };
     if (!o.latFixa) {
       /* Marginea textului: o tragi, iar textul se reașază pe loc (previzualizare);
@@ -1117,36 +1168,54 @@ export class Plansa {
           t.lat = Math.max(t.m * 2, prinde(wx - t.wx));
           t.trimiteLive();
         };
-        const gata = () => { t.margine.removeEventListener("pointermove", muta); t.margine.removeEventListener("pointerup", gata); ta.focus(); };
+        const gata = () => {
+          t.margine.removeEventListener("pointermove", muta); t.margine.removeEventListener("pointerup", gata);
+          ta.focus();
+          this.pasInEditor("margine");
+        };
         t.margine.addEventListener("pointermove", muta);
         t.margine.addEventListener("pointerup", gata);
       });
-      t.margine.addEventListener("dblclick", () => { t.lat = null; t.trimiteLive(); ta.focus(); });
+      t.margine.addEventListener("dblclick", () => { t.lat = null; t.trimiteLive(); ta.focus(); this.pasInEditor("margine"); });
     }
-    t.model = () => dinEditor(ta);
+    /* Cât e deschisă caseta, modelul ține și rândurile goale de la coadă:
+       cursorul poate sta pe ele, iar pozițiile selecției le numără. Ce pleacă
+       la elevi și ce se salvează e fără ele (`modelDinParagrafe`, `dinEditor`). */
+    t.model = () => dinParagrafe(paragrafeleDinEditor(ta, this.optEditor(t)));
+    /* Așază paragrafele (marcajele, intrările), pune caseta la locul ei și
+       trimite textul în lucru la elevi. */
     t.trimiteLive = () => {
-      refaParagrafele(ta, { m: t.m, ind: t.ind, z: this.vedere.z, aliniere: t.aliniere });
+      const opt = this.optEditor(t);
+      const ps = paragrafeleDinEditor(ta, opt);
+      const model = modelDinParagrafe(ps);
+      const as = aseaza(this.ctx, model, { m: t.m, lat: t.lat, ind: t.ind, aliniere: t.aliniere });
+      t.M1 = as.linii[0]?.M || t.baza;   // cea mai mare literă de pe primul rând
+      refaParagrafele(ta, { ...opt, ctx: this.ctx, ps, as, ind: t.ind, aliniere: t.aliniere });
       this.pozitioneazaEditorul();
-      t.laLive?.(t.model());
+      t.laLive?.(model);
     };
     this.text = t;
-    ta.addEventListener("input", (e) => {
-      /* Lista se pune singură, ca în Word: „1. ", „a) ", „- " la început de paragraf. */
-      if (e.inputType === "insertText" && e.data === " ") {
-        const u = undeECursorul(ta);
-        if (u && !u.d.dataset.l) {
-          const l = autoLista(u.inainte);
-          if (l) { u.d.dataset.l = l.l; u.d.dataset.f = l.f; taieInceputul(u.d, u.inainte.length); }
-        }
-      }
-      t.trimiteLive();
+    ta.addEventListener("beforeinput", (e) => {
+      /* „Anulează" din meniul browserului ori de pe tastatura de pe ecran. */
+      if (e.inputType === "historyUndo") { e.preventDefault(); this.inapoiInEditor(); }
+      else if (e.inputType === "historyRedo") { e.preventDefault(); this.inainteInEditor(); }
     });
+    /* Cât se compune o literă (tastaturi cu sugestii, accente moarte), caseta nu se atinge. */
+    ta.addEventListener("compositionstart", () => { t.compun = true; });
+    ta.addEventListener("compositionend", () => { t.compun = false; this.dupaIntrare({ inputType: "insertText", data: "" }); });
+    ta.addEventListener("input", (e) => { if (!t.compun) this.dupaIntrare(e); });
     ta.addEventListener("keydown", (e) => this.tastaInEditor(e));
     /* Lipit în text: doar literele, fără formatarea de unde vin. */
     ta.addEventListener("paste", (e) => {
       e.stopPropagation();
       e.preventDefault();
+      /* Rândurile făcute de lipit sunt copii ale celui în care lipești: se ține
+         minte care e, ca „lista de la capăt" să nu ajungă pe fiecare (vezi `dupaIntrare`). */
+      const aici = undeECursorul(ta);
+      const pars = [...ta.children];
+      t.lipit = aici ? { k: pars.indexOf(aici.d), n0: pars.length } : null;
       document.execCommand("insertText", false, e.clipboardData?.getData("text/plain") || "");
+      t.lipit = null;
     });
     ta.addEventListener("blur", () => setTimeout(() => {
       if (this.text?.ta !== ta) return;
@@ -1155,16 +1224,153 @@ export class Plansa {
       this.inchideTextul(true);
     }, 0));
     this.cere();
-    refaParagrafele(ta, { m: t.m, ind: t.ind, z: this.vedere.z, aliniere: t.aliniere });
-    this.pozitioneazaEditorul();
+    t.trimiteLive();
+    t.ist.cur = this.stareaEditorului();
+    /* Cursorul intră pe loc în casetă (la Tab dintr-o celulă în alta, prima
+       literă tastată repede n-are voie să se piardă), și încă o dată după ce
+       browserul și-a terminat apăsarea de pe planșă, care altfel i-l ia. */
+    ta.focus({ preventScroll: true });
+    puneSelectia(ta, String(o.model?.s || "").length);
     setTimeout(() => {
+      if (this.text !== t) return;
       ta.focus();
       /* Cursorul la capătul textului, nu la început. */
-      const sel = getSelection();
-      sel.selectAllChildren(ta);
-      sel.collapseToEnd();
+      const lung = dinEditor(ta, this.optEditor(t)).s.length;
+      puneSelectia(ta, lung);
+      t.sel = { a: lung, b: lung, intors: false };
+      if (t.ist.cur) t.ist.cur.sel = t.sel;
+      this.o.laFormat?.();
     }, 0);
     this.o.laSchimbare?.();
+  }
+
+  /* ---------- istoricul casetei (Ctrl+Z, Ctrl+Y) ---------- */
+
+  /** Starea casetei deschise: textul, selecția, lățimea, intrarea, culoarea, mărimea. */
+  stareaEditorului() {
+    const t = this.text;
+    return { model: t.model(), sel: selectiaIn(t.ta) || t.sel || null, lat: t.lat, ind: t.ind, c: t.c, m: t.m };
+  }
+  /**
+   * S-a schimbat ceva în casetă: pasul se ține minte. Tastatul se strânge pe
+   * cuvinte (literele la un loc, spațiile la un loc, ștersul la un loc), cât nu
+   * trece o secundă și jumătate între apăsări; restul, câte un pas fiecare.
+   */
+  pasInEditor(fel) {
+    const t = this.text;
+    if (!t?.ist.cur) return;
+    const i = t.ist;
+    const noua = this.stareaEditorului();
+    const v = i.cur;
+    if (noua.lat === v.lat && noua.ind === v.ind && noua.c === v.c && noua.m === v.m
+      && JSON.stringify(noua.model) === JSON.stringify(v.model)) { v.sel = noua.sel || v.sel; return; }
+    const acum = Date.now();
+    const lipit = fel === i.fel && ["tastat", "spatiu", "sters", "glisor"].includes(fel) && acum - i.cand < 1500;
+    const goale = !i.inapoi.length || i.inainte.length > 0;
+    if (!lipit) { i.inapoi.push(v); if (i.inapoi.length > 200) i.inapoi.shift(); }
+    i.inainte = [];
+    i.cur = noua; i.fel = fel; i.cand = acum;
+    if (goale) this.o.laSchimbare?.();   // butoanele ↶ ↷ se aprind ori se sting
+  }
+  /** Pune în casetă o stare ținută minte. */
+  puneStarea(s) {
+    const t = this.text;
+    t.lat = s.lat; t.ind = s.ind; t.c = s.c; t.m = s.m;
+    this.rescrieEditorul(s.model, s.sel);
+    t.trimiteLive();
+    this.o.laSchimbare?.();
+    this.o.laFormat?.();
+  }
+  inapoiInEditor() {
+    const i = this.text?.ist;
+    if (!i?.inapoi.length) return false;
+    i.inainte.push(i.cur);
+    i.cur = i.inapoi.pop();
+    i.fel = "";
+    this.puneStarea(i.cur);
+    return true;
+  }
+  inainteInEditor() {
+    const i = this.text?.ist;
+    if (!i?.inainte.length) return false;
+    i.inapoi.push(i.cur);
+    i.cur = i.inainte.pop();
+    i.fel = "";
+    this.puneStarea(i.cur);
+    return true;
+  }
+  /** Se poate da înapoi / înainte? În casetă, pașii ei; altfel, ai planșei. */
+  get poateInapoi() { return this.text ? this.text.ist.inapoi.length > 0 : this.inapoi.length > 0; }
+  get poateInainte() { return this.text ? this.text.ist.inainte.length > 0 : this.inainte.length > 0; }
+
+  /**
+   * Scrie din nou caseta din model, curat, cu selecția la loc. `asteptare`
+   * ({ poz, f, m, c, h }): fără selecție, formatul ales așteaptă la cursor.
+   */
+  rescrieEditorul(model, sel = null, asteptare = null) {
+    const t = this.text;
+    const mic = marimeaMica(model, t.m);
+    t.baza = asteptare?.m ? Math.min(mic, asteptare.m) : mic;
+    t.ta.innerHTML = asteptare
+      ? inEditorCuAsteptare(model, asteptare.poz, asteptare, { m: t.m, baza: t.baza })
+      : inEditor(model, { m: t.m, baza: t.baza });
+    t.asteapta = asteptare;
+    this.pozitioneazaEditorul();
+    t.ta.focus({ preventScroll: true });
+    if (asteptare) cursorInAsteptare(t.ta);
+    else if (sel) puneSelectia(t.ta, sel.a, sel.b, sel.intors);
+    else puneSelectia(t.ta, model.s.length);
+    t.sel = selectiaIn(t.ta) || sel || t.sel;
+  }
+
+  /** După orice apăsare care a schimbat textul. */
+  dupaIntrare(e) {
+    const t = this.text;
+    if (!t) return;
+    if (!curataAsteptarea(t.ta)) t.asteapta = null;
+    else if (t.asteapta) { const unde = selectiaIn(t.ta); if (unde) t.asteapta.poz = unde.a; }
+    /* Ce a pus browserul de capul lui (stiluri la lipirea a două paragrafe) ori
+       o literă de bază rămasă alta se scriu la loc, curat, din model. */
+    const model = t.model();
+    if (!t.asteapta && (areStrain(t.ta) || marimeaMica(model, t.m) !== t.baza)) this.rescrieEditorul(model, selectiaIn(t.ta));
+    const tip = e.inputType || "";
+    const fel = tip === "insertText" ? (/^\s+$/.test(e.data || "") ? "spatiu" : "tastat")
+      : /^delete/.test(tip) ? "sters" : tip === "insertParagraph" ? "paragraf" : /^format/.test(tip) ? "format" : "alt";
+    /* Paragraful nou, făcut de Enter, e o copie a celui de deasupra: „de la
+       capăt" rămâne doar pe cel dintâi. */
+    if (tip === "insertParagraph") { const nou = undeECursorul(t.ta); if (nou) delete nou.d.dataset.d; }
+    if (t.lipit && t.lipit.k >= 0) {
+      const pars = [...t.ta.children];
+      for (let k = t.lipit.k + 1; k <= t.lipit.k + (pars.length - t.lipit.n0) && k < pars.length; k++) delete pars[k].dataset.d;
+    }
+    this.pasInEditor(fel);
+    /* Lista se pune singură, ca în Word: „1. ", „a) ", „- " la început de
+       paragraf. E pasul ei: un Ctrl+Z o desface și rămâne ce ai tastat. */
+    if (tip === "insertText" && e.data === " ") {
+      const u = undeECursorul(t.ta);
+      if (u && !u.d.dataset.l) {
+        const l = autoLista(u.inainte);
+        if (l) {
+          /* Ai tastat chiar începutul unui șir: lista pornește de la capăt, și
+             când deasupra e alta la fel (altfel „1. " ar fi ieșit „3."). */
+          if (l.l !== "b" && continuaLista(u.d, l.l, l.f)) u.d.dataset.d = "1"; else delete u.d.dataset.d;
+          u.d.dataset.l = l.l; u.d.dataset.f = l.f;
+          taieInceputul(u.d, u.inainte.length);
+          t.sel = selectiaIn(t.ta) || t.sel;
+          this.pasInEditor("lista");
+        }
+      }
+    }
+    t.trimiteLive();
+    this.o.laFormat?.();
+  }
+  /** O schimbare făcută din bară ori din taste pe paragrafele casetei. */
+  schimbatInEditor(fel = "format") {
+    const t = this.text;
+    if (!t) return;
+    t.trimiteLive();
+    this.pasInEditor(fel);
+    this.o.laFormat?.();
   }
 
   tastaInEditor(e) {
@@ -1176,6 +1382,26 @@ export class Plansa {
     const u = undeECursorul(t.ta);
     /* Escape închide caseta și păstrează ce ai scris (greșelile se dau înapoi cu Ctrl+Z). */
     if (k === "Escape") { this.inchideTextul(true); return; }
+    if (ctrl && !e.altKey && /^[zy]$/i.test(k)) {
+      e.preventDefault();
+      if (/^y$/i.test(k) || e.shiftKey) this.inainteInEditor(); else this.inapoiInEditor();
+      return;
+    }
+    /* Mărimea literei, ca în Word: Ctrl+Shift+> și Ctrl+Shift+< (pe mărimile din
+       listă), Ctrl+] și Ctrl+[ (din unu în unu). După tastă, nu după literă:
+       pe tastatura românească, acolo stau alte semne. */
+    if (ctrl && !e.altKey && e.shiftKey && (e.code === "Period" || e.code === "Comma")) {
+      e.preventDefault();
+      const cu = e.code === "Period" ? 1 : -1;
+      this.marimeaTextului((m) => marimeaVecina(m, cu));
+      return;
+    }
+    if (ctrl && !e.altKey && !e.shiftKey && (e.code === "BracketRight" || e.code === "BracketLeft")) {
+      e.preventDefault();
+      const cu = e.code === "BracketRight" ? 1 : -1;
+      this.marimeaTextului((m) => m + cu);
+      return;
+    }
     if (k === "Enter" && ctrl) { e.preventDefault(); this.inchideTextul(true); return; }
     if (k === "Enter" && e.altKey && !t.tabel) {
       /* Alt+Enter: textul se închide și se deschide unul nou chiar dedesubt. */
@@ -1187,18 +1413,20 @@ export class Plansa {
       this.deschideTextul(x, y, null);
       return;
     }
-    if (k === "Enter" && u && u.d.dataset.l && !u.d.textContent.trim()) {
-      /* Enter pe un rând gol de listă: lista se oprește (ca în Word). */
+    if (k === "Enter" && u && u.d.dataset.l && !u.d.textContent.replace(/​/g, "").trim()) {
+      /* Enter pe un rând gol de listă, ca în Word: iese un nivel mai afară, iar
+         de pe primul nivel lista se oprește. */
       e.preventDefault();
-      delete u.d.dataset.l; delete u.d.dataset.f;
-      t.trimiteLive();
+      if (Number(u.d.dataset.n) > 0) schimbaNivelul([u.d], -1);
+      else { delete u.d.dataset.l; delete u.d.dataset.f; delete u.d.dataset.d; }
+      this.schimbatInEditor();
       return;
     }
     if (k === "Enter" && e.shiftKey) { e.preventDefault(); document.execCommand("insertParagraph"); return; }
     if (k === "Backspace" && u && u.inainte === "" && (u.d.dataset.l || u.d.dataset.n)) {
       e.preventDefault();
-      if (u.d.dataset.l) { delete u.d.dataset.l; delete u.d.dataset.f; } else schimbaNivelul([u.d], -1);
-      t.trimiteLive();
+      if (u.d.dataset.l) { delete u.d.dataset.l; delete u.d.dataset.f; delete u.d.dataset.d; } else schimbaNivelul([u.d], -1);
+      this.schimbatInEditor();
       return;
     }
     if (k === "Tab") {
@@ -1207,10 +1435,9 @@ export class Plansa {
       /* În tabel, Tab pe un paragraf care nu e în listă trece la celula vecină. */
       if (t.tabel && !pars.some((d) => d.dataset.l)) { this.celulaVecina(e.shiftKey ? -1 : 1); return; }
       schimbaNivelul(pars, e.shiftKey ? -1 : 1);
-      t.trimiteLive();
+      this.schimbatInEditor();
       return;
     }
-    if (ctrl && /^[biu]$/i.test(k)) { setTimeout(() => t.trimiteLive(), 0); return; }
     if (ctrl && !e.shiftKey && /^[lerj]$/i.test(k)) {
       e.preventDefault();
       this.aliniazaText({ l: "l", e: "c", r: "r", j: "j" }[k.toLowerCase()]);
@@ -1219,14 +1446,153 @@ export class Plansa {
     if (ctrl && e.shiftKey && /^l$/i.test(k)) { e.preventDefault(); this.puneListaText("b", "•"); }
   }
 
-  /** Culoarea textului deschis (toată caseta are o culoare). */
+  /* ---------- formatul pe cuvinte: mărimea, culoarea, markerul ---------- */
+
+  /** Dă cursorul înapoi casetei deschise, acolo unde era (după ce ai umblat
+   *  pe bara de unelte); formatul care aștepta la cursor rămâne. */
+  inapoiInCaseta() {
+    const t = this.text;
+    if (!t) return;
+    const sel = t.sel;
+    t.ta.focus({ preventScroll: true });
+    if (t.asteapta && cursorInAsteptare(t.ta)) return;
+    if (sel) puneSelectia(t.ta, sel.a, sel.b, sel.intors);
+  }
+  /** Selecția casetei deschise; cea ținută minte, cât ai mâna pe bara de unelte. */
+  selectiaEditorului() {
+    const t = this.text;
+    return selectiaIn(t.ta) || t.sel || null;
+  }
+  /**
+   * Un format pus în caseta deschisă. Cu ceva selectat: `pe(model, a, b)` →
+   * model. Fără: `laCursor(formatul de acolo)` → formatul care așteaptă la
+   * cursor. Într-o casetă goală, mărimea și culoarea sunt ale casetei înseși.
+   */
+  formatInEditor(pe, laCursor) {
+    const t = this.text;
+    let model = t.model();
+    const sel = this.selectiaEditorului() || { a: model.s.length, b: model.s.length };
+    if (sel.b > sel.a) {
+      model = pe(model, sel.a, sel.b);
+      /* Mărimea casetei rămâne cea a celor mai multe litere (la celule, a tabelului). */
+      if (!t.tabel) {
+        const mB = marimeaDeBaza(model, t.m);
+        /* Un text care începe cu rânduri goale își ține mărimea casetei: ele
+           n-au litere care s-o poarte și s-ar fi lungit odată cu ea. */
+        if (mB !== t.m && paragrafele(model)[0].bucati.length) { model = cuBaza(model, t.m, mB); t.m = mB; }
+      }
+      this.rescrieEditorul(model, sel);
+    } else {
+      const acum = t.asteapta && t.asteapta.poz === sel.a
+        ? { f: t.asteapta.f || 0, m: t.asteapta.m ?? t.m, c: t.asteapta.c || null, h: t.asteapta.h || null }
+        : formatulIn(model, sel.a, sel.a, t.m);
+      const f = laCursor({ ...acum });
+      const goala = !model.s.replace(/\n/g, "");
+      if (goala && !t.tabel) {
+        /* Caseta e goală: mărimea și culoarea alese sunt ale ei. */
+        if (f.m && f.m !== t.m) t.m = f.m;
+        if (f.c && f.c !== t.c) { t.c = f.c; }
+        f.m = t.m; f.c = null;
+      }
+      const gol = !f.f && (f.m ?? t.m) === t.m && !f.c && !f.h;
+      this.rescrieEditorul(model, sel, goala && gol ? null : { poz: sel.a, f: f.f || 0, m: f.m ?? t.m, c: f.c || null, h: f.h || null });
+    }
+    this.schimbatInEditor();
+  }
+
+  /**
+   * Mărimea literei, ca în Word. `v`: mărimea ori `m => m` (mai mare, mai mică).
+   * În casetă: pe ce e selectat ori pe ce scrii mai departe. Altfel: pe textele
+   * ori pe celulele alese, întregi. Mărimea aleasă rămâne și pentru textele noi.
+   */
+  marimeaTextului(v) {
+    const fn = typeof v === "function" ? (m) => marimeBuna(v(m)) : () => marimeBuna(v);
+    if (this.text) {
+      const t = this.text;
+      this.formatInEditor((mo, a, b) => cuMarime(mo, a, b, t.m, fn), (f) => ({ ...f, m: fn(f.m ?? t.m) }));
+      const f = this.formatulAles();
+      if (f.m) this.marimeText = f.m;
+      return;
+    }
+    const tb = this.tabelulAles();
+    let tinta = false;
+    if (tb) {
+      tinta = true;
+      const z = this.zonaAleasa(tb);
+      const tot = z.i0 === 0 && z.j0 === 0 && z.i1 === tb.cel.length - 1 && z.j1 === tb.col.length - 1;
+      this.peTabel((n) => {
+        for (let i = z.i0; i <= z.i1; i++) for (let j = z.j0; j <= z.j1; j++) {
+          if (celOk(n, i, j)) n.cel[i][j] = cuMarime(n.cel[i][j], 0, String(n.cel[i][j].s || "").length, n.m, fn);
+        }
+        if (tot) {
+          /* Tot tabelul la aceeași mărime: e mărimea tabelului, nu a fiecărui cuvânt. */
+          const marimi = new Set();
+          for (const rand of n.cel) for (const cel of rand) if (cel && !cel.x && cel.s) for (const { bucati } of paragrafele(cel)) for (const b of bucati) marimi.add(b.m ?? n.m);
+          const una = marimi.size === 1 ? [...marimi][0] : marimi.size === 0 ? fn(n.m) : null;
+          if (una && una !== n.m) {
+            n.cel = n.cel.map((rand) => rand.map((cel) => (cel && !cel.x ? cuBaza(cel, n.m, una) : cel)));
+            n.m = una;
+          }
+        }
+        return n;
+      });
+    } else {
+      const texte = this.el.filter((e) => this.selectate.has(e.id) && e.t === "x");
+      if (texte.length) {
+        tinta = true;
+        this.fa({ fel: "schimba", el: texte.map((e) => {
+          let n = cuMarime(copie(e), 0, e.s.length, e.m, fn);
+          const mB = marimeaDeBaza(n, e.m);
+          if (mB !== e.m && paragrafele(n)[0].bucati.length) { n = cuBaza(n, e.m, mB); n.m = mB; }
+          return this.masoara(n);
+        }) });
+      }
+    }
+    /* Mărimea rămâne și pentru textele noi. Fără nimic ales, asta e tot ce
+       face: alegi mărimea întâi, apoi scrii. */
+    const f = tinta ? this.formatulAles() : null;
+    this.marimeText = (f && f.m) || fn(this.marimeText);
+    this.o.laFormat?.();
+  }
+
+  /** Culoarea textului deschis: pe ce e selectat ori pe ce scrii mai departe
+   *  (într-o casetă goală, a casetei). */
   culoareText(c) {
     const t = this.text;
     if (!t) return;
-    if (t.tabel) { this.inchideTextul(true); this.peTabel((n) => { n.c = c; return n; }); return; }
-    t.c = c;
-    t.trimiteLive();
-    t.ta.focus();
+    this.formatInEditor((mo, a, b) => cuCuloare(mo, a, b, c, t.c), (f) => ({ ...f, c: c === t.c ? null : c }));
+  }
+
+  /** Markerul (evidențierea) pe cuvinte; `null` îl scoate. În casetă: pe ce e
+   *  selectat ori pe ce scrii mai departe. Altfel: pe textele ori celulele alese. */
+  evidentiaza(h) {
+    if (this.text) { this.formatInEditor((mo, a, b) => cuEvidentiere(mo, a, b, h), (f) => ({ ...f, h: h || null })); return; }
+    this.peModele(() => ({}), (mo) => cuEvidentiere(mo, 0, String(mo.s || "").length, h));
+  }
+
+  /**
+   * Formatul de arătat pe bară: { m, c, h, f }, cu `undefined` unde e amestecat.
+   * Al selecției din casetă (ori al formatului care așteaptă la cursor), al
+   * textelor ori celulelor alese, ori cel cu care pornesc textele noi.
+   */
+  formatulAles() {
+    const t = this.text;
+    if (t) {
+      const s = this.selectiaEditorului() || { a: 0, b: 0 };
+      if (t.asteapta && s.a === s.b && s.a === t.asteapta.poz) return { f: t.asteapta.f || 0, m: t.asteapta.m ?? t.m, c: t.asteapta.c || null, h: t.asteapta.h || null };
+      return formatulIn(t.model(), s.a, s.b, t.m);
+    }
+    const peste = (modele) => {
+      const f = modele.filter((x) => x.model.s).map((x) => formatulIn(x.model, 0, x.model.s.length, x.m));
+      if (!f.length) return null;
+      const la = (k) => (f.every((x) => x[k] === f[0][k]) ? f[0][k] : undefined);
+      return { m: la("m"), c: la("c"), h: la("h"), f: f.reduce((x, y) => x & y.f, 7) };
+    };
+    const tb = this.tabelulAles();
+    if (tb) return peste(this.celuleleAlese(tb).map(([i, j]) => ({ model: tb.cel[i][j], m: tb.m }))) || { m: tb.m, c: null, h: null, f: 0 };
+    const texte = this.el.filter((e) => this.selectate.has(e.id) && e.t === "x");
+    if (texte.length) return peste(texte.map((e) => ({ model: e, m: e.m }))) || { m: this.marimeText, c: null, h: null, f: 0 };
+    return { m: this.marimeText, c: null, h: null, f: 0 };
   }
 
   /** Pune editorul (și marginea) unde trebuie, după vedere. */
@@ -1235,9 +1601,12 @@ export class Plansa {
     if (!t) return;
     const { x, y, z } = this.vedere;
     const ta = t.ta;
+    /* Mărirea planșei, pentru tot ce e scris în mărimi de literă (bucățile cu
+       altă mărime, intrările listelor). */
+    ta.style.setProperty("--z", String(z));
     /* Lățimea și litera întâi: înălțimea casetei se măsoară după ele. */
     Object.assign(ta.style, {
-      fontSize: `${t.m * z}px`, color: t.c, fontFamily: LITERA,
+      fontSize: `${t.baza * z}px`, color: t.c, fontFamily: LITERA,
       width: t.lat ? `${t.lat * z}px` : "", whiteSpace: t.lat ? "pre-wrap" : "pre",
     });
     /* În celulă, caseta stă unde va sta textul: sus, la mijloc ori jos. */
@@ -1252,14 +1621,14 @@ export class Plansa {
         t.wx = e.x + k.x + L.pad;
       }
     }
-    Object.assign(ta.style, {
-      left: `${(t.wx - x) * z}px`, top: `${(t.wy - y) * z}px`,
-      fontSize: `${t.m * z}px`, color: t.c, fontFamily: LITERA,
-      width: t.lat ? `${t.lat * z}px` : "", whiteSpace: t.lat ? "pre-wrap" : "pre",
-    });
+    /* Caseta stă exact peste locul în care se desenează textul pe planșă: se
+       ridică cu cât pune browserul rândul mai jos decât pânza și se dă înapoi
+       cu chenarul ei, ca textul să nu sară la deschidere și la închidere. */
+    const salt = saltulEditorului(this.ctx, t.M1 || t.baza);
+    Object.assign(ta.style, { left: `${(t.wx - x) * z - 1}px`, top: `${(t.wy - salt - y) * z - 1}px` });
     if (t.margine) {
       const r = ta.getBoundingClientRect(), g = this.gazda.getBoundingClientRect();
-      const lx = t.lat ? (t.wx - x + t.lat) * z : r.right - g.left;
+      const lx = (t.lat ? (t.wx + t.lat - x) * z : r.right - g.left + 6);
       Object.assign(t.margine.style, { left: `${lx - 5}px`, top: `${r.top - g.top}px`, height: `${Math.max(r.height, t.m * z)}px` });
       Object.assign(t.ghid.style, { left: `${lx}px`, display: t.lat ? "" : "none" });
     }
@@ -1271,11 +1640,10 @@ export class Plansa {
     if (this.text) {
       this.text.ta.focus();
       document.execCommand(semn === BOLD ? "bold" : semn === ITALIC ? "italic" : "underline");
-      this.text.trimiteLive();
-      return;
+      return;   // schimbarea vine pe `input`, de unde se ține minte și pleacă la elevi
     }
     this.peModele((m) => ({ toate: bucatile(m).every(([n, f]) => !n || f & semn) }), (m, { toate }) => {
-      const r = strange(bucatile(m).map(([n, f]) => [n, toate ? f & ~semn : f | semn]));
+      const r = strange(bucatile(m).map(([n, f, a]) => [n, toate ? f & ~semn : f | semn, a]));
       const o = { ...m };
       if (r) o.r = r; else delete o.r;
       return o;
@@ -1284,23 +1652,27 @@ export class Plansa {
   /** Lista: în editor, pe paragrafele alese; altfel pe tot textul ales. */
   puneListaText(l, f) {
     if (this.text) {
-      puneLista(paragrafeleSelectate(this.text.ta), l, f);
-      this.text.trimiteLive();
       this.text.ta.focus();
+      puneLista(paragrafeleSelectate(this.text.ta), l, f);
+      this.schimbatInEditor();
       return;
     }
     this.peModele((m) => ({ toate: paragrafele(m).every((x) => x.p?.l === l && x.p?.f === f) }),
-      (m, { toate }) => cuParagrafe(m, (p) => { if (toate || !l) { delete p.l; delete p.f; } else { p.l = l; p.f = f; } }));
+      (m, { toate }) => cuParagrafe(m, (p) => { if (toate || !l) { delete p.l; delete p.f; delete p.d; } else { p.l = l; p.f = f; } }));
   }
+  /** Nivelul (Tab, Shift+Tab); lista își ia semnul nivelului nou, ca în Word. */
   nivelText(cu) {
-    if (this.text) { schimbaNivelul(paragrafeleSelectate(this.text.ta), cu); this.text.trimiteLive(); this.text.ta.focus(); return; }
-    this.peModele(() => ({}), (m) => cuParagrafe(m, (p) => {
-      const n = Math.max(0, Math.min(NIVEL_MAX, (p.n || 0) + cu));
-      if (n) p.n = n; else delete p.n;
-    }));
+    if (this.text) { this.text.ta.focus(); schimbaNivelul(paragrafeleSelectate(this.text.ta), cu); this.schimbatInEditor(); return; }
+    this.peModele(() => ({}), (m) => {
+      const ps = paragrafele(m).map((x) => (x.p ? { ...x.p } : {}));
+      mutaNivelul(ps, ps.map((_, k) => k), cu);
+      const o = { ...m };
+      if (ps.some((p) => Object.keys(p).length)) o.p = ps.map((p) => (Object.keys(p).length ? p : null)); else delete o.p;
+      return o;
+    });
   }
   aliniazaText(a) {
-    if (this.text) { aliniaza(paragrafeleSelectate(this.text.ta), a); this.text.trimiteLive(); this.text.ta.focus(); return; }
+    if (this.text) { this.text.ta.focus(); aliniaza(paragrafeleSelectate(this.text.ta), a); this.schimbatInEditor(); return; }
     /* Celulele alese: alinierea lor (ah), ca s-o aibă și paragrafele noi. */
     const tb = this.tabelulAles();
     if (tb) { this.peCelule((c) => { const o = cuParagrafe(c, (p) => { delete p.a; }); if (a === "l") delete o.ah; else o.ah = a; return o; }); return; }
@@ -1309,7 +1681,7 @@ export class Plansa {
   /** Cât intră un nivel de listă (cu previzualizare): pe textul deschis ori ales. */
   puneIndentarea(px) {
     this.indent = px;
-    if (this.text && !this.text.tabel) { this.text.ind = px; this.text.trimiteLive(); return; }
+    if (this.text && !this.text.tabel) { this.text.ind = px; this.text.trimiteLive(); this.pasInEditor("glisor"); return; }
     const noi = this.el.filter((e) => this.selectate.has(e.id) && e.t === "x").map((e) => this.masoara({ ...copie(e), ind: px }));
     if (noi.length) this.fa({ fel: "schimba", el: noi });
   }
@@ -1338,7 +1710,7 @@ export class Plansa {
     const m = vechi ? vechi.m : this.marimeText;
     const c = vechi ? vechi.c : this.culoare;
     const element = (model, t) => this.masoara({
-      id, t: "x", c: t.c || c, m, x: r1(t.wx), y: r1(t.wy), s: model.s, ...(model.r ? { r: model.r } : {}), ...(model.p ? { p: model.p } : {}),
+      id, t: "x", c: t.c || c, m: t.m || m, x: r1(t.wx), y: r1(t.wy), s: model.s, ...(model.r ? { r: model.r } : {}), ...(model.p ? { p: model.p } : {}),
       ...(t.lat ? { lat: r1(t.lat) } : {}), ...(t.ind ? { ind: r1(t.ind) } : {}),
     });
     this.deschideEditorul({
@@ -1348,7 +1720,7 @@ export class Plansa {
         if (vechi) this.ascunse.delete(vechi.id);
         if (!pastreaza) return;
         const el = model.s ? element(model, t) : null;
-        const schimbat = (a, b) => ["s", "r", "p", "lat", "ind"].some((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null));
+        const schimbat = (a, b) => ["s", "r", "p", "lat", "ind", "m", "c"].some((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null));
         if (vechi && !el) this.fa({ fel: "scoate", id: [vechi.id] });
         else if (vechi && schimbat(el, vechi)) this.fa({ fel: "schimba", el: [el] });
         else if (!vechi && el) this.fa({ fel: "pune", el: [el] });
@@ -1361,7 +1733,8 @@ export class Plansa {
     const t = this.text;
     if (!t) return;
     this.text = null;
-    const model = dinEditor(t.ta);
+    curataAsteptarea(t.ta);
+    const model = dinEditor(t.ta, this.optEditor(t));
     t.ta.remove();
     t.margine?.remove();
     t.ghid?.remove();

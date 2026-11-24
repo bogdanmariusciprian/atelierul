@@ -35,7 +35,9 @@ import {
   puneVederea, loculMaterialului, tableDeschise, intraCuClasa, tablaVizibila, paginileClasei, materialulClasei, canalul,
 } from "../../shared/scripts/tabla-alba-repo.js";
 import { ic } from "./tabla-alba-icone.js";
-import { Plansa, FUNDALURI, CHENARE, LISTE, BOLD, ITALIC, SUBLINIAT, inchisa } from "./tabla-alba-plansa.js";
+import {
+  Plansa, FUNDALURI, CHENARE, LISTE, MARIMI, EVIDENTIERI, BOLD, ITALIC, SUBLINIAT, inchisa, marimeaVecina,
+} from "./tabla-alba-plansa.js";
 /* Puntea spre lecția HTML din fila Material e cea din modulul Liceu: ascultă
    din afară apăsările, tastele, gesturile și derularea, iar la elev le reface
    în același loc (vezi `fisa-punte.js` și `jurnal.js`). */
@@ -89,6 +91,7 @@ const plansa = new Plansa($("#plansa"), {
   laManaMea: () => { if (!admin && urmaresc) { urmaresc = false; deseneazaBara(); } },
   laMarime: () => { if (!admin && urmaresc && prof.vedere && profulEAici()) plansa.arataZona(prof.vedere); },
   laSchimbare: () => deseneazaUneltele(),
+  laFormat: () => formatCurand(),
 });
 
 /* =========================================================
@@ -195,7 +198,9 @@ const UNELTE = [
   ["laser", ic("laser"), "Laser (K): arată, nu rămâne"],
 ];
 const CULORI = ["#1f2430", "#c2410c", "#dc2626", "#2563eb", "#16a34a", "#7c3aed", "#ca8a04", "#ffffff"];
-const GROSIMI = [[2, "subțire", 20], [4, "mijlocie", 28], [8, "groasă", 44]];
+/* Grosimile liniei. Până pe 24 noiembrie 2026 hotărau și mărimea literei
+   (20, 28, 44); acum litera are caseta ei de mărime, ca în Word. */
+const GROSIMI = [[2, "subțire"], [4, "mijlocie"], [8, "groasă"]];
 const NUME_FUNDAL = { alb: "Fără linii", patratele: "Pătrățele", dictando: "Dictando", puncte: "Puncte" };
 /* Culorile paginii: albă, crem, verde de tablă, neagră și câteva pale. */
 const CULORI_PAGINA = [["#ffffff", "Albă"], ["#fbf6ec", "Crem"], ["#fdf6c9", "Galben pal"], ["#e8f1fb", "Albastru pal"],
@@ -213,7 +218,7 @@ const NUME_LISTE = { b: "Buline", n: "Numere", a: "Litere" };
 const NUME_CHENARE = { toate: "Toate", exterior: "Doar exteriorul", interior: "Doar interiorul", orizontale: "Doar orizontale", fara: "Fără chenare" };
 
 /* ---------- implicitele tale, ținute în cont (0117) ---------- */
-let setari = { culoare: "#1f2430", grosime: 3, marimeText: 28, fundalCuloare: "#ffffff", fundalLinii: "alb", indent: null };
+let setari = { culoare: "#1f2430", grosime: 3, marimeText: 28, fundalCuloare: "#ffffff", fundalLinii: "alb", indent: null, evidentiere: "#fde047" };
 let ceasSetari = null;
 function tineMinte(ce) {
   Object.assign(setari, ce);
@@ -258,8 +263,8 @@ function deseneazaUneltele() {
       <label class="ta-cul ta-cul--alta" title="Altă culoare"><input type="color" value="${plansa.culoare}" data-alta></label></div>
     <div class="ta-grup">${GROSIMI.map(([g, t]) => `<button type="button" class="ta-gros${plansa.grosime === g ? " is-on" : ""}" data-g="${g}" title="Linie ${t}"><i style="--g:${g}px"></i></button>`).join("")}</div>
     <div class="ta-grup">
-      ${buton("", 'data-a="inapoi"', "Înapoi (Ctrl+Z)", ic("inapoi"), false, !plansa.inapoi.length)}
-      ${buton("", 'data-a="inainte"', "Înainte (Ctrl+Y)", ic("inainte"), false, !plansa.inainte.length)}
+      ${buton("", 'data-a="inapoi"', "Înapoi (Ctrl+Z)", ic("inapoi"), false, !plansa.poateInapoi)}
+      ${buton("", 'data-a="inainte"', "Înainte (Ctrl+Y)", ic("inainte"), false, !plansa.poateInainte)}
       ${sel ? `${buton("", 'data-a="fata"', "În față, peste celelalte (Ctrl+])", ic("fata"))}
       ${buton("", 'data-a="spate"', "În spate, sub celelalte, și sub text (Ctrl+[)", ic("spate"))}
       ${buton("", 'data-a="dubleaza"', "Dublează selecția (Ctrl+D)", ic("dubleaza"))}
@@ -273,17 +278,139 @@ function deseneazaUneltele() {
     </div>`;
   /* Formatarea textului, ca în Word: o bară orizontală, sus. */
   formatBara.hidden = false;
-  formatBara.innerHTML = `<div class="ta-grup ta-format" title="Pe textul pe care îl scrii ori pe textele (celulele) alese">
+  /* Cât scrii în caseta cu mărimea, bara nu se desenează din nou: ți-ar lua cursorul. */
+  const inMarime = document.activeElement?.matches?.("[data-marime]");
+  if (!inMarime) {
+    formatBara.innerHTML = `<div class="ta-grup ta-format" title="Pe ce e selectat în textul pe care îl scrii, ori pe textele (celulele) alese">
+      <span class="ta-marime" title="Mărimea literei: alege din listă ori scrie un număr și apasă Enter">
+        <input type="text" inputmode="decimal" data-marime aria-label="Mărimea literei" autocomplete="off" spellcheck="false">
+        <button type="button" class="ta-u ta-u--ingust${popDeschis === "marimi" ? " is-on" : ""}" data-a="marimi" title="Lista mărimilor" aria-label="Lista mărimilor">${ic("jos", 14)}</button>
+      </span>
+      ${buton("", 'data-mar="1"', "Litera mai mare (Ctrl+Shift+>)", ic("literaMare"))}
+      ${buton("", 'data-mar="-1"', "Litera mai mică (Ctrl+Shift+<)", ic("literaMica"))}
       ${buton("", `data-f="${BOLD}"`, "Bold (Ctrl+B)", ic("bold"))}
       ${buton("", `data-f="${ITALIC}"`, "Italic (Ctrl+I)", ic("italic"))}
       ${buton("", `data-f="${SUBLINIAT}"`, "Subliniat (Ctrl+U)", ic("subliniat"))}
+      <span class="ta-ev-grup">
+        ${buton("ta-ev", 'data-a="evidentiaza"', "Marker: evidențiază cuvintele selectate", `${ic("marker")}<i style="background:${esc(setari.evidentiere)}"></i>`)}
+        <button type="button" class="ta-u ta-u--ingust${popDeschis === "evidentieri" ? " is-on" : ""}" data-a="evidentieri" title="Culoarea markerului; fără marker" aria-label="Culoarea markerului">${ic("jos", 14)}</button>
+      </span>
       ${ALINIERI.map(([a, i, t]) => buton("ta-u--mic", `data-al="${a}"`, t, i)).join("")}
       ${buton("", 'data-a="liste"', "Liste: buline, numere, litere; nivelul și distanța", ic("liste"), panouDeschis === "liste")}
       ${buton("", 'data-niv="-1"', "Mai puțin înăuntru (Shift+Tab)", ic("afara"))}
       ${buton("", 'data-niv="1"', "Mai înăuntru (Tab)", ic("inauntru"))}
     </div>`;
+  }
+  deseneazaPopul();
+  formatAcum();
   deseneazaPanoulLateral();
 }
+
+/* ---------- formatul de pe bară: mărimea, markerul ---------- */
+/* Listele care se deschid sub bară (mărimile, culorile markerului). Stau lângă
+   bară, nu în ea: bara se derulează pe lățime și le-ar fi tăiat. */
+let popDeschis = null;
+const popFormat = document.createElement("div");
+popFormat.className = "ta-pop";
+popFormat.hidden = true;
+popFormat.dataset.pastreazaTextul = "";
+filaTabla.append(popFormat);
+function deseneazaPopul() {
+  const ancora = popDeschis && formatBara.querySelector(`[data-a="${popDeschis}"]`);
+  if (!ancora || !admin) { popFormat.hidden = true; popDeschis = null; return; }
+  const f = plansa.formatulAles();
+  popFormat.className = `ta-pop ta-pop--${popDeschis}`;
+  popFormat.innerHTML = popDeschis === "marimi"
+    ? MARIMI.map((m) => `<button type="button" data-marime-pune="${m}"${f.m === m ? ' class="is-on"' : ""}>${m}</button>`).join("")
+    : `${EVIDENTIERI.map(([c, n]) => `<button type="button" class="ta-cul${f.h === c ? " is-on" : ""}" data-ev="${c}" style="--c:${c}" title="${n}" aria-label="Marker ${n.toLowerCase()}"></button>`).join("")}
+       <button type="button" class="ta-btn" data-ev="">Fără marker</button>`;
+  popFormat.hidden = false;
+  const r = ancora.getBoundingClientRect(), g = filaTabla.getBoundingClientRect();
+  popFormat.style.top = `${r.bottom - g.top + 8}px`;
+  popFormat.style.left = `${Math.max(8, Math.min(r.left - g.left - 20, g.width - popFormat.offsetWidth - 8))}px`;
+}
+function inchidePopul() {
+  if (!popDeschis) return;
+  popDeschis = null;
+  popFormat.hidden = true;
+  formatBara.querySelectorAll('[data-a="marimi"], [data-a="evidentieri"]').forEach((b) => b.classList.remove("is-on"));
+}
+addEventListener("pointerdown", (e) => {
+  if (popDeschis && !e.target.closest?.(".ta-pop, [data-a='marimi'], [data-a='evidentieri']")) inchidePopul();
+}, true);
+
+/** Arată pe bară formatul de la cursor (ori al selecției, ori al textelor alese). */
+let formatCerut = false;
+function formatCurand() {
+  if (formatCerut) return;
+  formatCerut = true;
+  requestAnimationFrame(() => { formatCerut = false; formatAcum(); });
+}
+function formatAcum() {
+  if (!admin || formatBara.hidden) return;
+  const f = plansa.formatulAles();
+  const inp = formatBara.querySelector("[data-marime]");
+  if (inp && document.activeElement !== inp) inp.value = f.m ?? "";
+  /* B, I, U: în casetă le știe browserul (și pe cele alese fără selecție). */
+  const inCaseta = plansa.text && document.activeElement === plansa.text.ta;
+  const are = (semn, comanda) => {
+    if (inCaseta) { try { return document.queryCommandState(comanda); } catch { return false; } }
+    return !!(plansa.text || plansa.selectate.size) && !!(f.f & semn);
+  };
+  for (const [semn, comanda] of [[BOLD, "bold"], [ITALIC, "italic"], [SUBLINIAT, "underline"]]) {
+    formatBara.querySelector(`[data-f="${semn}"]`)?.classList.toggle("is-on", are(semn, comanda));
+  }
+}
+/** Pune mărimea scrisă ori aleasă; rămâne și pentru textele noi (în cont). */
+function puneMarimea(v) {
+  const m = Number(String(v).trim().replace(",", "."));
+  if (!(m > 0)) { formatAcum(); return; }
+  plansa.marimeaTextului(m);
+  tineMinte({ marimeText: plansa.marimeText });
+  formatAcum();
+}
+function schimbaMarimea(cu) {
+  plansa.marimeaTextului((m) => marimeaVecina(m, cu));
+  tineMinte({ marimeText: plansa.marimeText });
+  formatAcum();
+}
+formatBara.addEventListener("keydown", (e) => {
+  const inp = e.target.closest?.("[data-marime]");
+  if (!inp) return;
+  /* MĂRIMEA SE PUNE DOAR CU ENTER (ori din listă). Un număr scris pe jumătate
+     și lăsat acolo (Escape, o apăsare în altă parte) nu se pune: până pleacă
+     cursorul din casetă, ținta s-ar fi putut schimba. */
+  if (e.key === "Enter") {
+    e.preventDefault();
+    puneMarimea(inp.value);
+    if (!plansa.text) inp.blur();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    inp.blur();
+    plansa.inapoiInCaseta();
+    formatAcum();
+  } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+    e.preventDefault();
+    schimbaMarimea(e.key === "ArrowUp" ? 1 : -1);
+    /* Scrisul din nou al casetei de text ia cursorul (și bara se poate
+       desena din nou): se întoarce aici, ca săgeata să meargă de câte ori apeși. */
+    const nou = formatBara.querySelector("[data-marime]");
+    if (nou) { nou.value = plansa.formatulAles().m ?? nou.value; nou.focus({ preventScroll: true }); }
+  }
+});
+formatBara.addEventListener("focusin", (e) => { if (e.target.matches?.("[data-marime]")) e.target.select(); });
+popFormat.addEventListener("click", (e) => {
+  const m = e.target.closest("[data-marime-pune]");
+  if (m) { inchidePopul(); puneMarimea(m.dataset.marimePune); return; }
+  const ev = e.target.closest("[data-ev]");
+  if (ev) {
+    const c = ev.dataset.ev || null;
+    if (c) tineMinte({ evidentiere: c });
+    inchidePopul();
+    plansa.evidentiaza(c);
+    deseneazaUneltele();
+  }
+});
 
 function deseneazaPanoulLateral() {
   const tb = plansa.tabelulAles();
@@ -308,7 +435,7 @@ function deseneazaPanoulLateral() {
       <div class="ta-liste__rand"><button type="button" class="ta-btn" data-niv="-1" title="Shift+Tab">⇤ Afară</button><button type="button" class="ta-btn" data-niv="1" title="Tab">Înăuntru ⇥</button></div>
       <p>Distanța indentării: <b data-ind-val>${Math.round(ind)}</b></p>
       <input type="range" min="8" max="160" step="2" value="${Math.round(ind)}" data-ind aria-label="Distanța indentării">
-      <p class="ta-nota">Se pune și singură: „1. ", „a) ", „(1) ", „- " la început de rând.</p>
+      <p class="ta-nota">Se pune și singură: „1. ", „a) ", „(1) ", „- " la început de rând. Dacă n-o vrei, Ctrl+Z o desface și rămâne ce ai tastat.</p>
     </div>`;
   } else if (ce === "tabelNou") {
     panouFundal.innerHTML = `<div class="ta-grup ta-fundal ta-tabel-nou" role="group" aria-label="Tabel nou">
@@ -364,7 +491,7 @@ function culoareaPaginii(c) {
   deseneazaUneltele();
 }
 /* Butoanele care lucrează pe textul deschis nu-i iau cursorul. */
-for (const loc of [unelte, panouFundal, formatBara]) {
+for (const loc of [unelte, panouFundal, formatBara, popFormat]) {
   loc.addEventListener("mousedown", (e) => {
     if (e.target.closest("button") && plansa.text) e.preventDefault();
   });
@@ -409,8 +536,13 @@ panouFundal.addEventListener("change", (e) => {
 });
 
 formatBara.addEventListener("click", (e) => {
+  const mar = e.target.closest("[data-mar]");
+  if (mar) { schimbaMarimea(Number(mar.dataset.mar)); return; }
+  const pop = e.target.closest('[data-a="marimi"], [data-a="evidentieri"]');
+  if (pop) { popDeschis = popDeschis === pop.dataset.a ? null : pop.dataset.a; deseneazaUneltele(); return; }
+  if (e.target.closest('[data-a="evidentiaza"]')) { plansa.evidentiaza(setari.evidentiere); return; }
   const fm = e.target.closest("[data-f]");
-  if (fm) { plansa.formateaza(Number(fm.dataset.f)); return; }
+  if (fm) { plansa.formateaza(Number(fm.dataset.f)); formatCurand(); return; }
   const al = e.target.closest("[data-al]");
   if (al) { plansa.aliniazaText(al.dataset.al); return; }
   const nv = e.target.closest("[data-niv]");
@@ -431,8 +563,7 @@ unelte.addEventListener("click", (e) => {
   const g = e.target.closest("[data-g]");
   if (g) {
     plansa.grosime = Number(g.dataset.g);
-    plansa.marimeText = GROSIMI.find((x) => x[0] === plansa.grosime)?.[2] || 28;
-    tineMinte({ grosime: plansa.grosime, marimeText: plansa.marimeText });
+    tineMinte({ grosime: plansa.grosime });
     deseneazaUneltele();
     return;
   }
@@ -456,7 +587,10 @@ unelte.addEventListener("click", (e) => {
     if (plansa.el.length && confirm("Golești pagina asta? Se poate da înapoi cu ↶.")) plansa.golesteTot();
   }
 });
-unelte.addEventListener("input", (e) => { if (e.target.matches("[data-alta]")) puneCuloarea(e.target.value, false); });
+unelte.addEventListener("input", (e) => { if (e.target.matches("[data-alta]") && !plansa.text) puneCuloarea(e.target.value, false); });
+/* Cât scrii într-o casetă, culoarea „alta" se pune abia când ai ales-o: pusă la
+   fiecare mișcare, caseta și-ar lua cursorul înapoi și fereastra culorilor s-ar închide. */
+unelte.addEventListener("change", (e) => { if (e.target.matches("[data-alta]") && plansa.text) puneCuloarea(e.target.value, false); });
 
 function puneCuloarea(c, redeseneaza = true) {
   plansa.culoare = c;
@@ -481,6 +615,12 @@ addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); if (e.shiftKey) plansa.refa(); else plansa.anuleaza(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "y") { e.preventDefault(); plansa.refa(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "d") { e.preventDefault(); plansa.dubleazaSelectia(); return; }
+  /* Litera mai mare / mai mică pe textele alese (în casetă le prinde ea). După tastă, nu după semn. */
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.code === "Period" || e.code === "Comma")) {
+    e.preventDefault();
+    schimbaMarimea(e.code === "Period" ? 1 : -1);
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && (e.key === "]" || e.key === "[")) { e.preventDefault(); plansa.ordoneazaSelectia(e.key === "]" ? "fata" : "spate"); return; }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && /^[lerj]$/.test(k) && (plansa.selectate.size || plansa.tabelulAles())) {
     e.preventDefault();
