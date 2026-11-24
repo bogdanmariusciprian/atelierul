@@ -34,7 +34,7 @@
 import {
   BOLD, ITALIC, SUBLINIAT, LITERA, RAND, LISTE, MARIMI, EVIDENTIERI, bucatile, strange, paragrafele, aseaza, deseneazaText,
   inEditor, inEditorCuAsteptare, dinEditor, dinParagrafe, paragrafeleDinEditor, modelDinParagrafe, refaParagrafele, paragrafeleSelectate,
-  puneLista, schimbaNivelul, aliniaza, undeECursorul, taieInceputul, autoLista, continuaLista, mutaNivelul,
+  puneLista, schimbaNivelul, aliniaza, undeECursorul, taieInceputul, autoLista, listaDinTaste, mutaNivelul,
   marimeaMica, marimeaDeBaza, marimeaVecina, marimeBuna, cuBaza, cuMarime, cuCuloare, cuEvidentiere, textMarit, formatulIn,
   selectiaIn, puneSelectia, cursorInAsteptare, curataAsteptarea, areStrain, saltulEditorului,
 } from "./tabla-alba-text.js";
@@ -1350,11 +1350,7 @@ export class Plansa {
       const u = undeECursorul(t.ta);
       if (u && !u.d.dataset.l) {
         const l = autoLista(u.inainte);
-        if (l) {
-          /* Ai tastat chiar începutul unui șir: lista pornește de la capăt, și
-             când deasupra e alta la fel (altfel „1. " ar fi ieșit „3."). */
-          if (l.l !== "b" && continuaLista(u.d, l.l, l.f)) u.d.dataset.d = "1"; else delete u.d.dataset.d;
-          u.d.dataset.l = l.l; u.d.dataset.f = l.f;
+        if (l && listaDinTaste(u.d, l)) {
           taieInceputul(u.d, u.inainte.length);
           t.sel = selectiaIn(t.ta) || t.sel;
           this.pasInEditor("lista");
@@ -1423,9 +1419,10 @@ export class Plansa {
       return;
     }
     if (k === "Enter" && e.shiftKey) { e.preventDefault(); document.execCommand("insertParagraph"); return; }
-    if (k === "Backspace" && u && u.inainte === "" && (u.d.dataset.l || u.d.dataset.n)) {
+    if (k === "Backspace" && u && u.inainte === "" && (u.d.dataset.l || u.d.dataset.n || u.d.dataset.i)) {
       e.preventDefault();
-      if (u.d.dataset.l) { delete u.d.dataset.l; delete u.d.dataset.f; delete u.d.dataset.d; } else schimbaNivelul([u.d], -1);
+      if (u.d.dataset.i && !u.d.dataset.l) delete u.d.dataset.i;
+      else if (u.d.dataset.l) { delete u.d.dataset.l; delete u.d.dataset.f; delete u.d.dataset.d; } else schimbaNivelul([u.d], -1);
       this.schimbatInEditor();
       return;
     }
@@ -1434,7 +1431,17 @@ export class Plansa {
       const pars = paragrafeleSelectate(t.ta);
       /* În tabel, Tab pe un paragraf care nu e în listă trece la celula vecină. */
       if (t.tabel && !pars.some((d) => d.dataset.l)) { this.celulaVecina(e.shiftKey ? -1 : 1); return; }
-      schimbaNivelul(pars, e.shiftKey ? -1 : 1);
+      /* TAB PE UN PARAGRAF OBIȘNUIT FACE ALINEAT: intră doar primul rând (cerut
+         de Marius pe 25 noiembrie 2026; înainte intra tot paragraful). Shift+Tab
+         îl scoate. La liste, Tab schimbă nivelul, ca până acum. */
+      const liste = pars.filter((d) => d.dataset.l);
+      for (const d of pars) {
+        if (d.dataset.l) continue;
+        if (!e.shiftKey) d.dataset.i = "1";
+        else if (d.dataset.i) delete d.dataset.i;
+        else if (Number(d.dataset.n) > 0) schimbaNivelul([d], -1);
+      }
+      if (liste.length) schimbaNivelul(liste, e.shiftKey ? -1 : 1);
       this.schimbatInEditor();
       return;
     }

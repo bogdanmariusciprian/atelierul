@@ -18,7 +18,10 @@
 //   p   paragrafele, unul pe rând de „\n": null ori
 //       { l: "b" | "n" | "a" (bulină, număr, literă), f: formatul („•",
 //         „1.", „(1)", „a)" …), n: nivelul (0–5), a: "l" | "c" | "r" | "j",
-//         d: 1 (lista o ia de la capăt de aici, chiar dacă deasupra e alta la fel) }
+//         d: numărul de la care pornește lista aici (1 = de la capăt, chiar
+//            dacă deasupra e alta la fel; 2 = continuă una de mai sus, peste
+//            rânduri obișnuite),
+//         i: 1 (alineat: doar primul rând intră înăuntru; nu la liste) }
 // Lângă el, la element: m (mărimea obișnuită a casetei), lat (până unde merge
 // rândul; fără ea, rândul merge cât e scris), ind (cât intră un nivel de listă).
 //
@@ -122,9 +125,10 @@ export function strange(r) {
 function paragraful(x) {
   if (!x || typeof x !== "object") return null;
   const o = {};
-  if (["b", "n", "a"].includes(x.l) && LISTE[x.l].includes(x.f)) { o.l = x.l; o.f = x.f; if (x.d === 1) o.d = 1; }
+  if (["b", "n", "a"].includes(x.l) && LISTE[x.l].includes(x.f)) { o.l = x.l; o.f = x.f; if (Number.isInteger(x.d) && x.d >= 1) o.d = Math.min(x.d, 9999); }
   if (Number.isInteger(x.n) && x.n > 0) o.n = Math.min(NIVEL_MAX, x.n);
   if (["c", "r", "j"].includes(x.a)) o.a = x.a;
+  if (x.i === 1 && !o.l) o.i = 1;
   return Object.keys(o).length ? o : null;
 }
 
@@ -325,15 +329,21 @@ export function marcajul(l, f, k) {
  *  se schimbă felul listei ori unde paragraful o cere (`d`); un nivel mai adânc
  *  începe de la 1. */
 export function marcajele(ps) {
+  const nr = numerele(ps);
+  return ps.map((p, k) => (p?.l ? marcajul(p.l, p.f, nr[k]) : ""));
+}
+/** Al câtelea e fiecare paragraf în lista lui (0 dacă nu e în listă). */
+export function numerele(ps) {
   const nr = [], fel = [];
   return ps.map((p) => {
-    if (!p?.l) { nr.length = 0; fel.length = 0; return ""; }
+    if (!p?.l) { nr.length = 0; fel.length = 0; return 0; }
     const n = p.n || 0;
     const cheie = `${p.l}|${p.f}`;
-    if (fel[n] !== cheie || p.d) { nr[n] = 0; fel[n] = cheie; }
+    if (fel[n] !== cheie) { nr[n] = 0; fel[n] = cheie; }
+    if (p.d) nr[n] = p.d - 1;
     nr[n] = (nr[n] || 0) + 1;
     nr.length = n + 1; fel.length = n + 1;
-    return marcajul(p.l, p.f, nr[n]);
+    return nr[n];
   });
 }
 
@@ -404,7 +414,9 @@ export function geometria(ps, { m, ind = null, masoara }) {
     const n = p?.n || 0;
     const pas = ind || pm * 1.4;
     const lista = !!p?.l;
-    return { n, pm, pas, lista, marc: marc[k], wm: lista ? masoara(marc[k], 0, pm) : 0, xm: locMarcaj(n, pas), slot: 0, gol: 0, stanga: n * pas };
+    return { n, pm, pas, lista, marc: marc[k], wm: lista ? masoara(marc[k], 0, pm) : 0, xm: locMarcaj(n, pas), slot: 0, gol: 0, stanga: n * pas,
+      /* Alineatul: doar primul rând intră, cu un pas (cel puțin o literă și jumătate). */
+      alin: !lista && p?.i ? Math.max(pas, pm * 1.5) : 0 };
   });
   /* Listele, pe niveluri: paragrafele de același fel, unul după altul. */
   const deschise = [];
@@ -494,7 +506,7 @@ export function aseaza(ctx, t, { m, lat = null, ind = null, aliniere = "l" }) {
   const randuri = [];   // înainte de aliniere
   ps.forEach(({ bucati, p }, k) => {
     const g = geo[k];
-    const loc = lat ? Math.max(g.pm, lat - g.stanga) : Infinity;
+    const locTot = lat ? Math.max(g.pm, lat - g.stanga) : Infinity;
     /* Cuvintele și spațiile, fiecare cu ale lui. */
     const bucs = [];
     for (const b of bucati) {
@@ -514,10 +526,12 @@ export function aseaza(ctx, t, { m, lat = null, ind = null, aliniere = "l" }) {
     const linii = [[]];
     let lung = 0;
     for (const gr of grupuri) {
+      /* Primul rând al unui alineat e mai scurt cu cât intră. */
+      let loc = linii.length === 1 ? Math.max(g.pm, locTot - g.alin) : locTot;
       const linia = linii[linii.length - 1];
       if (!gr.sp && lung + gr.w > loc && linia.some((x) => !x.sp)) {
         while (linia.length && linia[linia.length - 1].sp) lung -= linia.pop().w;
-        linii.push([]); lung = 0;
+        linii.push([]); lung = 0; loc = locTot;
       }
       if (gr.sp && !linii[linii.length - 1].length && linii.length > 1) continue;   // spațiu la început de rând nou
       /* Un cuvânt mai lung decât rândul se rupe pe litere. */
@@ -528,7 +542,7 @@ export function aseaza(ctx, t, { m, lat = null, ind = null, aliniere = "l" }) {
             const w = masoara(bucata + ch, b.f, b.m);
             if ((bucata || lung > 0) && lung + w > loc) {
               if (bucata) linii[linii.length - 1].push({ ...b, s: bucata, w: masoara(bucata, b.f, b.m) });
-              linii.push([]); lung = 0; bucata = ch;
+              linii.push([]); lung = 0; bucata = ch; loc = locTot;
             } else bucata += ch;
           }
           if (bucata) { const w = masoara(bucata, b.f, b.m); linii[linii.length - 1].push({ ...b, s: bucata, w }); lung += w; }
@@ -544,7 +558,7 @@ export function aseaza(ctx, t, { m, lat = null, ind = null, aliniere = "l" }) {
         M: l.length ? l.reduce((x, y) => Math.max(x, y.m), 0) : g.pm });
     });
   });
-  const W = lat || Math.max(4, ...randuri.map((x) => x.g.stanga + x.w));
+  const W = lat || Math.max(4, ...randuri.map((x) => x.g.stanga + (x.prim ? x.g.alin : 0) + x.w));
   let y = 0;
   const linii = randuri.map((rd) => {
     const a = rd.p?.a || aliniere;
@@ -558,11 +572,12 @@ export function aseaza(ctx, t, { m, lat = null, ind = null, aliniere = "l" }) {
       marcaj = { s: g.marc, x: g.xm + d, m: g.pm, dy: B * (M - g.pm) };
       x = g.xm + d + avans;
     } else {
-      const liber = Math.max(0, W - g.stanga - rd.w);
-      x = g.stanga + (a === "c" ? liber / 2 : a === "r" ? liber : 0);
+      const al = rd.prim ? g.alin : 0;
+      const liber = Math.max(0, W - g.stanga - al - rd.w);
+      x = g.stanga + al + (a === "c" ? liber / 2 : a === "r" ? liber : 0);
       if (g.lista && rd.prim) marcaj = { s: g.marc, x: g.xm, m: g.pm, dy: B * (M - g.pm) };
     }
-    const liberJ = Math.max(0, W - g.stanga - rd.w);
+    const liberJ = Math.max(0, W - g.stanga - (rd.prim ? g.alin : 0) - rd.w);
     const spatii = rd.bucs.filter((b) => b.sp).length;
     const intre = a === "j" && !rd.ultim && spatii && lat ? liberJ / spatii : 0;
     const bucati = [], sub = [], ev = [];
@@ -611,7 +626,7 @@ function invelis(b, m, baza, asteapta = false) {
   if (asteapta) at.push("data-asteapta");
   return at.length ? `<span ${at.join(" ")}${st.length ? ` style="${st.join(";")}"` : ""}>` : "";
 }
-const atributeParagraf = (p) => (p ? `${p.l ? ` data-l="${p.l}" data-f="${escH(p.f)}"${p.d ? ' data-d="1"' : ""}` : ""}${p.n ? ` data-n="${p.n}"` : ""}${p.a ? ` data-a="${p.a}"` : ""}` : "");
+const atributeParagraf = (p) => (p ? `${p.l ? ` data-l="${p.l}" data-f="${escH(p.f)}"${p.d ? ` data-d="${p.d}"` : ""}` : ""}${p.n ? ` data-n="${p.n}"` : ""}${p.a ? ` data-a="${p.a}"` : ""}${p.i ? ' data-i="1"' : ""}` : "");
 
 /** HTML-ul editorului pentru niște paragrafe (o bucată cu `zw` e locul în care
  *  așteaptă formatul ales la cursor). */
@@ -696,7 +711,7 @@ export function normalizeazaEditor(rad) {
 
 const paragrafeleDom = (rad) => [...rad.children].filter((d) => d.classList?.contains("ta-p"));
 const pDin = (d) => paragraful({
-  l: d.dataset.l, f: d.dataset.f, n: Number(d.dataset.n) || 0, a: d.dataset.a, d: d.dataset.d ? 1 : 0,
+  l: d.dataset.l, f: d.dataset.f, n: Number(d.dataset.n) || 0, a: d.dataset.a, d: Number(d.dataset.d) || 0, i: d.dataset.i ? 1 : 0,
 });
 const curat = (s) => s.replace(/​/g, "").replace(/ /g, " ").replace(/\n/g, " ");
 const lungime = (s) => s.replace(/​/g, "").length;
@@ -909,6 +924,7 @@ export function refaParagrafele(rad, { ctx, ps = null, as = null, m, baza = m, i
     d.style.setProperty("--mw", cuZ(g.slot + g.gol));
     d.style.setProperty("--my", cuZ(Math.max(0, (primul.get(k) ?? g.pm) - g.pm) * 1.04));
     d.style.textAlign = { c: "center", r: "right", j: "justify" }[a] || "left";
+    d.style.textIndent = g.alin ? cuZ(g.alin) : "";
     if (g.lista && g.marc) d.dataset.m = g.marc; else delete d.dataset.m;
     if (lipit) d.dataset.am = a; else delete d.dataset.am;
   });
@@ -941,7 +957,7 @@ export function schimbaNivelul(pars, cu) {
     const o = {};
     if (d.dataset.l) { o.l = d.dataset.l; o.f = d.dataset.f; }
     if (Number(d.dataset.n) > 0) o.n = Number(d.dataset.n);
-    if (d.dataset.d) o.d = 1;
+    if (d.dataset.d) o.d = Number(d.dataset.d) || 1;
     return o;
   });
   const care = pars.map((d) => toate.indexOf(d)).filter((k) => k >= 0).sort((x, y) => x - y);
@@ -950,7 +966,7 @@ export function schimbaNivelul(pars, cu) {
     const d = toate[k], p = ps[k];
     if (p.n) d.dataset.n = String(p.n); else delete d.dataset.n;
     if (p.l) { d.dataset.l = p.l; d.dataset.f = p.f; }
-    if (p.d) d.dataset.d = "1"; else delete d.dataset.d;
+    if (p.d) d.dataset.d = String(p.d); else delete d.dataset.d;
   }
 }
 export function aliniaza(pars, a) {
@@ -1010,25 +1026,42 @@ export function taieInceputul(d, k) {
  * Marius pe 24 noiembrie 2026: înainte, orice literă ori număr pornea o listă,
  * și încă una numărată greșit, de la început).
  */
-/** Ar continua paragraful `d`, pus în lista (l, f), numerotarea celei de
- *  deasupra? Atunci lista pornită din taste („1. ") trebuie luată de la capăt. */
-export function continuaLista(d, l, f) {
-  const n = Number(d.dataset.n) || 0;
-  for (let v = d.previousElementSibling; v; v = v.previousElementSibling) {
-    if (!v.dataset?.l) return false;
-    const nv = Number(v.dataset.n) || 0;
-    if (nv > n) continue;
-    return nv === n && v.dataset.l === l && v.dataset.f === f;
-  }
-  return false;
+export function autoLista(inainte) {
+  if (/^[-*•]\s$/.test(inainte)) return { l: "b", f: inainte[0] === "-" ? "–" : "•", k: 1 };
+  let x;
+  if ((x = /^(\d{1,3})([.)])\s$/.exec(inainte))) return { l: "n", f: `1${x[2]}`, k: Number(x[1]) };
+  if ((x = /^\((\d{1,3})\)\s$/.exec(inainte))) return { l: "n", f: "(1)", k: Number(x[1]) };
+  if ((x = /^([a-z])([.)])\s$/.exec(inainte))) return { l: "a", f: `a${x[2]}`, k: x[1].charCodeAt(0) - 96 };
+  if ((x = /^\(([a-z])\)\s$/.exec(inainte))) return { l: "a", f: "(a)", k: x[1].charCodeAt(0) - 96 };
+  return null;
 }
 
-export function autoLista(inainte) {
-  if (/^[-*•]\s$/.test(inainte)) return { l: "b", f: inainte[0] === "-" ? "–" : "•" };
-  let x;
-  if ((x = /^1([.)])\s$/.exec(inainte))) return { l: "n", f: `1${x[1]}` };
-  if (/^\(1\)\s$/.test(inainte)) return { l: "n", f: "(1)" };
-  if ((x = /^a([.)])\s$/.exec(inainte))) return { l: "a", f: `a${x[1]}` };
-  if (/^\(a\)\s$/.test(inainte)) return { l: "a", f: "(a)" };
-  return null;
+/**
+ * Face listă din paragraful `d`, dacă ce s-a tastat (`a`, din `autoLista`) e
+ * primul din șir („1.", „a)", „-") ori chiar următorul după o listă la fel de
+ * mai sus din casetă („2." după un „1.", și peste rânduri obișnuite). Altfel
+ * („5." din senin, „b)" fără „a)") rămâne text. Întoarce dacă a făcut-o.
+ */
+export function listaDinTaste(d, a) {
+  const rad = d.parentNode;
+  const toate = paragrafeleDom(rad);
+  const k = toate.indexOf(d);
+  if (k < 0) return false;
+  const n = Number(d.dataset.n) || 0;
+  if (a.l !== "b" && a.k !== 1) {
+    const ps = toate.map(pDin);
+    const nr = numerele(ps);
+    let asteptat = 0;
+    for (let j = k - 1; j >= 0; j--) {
+      const p = ps[j];
+      if (p?.l === a.l && p.f === a.f && (p.n || 0) === n) { asteptat = nr[j] + 1; break; }
+    }
+    if (a.k !== asteptat) return false;
+  }
+  delete d.dataset.i;
+  delete d.dataset.d;
+  d.dataset.l = a.l; d.dataset.f = a.f;
+  /* Numărul tastat se ține doar dacă lista n-ar ajunge singură la el. */
+  if (a.l !== "b" && numerele(toate.map(pDin))[k] !== a.k) d.dataset.d = String(a.k);
+  return true;
 }
